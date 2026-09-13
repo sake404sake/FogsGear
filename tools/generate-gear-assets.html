@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="ja">
+<meta charset="utf-8">
+<title>Gear asset generator</title>
+<style>body{margin:0;background:transparent}canvas{display:block}</style>
+<body>
+<script>
+const SIZE = 320;
+const designs = {
+    XXS: { teeth: 4, style: 'ring' },
+    SS: { teeth: 6, style: 'sunburst' },
+    S: { teeth: 10, style: 'holes' },
+    M: { teeth: 14, style: 'triangular' },
+    L: { teeth: 18, style: 'wave' },
+    LL: { teeth: 24, style: 'crown' },
+    '3L': { teeth: 32, style: 'lattice' },
+    '4L': { teeth: 40, style: 'radial' },
+    MAX: { teeth: 48, style: 'industrial' },
+    CORE: { teeth: 24, style: 'core' }
+};
+
+function drawGear(canvas, design) {
+    const ctx = canvas.getContext('2d');
+    const center = SIZE / 2;
+    const radius = 132;
+    ctx.clearRect(0, 0, SIZE, SIZE);
+    ctx.save();
+    ctx.translate(center, center);
+    ctx.strokeStyle = '#ffffff';
+    ctx.fillStyle = '#ffffff';
+    ctx.lineWidth = 5;
+    const toothWidth = Math.max(4, Math.min(12, 2 * Math.PI * radius / design.teeth * 0.48));
+    const toothHeight = Math.max(9, Math.min(14, radius * 0.1));
+    for (let i = 0; i < design.teeth; i++) {
+        ctx.save();
+        ctx.rotate(i * Math.PI * 2 / design.teeth);
+        ctx.fillRect(radius - 2, -toothWidth / 2, toothHeight, toothWidth);
+        ctx.restore();
+    }
+    ctx.beginPath(); ctx.arc(0, 0, radius, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(0, 0, radius * 0.78, 0, Math.PI * 2); ctx.stroke();
+    drawDesign(ctx, radius, design.style);
+    ctx.restore();
+}
+
+function drawLineSpokes(ctx, radius, count, inner, outer, width = 7) {
+    ctx.lineWidth = width;
+    for (let i = 0; i < count; i++) {
+        const angle = i * Math.PI * 2 / count;
+        ctx.beginPath();
+        ctx.moveTo(radius * inner * Math.cos(angle), radius * inner * Math.sin(angle));
+        ctx.lineTo(radius * outer * Math.cos(angle), radius * outer * Math.sin(angle));
+        ctx.stroke();
+    }
+}
+
+function holes(ctx, radius, count, scale, size) {
+    for (let i = 0; i < count; i++) {
+        const angle = i * Math.PI * 2 / count;
+        ctx.beginPath();
+        ctx.arc(radius * scale * Math.cos(angle), radius * scale * Math.sin(angle), size, 0, Math.PI * 2);
+        ctx.stroke();
+    }
+}
+
+function drawDesign(ctx, radius, style) {
+    ctx.lineCap = 'round';
+    if (style === 'ring') { drawLineSpokes(ctx, radius, 4, .18, .7, 7); return; }
+    if (style === 'sunburst') { drawLineSpokes(ctx, radius, 6, .18, .7, 6); holes(ctx, radius, 6, .5, 4); return; }
+    if (style === 'holes') { holes(ctx, radius, 8, .52, 11); drawLineSpokes(ctx, radius, 4, .18, .4, 6); return; }
+    if (style === 'triangular') { drawLineSpokes(ctx, radius, 4, .18, .72, 11); holes(ctx, radius, 4, .5, 5); return; }
+    if (style === 'wave') {
+        ctx.lineWidth = 9;
+        for (let i = 0; i < 6; i++) {
+            ctx.save(); ctx.rotate(i * Math.PI / 3); ctx.beginPath();
+            ctx.moveTo(-radius * .1, -radius * .24);
+            ctx.quadraticCurveTo(radius * .3, -radius * .5, radius * .68, -radius * .16);
+            ctx.quadraticCurveTo(radius * .43, radius * .04, radius * .18, radius * .26);
+            ctx.stroke(); ctx.restore();
+        }
+        return;
+    }
+    if (style === 'crown') { drawLineSpokes(ctx, radius, 6, .18, .78, 10); holes(ctx, radius, 6, .58, 5); return; }
+    if (style === 'lattice') { drawLineSpokes(ctx, radius, 8, .18, .82, 6); holes(ctx, radius, 8, .55, 4); return; }
+    if (style === 'radial') { drawLineSpokes(ctx, radius, 12, .16, .72, 4); return; }
+    if (style === 'industrial') { drawLineSpokes(ctx, radius, 6, .18, .86, 14); holes(ctx, radius, 10, .65, 5); return; }
+    if (style === 'core') {
+        drawLineSpokes(ctx, radius, 8, .18, .7, 9);
+        holes(ctx, radius, 8, .58, 6);
+        ctx.lineWidth = 6;
+        ctx.beginPath(); ctx.arc(0, 0, radius * .56, 0, Math.PI * 2); ctx.stroke();
+        ctx.beginPath(); ctx.arc(0, 0, radius * .3, 0, Math.PI * 2); ctx.stroke();
+        ctx.beginPath(); ctx.arc(0, 0, radius * .12, 0, Math.PI * 2); ctx.fill();
+    }
+}
+
+for (const [name, design] of Object.entries(designs)) {
+    const canvas = document.createElement('canvas');
+    canvas.id = `gear-${name.toLowerCase()}`;
+    canvas.width = SIZE; canvas.height = SIZE;
+    document.body.appendChild(canvas);
+    drawGear(canvas, design);
+}
+</script>
+</body>
+</html>
