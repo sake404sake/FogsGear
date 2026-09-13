@@ -68,7 +68,7 @@ export class UIController {
         this.canvas.setPointerCapture(event.pointerId);
         if (this.state.selectedSize) {
             const point = this.renderer.canvasPoint(event.clientX, event.clientY);
-            this.gearManager.updateGhost(point.x, point.y);
+            this.gearManager.updateGhost(point.x, point.y, this.pointerOffset(event));
         }
     }
 
@@ -76,7 +76,7 @@ export class UIController {
         if (this.activeTouches.has(event.pointerId)) this.activeTouches.set(event.pointerId, { x: event.clientX, y: event.clientY });
         if (this.state.selectedSize) {
             const point = this.renderer.canvasPoint(event.clientX, event.clientY);
-            this.gearManager.updateGhost(point.x, point.y);
+            this.gearManager.updateGhost(point.x, point.y, this.pointerOffset(event));
             return;
         }
         if (this.activeTouches.size === 2 && this.initialPinchDist) {
@@ -100,12 +100,16 @@ export class UIController {
         const point = this.renderer.worldPoint(event.clientX, event.clientY);
         if (this.state.selectedSize) {
             const canvasPoint = this.renderer.canvasPoint(event.clientX, event.clientY);
-            this.gearManager.updateGhost(canvasPoint.x, canvasPoint.y);
+            this.gearManager.updateGhost(canvasPoint.x, canvasPoint.y, this.pointerOffset(event));
             this.gearManager.tryPlaceGear(point.x, point.y);
         } else {
             this.gearManager.tryPlaceGear(point.x, point.y);
         }
         this.state.ghostGear = null;
+    }
+
+    pointerOffset(event) {
+        return event.pointerType === 'mouse' ? 0 : 110;
     }
 
     updateUI() {

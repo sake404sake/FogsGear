@@ -26,28 +26,40 @@ function Draw-Holes($graphics, $radius, $count, $scale, $size, $pen) {
     }
 }
 
-function Draw-Design($graphics, $style, $pen, $radius) {
-    if ($style -eq 'ring') { Draw-LineSpokes $graphics $radius 4 .18 .7 $pen; return }
-    if ($style -eq 'sunburst') { Draw-LineSpokes $graphics $radius 6 .18 .7 $pen; Draw-Holes $graphics $radius 6 .5 4 $pen; return }
-    if ($style -eq 'holes') { Draw-Holes $graphics $radius 8 .52 11 $pen; Draw-LineSpokes $graphics $radius 4 .18 .4 $pen; return }
-    if ($style -eq 'triangular') { Draw-LineSpokes $graphics $radius 4 .18 .72 $pen; Draw-Holes $graphics $radius 4 .5 5 $pen; return }
+function Draw-Ring($graphics, $radius, $scale, $pen) {
+    $r = $radius * $scale
+    $graphics.DrawEllipse($pen, [float]-$r, [float]-$r, [float]($r * 2), [float]($r * 2))
+}
+
+function Draw-Design($graphics, $style, $pen, $radius, $supportPen) {
+    $graphics.CompositingMode = [System.Drawing.Drawing2D.CompositingMode]::SourceOver
+    $graphics.FillEllipse([System.Drawing.Brushes]::White, [float](-$radius * .24), [float](-$radius * .24), [float]($radius * .48), [float]($radius * .48))
+    $graphics.CompositingMode = [System.Drawing.Drawing2D.CompositingMode]::SourceCopy
+    $graphics.FillEllipse([System.Drawing.Brushes]::Transparent, [float](-$radius * .1), [float](-$radius * .1), [float]($radius * .2), [float]($radius * .2))
+    $graphics.CompositingMode = [System.Drawing.Drawing2D.CompositingMode]::SourceOver
+    Draw-Ring $graphics $radius .16 $pen
+    Draw-LineSpokes $graphics $radius 8 .2 .95 $supportPen
+    if ($style -eq 'ring') { Draw-LineSpokes $graphics $radius 4 .16 .8 $pen; return }
+    if ($style -eq 'sunburst') { Draw-LineSpokes $graphics $radius 6 .16 .8 $pen; Draw-Holes $graphics $radius 6 .5 4 $pen; return }
+    if ($style -eq 'holes') { Draw-LineSpokes $graphics $radius 8 .2 .8 $pen; Draw-Holes $graphics $radius 8 .5 9 $pen; return }
+    if ($style -eq 'triangular') { Draw-LineSpokes $graphics $radius 4 .18 .8 $pen; Draw-Holes $graphics $radius 4 .5 5 $pen; return }
     if ($style -eq 'wave') {
         for ($i = 0; $i -lt 6; $i++) {
             $state = $graphics.Save()
             $graphics.RotateTransform([float]($i * 60))
             $path = New-Object System.Drawing.Drawing2D.GraphicsPath
-            $path.AddBezier(-$radius*.1, -$radius*.24, $radius*.3, -$radius*.5, $radius*.48, -$radius*.42, $radius*.68, -$radius*.16)
-            $path.AddBezier($radius*.68, -$radius*.16, $radius*.43, $radius*.04, $radius*.25, $radius*.2, $radius*.18, $radius*.26)
+            $path.AddBezier(-$radius*.1, -$radius*.24, $radius*.3, -$radius*.5, $radius*.58, -$radius*.42, $radius*.8, -$radius*.16)
+            $path.AddBezier($radius*.8, -$radius*.16, $radius*.48, $radius*.04, $radius*.25, $radius*.2, $radius*.18, $radius*.26)
             $graphics.DrawPath($pen, $path)
             $path.Dispose(); $graphics.Restore($state)
         }
         return
     }
-    if ($style -eq 'crown') { Draw-LineSpokes $graphics $radius 6 .18 .78 $pen; Draw-Holes $graphics $radius 6 .58 5 $pen; return }
-    if ($style -eq 'lattice') { Draw-LineSpokes $graphics $radius 8 .18 .82 $pen; Draw-Holes $graphics $radius 8 .55 4 $pen; return }
-    if ($style -eq 'radial') { Draw-LineSpokes $graphics $radius 12 .16 .72 $pen; return }
-    if ($style -eq 'industrial') { Draw-LineSpokes $graphics $radius 6 .18 .86 $pen; Draw-Holes $graphics $radius 10 .65 5 $pen; return }
-    if ($style -eq 'core') { Draw-LineSpokes $graphics $radius 8 .18 .7 $pen; Draw-Holes $graphics $radius 8 .58 6 $pen; return }
+    if ($style -eq 'crown') { Draw-LineSpokes $graphics $radius 6 .18 .8 $pen; Draw-Ring $graphics $radius .48 $pen; Draw-Holes $graphics $radius 6 .58 5 $pen; return }
+    if ($style -eq 'lattice') { Draw-LineSpokes $graphics $radius 8 .18 .84 $pen; Draw-Ring $graphics $radius .34 $pen; Draw-Holes $graphics $radius 8 .55 4 $pen; return }
+    if ($style -eq 'radial') { Draw-LineSpokes $graphics $radius 12 .16 .8 $pen; Draw-Ring $graphics $radius .3 $pen; return }
+    if ($style -eq 'industrial') { Draw-LineSpokes $graphics $radius 6 .18 .88 $pen; Draw-Ring $graphics $radius .48 $pen; Draw-Holes $graphics $radius 10 .65 5 $pen; return }
+    if ($style -eq 'core') { Draw-LineSpokes $graphics $radius 8 .18 .8 $pen; Draw-Holes $graphics $radius 8 .58 6 $pen; return }
 }
 
 function New-GearPng($name, $teeth, $style) {
@@ -56,25 +68,29 @@ function New-GearPng($name, $teeth, $style) {
     $graphics.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
     $graphics.Clear([System.Drawing.Color]::Transparent)
     $graphics.TranslateTransform($center, $center)
-    $pen = New-Object System.Drawing.Pen([System.Drawing.Color]::White, 5)
+    $lineWidth = if ($name -eq 'xxs') { 18 } elseif ($name -eq 'ss') { 16 } elseif ($name -eq 's') { 14 } else { 5 }
+    $pen = New-Object System.Drawing.Pen([System.Drawing.Color]::White, $lineWidth)
+    $outerPen = New-Object System.Drawing.Pen([System.Drawing.Color]::White, 20)
+    $supportPen = New-Object System.Drawing.Pen([System.Drawing.Color]::White, 5)
     $pen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
     $pen.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
-    $toothWidth = [Math]::Max(4, [Math]::Min(12, 2 * [Math]::PI * $radius / $teeth * 0.48))
-    $toothHeight = [Math]::Max(9, [Math]::Min(14, $radius * 0.1))
-    for ($i = 0; $i -lt $teeth; $i++) {
-        $state = $graphics.Save()
-        $graphics.RotateTransform([float]($i * 360 / $teeth))
-        $graphics.FillRectangle([System.Drawing.Brushes]::White, [float]($radius - 2), [float](-$toothWidth / 2), [float]$toothHeight, [float]$toothWidth)
-        $graphics.Restore($state)
-    }
-    $graphics.DrawEllipse($pen, [float]-$radius, [float]-$radius, [float]($radius * 2), [float]($radius * 2))
+    $outerPen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
+    $outerPen.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
+    $toothWidth = [Math]::Max(5, [Math]::Min(18, 2 * [Math]::PI * $radius / $teeth * 0.48))
+    $toothHeight = 46
+    $toothStart = $radius - 24
+    $graphics.CompositingMode = [System.Drawing.Drawing2D.CompositingMode]::SourceCopy
+    $graphics.FillEllipse([System.Drawing.Brushes]::White, [float](-$radius - 10), [float](-$radius - 10), [float](($radius + 10) * 2), [float](($radius + 10) * 2))
+    $graphics.FillEllipse([System.Drawing.Brushes]::Transparent, [float](-$radius + 18), [float](-$radius + 18), [float](($radius - 18) * 2), [float](($radius - 18) * 2))
+    $graphics.CompositingMode = [System.Drawing.Drawing2D.CompositingMode]::SourceOver
+    $graphics.DrawEllipse($outerPen, [float]-$radius, [float]-$radius, [float]($radius * 2), [float]($radius * 2))
     $graphics.DrawEllipse($pen, [float](-$radius * .78), [float](-$radius * .78), [float]($radius * 1.56), [float]($radius * 1.56))
-    Draw-Design $graphics $style $pen $radius
+    Draw-Design $graphics $style $pen $radius $supportPen
     if ($style -eq 'core') {
         $graphics.DrawEllipse($pen, [float](-$radius*.3), [float](-$radius*.3), [float]($radius*.6), [float]($radius*.6))
         $graphics.FillEllipse([System.Drawing.Brushes]::White, [float](-$radius*.12), [float](-$radius*.12), [float]($radius*.24), [float]($radius*.24))
     }
-    $graphics.Dispose(); $pen.Dispose()
+    $graphics.Dispose(); $pen.Dispose(); $outerPen.Dispose(); $supportPen.Dispose()
     $bitmap.Save((Join-Path $assetDirectory "gear-$name.png"), [System.Drawing.Imaging.ImageFormat]::Png)
     $bitmap.Dispose()
 }

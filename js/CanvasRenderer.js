@@ -143,10 +143,28 @@ export class CanvasRenderer {
         const image = this.getTintedImage(name, color);
         if (!image) return false;
         this.ctx.globalAlpha = alpha;
-        const imageRadius = radius * (160 / 144);
+        const toothLength = Math.max(6, Math.min(10, radius * 0.1));
+        const bodyRadius = radius - toothLength;
+        const imageRadius = bodyRadius * (160 / 142);
         this.ctx.drawImage(image, -imageRadius, -imageRadius, imageRadius * 2, imageRadius * 2);
         this.ctx.globalAlpha = 1;
         return true;
+    }
+
+    drawTeeth(gear, radius, color, isGhost) {
+        const toothLength = Math.max(6, Math.min(10, radius * 0.1));
+        const bodyRadius = radius - toothLength;
+        const toothWidth = Math.max(3, Math.min(12, (Math.PI * 2 * radius / gear.teeth) * 0.48));
+        this.ctx.fillStyle = color;
+        this.ctx.strokeStyle = isGhost ? 'rgba(255,255,255,0.7)' : color;
+        this.ctx.lineWidth = isGhost ? 1 : Math.max(1, toothWidth * 0.12);
+        for (let i = 0; i < gear.teeth; i++) {
+            this.ctx.save();
+            this.ctx.rotate(i * Math.PI * 2 / gear.teeth);
+            this.ctx.fillRect(bodyRadius - 2, -toothWidth / 2, toothLength + 2, toothWidth);
+            this.ctx.strokeRect(bodyRadius - 2, -toothWidth / 2, toothLength + 2, toothWidth);
+            this.ctx.restore();
+        }
     }
 
     drawGear(gear, isGhost = false) {
@@ -173,8 +191,15 @@ export class CanvasRenderer {
         if (gear.isCore && !isGhost) { ctx.shadowColor = '#ffe066'; ctx.shadowBlur = 20; }
         ctx.rotate(gear.angle);
         const assetName = gear.isCore ? 'core' : String(gear.sizeKey).toLowerCase();
-        const assetColor = isGhost && !gear.valid ? '#d85c4a' : gear.isCore ? '#f5c942' : palette.fill;
+        const assetColor = isGhost && !gear.valid
+            ? '#d85c4a'
+            : gear.isCore
+                ? '#f5c942'
+                : gear.powered && !gear.isDeadlocked
+                    ? palette.fill
+                    : '#3d322c';
         if (this.drawGearImage(assetName, radius, assetColor, isGhost ? 0.72 : 1)) {
+            this.drawTeeth(gear, radius, assetColor, isGhost);
             ctx.shadowBlur = 0;
             ctx.restore();
             if (!isGhost && gear.layer > 0) {

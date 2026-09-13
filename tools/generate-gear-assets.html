@@ -29,15 +29,26 @@ function drawGear(canvas, design) {
     ctx.strokeStyle = '#ffffff';
     ctx.fillStyle = '#ffffff';
     ctx.lineWidth = 5;
-    const toothWidth = Math.max(4, Math.min(12, 2 * Math.PI * radius / design.teeth * 0.48));
-    const toothHeight = Math.max(9, Math.min(14, radius * 0.1));
-    for (let i = 0; i < design.teeth; i++) {
-        ctx.save();
-        ctx.rotate(i * Math.PI * 2 / design.teeth);
-        ctx.fillRect(radius - 2, -toothWidth / 2, toothHeight, toothWidth);
-        ctx.restore();
-    }
+    const outerLineWidth = 20;
+    const toothWidth = Math.max(5, Math.min(18, 2 * Math.PI * radius / design.teeth * 0.48));
+    const toothHeight = 46;
+    const toothStart = radius - 24;
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(0, 0, radius + 10, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.beginPath();
+    ctx.arc(0, 0, radius - 18, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.save();
+    ctx.lineWidth = 5;
+    drawLineSpokes(ctx, radius, 8, .2, .95, 5);
+    ctx.restore();
+    ctx.lineWidth = outerLineWidth;
     ctx.beginPath(); ctx.arc(0, 0, radius, 0, Math.PI * 2); ctx.stroke();
+    ctx.lineWidth = 5;
     ctx.beginPath(); ctx.arc(0, 0, radius * 0.78, 0, Math.PI * 2); ctx.stroke();
     drawDesign(ctx, radius, design.style);
     ctx.restore();
@@ -63,29 +74,45 @@ function holes(ctx, radius, count, scale, size) {
     }
 }
 
+function ring(ctx, radius, scale) {
+    ctx.beginPath();
+    ctx.arc(0, 0, radius * scale, 0, Math.PI * 2);
+    ctx.stroke();
+}
+
 function drawDesign(ctx, radius, style) {
     ctx.lineCap = 'round';
-    if (style === 'ring') { drawLineSpokes(ctx, radius, 4, .18, .7, 7); return; }
-    if (style === 'sunburst') { drawLineSpokes(ctx, radius, 6, .18, .7, 6); holes(ctx, radius, 6, .5, 4); return; }
-    if (style === 'holes') { holes(ctx, radius, 8, .52, 11); drawLineSpokes(ctx, radius, 4, .18, .4, 6); return; }
-    if (style === 'triangular') { drawLineSpokes(ctx, radius, 4, .18, .72, 11); holes(ctx, radius, 4, .5, 5); return; }
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(0, 0, radius * .24, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.beginPath();
+    ctx.arc(0, 0, radius * .1, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalCompositeOperation = 'source-over';
+    ring(ctx, radius, .16);
+    if (style === 'ring') { drawLineSpokes(ctx, radius, 4, .16, .8, 18); return; }
+    if (style === 'sunburst') { drawLineSpokes(ctx, radius, 6, .16, .8, 16); holes(ctx, radius, 6, .5, 4); return; }
+    if (style === 'holes') { drawLineSpokes(ctx, radius, 8, .2, .8, 14); holes(ctx, radius, 8, .5, 9); return; }
+    if (style === 'triangular') { drawLineSpokes(ctx, radius, 4, .18, .8, 11); holes(ctx, radius, 4, .5, 5); return; }
     if (style === 'wave') {
         ctx.lineWidth = 9;
         for (let i = 0; i < 6; i++) {
             ctx.save(); ctx.rotate(i * Math.PI / 3); ctx.beginPath();
             ctx.moveTo(-radius * .1, -radius * .24);
-            ctx.quadraticCurveTo(radius * .3, -radius * .5, radius * .68, -radius * .16);
-            ctx.quadraticCurveTo(radius * .43, radius * .04, radius * .18, radius * .26);
+            ctx.quadraticCurveTo(radius * .3, -radius * .5, radius * .8, -radius * .16);
+            ctx.quadraticCurveTo(radius * .48, radius * .04, radius * .18, radius * .26);
             ctx.stroke(); ctx.restore();
         }
         return;
     }
-    if (style === 'crown') { drawLineSpokes(ctx, radius, 6, .18, .78, 10); holes(ctx, radius, 6, .58, 5); return; }
-    if (style === 'lattice') { drawLineSpokes(ctx, radius, 8, .18, .82, 6); holes(ctx, radius, 8, .55, 4); return; }
-    if (style === 'radial') { drawLineSpokes(ctx, radius, 12, .16, .72, 4); return; }
-    if (style === 'industrial') { drawLineSpokes(ctx, radius, 6, .18, .86, 14); holes(ctx, radius, 10, .65, 5); return; }
+    if (style === 'crown') { drawLineSpokes(ctx, radius, 6, .18, .8, 10); ring(ctx, radius, .48); holes(ctx, radius, 6, .58, 5); return; }
+    if (style === 'lattice') { drawLineSpokes(ctx, radius, 8, .18, .84, 6); ring(ctx, radius, .34); holes(ctx, radius, 8, .55, 4); return; }
+    if (style === 'radial') { drawLineSpokes(ctx, radius, 12, .16, .8, 4); ring(ctx, radius, .3); return; }
+    if (style === 'industrial') { drawLineSpokes(ctx, radius, 6, .18, .88, 14); ring(ctx, radius, .48); holes(ctx, radius, 10, .65, 5); return; }
     if (style === 'core') {
-        drawLineSpokes(ctx, radius, 8, .18, .7, 9);
+        drawLineSpokes(ctx, radius, 8, .18, .8, 9);
         holes(ctx, radius, 8, .58, 6);
         ctx.lineWidth = 6;
         ctx.beginPath(); ctx.arc(0, 0, radius * .56, 0, Math.PI * 2); ctx.stroke();

@@ -77,19 +77,28 @@ export class GearManager {
         });
     }
 
-    updateGhost(mouseX, mouseY) {
+    updateGhost(mouseX, mouseY, pointerOffsetY = 110) {
         const sizeKey = this.state.selectedSize;
         if (!sizeKey) {
             this.state.ghostGear = null;
             return;
         }
-        const adjustedMouseY = mouseY - 110;
+        const adjustedMouseY = mouseY - pointerOffsetY;
         const x = (mouseX - this.canvas.width / 2) / this.state.zoomScale - this.state.offsetX;
         const y = (adjustedMouseY - this.canvas.height / 2) / this.state.zoomScale - this.state.offsetY;
         const config = GEAR_CONFIG[sizeKey];
         const layer = this.state.selectedLayer;
         let valid = layer < 3 && (this.state.creativeMode || this.state.brass >= config.cost);
         const sameLayer = this.state.placedGears.filter(gear => gear.layer === layer);
+        const allAxes = [];
+        const axisKeys = new Set();
+        this.state.placedGears.forEach(gear => {
+            const key = `${gear.q},${gear.r}`;
+            if (axisKeys.has(key)) return;
+            axisKeys.add(key);
+            const axisPosition = hexToPixel(gear.q, gear.r);
+            allAxes.push({ q: gear.q, r: gear.r, x: axisPosition.x, y: axisPosition.y });
+        });
         let position = { x, y };
         let hex = pixelToHex(x, y);
         const nearest = sameLayer.reduce((best, gear) => {
@@ -114,6 +123,16 @@ export class GearManager {
             this.state.ghostGear = { ...position, q: hex.q, r: hex.r, layer, radius: config.radius, teeth: config.teeth, pattern: config.pattern, angle: meshAngle, valid };
             return;
         } else {
+            let closestAxis = null;
+            let closestDistance = 65;
+            allAxes.forEach(axis => {
+                const distance = Math.hypot(x - axis.x, y - axis.y);
+                if (distance < closestDistance) {
+                    closestDistance = distance;
+                    closestAxis = axis;
+                }
+            });
+            if (closestAxis) hex = { q: closestAxis.q, r: closestAxis.r };
             const snapped = hexToPixel(hex.q, hex.r);
             position = snapped;
             if (sameLayer.some(gear => gear.q === hex.q && gear.r === hex.r || Math.hypot(position.x - gear.x, position.y - gear.y) < config.radius + gear.radius - 2)) valid = false;
