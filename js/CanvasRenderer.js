@@ -57,7 +57,8 @@ export class CanvasRenderer {
     render() {
         const { width, height } = this.canvas;
         this.ctx.clearRect(0, 0, width, height);
-        this.drawHexGrid();
+        this.ctx.fillStyle = '#120e0c';
+        this.ctx.fillRect(0, 0, width, height);
         this.ctx.save();
         this.ctx.translate(width / 2, height / 2);
         this.ctx.scale(this.state.zoomScale, this.state.zoomScale);
@@ -284,6 +285,7 @@ export class CanvasRenderer {
                     : '#2f231e';
         if (this.drawGearImage(assetName, radius, assetColor, isGhost ? 0.72 : 1)) {
             this.drawTeeth(gear, radius, assetColor, isGhost);
+            this.drawProcessIndicator(gear, radius, isGhost);
             ctx.shadowBlur = 0;
             ctx.restore();
             if (!isGhost && gear.layer > 0) {
@@ -335,11 +337,25 @@ export class CanvasRenderer {
         } else {
             ctx.beginPath(); ctx.arc(0, 0, radius < 20 ? 2.5 : 4.5, 0, Math.PI * 2); ctx.fill();
         }
+        this.drawProcessIndicator(gear, radius, isGhost);
         ctx.restore();
         if (!isGhost && gear.layer > 0) {
             ctx.fillStyle = '#f0c674'; ctx.font = 'bold 10px sans-serif';
             ctx.fillText(`L${gear.layer + 1}`, gear.x - 10, gear.y - radius + 10);
         }
+    }
+
+    drawProcessIndicator(gear, radius, isGhost) {
+        if (isGhost || gear.processMode === 'NONE' || gear.processMode === 'POWER' || gear.isCore) return;
+        const color = gear.processMode === 'FOG_COLLECTION' ? '#8eeaff' : '#78b9ff';
+        this.ctx.save();
+        this.ctx.strokeStyle = color;
+        this.ctx.lineWidth = Math.max(2, radius * 0.025);
+        this.ctx.globalAlpha = gear.powered && !gear.isDeadlocked ? 0.95 : 0.5;
+        this.ctx.beginPath();
+        this.ctx.arc(0, 0, radius - Math.max(8, radius * 0.12), -Math.PI * 0.78, -Math.PI * 0.2);
+        this.ctx.stroke();
+        this.ctx.restore();
     }
 
     drawCoreDetails(radius) {

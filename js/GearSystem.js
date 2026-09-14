@@ -1,12 +1,12 @@
 export const GearSize = Object.freeze({ XXS: 4, SS: 6, S: 10, M: 14, L: 18, LL: 24, THREE_L: 32, FOUR_L: 40, MAX: 48 });
 export const Layer = Object.freeze({ GOLD: 0, SILVER: 1, BRONZE: 2 });
 export const GearDesignType = Object.freeze({ INDUSTRIAL: 'INDUSTRIAL', ALCHEMICAL: 'ALCHEMICAL', LOGISTICS: 'LOGISTICS', CLOCKWORK: 'CLOCKWORK', PRODUCTION: 'PRODUCTION' });
-export const ProcessMode = Object.freeze({ FOG_COLLECTION: 'FOG_COLLECTION', POWER: 'POWER', TRANSFORM: 'TRANSFORM', BUFFER: 'BUFFER', LOGISTICS: 'LOGISTICS', BUFF: 'BUFF' });
+export const ProcessMode = Object.freeze({ NONE: 'NONE', FOG_COLLECTION: 'FOG_COLLECTION', TRANSFORM: 'TRANSFORM' });
 
 const layerDesigns = [GearDesignType.INDUSTRIAL, GearDesignType.ALCHEMICAL, GearDesignType.CLOCKWORK];
 
 export class Gear {
-    constructor({ id, size, layer = Layer.GOLD, isLocked, designType, processMode = ProcessMode.POWER, position = { q: 0, r: 0 }, isCore = false, angle = 0 }) {
+    constructor({ id, size, layer = Layer.GOLD, isLocked, designType, processMode = ProcessMode.NONE, position = { q: 0, r: 0 }, isCore = false, angle = 0 }) {
         this.id = id || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
         this.size = size;
         this.sizeKey = Object.keys(GearSize).find(key => GearSize[key] === size) || 'M';
@@ -14,7 +14,7 @@ export class Gear {
         this.layer = layer;
         this.isLocked = isLocked ?? isCore;
         this.designType = designType || layerDesigns[layer];
-        this.processMode = processMode;
+        this.processMode = processMode === 'POWER' ? ProcessMode.NONE : processMode;
         this.q = position.q;
         this.r = position.r;
         this.isCore = isCore;

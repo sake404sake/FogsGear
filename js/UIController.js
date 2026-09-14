@@ -48,7 +48,10 @@ export class UIController {
         });
 
         document.getElementById('gear-lock-toggle').addEventListener('change', event => { const gear = this.gearManager.findGearById(this.state.selectedGearId); if (gear) this.gearManager.setGearLock(gear, event.target.checked); });
-        document.getElementById('gear-design-select').addEventListener('change', event => this.updateSelectedGear({ designType: event.target.value }));
+        document.getElementById('gear-design-select').addEventListener('change', event => {
+            const processMode = this.updateProcessOptions(event.target.value);
+            this.updateSelectedGear({ designType: event.target.value, processMode });
+        });
         document.getElementById('gear-process-select').addEventListener('change', event => this.updateSelectedGear({ processMode: event.target.value }));
         document.getElementById('gear-popover-close').addEventListener('click', () => this.closeGearPopover());
         document.getElementById('gear-modal').addEventListener('click', event => {
@@ -56,15 +59,21 @@ export class UIController {
         });
 
         document.addEventListener('pointerdown', event => {
-            if (!this.canvas.contains(event.target) && !event.target.closest('.panel') && this.state.selectedSize) {
+            if (!this.canvas.contains(event.target) && !event.target.closest('.panel')) {
                 this.state.setSelectedSize(null);
                 this.state.ghostGear = null;
+                this.closeGearPopover();
             }
         });
         this.canvas.addEventListener('pointerdown', event => this.pointerDown(event));
         this.canvas.addEventListener('pointermove', event => this.pointerMove(event));
         this.canvas.addEventListener('pointerup', event => this.pointerUp(event));
-        this.canvas.addEventListener('contextmenu', event => { event.preventDefault(); this.closeGearPopover(); this.state.setSelectedSize(null); });
+        this.canvas.addEventListener('contextmenu', event => {
+            event.preventDefault();
+            this.state.setSelectedSize(null);
+            this.state.ghostGear = null;
+            this.closeGearPopover();
+        });
         this.canvas.addEventListener('pointercancel', event => {
             this.activeTouches.delete(event.pointerId);
             this.initialPinchDist = null;
@@ -145,9 +154,27 @@ export class UIController {
         this.state.ghostGear = null;
     }
 
-    openGearPopover(gear) { this.state.selectedGearId = gear.id; document.getElementById('gear-modal').hidden = false; document.getElementById('gear-popover-title').textContent = gear.isCore ? 'メインギア' : `${gear.sizeKey} ギア設定`; document.getElementById('gear-popover-meta').textContent = `L${gear.layer + 1} / ${gear.teeth}歯 / ${gear.designType} / ${gear.processMode}`; const friction = Math.round(this.state.network?.calculateGearFriction(gear) || 0); const driveCost = Math.round(gear.steamLoad); const steamCost = driveCost + friction; const rotation = Math.round(Math.abs(gear.angularVelocity || 0)); const loopBonus = this.state.network?.loopGearIds?.has(gear.id) ? '環機構ボーナス' : ''; document.getElementById('gear-popover-cost').innerHTML = gear.isCore ? '<div class="cost-note">メインギア<br>現在コストの集計対象外</div>' : `<div class="resource-block brass-block"><div class="resource-heading">真鍮資材 <strong>${Math.round(gear.brassCost)}</strong></div></div><div class="resource-divider"></div><div class="resource-block steam-block"><div class="cost-row"><span>駆動コスト</span><strong>${driveCost}</strong></div><div class="cost-row"><span>摩擦コスト</span><strong>${friction}</strong></div>${loopBonus ? `<div class="bonus-row">(${loopBonus})</div>` : ''}</div><div class="resource-divider strong"></div><div class="cost-row steam-total"><span>消費スチーム / 回転</span><strong>${steamCost} / ${rotation}</strong></div>`; document.getElementById('gear-lock-toggle').checked = gear.isLocked; document.getElementById('gear-design-select').value = gear.designType; document.getElementById('gear-process-select').value = gear.processMode; document.getElementById('gear-delete-button').disabled = gear.isCore; }
+    getProcessOptions(designType) {
+        if (designType === 'PRODUCTION') return [['NONE', '処理なし'], ['FOG_COLLECTION', '霧の回収']];
+        if (designType === 'ALCHEMICAL') return [['NONE', '処理なし'], ['TRANSFORM', '水→スチーム']];
+        return [['NONE', '処理なし']];
+    }
+    updateProcessOptions(designType, selectedMode = null) {
+        const select = document.getElementById('gear-process-select');
+        const options = this.getProcessOptions(designType);
+        select.replaceChildren(...options.map(([value, label]) => new Option(label, value)));
+        const mode = options.some(([value]) => value === selectedMode) ? selectedMode : options[0][0];
+        select.value = mode;
+        return mode;
+    }
+    openGearPopover(gear) { this.state.selectedGearId = gear.id; document.getElementById('gear-modal').hidden = false; document.getElementById('gear-popover-title').textContent = gear.isCore ? 'メインギア' : `${gear.sizeKey} ギア設定`; document.getElementById('gear-popover-meta').textContent = `L${gear.layer + 1} / ${gear.teeth}歯 / ${gear.designType} / ${gear.processMode}`; const friction = Math.round(this.state.network?.calculateGearFriction(gear) || 0); const driveCost = Math.round(gear.steamLoad); const steamCost = driveCost + friction; const rotation = Math.round(Math.abs(gear.angularVelocity || 0)); const loopBonus = this.state.network?.loopGearIds?.has(gear.id) ? '環機構ボーナス' : ''; document.getElementById('gear-popover-cost').innerHTML = gear.isCore ? '<div class="cost-note">メインギア<br>現在コストの集計対象外</div>' : `<div class="resource-block brass-block"><div class="resource-heading">真鍮資材 <strong>${Math.round(gear.brassCost)}</strong></div></div><div class="resource-divider"></div><div class="resource-block steam-block"><div class="cost-row"><span>駆動コスト</span><strong>${driveCost}</strong></div><div class="cost-row"><span>摩擦コスト</span><strong>${friction}</strong></div>${loopBonus ? `<div class="bonus-row">(${loopBonus})</div>` : ''}</div><div class="resource-divider strong"></div><div class="cost-row steam-total"><span>消費スチーム / 回転</span><strong>${steamCost} / ${rotation}</strong></div>`; document.getElementById('gear-lock-toggle').checked = gear.isLocked; document.getElementById('gear-design-select').value = gear.designType; this.updateProcessOptions(gear.designType, gear.processMode); document.getElementById('gear-delete-button').disabled = gear.isCore; }
     updateSelectedGear(settings) { const gear = this.gearManager.findGearById(this.state.selectedGearId); if (gear) this.gearManager.updateGearSettings(gear, settings); }
-    closeGearPopover() { this.state.selectedGearId = null; const modal = document.getElementById('gear-modal'); if (modal) modal.hidden = true; }
+    closeGearPopover() {
+        this.state.selectedGearId = null;
+        this.state.ghostGear = null;
+        const modal = document.getElementById('gear-modal');
+        if (modal) modal.hidden = true;
+    }
 
     pointerOffset(event) {
         return event.pointerType === 'mouse' ? 0 : 110;
@@ -187,7 +214,7 @@ export class UIController {
         document.getElementById('btn-redo').disabled = this.state.redoStack.length === 0;
         const loopButton = document.querySelector('[data-action="toggle-loops"]');
         if (loopButton) {
-            loopButton.textContent = `環機構の可視化: ${this.state.showLoops ? 'ON' : 'OFF'}`;
+            loopButton.textContent = `環機構可視化: ${this.state.showLoops ? 'ON' : 'OFF'}`;
             loopButton.classList.toggle('active', this.state.showLoops);
             loopButton.setAttribute('aria-pressed', String(this.state.showLoops));
         }

@@ -55,7 +55,7 @@
             <div id="gear-popover-cost" class="cost-panel"></div>
             <label class="sync-control"><span>同軸同期</span><input id="gear-lock-toggle" type="checkbox"><span class="switch-track" aria-hidden="true"></span></label>
             <label>ギア種類 <select id="gear-design-select"><option value="INDUSTRIAL">工業・動力</option><option value="ALCHEMICAL">加工・錬金</option><option value="LOGISTICS">物流・搬送</option><option value="CLOCKWORK">精密・制御</option><option value="PRODUCTION">産業・生産</option></select></label>
-            <label>処理内容 <select id="gear-process-select"><option value="FOG_COLLECTION">霧の回収</option><option value="TRANSFORM">水→スチーム</option><option value="POWER">動力</option><option value="BUFFER">蓄積・緩衝</option><option value="LOGISTICS">搬送</option><option value="BUFF">品質・制御</option></select></label>
+            <label>処理内容 <select id="gear-process-select"><option value="NONE">処理なし</option></select></label>
             <button id="gear-delete-button" class="danger-button" data-action="delete-gear" type="button">ギアを撤去</button>
             <button id="gear-popover-close" type="button">閉じる</button>
         </aside>
@@ -78,7 +78,7 @@
             <div class="button-row" style="width: 100%;">
                 <button class="btn btn-action" id="btn-undo" data-action="undo" disabled>↩ Undo</button>
                 <button class="btn btn-action" id="btn-redo" data-action="redo" disabled>Redo ↪</button>
-                <button class="btn btn-action" data-action="toggle-loops" aria-pressed="false">環機構の可視化: OFF</button>
+                <button class="btn btn-loop-visualize" data-action="toggle-loops" aria-pressed="false">環機構可視化: OFF</button>
                 <button class="btn btn-reset" data-action="reset">盤面リセット</button>
             </div>
         </div>

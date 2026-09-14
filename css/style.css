@@ -221,6 +221,9 @@ h1 {
     color: #fff;
 }
 
+.btn-loop-visualize { color: #b8f4ff; background: rgba(77, 194, 218, 0.12); border-color: #62cbe4; }
+.btn-loop-visualize:hover:not(:disabled), .btn-loop-visualize.active { color: #08242b; background: #8eeaff; border-color: #c1f6ff; box-shadow: 0 0 10px rgba(98, 203, 228, 0.45); }
+
 .btn-reset {
     background: #261515;
     border-color: #5a2e2e;

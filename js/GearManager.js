@@ -100,7 +100,7 @@ export class GearManager {
         return [...this.state.placedGears].sort((a, b) => b.layer - a.layer).find(gear => {
             const dx = gear.x - x;
             const dy = gear.y - y;
-            return Math.hypot(dx, dy) < Math.max(12, gear.radius * 0.35);
+            return Math.hypot(dx, dy) < Math.max(18, gear.radius * 0.55);
         });
     }
 
