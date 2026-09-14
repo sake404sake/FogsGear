@@ -59,7 +59,8 @@ export class UIController {
         });
 
         document.addEventListener('pointerdown', event => {
-            if (!this.canvas.contains(event.target) && !event.target.closest('.panel')) {
+            if (!this.canvas.contains(event.target) && !event.target.closest('.panel') && !event.target.closest('#gear-modal')) {
+        this.state.setSelectedSize(null);
                 this.state.setSelectedSize(null);
                 this.state.ghostGear = null;
                 this.closeGearPopover();
