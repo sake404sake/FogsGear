@@ -11,6 +11,8 @@ export class CanvasRenderer {
         ];
         this.gridCanvas = document.createElement('canvas');
         this.gridKey = '';
+        this.sortedGears = [];
+        this.sortedGearKey = '';
         this.gearImages = {};
         this.tintedImages = {};
         this.loadGearImages();
@@ -18,7 +20,8 @@ export class CanvasRenderer {
     }
 
     loadGearImages() {
-        const names = ['xxs', 'ss', 's', 'm', 'l', 'll', '3l', '4l', 'max', 'core'];
+        const designs = ['industrial', 'alchemical', 'logistics', 'clockwork', 'production'];
+        const names = designs.concat('core');
         names.forEach(name => {
             const image = new Image();
             image.onload = () => {
@@ -59,9 +62,85 @@ export class CanvasRenderer {
         this.ctx.translate(width / 2, height / 2);
         this.ctx.scale(this.state.zoomScale, this.state.zoomScale);
         this.ctx.translate(this.state.offsetX, this.state.offsetY);
-        [...this.state.placedGears].sort((a, b) => a.layer - b.layer).forEach(gear => this.drawGear(gear));
+        const sortedKey = this.state.placedGears.map(gear => `${gear.id}:${gear.layer}`).join('|');
+        if (sortedKey !== this.sortedGearKey) {
+            this.sortedGears = [...this.state.placedGears].sort((a, b) => a.layer - b.layer);
+            this.sortedGearKey = sortedKey;
+        }
+        this.sortedGears.forEach(gear => this.drawGear(gear));
+        if (this.state.showLoops) this.drawLoops();
         if (this.state.ghostGear && this.state.selectedSize) this.drawGear(this.state.ghostGear, true);
+        if (this.state.ghostGear) this.drawGhostConnections(this.state.ghostGear);
         this.ctx.restore();
+    }
+
+    drawLoops() {
+        const loopIds = this.state.network?.loopGearIds || new Set();
+        if (loopIds.size < 2) return;
+        const drawn = new Set();
+        this.ctx.save();
+        this.ctx.lineWidth = 4 / this.state.zoomScale;
+        this.ctx.strokeStyle = 'rgba(116, 240, 194, 0.92)';
+        this.ctx.shadowColor = '#62c2aa';
+        this.ctx.shadowBlur = 10 / this.state.zoomScale;
+        for (const id of loopIds) {
+            const gear = this.state.placedGears.find(item => item.id === id);
+            if (!gear) continue;
+            for (const otherId of this.state.network.connections.get(id) || []) {
+                if (!loopIds.has(otherId)) continue;
+                const edge = [id, otherId].sort().join(':');
+                if (drawn.has(edge)) continue;
+                drawn.add(edge);
+                const other = this.state.placedGears.find(item => item.id === otherId);
+                if (!other) continue;
+                this.ctx.beginPath();
+                this.ctx.moveTo(gear.x, gear.y);
+                this.ctx.lineTo(other.x, other.y);
+                this.ctx.stroke();
+            }
+        }
+        this.ctx.shadowBlur = 0;
+        this.ctx.setLineDash([6 / this.state.zoomScale, 4 / this.state.zoomScale]);
+        this.ctx.lineWidth = 3 / this.state.zoomScale;
+        for (const id of loopIds) {
+            const gear = this.state.placedGears.find(item => item.id === id);
+            if (!gear) continue;
+            this.ctx.beginPath();
+            this.ctx.arc(gear.x, gear.y, gear.radius + 7 / this.state.zoomScale, 0, Math.PI * 2);
+            this.ctx.stroke();
+        }
+        this.ctx.restore();
+    }
+
+    drawGhostConnections(ghost) {
+        const connected = new Set(ghost.connectionIds || []);
+        const blocked = new Set(ghost.blockedIds || []);
+        const count = connected.size;
+        const outlineColor = count >= 2 ? '#74f0c2' : count === 1 ? '#f2c96d' : '#e88b7d';
+        this.ctx.save();
+        this.ctx.translate(ghost.x, ghost.y);
+        this.ctx.strokeStyle = outlineColor;
+        this.ctx.lineWidth = 4 / this.state.zoomScale;
+        this.ctx.setLineDash([9 / this.state.zoomScale, 5 / this.state.zoomScale]);
+        this.ctx.globalAlpha = 0.98;
+        this.ctx.beginPath();
+        this.ctx.arc(0, 0, ghost.radius + 7 / this.state.zoomScale, 0, Math.PI * 2);
+        this.ctx.stroke();
+        this.ctx.restore();
+        if (!count) return;
+        this.state.placedGears.forEach(gear => {
+            if (!connected.has(gear.id) && !blocked.has(gear.id)) return;
+            this.ctx.save();
+            this.ctx.translate(gear.x, gear.y);
+            this.ctx.strokeStyle = blocked.has(gear.id) ? '#ff4d4d' : outlineColor;
+            this.ctx.lineWidth = 3 / this.state.zoomScale;
+            this.ctx.setLineDash([7 / this.state.zoomScale, 4 / this.state.zoomScale]);
+            this.ctx.globalAlpha = 0.95;
+            this.ctx.beginPath();
+            this.ctx.arc(0, 0, gear.radius + 8 / this.state.zoomScale, 0, Math.PI * 2);
+            this.ctx.stroke();
+            this.ctx.restore();
+        });
     }
 
     drawHexGrid() {
@@ -83,10 +162,11 @@ export class CanvasRenderer {
 
         const worldWidth = width / this.state.zoomScale;
         const worldHeight = height / this.state.zoomScale;
-        const qRange = Math.ceil((worldWidth + worldHeight) / (2 * Math.sqrt(3) * 2)) + 4;
+        const gridStep = this.state.zoomScale < 0.6 ? 2 : 1;
+        const qRange = Math.ceil(Math.max(worldWidth / (2 * Math.sqrt(3)), worldHeight / 3)) + 4;
         const activeAxes = new Set(this.state.placedGears.map(gear => `${gear.q},${gear.r}`));
-        for (let q = -qRange; q <= qRange; q++) {
-            for (let r = -qRange; r <= qRange; r++) {
+        for (let q = -qRange; q <= qRange; q += gridStep) {
+            for (let r = -qRange; r <= qRange; r += gridStep) {
                 if (Math.abs(q + r) > qRange) continue;
                 const center = this.hexToPixel(q, r);
                 const screenX = width / 2 + (center.x + this.state.offsetX) * this.state.zoomScale;
@@ -155,14 +235,16 @@ export class CanvasRenderer {
         const toothLength = Math.max(6, Math.min(10, radius * 0.1));
         const bodyRadius = radius - toothLength;
         const toothWidth = Math.max(3, Math.min(12, (Math.PI * 2 * radius / gear.teeth) * 0.48));
+        const toothStart = bodyRadius - Math.max(5, toothLength * 0.55);
+        const toothDepth = toothLength + Math.max(5, toothLength * 0.55);
         this.ctx.fillStyle = color;
         this.ctx.strokeStyle = isGhost ? 'rgba(255,255,255,0.7)' : color;
         this.ctx.lineWidth = isGhost ? 1 : Math.max(1, toothWidth * 0.12);
         for (let i = 0; i < gear.teeth; i++) {
             this.ctx.save();
             this.ctx.rotate(i * Math.PI * 2 / gear.teeth);
-            this.ctx.fillRect(bodyRadius - 2, -toothWidth / 2, toothLength + 2, toothWidth);
-            this.ctx.strokeRect(bodyRadius - 2, -toothWidth / 2, toothLength + 2, toothWidth);
+            this.ctx.fillRect(toothStart, -toothWidth / 2, toothDepth, toothWidth);
+            this.ctx.strokeRect(toothStart, -toothWidth / 2, toothDepth, toothWidth);
             this.ctx.restore();
         }
     }
@@ -174,7 +256,7 @@ export class CanvasRenderer {
         let fill = palette.fill;
         let stroke = palette.stroke;
         if (isGhost) {
-            fill = gear.valid ? palette.fill : 'rgba(210, 30, 30, 0.65)';
+            fill = gear.valid ? '#858b8f' : 'rgba(170, 58, 58, 0.7)';
             stroke = gear.valid ? palette.stroke : 'rgba(255, 100, 100, 1.0)';
         } else if (gear.isDeadlocked) {
             fill = '#8b0000';
@@ -190,14 +272,16 @@ export class CanvasRenderer {
         ctx.translate(gear.x, gear.y);
         if (gear.isCore && !isGhost) { ctx.shadowColor = '#ffe066'; ctx.shadowBlur = 20; }
         ctx.rotate(gear.angle);
-        const assetName = gear.isCore ? 'core' : String(gear.sizeKey).toLowerCase();
-        const assetColor = isGhost && !gear.valid
-            ? '#d85c4a'
+        const assetName = gear.isCore ? 'core' : String(gear.designType || 'INDUSTRIAL').toLowerCase();
+        const assetColor = isGhost
+            ? gear.valid ? '#858b8f' : '#d85c4a'
+            : gear.isDeadlocked
+                ? '#b52a2a'
             : gear.isCore
                 ? '#f5c942'
                 : gear.powered && !gear.isDeadlocked
                     ? palette.fill
-                    : '#3d322c';
+                    : '#2f231e';
         if (this.drawGearImage(assetName, radius, assetColor, isGhost ? 0.72 : 1)) {
             this.drawTeeth(gear, radius, assetColor, isGhost);
             ctx.shadowBlur = 0;

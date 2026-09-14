@@ -1,16 +1,7 @@
-/**
- * GearManager - ギア仕様定義・配置・補正計算ロジック
- */
+/** GearManager - ギア仕様定義・配置・補正計算ロジック */
+import { Gear, GearNetwork } from './GearSystem.js';
 export const GEAR_CONFIG = {
-    'XXS': { teeth: 4, radius: 12, cost: 5, pattern: 'ring' },
-    'SS': { teeth: 6, radius: 18, cost: 10, pattern: 'sunburst' },
-    'S': { teeth: 10, radius: 30, cost: 15, pattern: 'holes' },
-    'M': { teeth: 14, radius: 42, cost: 25, pattern: 'triangular' },
-    'L': { teeth: 18, radius: 54, cost: 35, pattern: 'wave' },
-    'LL': { teeth: 24, radius: 72, cost: 50, pattern: 'crown' },
-    '3L': { teeth: 32, radius: 96, cost: 70, pattern: 'lattice' },
-    '4L': { teeth: 40, radius: 120, cost: 95, pattern: 'radial' },
-    'MAX': { teeth: 48, radius: 144, cost: 120, pattern: 'industrial' }
+    'XXS': { teeth: 4, radius: 12, cost: 4, pattern: 'ring' }, 'SS': { teeth: 6, radius: 18, cost: 6, pattern: 'sunburst' }, 'S': { teeth: 10, radius: 30, cost: 10, pattern: 'holes' }, 'M': { teeth: 14, radius: 42, cost: 14, pattern: 'triangular' }, 'L': { teeth: 18, radius: 54, cost: 18, pattern: 'wave' }, 'LL': { teeth: 24, radius: 72, cost: 24, pattern: 'crown' }, '3L': { teeth: 32, radius: 96, cost: 32, pattern: 'lattice' }, '4L': { teeth: 40, radius: 120, cost: 40, pattern: 'radial' }, 'MAX': { teeth: 48, radius: 144, cost: 48, pattern: 'industrial' }
 };
 
 export const PITCH = 2;
@@ -34,24 +25,73 @@ export class GearManager {
     constructor(gameState) {
         this.state = gameState;
         this.canvas = document.getElementById('gearCanvas');
+        this.network = new GearNetwork();
+        this.state.network = this.network;
         this.state.loadGameData(data => {
             const sizeKey = data.sizeKey || data.size || 'M';
             const position = data.q === undefined ? pixelToHex(data.x || 0, data.y || 0) : { q: data.q, r: data.r };
-            return this.createGear(position.q, position.r, sizeKey, data.layer, data.isCore, data.angle);
+            const gear = this.createGear(position.q, position.r, sizeKey, data.layer, data.isCore, data.angle);
+            gear.isLocked = data.isLocked ?? Boolean(data.isCore);
+            gear.designType = data.designType || gear.designType;
+            gear.processMode = data.processMode || gear.processMode;
+            return gear;
         });
+        this.network.rebuild(this.state.placedGears);
+        this.state.updatePowerGrid();
+        this.state.saveGameData();
     }
 
     createGear(q = 0, r = 0, sizeKey, layer = 0, isCore = false, angle = 0) {
         const config = GEAR_CONFIG[sizeKey] || GEAR_CONFIG.M;
         const position = hexToPixel(q, r);
-        return {
-            id: `${Date.now()}-${Math.random()}`,
-            q, r, x: position.x, y: position.y, sizeKey,
-            teeth: config.teeth, radius: config.radius, cost: config.cost,
-            pattern: config.pattern, layer, isCore, powered: isCore,
-            rotationDir: isCore ? 1 : 0, isDeadlocked: false, angle
-        };
+        const gear = new Gear({ size: config.teeth, layer, position: { q, r }, isCore, angle });
+        return Object.assign(gear, { x: position.x, y: position.y, sizeKey, radius: config.radius, cost: config.cost, pattern: config.pattern });
     }
+
+    removeGear(gear) {
+        if (!gear || gear.isCore) return false;
+        this.state.saveState();
+        this.state.placedGears = this.state.placedGears.filter(other => other.id !== gear.id);
+        if (!this.state.creativeMode) this.state.brass += Math.floor(gear.cost * 0.8);
+        this.state.updatePowerGrid();
+        this.state.saveGameData();
+        this.state.notify();
+        return true;
+    }
+
+    findGearById(id) { return this.state.placedGears.find(gear => gear.id === id) || null; }
+    setGearLock(gear, locked) {
+        const synced = this.state.placedGears.filter(other => other.q === gear.q && other.r === gear.r);
+        if (locked && synced.length < 2) {
+            gear.isLocked = false;
+            this.state.notify();
+            return false;
+        }
+        synced.forEach(other => { other.isLocked = locked || other.isCore; });
+        if (locked) {
+            const lockedGears = synced.filter(other => other.isLocked).sort((a, b) => a.layer - b.layer);
+            const base = lockedGears[0];
+            if (base) lockedGears.forEach(other => {
+                other.angle = base.angle;
+                other.rotationDir = base.rotationDir || 1;
+                other.angularVelocity = base.angularVelocity || 1;
+                other.angleError = false;
+                other.isDeadlocked = false;
+            });
+        } else {
+            gear.angleError = false;
+            gear.isDeadlocked = false;
+        }
+        this.state.updatePowerGrid();
+        this.state.saveGameData();
+        this.state.notify();
+        return true;
+    }
+
+    findMeshConnections(x, y, radius, layer) {
+        return this.state.placedGears.filter(gear => gear.layer === layer && Math.hypot(gear.x - x, gear.y - y) <= gear.radius + radius + 2);
+    }
+    updateGearSettings(gear, settings) { Object.assign(gear, settings); this.state.saveGameData(); this.state.notify(); }
 
     /**
      * 指定位置に既存ギアの中心があるか判定（中心タップで削除用）
@@ -119,8 +159,16 @@ export class GearManager {
             const otherTooth = nearest.gear.angle + Math.round((angle - nearest.gear.angle) / otherPitch) * otherPitch;
             const fineToothCorrection = sizeKey === '4L' || sizeKey === 'MAX' ? selfPitch / 2 : 0;
             const meshAngle = otherTooth + Math.PI + selfPitch / 2 + fineToothCorrection;
-            if (sameLayer.some(gear => gear !== nearest.gear && Math.hypot(position.x - gear.x, position.y - gear.y) < config.radius + gear.radius - 2)) valid = false;
-            this.state.ghostGear = { ...position, q: hex.q, r: hex.r, layer, radius: config.radius, teeth: config.teeth, pattern: config.pattern, angle: meshAngle, valid };
+            const blockedBy = sameLayer.filter(gear => gear !== nearest.gear && Math.hypot(position.x - gear.x, position.y - gear.y) < config.radius + gear.radius - 2);
+            const designType = ['INDUSTRIAL', 'ALCHEMICAL', 'CLOCKWORK'][layer] || 'INDUSTRIAL';
+            if (blockedBy.length) {
+                const cursorBlockedBy = sameLayer.filter(gear => Math.hypot(x - gear.x, y - gear.y) < config.radius + gear.radius - 2);
+                const cursorConnections = this.findMeshConnections(x, y, config.radius, layer);
+                this.state.ghostGear = { x, y, q: pixelToHex(x, y).q, r: pixelToHex(x, y).r, layer, sizeKey, designType, radius: config.radius, teeth: config.teeth, pattern: config.pattern, angle: 0, valid: false, connectionIds: cursorConnections.map(gear => gear.id), blockedIds: cursorBlockedBy.map(gear => gear.id) };
+                return;
+            }
+            const connections = this.findMeshConnections(position.x, position.y, config.radius, layer);
+            this.state.ghostGear = { ...position, q: hex.q, r: hex.r, layer, sizeKey, designType, radius: config.radius, teeth: config.teeth, pattern: config.pattern, angle: meshAngle, valid, connectionIds: connections.map(gear => gear.id), blockedIds: blockedBy.map(gear => gear.id) };
             return;
         } else {
             let closestAxis = null;
@@ -135,9 +183,13 @@ export class GearManager {
             if (closestAxis) hex = { q: closestAxis.q, r: closestAxis.r };
             const snapped = hexToPixel(hex.q, hex.r);
             position = snapped;
-            if (sameLayer.some(gear => gear.q === hex.q && gear.r === hex.r || Math.hypot(position.x - gear.x, position.y - gear.y) < config.radius + gear.radius - 2)) valid = false;
+            const blockedBy = sameLayer.filter(gear => gear.q === hex.q && gear.r === hex.r || Math.hypot(position.x - gear.x, position.y - gear.y) < config.radius + gear.radius - 2);
+            if (blockedBy.length) valid = false;
         }
-        this.state.ghostGear = { ...position, q: hex.q, r: hex.r, layer, radius: config.radius, teeth: config.teeth, pattern: config.pattern, angle: 0, valid };
+        const designType = ['INDUSTRIAL', 'ALCHEMICAL', 'CLOCKWORK'][layer] || 'INDUSTRIAL';
+        const connections = this.findMeshConnections(position.x, position.y, config.radius, layer);
+        const blockedBy = sameLayer.filter(gear => gear.q === hex.q && gear.r === hex.r || Math.hypot(position.x - gear.x, position.y - gear.y) < config.radius + gear.radius - 2);
+        this.state.ghostGear = { ...position, q: hex.q, r: hex.r, layer, sizeKey, designType, radius: config.radius, teeth: config.teeth, pattern: config.pattern, angle: 0, valid, connectionIds: connections.map(gear => gear.id), blockedIds: blockedBy.map(gear => gear.id) };
     }
 
     /**

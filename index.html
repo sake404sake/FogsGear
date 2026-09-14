@@ -11,10 +11,23 @@
     <div class="panel">
         <h1>Fog Thermodynamics</h1>
         <div class="status-container">
-            <div>スチーム力: <span id="steamPower" class="status-value">100</span></div>
-            <div>真鍮資材: <span id="brass" class="status-value">300</span></div>
+            <div class="status-steam">スチーム力: <span id="steamPower" class="status-value">100</span></div>
+            <div class="status-brass">真鍮資材: <span id="brass" class="status-value">300</span></div>
+            <div class="status-water">水: <span id="water" class="status-value">0</span></div>
+            <div>現在コスト：真鍮 <span id="currentBrassCost" class="status-value">0</span>、消費スチーム <span id="currentSteamCost" class="status-value">0</span></div>
             <div><button id="creativeBtn" class="creative-toggle" data-action="toggle-creative">クリエイティブ: OFF</button></div>
         </div>
+        <section class="dashboard" aria-label="動力ダッシュボード">
+            <div class="dashboard-title">LIVE ENGINE DASHBOARD</div>
+            <div class="dashboard-grid">
+                <div><span>動力出力</span><strong id="powerOutput">0</strong></div>
+                <div><span>稼働ギア</span><strong id="activeGears">0</strong></div>
+                <div><span>稼働出力</span><strong id="productionRate">0</strong><small> 資源処理</small></div>
+                <div><span>水回収</span><strong id="waterRecoveryRate">0</strong><small> 水/秒</small></div>
+                <div><span>水→スチーム</span><strong id="steamTransformRate">0</strong><small> /秒</small></div>
+                <div><span>スチーム残量</span><strong id="dashboardSteam">100</strong></div>
+            </div>
+        </section>
         <div class="control-group">
             <span class="group-label">— Gear Type Selector —</span>
             <div class="button-row">
@@ -34,6 +47,16 @@
     <!-- マップ描画エリア -->
     <div id="canvas-container">
         <canvas id="gearCanvas" width="800" height="600"></canvas>
+        <aside id="gear-popover" class="gear-popover" hidden>
+            <h2 id="gear-popover-title">ギア設定</h2>
+            <p id="gear-popover-meta"></p>
+            <div id="gear-popover-cost" class="cost-panel"></div>
+            <label class="sync-control"><span>同軸同期</span><input id="gear-lock-toggle" type="checkbox"><span class="switch-track" aria-hidden="true"></span></label>
+            <label>ギア種類 <select id="gear-design-select"><option value="INDUSTRIAL">工業・動力</option><option value="ALCHEMICAL">加工・錬金</option><option value="LOGISTICS">物流・搬送</option><option value="CLOCKWORK">精密・制御</option><option value="PRODUCTION">産業・生産</option></select></label>
+            <label>処理内容 <select id="gear-process-select"><option value="FOG_COLLECTION">霧の回収</option><option value="TRANSFORM">水→スチーム</option><option value="POWER">動力</option><option value="BUFFER">蓄積・緩衝</option><option value="LOGISTICS">搬送</option><option value="BUFF">品質・制御</option></select></label>
+            <button id="gear-delete-button" class="danger-button" data-action="delete-gear" type="button">ギアを撤去</button>
+            <button id="gear-popover-close" type="button">閉じる</button>
+        </aside>
     </div>
 
     <!-- 下部パネル：レイヤー選択・アクション操作盤 -->
@@ -52,6 +75,7 @@
             <div class="button-row" style="width: 100%;">
                 <button class="btn btn-action" id="btn-undo" data-action="undo" disabled>↩ Undo</button>
                 <button class="btn btn-action" id="btn-redo" data-action="redo" disabled>Redo ↪</button>
+                <button class="btn btn-action" data-action="toggle-loops" aria-pressed="false">環機構: OFF</button>
                 <button class="btn btn-reset" data-action="reset">盤面リセット</button>
             </div>
         </div>
