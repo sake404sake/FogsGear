@@ -7,16 +7,11 @@
 <script>
 const SIZE = 320;
 const designs = {
-    XXS: { teeth: 4, style: 'ring' },
-    SS: { teeth: 6, style: 'sunburst' },
-    S: { teeth: 10, style: 'holes' },
-    M: { teeth: 14, style: 'triangular' },
-    L: { teeth: 18, style: 'wave' },
-    LL: { teeth: 24, style: 'crown' },
-    '3L': { teeth: 32, style: 'lattice' },
-    '4L': { teeth: 40, style: 'radial' },
-    MAX: { teeth: 48, style: 'industrial' },
-    CORE: { teeth: 24, style: 'core' }
+    industrial: 'industrial',
+    alchemical: 'alchemical',
+    logistics: 'logistics',
+    clockwork: 'clockwork',
+    production: 'production'
 };
 
 function drawGear(canvas, design) {
@@ -30,9 +25,6 @@ function drawGear(canvas, design) {
     ctx.fillStyle = '#ffffff';
     ctx.lineWidth = 5;
     const outerLineWidth = 20;
-    const toothWidth = Math.max(5, Math.min(18, 2 * Math.PI * radius / design.teeth * 0.48));
-    const toothHeight = 46;
-    const toothStart = radius - 24;
     ctx.fillStyle = '#ffffff';
     ctx.beginPath();
     ctx.arc(0, 0, radius + 10, 0, Math.PI * 2);
@@ -44,7 +36,6 @@ function drawGear(canvas, design) {
     ctx.globalCompositeOperation = 'source-over';
     ctx.save();
     ctx.lineWidth = 5;
-    drawLineSpokes(ctx, radius, 8, .2, .95, 5);
     ctx.restore();
     ctx.lineWidth = outerLineWidth;
     ctx.beginPath(); ctx.arc(0, 0, radius, 0, Math.PI * 2); ctx.stroke();
@@ -84,33 +75,13 @@ function drawDesign(ctx, radius, style) {
     ctx.lineCap = 'round';
     ctx.fillStyle = '#ffffff';
     ctx.beginPath();
-    ctx.arc(0, 0, radius * .24, 0, Math.PI * 2);
+    ctx.arc(0, 0, radius * .2, 0, Math.PI * 2);
     ctx.fill();
-    ctx.globalCompositeOperation = 'destination-out';
-    ctx.beginPath();
-    ctx.arc(0, 0, radius * .1, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.globalCompositeOperation = 'source-over';
-    ring(ctx, radius, .16);
-    if (style === 'ring') { drawLineSpokes(ctx, radius, 4, .16, .8, 18); return; }
-    if (style === 'sunburst') { drawLineSpokes(ctx, radius, 6, .16, .8, 16); holes(ctx, radius, 6, .5, 4); return; }
-    if (style === 'holes') { drawLineSpokes(ctx, radius, 8, .2, .8, 14); holes(ctx, radius, 8, .5, 9); return; }
-    if (style === 'triangular') { drawLineSpokes(ctx, radius, 4, .18, .8, 11); holes(ctx, radius, 4, .5, 5); return; }
-    if (style === 'wave') {
-        ctx.lineWidth = 9;
-        for (let i = 0; i < 6; i++) {
-            ctx.save(); ctx.rotate(i * Math.PI / 3); ctx.beginPath();
-            ctx.moveTo(-radius * .1, -radius * .24);
-            ctx.quadraticCurveTo(radius * .3, -radius * .5, radius * .8, -radius * .16);
-            ctx.quadraticCurveTo(radius * .48, radius * .04, radius * .18, radius * .26);
-            ctx.stroke(); ctx.restore();
-        }
-        return;
-    }
-    if (style === 'crown') { drawLineSpokes(ctx, radius, 6, .18, .8, 10); ring(ctx, radius, .48); holes(ctx, radius, 6, .58, 5); return; }
-    if (style === 'lattice') { drawLineSpokes(ctx, radius, 8, .18, .84, 6); ring(ctx, radius, .34); holes(ctx, radius, 8, .55, 4); return; }
-    if (style === 'radial') { drawLineSpokes(ctx, radius, 12, .16, .8, 4); ring(ctx, radius, .3); return; }
-    if (style === 'industrial') { drawLineSpokes(ctx, radius, 6, .18, .88, 14); ring(ctx, radius, .48); holes(ctx, radius, 10, .65, 5); return; }
+    if (style === 'industrial') { ring(ctx, radius, .52); drawLineSpokes(ctx, radius, 6, .16, .76, 14); return; }
+    if (style === 'alchemical') { ring(ctx, radius, .3); ring(ctx, radius, .58); drawLineSpokes(ctx, radius, 3, .16, .82, 8); return; }
+    if (style === 'logistics') { ring(ctx, radius, .68); drawLineSpokes(ctx, radius, 4, .16, .68, 12); ring(ctx, radius, .34); return; }
+    if (style === 'clockwork') { ring(ctx, radius, .42); drawLineSpokes(ctx, radius, 8, .16, .72, 5); ring(ctx, radius, .76, 3); return; }
+    if (style === 'production') { ring(ctx, radius, .26); ring(ctx, radius, .52); drawLineSpokes(ctx, radius, 8, .26, .78, 6); return; }
     if (style === 'core') {
         drawLineSpokes(ctx, radius, 8, .18, .8, 9);
         holes(ctx, radius, 8, .58, 6);
@@ -121,12 +92,12 @@ function drawDesign(ctx, radius, style) {
     }
 }
 
-for (const [name, design] of Object.entries(designs)) {
+for (const [designName, style] of Object.entries(designs)) {
     const canvas = document.createElement('canvas');
-    canvas.id = `gear-${name.toLowerCase()}`;
+    canvas.id = `gear-${designName}`;
     canvas.width = SIZE; canvas.height = SIZE;
     document.body.appendChild(canvas);
-    drawGear(canvas, design);
+    drawGear(canvas, { style });
 }
 </script>
 </body>

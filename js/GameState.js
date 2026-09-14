@@ -19,6 +19,7 @@ export class GameState {
         this.placedGears = [];
         this.ghostGear = null;
         this.showLoops = false;
+        this.dashboardOpen = false;
         this.zoomScale = 1;
         this.offsetX = 0;
         this.offsetY = 0;
@@ -90,8 +91,16 @@ export class GameState {
         this.brass = data.brass;
         const gears = data.gears || data.placedGears || [];
         this.placedGears = this.createGear
-            ? gears.map(this.createGear)
+            ? gears.map(gear => this.createGear(gear.q, gear.r, gear.sizeKey || gear.size, gear.layer, gear.isCore, gear.angle))
             : gears.map(gear => ({ ...gear, sizeKey: gear.sizeKey || gear.size }));
+        this.placedGears.forEach((gear, index) => {
+            const savedGear = gears[index];
+            gear.isLocked = savedGear.isLocked ?? gear.isCore;
+            gear.designType = savedGear.designType || gear.designType;
+            gear.processMode = savedGear.processMode || gear.processMode;
+        });
+        this.rotationProgress = new Map();
+        this.updatePowerGrid();
         this.notify();
     }
 

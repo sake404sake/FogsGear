@@ -17,7 +17,8 @@
             <div>現在コスト：真鍮 <span id="currentBrassCost" class="status-value">0</span>、消費スチーム <span id="currentSteamCost" class="status-value">0</span></div>
             <div><button id="creativeBtn" class="creative-toggle" data-action="toggle-creative">クリエイティブ: OFF</button></div>
         </div>
-        <section class="dashboard" aria-label="動力ダッシュボード">
+        <button class="dashboard-toggle" data-action="toggle-dashboard" aria-expanded="false">動力ダッシュボード <span>+</span></button>
+        <section class="dashboard" aria-label="動力ダッシュボード" hidden>
             <div class="dashboard-title">LIVE ENGINE DASHBOARD</div>
             <div class="dashboard-grid">
                 <div><span>動力出力</span><strong id="powerOutput">0</strong></div>
@@ -47,7 +48,8 @@
     <!-- マップ描画エリア -->
     <div id="canvas-container">
         <canvas id="gearCanvas" width="800" height="600"></canvas>
-        <aside id="gear-popover" class="gear-popover" hidden>
+        <div id="gear-modal" class="gear-modal" hidden>
+        <aside id="gear-popover" class="gear-popover">
             <h2 id="gear-popover-title">ギア設定</h2>
             <p id="gear-popover-meta"></p>
             <div id="gear-popover-cost" class="cost-panel"></div>
@@ -57,6 +59,7 @@
             <button id="gear-delete-button" class="danger-button" data-action="delete-gear" type="button">ギアを撤去</button>
             <button id="gear-popover-close" type="button">閉じる</button>
         </aside>
+        </div>
     </div>
 
     <!-- 下部パネル：レイヤー選択・アクション操作盤 -->
@@ -75,7 +78,7 @@
             <div class="button-row" style="width: 100%;">
                 <button class="btn btn-action" id="btn-undo" data-action="undo" disabled>↩ Undo</button>
                 <button class="btn btn-action" id="btn-redo" data-action="redo" disabled>Redo ↪</button>
-                <button class="btn btn-action" data-action="toggle-loops" aria-pressed="false">環機構: OFF</button>
+                <button class="btn btn-action" data-action="toggle-loops" aria-pressed="false">環機構の可視化: OFF</button>
                 <button class="btn btn-reset" data-action="reset">盤面リセット</button>
             </div>
         </div>
