@@ -185,8 +185,8 @@ export class UIController {
     }
 
     getProcessOptions(designType) {
-        if (designType === 'PRODUCTION') return [['NONE', '処理なし'], ['FOG_COLLECTION', '霧の回収']];
-        if (designType === 'ALCHEMICAL') return [['NONE', '処理なし'], ['TRANSFORM', '水→スチーム']];
+        if (designType === 'PRODUCTION') return [['NONE', '処理なし'], ['FOG_COLLECTION', '霧の回収'], ['GAS_METAL_COLLECTION', '気体金属の収集']];
+        if (designType === 'ALCHEMICAL') return [['NONE', '処理なし'], ['TRANSFORM', '水→スチーム'], ['GAS_TO_LIQUID_METAL', '気体金属→液体金属'], ['LIQUID_TO_SOLID_METAL', '液体金属→固体金属']];
         return [['NONE', '処理なし']];
     }
     updateProcessOptions(designType, selectedMode = null) {
@@ -225,6 +225,12 @@ export class UIController {
         const dashboardSteam = document.getElementById('dashboardSteam');
         const water = document.getElementById('water');
         const waterRecoveryRate = document.getElementById('waterRecoveryRate');
+        const gasMetal = document.getElementById('gasMetal');
+        const gasMetalRecoveryRate = document.getElementById('gasMetalRecoveryRate');
+        const liquidMetal = document.getElementById('liquidMetal');
+        const liquidMetalRate = document.getElementById('liquidMetalRate');
+        const solidMetal = document.getElementById('solidMetal');
+        const solidMetalRate = document.getElementById('solidMetalRate');
         const steamTransformRate = document.getElementById('steamTransformRate');
         if (powerOutput) powerOutput.textContent = Math.floor(this.state.powerOutput || 0);
         if (activeGears) activeGears.textContent = this.state.placedGears.filter(gear => gear.powered && !gear.isDeadlocked).length;
@@ -232,6 +238,12 @@ export class UIController {
         if (dashboardSteam) dashboardSteam.textContent = Math.floor(this.state.steamPower);
         if (water) water.textContent = Math.floor(this.state.water || 0);
         if (waterRecoveryRate) waterRecoveryRate.textContent = (this.state.waterRecoveryRate || 0).toFixed(1);
+        if (gasMetal) gasMetal.textContent = (this.state.gasMetal || 0).toFixed(1);
+        if (gasMetalRecoveryRate) gasMetalRecoveryRate.textContent = (this.state.gasMetalRecoveryRate || 0).toFixed(1);
+        if (liquidMetal) liquidMetal.textContent = (this.state.liquidMetal || 0).toFixed(1);
+        if (liquidMetalRate) liquidMetalRate.textContent = (this.state.liquidMetalRate || 0).toFixed(1);
+        if (solidMetal) solidMetal.textContent = (this.state.solidMetal || 0).toFixed(1);
+        if (solidMetalRate) solidMetalRate.textContent = (this.state.solidMetalRate || 0).toFixed(1);
         if (steamTransformRate) steamTransformRate.textContent = (this.state.steamTransformRate || 0).toFixed(1);
         const creative = document.getElementById('creativeBtn');
         if (creative) {
