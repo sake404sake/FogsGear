@@ -86,12 +86,15 @@ export class GearManager {
                 other.angle = base.angle;
                 other.rotationDir = base.rotationDir || 1;
                 other.angularVelocity = base.angularVelocity || 1;
+                other.powered = base.powered;
                 other.angleError = false;
                 other.isDeadlocked = false;
             });
         } else {
-            gear.angleError = false;
-            gear.isDeadlocked = false;
+            synced.forEach(other => {
+                other.angleError = false;
+                other.isDeadlocked = false;
+            });
         }
         this.state.updatePowerGrid();
         this.state.saveGameData();
@@ -156,6 +159,33 @@ export class GearManager {
             const distance = Math.hypot(x - gear.x, y - gear.y);
             return distance < best.distance ? { gear, distance } : best;
         }, { gear: null, distance: Infinity });
+        const nearestAxis = allAxes.reduce((best, axis) => {
+            const distance = Math.hypot(x - axis.x, y - axis.y);
+            return distance < best.distance ? { axis, distance } : best;
+        }, { axis: null, distance: Infinity });
+        const axisGear = nearestAxis.axis && this.state.placedGears.find(gear => gear.q === nearestAxis.axis.q && gear.r === nearestAxis.axis.r);
+        const axisOccupied = axisGear && sameLayer.some(gear => gear.q === nearestAxis.axis.q && gear.r === nearestAxis.axis.r);
+        if (axisGear && !axisOccupied && nearestAxis.distance < 70) {
+            const axisPosition = hexToPixel(nearestAxis.axis.q, nearestAxis.axis.r);
+            const designType = ['INDUSTRIAL', 'ALCHEMICAL', 'CLOCKWORK'][layer] || 'INDUSTRIAL';
+            const connections = this.findMeshConnections(axisPosition.x, axisPosition.y, config.radius, layer);
+            this.state.ghostGear = {
+                ...axisPosition,
+                q: nearestAxis.axis.q,
+                r: nearestAxis.axis.r,
+                layer,
+                sizeKey,
+                designType,
+                radius: config.radius,
+                teeth: config.teeth,
+                pattern: config.pattern,
+                angle: axisGear.angle,
+                valid,
+                connectionIds: connections.map(gear => gear.id),
+                blockedIds: []
+            };
+            return;
+        }
         if (nearest.gear && nearest.distance < nearest.gear.radius + config.radius + 50) {
             const angle = Math.atan2(y - nearest.gear.y, x - nearest.gear.x);
             const meshOverlap = Math.max(3, config.radius * 0.015);

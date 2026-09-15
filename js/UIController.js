@@ -66,7 +66,7 @@ export class UIController {
         });
 
         document.addEventListener('pointerdown', event => {
-            if (!this.canvas.contains(event.target) && !event.target.closest('.panel')) {
+            if (!this.canvas.contains(event.target) && !event.target.closest('.panel') && !event.target.closest('.gear-popover')) {
                 this.state.setSelectedSize(null);
                 this.state.ghostGear = null;
                 this.closeGearPopover();
@@ -100,7 +100,7 @@ export class UIController {
     pointerDown(event) {
         if (event.button === 2) return;
         const point = this.renderer.worldPoint(event.clientX, event.clientY);
-        this.pointerDownGear = this.gearManager.findGearAt(point.x, point.y);
+        this.pointerDownGear = this.state.selectedSize ? null : this.gearManager.findGearAt(point.x, point.y);
         if (this.pointerDownGear) {
             this.openGearPopover(this.pointerDownGear);
             this.state.ghostGear = null;
@@ -162,7 +162,7 @@ export class UIController {
         if (this.activeTouches.size < 2) this.initialPinchDist = null;
         if (this.activeTouches.size !== 0) return;
         const point = this.renderer.worldPoint(event.clientX, event.clientY);
-        const existingGear = this.gearManager.findGearAt(point.x, point.y);
+        const existingGear = this.state.selectedSize ? null : this.gearManager.findGearAt(point.x, point.y);
         if (existingGear) {
             this.openGearPopover(existingGear);
             return;
@@ -178,7 +178,7 @@ export class UIController {
     }
 
     clickGear(event) {
-        if (event.button !== 0) return;
+        if (event.button !== 0 || this.state.selectedSize) return;
         const point = this.renderer.worldPoint(event.clientX, event.clientY);
         const existingGear = this.gearManager.findGearAt(point.x, point.y);
         if (existingGear) this.openGearPopover(existingGear);

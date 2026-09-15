@@ -126,7 +126,15 @@ export class GearNetwork {
             const invalid = locked.some(gear => Math.abs(Math.atan2(Math.sin(gear.angle - base.angle), Math.cos(gear.angle - base.angle))) > 0.08)
                 || new Set(locked.map(gear => gear.rotationDir).filter(Boolean)).size > 1
                 || locked.some(gear => gear.angularVelocity && base.angularVelocity && Math.abs(gear.angularVelocity - base.angularVelocity) > 0.001);
-            if (invalid) locked.forEach(gear => invalidLockedAxes.add(gear.id));
+            if (invalid) {
+                locked.forEach(gear => {
+                    gear.angle = base.angle;
+                    gear.rotationDir = base.rotationDir || 1;
+                    gear.angularVelocity = base.angularVelocity || 1;
+                    gear.angleError = false;
+                    gear.isDeadlocked = false;
+                });
+            }
         }
         this.gears.forEach(gear => { gear.powered = false; gear.rotationDir = 0; gear.angularVelocity = 0; gear.isDeadlocked = false; gear.angleError = false; });
         invalidLockedAxes.forEach(id => { const gear = this.gears.get(id); gear.angleError = true; gear.isDeadlocked = true; });
