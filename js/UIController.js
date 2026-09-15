@@ -13,6 +13,7 @@ export class UIController {
         this.pendingPointer = null;
         this.inputFrame = 0;
         this.pendingZoom = null;
+        this.pointerDownGear = null;
         this.initEvents();
         this.state.subscribe(() => this.updateUI());
     }
@@ -39,6 +40,8 @@ export class UIController {
             } else if (button.dataset.action === 'toggle-dashboard') {
                 this.state.dashboardOpen = !this.state.dashboardOpen;
                 this.state.notify();
+            } else if (button.dataset.action === 'toggle-main-gear') {
+                this.state.toggleMainGear();
             } else if (button.dataset.action === 'reset' && confirm('盤面のギアと資材を初期状態にリセットしますか？')) {
                 this.state.reset();
             } else if (button.dataset.action === 'delete-gear') {
@@ -48,6 +51,10 @@ export class UIController {
         });
 
         document.getElementById('gear-lock-toggle').addEventListener('change', event => { const gear = this.gearManager.findGearById(this.state.selectedGearId); if (gear) this.gearManager.setGearLock(gear, event.target.checked); });
+        document.getElementById('main-gear-size-select').addEventListener('change', event => {
+            const gear = this.gearManager.findGearById(this.state.selectedGearId);
+            if (gear && this.gearManager.updateGearSize(gear, event.target.value)) this.openGearPopover(gear);
+        });
         document.getElementById('gear-design-select').addEventListener('change', event => {
             const processMode = this.updateProcessOptions(event.target.value);
             this.updateSelectedGear({ designType: event.target.value, processMode });
@@ -59,8 +66,7 @@ export class UIController {
         });
 
         document.addEventListener('pointerdown', event => {
-            if (!this.canvas.contains(event.target) && !event.target.closest('.panel') && !event.target.closest('#gear-modal')) {
-        this.state.setSelectedSize(null);
+            if (!this.canvas.contains(event.target) && !event.target.closest('.panel')) {
                 this.state.setSelectedSize(null);
                 this.state.ghostGear = null;
                 this.closeGearPopover();
@@ -69,6 +75,7 @@ export class UIController {
         this.canvas.addEventListener('pointerdown', event => this.pointerDown(event));
         this.canvas.addEventListener('pointermove', event => this.pointerMove(event));
         this.canvas.addEventListener('pointerup', event => this.pointerUp(event));
+        this.canvas.addEventListener('click', event => this.clickGear(event));
         this.canvas.addEventListener('contextmenu', event => {
             event.preventDefault();
             this.state.setSelectedSize(null);
@@ -92,7 +99,15 @@ export class UIController {
 
     pointerDown(event) {
         if (event.button === 2) return;
-        if (!this.state.selectedSize) this.closeGearPopover();
+        const point = this.renderer.worldPoint(event.clientX, event.clientY);
+        this.pointerDownGear = this.gearManager.findGearAt(point.x, point.y);
+        if (this.pointerDownGear) {
+            this.openGearPopover(this.pointerDownGear);
+            this.state.ghostGear = null;
+            this.activeTouches.clear();
+            return;
+        }
+        this.closeGearPopover();
         this.activeTouches.set(event.pointerId, { x: event.clientX, y: event.clientY });
         if (this.activeTouches.size === 1) {
             this.startX = event.clientX;
@@ -139,12 +154,19 @@ export class UIController {
 
     pointerUp(event) {
         if (event.button === 2) return;
+        if (this.pointerDownGear) {
+            this.pointerDownGear = null;
+            return;
+        }
         this.activeTouches.delete(event.pointerId);
         if (this.activeTouches.size < 2) this.initialPinchDist = null;
         if (this.activeTouches.size !== 0) return;
         const point = this.renderer.worldPoint(event.clientX, event.clientY);
         const existingGear = this.gearManager.findGearAt(point.x, point.y);
-        if (!this.state.selectedSize && existingGear) { this.openGearPopover(existingGear); return; }
+        if (existingGear) {
+            this.openGearPopover(existingGear);
+            return;
+        }
         if (this.state.selectedSize) {
             const canvasPoint = this.renderer.canvasPoint(event.clientX, event.clientY);
             this.gearManager.updateGhost(canvasPoint.x, canvasPoint.y, this.pointerOffset(event));
@@ -153,6 +175,13 @@ export class UIController {
             this.gearManager.tryPlaceGear(point.x, point.y);
         }
         this.state.ghostGear = null;
+    }
+
+    clickGear(event) {
+        if (event.button !== 0) return;
+        const point = this.renderer.worldPoint(event.clientX, event.clientY);
+        const existingGear = this.gearManager.findGearAt(point.x, point.y);
+        if (existingGear) this.openGearPopover(existingGear);
     }
 
     getProcessOptions(designType) {
@@ -168,7 +197,7 @@ export class UIController {
         select.value = mode;
         return mode;
     }
-    openGearPopover(gear) { this.state.selectedGearId = gear.id; document.getElementById('gear-modal').hidden = false; document.getElementById('gear-popover-title').textContent = gear.isCore ? 'メインギア' : `${gear.sizeKey} ギア設定`; document.getElementById('gear-popover-meta').textContent = `L${gear.layer + 1} / ${gear.teeth}歯 / ${gear.designType} / ${gear.processMode}`; const friction = Math.round(this.state.network?.calculateGearFriction(gear) || 0); const driveCost = Math.round(gear.steamLoad); const steamCost = driveCost + friction; const rotation = Math.round(Math.abs(gear.angularVelocity || 0)); const loopBonus = this.state.network?.loopGearIds?.has(gear.id) ? '環機構ボーナス' : ''; document.getElementById('gear-popover-cost').innerHTML = gear.isCore ? '<div class="cost-note">メインギア<br>現在コストの集計対象外</div>' : `<div class="resource-block brass-block"><div class="resource-heading">真鍮資材 <strong>${Math.round(gear.brassCost)}</strong></div></div><div class="resource-divider"></div><div class="resource-block steam-block"><div class="cost-row"><span>駆動コスト</span><strong>${driveCost}</strong></div><div class="cost-row"><span>摩擦コスト</span><strong>${friction}</strong></div>${loopBonus ? `<div class="bonus-row">(${loopBonus})</div>` : ''}</div><div class="resource-divider strong"></div><div class="cost-row steam-total"><span>消費スチーム / 回転</span><strong>${steamCost} / ${rotation}</strong></div>`; document.getElementById('gear-lock-toggle').checked = gear.isLocked; document.getElementById('gear-design-select').value = gear.designType; this.updateProcessOptions(gear.designType, gear.processMode); document.getElementById('gear-delete-button').disabled = gear.isCore; }
+    openGearPopover(gear) { this.state.selectedGearId = gear.id; document.getElementById('gear-modal').hidden = false; document.getElementById('gear-popover-title').textContent = gear.isCore ? 'メインギア' : `${gear.sizeKey} ギア設定`; document.getElementById('gear-popover-meta').textContent = gear.isCore ? `L${gear.layer + 1} / ${gear.teeth}歯` : `L${gear.layer + 1} / ${gear.teeth}歯 / ${gear.designType} / ${gear.processMode}`; const friction = Math.round(this.state.network?.calculateGearFriction(gear) || 0); const driveCost = Math.round(gear.steamLoad); const steamCost = driveCost + friction; const rotation = Math.round(Math.abs(gear.angularVelocity || 0)); const loopBonus = this.state.network?.loopGearIds?.has(gear.id) ? '環機構ボーナス' : ''; document.getElementById('gear-popover-cost').innerHTML = gear.isCore ? '<div class="cost-note">メインギア<br>現在コストの集計対象外</div>' : `<div class="resource-block brass-block"><div class="resource-heading">真鍮資材 <strong>${Math.round(gear.brassCost)}</strong></div></div><div class="resource-divider"></div><div class="resource-block steam-block"><div class="cost-row"><span>駆動コスト</span><strong>${driveCost}</strong></div><div class="cost-row"><span>摩擦コスト</span><strong>${friction}</strong></div>${loopBonus ? `<div class="bonus-row">(${loopBonus})</div>` : ''}</div><div class="resource-divider strong"></div><div class="cost-row steam-total"><span>消費スチーム / 回転</span><strong>${steamCost} / ${rotation}</strong></div>`; document.getElementById('gear-lock-toggle').checked = gear.isLocked; document.getElementById('main-gear-size-select').value = gear.sizeKey; document.getElementById('gear-design-select').value = gear.designType; this.updateProcessOptions(gear.designType, gear.processMode); document.getElementById('main-gear-size-row').classList.toggle('main-gear-hidden', !gear.isCore); document.getElementById('gear-design-row').classList.toggle('main-gear-hidden', gear.isCore); document.getElementById('gear-process-row').classList.toggle('main-gear-hidden', gear.isCore); document.getElementById('gear-delete-button').disabled = gear.isCore; }
     updateSelectedGear(settings) { const gear = this.gearManager.findGearById(this.state.selectedGearId); if (gear) this.gearManager.updateGearSettings(gear, settings); }
     closeGearPopover() {
         this.state.selectedGearId = null;
@@ -218,6 +247,12 @@ export class UIController {
             loopButton.textContent = `環機構可視化: ${this.state.showLoops ? 'ON' : 'OFF'}`;
             loopButton.classList.toggle('active', this.state.showLoops);
             loopButton.setAttribute('aria-pressed', String(this.state.showLoops));
+        }
+        const mainGearButton = document.querySelector('[data-action="toggle-main-gear"]');
+        if (mainGearButton) {
+            mainGearButton.textContent = `メインギア: ${this.state.mainGearRunning ? '起動中' : '停止中'}`;
+            mainGearButton.classList.toggle('active', this.state.mainGearRunning);
+            mainGearButton.setAttribute('aria-pressed', String(this.state.mainGearRunning));
         }
         const dashboard = document.querySelector('.dashboard');
         const dashboardToggle = document.querySelector('[data-action="toggle-dashboard"]');

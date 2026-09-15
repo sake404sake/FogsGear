@@ -12,6 +12,8 @@ export class GameState {
         this.rotationProgress = new Map();
         this.waterRecoveryRate = 0;
         this.steamTransformRate = 0;
+        this.mainGearRunning = true;
+        this.lastTickAt = performance.now();
         
         this.selectedSize = null;
         this.selectedLayer = 0;
@@ -61,6 +63,13 @@ export class GameState {
         this.notify();
     }
 
+    toggleMainGear() {
+        this.mainGearRunning = !this.mainGearRunning;
+        this.updatePowerGrid();
+        this.saveGameData();
+        this.notify();
+    }
+
     saveState() {
         this.undoStack.push(this.createSnapshot());
         if (this.undoStack.length > this.maxHistory) this.undoStack.shift();
@@ -73,6 +82,7 @@ export class GameState {
             steamPower: this.steamPower,
             water: this.water,
             brass: this.brass,
+            mainGearRunning: this.mainGearRunning,
             gears: this.placedGears.map(gear => ({
                 q: gear.q,
                 r: gear.r,
@@ -89,9 +99,10 @@ export class GameState {
         this.steamPower = data.steamPower;
         this.water = data.water ?? 0;
         this.brass = data.brass;
+        this.mainGearRunning = data.mainGearRunning ?? true;
         const gears = data.gears || data.placedGears || [];
         this.placedGears = this.createGear
-            ? gears.map(gear => this.createGear(gear.q, gear.r, gear.sizeKey || gear.size, gear.layer, gear.isCore, gear.angle))
+            ? gears.map(gear => this.createGear(gear))
             : gears.map(gear => ({ ...gear, sizeKey: gear.sizeKey || gear.size }));
         this.placedGears.forEach((gear, index) => {
             const savedGear = gears[index];
@@ -128,6 +139,7 @@ export class GameState {
         this.steamPower = 100;
         this.water = 0;
         this.brass = 300;
+        this.mainGearRunning = true;
         this.undoStack = [];
         this.redoStack = [];
         this.updatePowerGrid();
@@ -140,6 +152,7 @@ export class GameState {
             steamPower: this.steamPower,
             water: this.water,
             brass: this.brass,
+            mainGearRunning: this.mainGearRunning,
             gears: this.placedGears.map(gear => ({
                 q: gear.q, r: gear.r, size: gear.sizeKey, layer: gear.layer,
                 isCore: Boolean(gear.isCore), angle: gear.angle, isLocked: gear.isLocked, designType: gear.designType, processMode: gear.processMode
@@ -159,7 +172,15 @@ export class GameState {
                 this.steamPower = data.steamPower ?? 100;
                 this.water = data.water ?? 0;
                 this.brass = data.brass ?? 300;
+                this.mainGearRunning = data.mainGearRunning ?? true;
                 this.placedGears = (data.gears || data.placedGears || []).map(createGear);
+                if (this.placedGears.length > 0 && !this.placedGears.some(gear => gear.isCore)) {
+                    this.placedGears = [this.createGear({ q: 0, r: 0, size: 'LL', layer: 0, isCore: true })];
+                    this.undoStack = [];
+                    this.redoStack = [];
+                    this.saveGameData();
+                    return;
+                }
                 this.undoStack = data.undoStack || [];
                 this.redoStack = data.redoStack || [];
                 if (this.placedGears.length > 0) return;
@@ -174,6 +195,9 @@ export class GameState {
     }
 
     tick() {
+        const now = performance.now();
+        const elapsed = Math.min(0.25, Math.max(0, (now - this.lastTickAt) / 1000));
+        this.lastTickAt = now;
         if (this.network) this.network.updateRotation();
         const activeCount = this.placedGears.filter(gear => gear.powered && !gear.isDeadlocked).length;
         const activeGears = this.placedGears.filter(gear => gear.powered && !gear.isDeadlocked);
@@ -185,10 +209,18 @@ export class GameState {
             this.steamPower = 200;
             this.brass = 9999;
         } else {
-            this.steamPower = Math.min(200, Math.max(0, this.steamPower + 0.1 - activeCount * 0.05));
+            this.steamPower = Math.min(200, Math.max(0, this.steamPower + elapsed - activeCount * elapsed * 0.05));
+        }
+        if (this.steamPower <= 0) this.mainGearRunning = false;
+        if (!this.mainGearRunning) {
+            this.placedGears.forEach(gear => {
+                gear.powered = false;
+                gear.rotationDir = 0;
+                gear.angularVelocity = 0;
+            });
         }
         this.placedGears.forEach(gear => {
-            if (gear.powered && !gear.isDeadlocked) {
+            if (gear.powered && !gear.isDeadlocked && this.steamPower > 0 && this.mainGearRunning) {
                 const rotationDelta = 0.012 * (gear.angularVelocity || 1) * gear.rotationDir;
                 gear.angle += rotationDelta;
                 if (gear.designType === 'PRODUCTION' && gear.processMode === 'FOG_COLLECTION') {
@@ -216,7 +248,11 @@ export class GameState {
     }
 
     updatePowerGrid() {
-        if (this.network) { this.network.rebuild(this.placedGears).updateRotation(); return; }
+        if (this.network) {
+            this.network.rebuild(this.placedGears).updateRotation();
+            if (!this.mainGearRunning || this.steamPower <= 0) this.placedGears.forEach(gear => { gear.powered = false; gear.rotationDir = 0; gear.angularVelocity = 0; });
+            return;
+        }
         this.placedGears.forEach(gear => {
             gear.powered = false;
             gear.rotationDir = 0;

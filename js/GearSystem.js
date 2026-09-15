@@ -27,7 +27,7 @@ export class Gear {
     }
 
     get brassCost() { return this.size; }
-    get steamLoad() { return this.size; }
+    get steamLoad() { return Math.floor(Math.sqrt(this.teeth)); }
 }
 
 export class Axis {

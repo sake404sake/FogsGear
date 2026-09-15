@@ -29,7 +29,8 @@ export class GearManager {
         this.state.network = this.network;
         this.state.loadGameData(data => {
             const sizeKey = data.sizeKey || data.size || 'M';
-            const position = data.q === undefined ? pixelToHex(data.x || 0, data.y || 0) : { q: data.q, r: data.r };
+            const hasHexPosition = Number.isFinite(data.q) && Number.isFinite(data.r);
+            const position = hasHexPosition ? { q: data.q, r: data.r } : pixelToHex(data.x || 0, data.y || 0);
             const gear = this.createGear(position.q, position.r, sizeKey, data.layer, data.isCore, data.angle);
             gear.isLocked = data.isLocked ?? Boolean(data.isCore);
             gear.designType = data.designType || gear.designType;
@@ -60,6 +61,16 @@ export class GearManager {
     }
 
     findGearById(id) { return this.state.placedGears.find(gear => gear.id === id) || null; }
+    updateGearSize(gear, sizeKey) {
+        const config = GEAR_CONFIG[sizeKey];
+        if (!gear || !config || !gear.isCore || gear.sizeKey === sizeKey) return false;
+        this.state.saveState();
+        Object.assign(gear, { size: config.teeth, teeth: config.teeth, sizeKey, radius: config.radius, cost: config.cost, pattern: config.pattern });
+        this.state.updatePowerGrid();
+        this.state.saveGameData();
+        this.state.notify();
+        return true;
+    }
     setGearLock(gear, locked) {
         const synced = this.state.placedGears.filter(other => other.q === gear.q && other.r === gear.r);
         if (locked && synced.length < 2) {
@@ -100,7 +111,7 @@ export class GearManager {
         return [...this.state.placedGears].sort((a, b) => b.layer - a.layer).find(gear => {
             const dx = gear.x - x;
             const dy = gear.y - y;
-            return Math.hypot(dx, dy) < Math.max(18, gear.radius * 0.55);
+            return Math.hypot(dx, dy) < Math.max(40, gear.radius);
         });
     }
 
