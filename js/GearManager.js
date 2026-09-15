@@ -34,7 +34,7 @@ export class GearManager {
             const gear = this.createGear(position.q, position.r, sizeKey, data.layer, data.isCore, data.angle);
             gear.isLocked = data.isLocked ?? Boolean(data.isCore);
             gear.designType = data.designType || gear.designType;
-            gear.processMode = data.processMode || gear.processMode;
+            gear.processMode = data.processMode === 'GAS_TO_LIQUID_METAL' ? 'FOG_TO_LIQUID_METAL' : data.processMode || gear.processMode;
             return gear;
         });
         this.network.rebuild(this.state.placedGears);
