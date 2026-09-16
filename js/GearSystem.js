@@ -1,11 +1,16 @@
+// ギアの歯数をサイズ名から参照する。歯数はコスト・回転比・処理量の基準になる。
 export const GearSize = Object.freeze({ XXS: 4, SS: 6, S: 10, M: 14, L: 18, LL: 24, THREE_L: 32, FOUR_L: 40, MAX: 48 });
+// 物理レイヤーは金・銀・銅の3段で、同じq/rなら同軸として扱う。
 export const Layer = Object.freeze({ GOLD: 0, SILVER: 1, BRONZE: 2 });
+// ギアの外観分類。処理モードとは独立した設定値として保持する。
 export const GearDesignType = Object.freeze({ INDUSTRIAL: 'INDUSTRIAL', ALCHEMICAL: 'ALCHEMICAL', LOGISTICS: 'LOGISTICS', CLOCKWORK: 'CLOCKWORK', PRODUCTION: 'PRODUCTION' });
+// 資源変換や霧回収の種類。実際の資源処理はGameStateが担当する。
 export const ProcessMode = Object.freeze({ NONE: 'NONE', FOG_COLLECTION: 'FOG_COLLECTION', TRANSFORM: 'TRANSFORM', FOG_TO_WATER: 'FOG_TO_WATER', FOG_TO_LIQUID_METAL: 'FOG_TO_LIQUID_METAL', LIQUID_TO_SOLID_METAL: 'LIQUID_TO_SOLID_METAL', SOLID_TO_BRASS: 'SOLID_TO_BRASS' });
 
 const layerDesigns = [GearDesignType.INDUSTRIAL, GearDesignType.ALCHEMICAL, GearDesignType.CLOCKWORK];
 
 export class Gear {
+    // ギア1個の永続設定と、ネットワークが毎 tick 更新する回転状態を保持する。
     constructor({ id, size, layer = Layer.GOLD, isLocked, designType, processMode = ProcessMode.NONE, position = { q: 0, r: 0 }, isCore = false, angle = 0 }) {
         this.id = id || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
         this.size = size;
@@ -31,6 +36,7 @@ export class Gear {
 }
 
 export class Axis {
+    // 同じq/rにある複数レイヤーのギアをまとめ、同軸ロックと摩擦を計算する。
     constructor(q, r) { this.q = q; this.r = r; this.gears = new Map(); }
     add(gear) { this.gears.set(gear.layer, gear); }
     get lockedGears() { return [...this.gears.values()].filter(gear => gear.isLocked); }
@@ -42,8 +48,10 @@ export class Axis {
 }
 
 export class GearNetwork {
+    // ギア間の接続グラフ、同軸、ループ、回転状態を再計算する物理モデル。
     constructor(gears = []) { this.rebuild(gears); }
     rebuild(gears) {
+        // 配置済みギアをIDで管理し、軸と接続関係を毎回再構築する。
         this.gears = new Map(gears.map(gear => [gear.id, gear]));
         this.axes = new Map();
         this.connections = new Map();
@@ -54,12 +62,14 @@ export class GearNetwork {
         return this;
     }
     connect(first, second) {
+        // 接続はIDの隣接集合として双方向に登録する。
         if (!this.connections.has(first.id)) this.connections.set(first.id, new Set());
         if (!this.connections.has(second.id)) this.connections.set(second.id, new Set());
         this.connections.get(first.id).add(second.id);
         this.connections.get(second.id).add(first.id);
     }
     rebuildConnections() {
+        // 同軸のロック接続と、同一層で噛み合う物理接続だけを作る。
         this.connections.clear();
         const gears = [...this.gears.values()];
         gears.forEach((gear, index) => gears.slice(index + 1).forEach(other => {
@@ -70,6 +80,7 @@ export class GearNetwork {
         this.rebuildLoops();
     }
     rebuildLoops() {
+        // 次数1未満の端点を除去し、最後に残る閉路ギアをループとして識別する。
         const degree = new Map([...this.gears.keys()].map(id => [id, (this.connections.get(id) || new Set()).size]));
         const queue = [...degree.entries()].filter(([, count]) => count < 2).map(([id]) => id);
         const removed = new Set();
@@ -85,7 +96,9 @@ export class GearNetwork {
         }
         this.loopGearIds = new Set([...this.gears.keys()].filter(id => !removed.has(id)));
     }
+    // 配置済みギアのサイズから、設置済み真鍮コストを合計する。
     calculateBrassCost() { return [...this.gears.values()].filter(gear => !gear.isCore).reduce((sum, gear) => sum + gear.brassCost, 0); }
+    // 基本駆動負荷と軸摩擦を合算する。ループ内の軸摩擦は0として扱う。
     calculateSteamConsumption() {
         const baseLoad = [...this.gears.values()].filter(gear => !gear.isCore).reduce((sum, gear) => sum + gear.steamLoad, 0);
         const friction = [...this.axes.values()].reduce((sum, axis) => {
@@ -94,6 +107,7 @@ export class GearNetwork {
         }, 0);
         return baseLoad + friction;
     }
+    // ポップオーバーに表示する、指定ギア単体の摩擦負荷を返す。
     calculateGearFriction(gear) {
         if (!gear || gear.isCore) return 0;
         const axis = this.axes.get(`${gear.q},${gear.r}`);
@@ -104,6 +118,7 @@ export class GearNetwork {
         return synchronized ? 8 / synchronized : 8;
     }
     synchronizeLockedAxes() {
+        // 同軸ロック時に同期するのは回転状態だけ。種類・処理設定は同期しない。
         for (const axis of this.axes.values()) {
             const locked = axis.lockedGears.sort((a, b) => a.layer - b.layer);
             if (locked.length < 2 || locked.some(gear => gear.isDeadlocked || gear.angleError)) continue;
@@ -117,6 +132,7 @@ export class GearNetwork {
         }
     }
     updateRotation() {
+        // 接続グラフから各ギアの回転方向・速度を決める。処理設定は変更しない。
         this.rebuildConnections();
         const invalidLockedAxes = new Set();
         for (const axis of this.axes.values()) {

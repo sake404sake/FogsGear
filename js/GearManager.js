@@ -6,6 +6,7 @@ export const GEAR_CONFIG = {
 
 export const PITCH = 2;
 
+// 画面上の座標を、ギア配置に使う六角座標へ丸める。
 export function pixelToHex(x, y) {
     const q = (Math.sqrt(3) / 3 * x - y / 3) / PITCH;
     const r = (2 / 3 * y) / PITCH;
@@ -17,16 +18,19 @@ export function pixelToHex(x, y) {
     return { q: rq, r: rr };
 }
 
+// 六角座標をキャンバス上のワールド座標へ変換する。
 export function hexToPixel(q, r) {
     return { x: PITCH * Math.sqrt(3) * (q + r / 2), y: PITCH * 1.5 * r };
 }
 
 export class GearManager {
+    // 配置・保存復元・ギア設定変更を担当する。物理計算はGearNetworkへ委譲する。
     constructor(gameState) {
         this.state = gameState;
         this.canvas = document.getElementById('gearCanvas');
         this.network = new GearNetwork();
         this.state.network = this.network;
+        // 保存データからギアを1個ずつ復元し、種類・処理・ロック状態を各オブジェクトへ設定する。
         this.state.loadGameData(data => {
             const sizeKey = data.sizeKey || data.size || 'M';
             const hasHexPosition = Number.isFinite(data.q) && Number.isFinite(data.r);
@@ -43,6 +47,7 @@ export class GearManager {
     }
 
     createGear(q = 0, r = 0, sizeKey, layer = 0, isCore = false, angle = 0) {
+        // サイズ定義から、独立したGearオブジェクトと描画用メタデータを作る。
         const config = GEAR_CONFIG[sizeKey] || GEAR_CONFIG.M;
         const position = hexToPixel(q, r);
         const gear = new Gear({ size: config.teeth, layer, position: { q, r }, isCore, angle });
@@ -50,6 +55,7 @@ export class GearManager {
     }
 
     removeGear(gear) {
+        // 配置一覧から対象ギアだけを除去し、通常モードでは使用コストの80%を返還する。
         if (!gear || gear.isCore) return false;
         this.state.saveState();
         this.state.placedGears = this.state.placedGears.filter(other => other.id !== gear.id);
@@ -60,8 +66,10 @@ export class GearManager {
         return true;
     }
 
+    // UIが保持するIDから、現在のギア実体を検索する。
     findGearById(id) { return this.state.placedGears.find(gear => gear.id === id) || null; }
     updateGearSize(gear, sizeKey) {
+        // メインギアだけサイズを変更し、歯数・半径・コストを一緒に更新する。
         const config = GEAR_CONFIG[sizeKey];
         if (!gear || !config || !gear.isCore || gear.sizeKey === sizeKey) return false;
         this.state.saveState();
@@ -72,6 +80,7 @@ export class GearManager {
         return true;
     }
     setGearLock(gear, locked) {
+        // 同じ軸のロック状態と回転状態を調整する。種類・処理設定は変更しない。
         const synced = this.state.placedGears.filter(other => other.q === gear.q && other.r === gear.r);
         if (locked && synced.length < 2) {
             gear.isLocked = false;
@@ -103,25 +112,40 @@ export class GearManager {
     }
 
     findMeshConnections(x, y, radius, layer) {
+        // ゴーストギアの候補から、同じレイヤーで接触範囲に入るギアを探す。
         return this.state.placedGears.filter(gear => gear.layer === layer && Math.hypot(gear.x - x, gear.y - y) <= gear.radius + radius + 2);
     }
-    updateGearSettings(gear, settings) { Object.assign(gear, settings); this.state.saveGameData(); this.state.notify(); }
+    updateGearSettings(gear, settings) {
+        // 設定変更の対象は、現在選択されている実体1個だけ。連結先にはコピーしない。
+        if (!gear || !this.state.placedGears.includes(gear)) return false;
+        if (Object.hasOwn(settings, 'designType')) gear.designType = settings.designType;
+        if (Object.hasOwn(settings, 'processMode')) gear.processMode = settings.processMode;
+        this.state.saveGameData();
+        this.state.notify();
+        return true;
+    }
 
     /**
      * 指定位置に既存ギアの中心があるか判定（中心タップで削除用）
      */
-    findGearAt(x, y) {
-        return [...this.state.placedGears].sort((a, b) => b.layer - a.layer).find(gear => {
+    findGearsAt(x, y) {
+        // クリック位置に重なるギアを返す。同軸選択用に層順を保持する。
+        return [...this.state.placedGears].filter(gear => {
             const dx = gear.x - x;
             const dy = gear.y - y;
             return Math.hypot(dx, dy) < Math.max(40, gear.radius);
-        });
+        }).sort((a, b) => b.layer - a.layer);
+    }
+
+    findGearAt(x, y) {
+        return this.findGearsAt(x, y)[0];
     }
 
     /**
      * 重複配置のチェック（同じレイヤーで距離が小さすぎる場合は不可）
      */
     canPlaceAt(x, y, radius, layer) {
+        // 同一レイヤーの物理重複を検査し、配置可能かを返す。
         return !this.state.placedGears.some(gear => {
             if (gear.layer !== layer) return false;
             const dx = gear.x - x;
@@ -132,6 +156,7 @@ export class GearManager {
     }
 
     updateGhost(mouseX, mouseY, pointerOffsetY = 110) {
+        // ポインター位置を配置候補へ変換し、軸合わせ・噛み合わせ・接続候補を計算する。
         const sizeKey = this.state.selectedSize;
         if (!sizeKey) {
             this.state.ghostGear = null;
@@ -237,6 +262,7 @@ export class GearManager {
      * 近接するギアとの自動噛み合い補正（スナップ計算）
      */
     calculateSnapPosition(x, y, sizeKey, layer) {
+        // 旧配置ロジック用のスナップ計算。現在のゴースト配置でも補正の考え方を共有する。
         const config = GEAR_CONFIG[sizeKey];
         if (!config) return { x, y, angle: 0 };
 
@@ -272,6 +298,7 @@ export class GearManager {
      * ギアの配置実行
      */
     tryPlaceGear(x, y) {
+        // 選択サイズがあればゴーストを確定配置し、なければクリック位置のギアを撤去する。
         const sizeKey = this.state.selectedSize;
         const layer = this.state.selectedLayer;
         if (!sizeKey) {

@@ -1,5 +1,9 @@
-/** Canvas rendering, animation, and world-to-screen presentation. */
+/**
+ * CanvasRenderer - ギア盤面の描画、アニメーション、座標変換を担当する。
+ * GameStateを変更せず、現在の状態をキャンバスへ投影する表示専用モジュール。
+ */
 export class CanvasRenderer {
+    // キャンバス、レイヤー色、画像キャッシュを初期化して描画ループを開始する。
     constructor(canvasId, state) {
         this.canvas = document.getElementById(canvasId);
         this.ctx = this.canvas.getContext('2d');
@@ -20,6 +24,7 @@ export class CanvasRenderer {
     }
 
     loadGearImages() {
+        // ギア種類ごとの画像を非同期読み込みし、読み込み完了後に色付きキャッシュを破棄する。
         const designs = ['industrial', 'alchemical', 'logistics', 'clockwork', 'production'];
         const names = designs.concat('core');
         names.forEach(name => {
@@ -33,12 +38,14 @@ export class CanvasRenderer {
     }
 
     loop() {
+        // 1フレームごとにゲーム状態を進めてから、最新状態を描画する。
         this.state.tick();
         this.render();
         requestAnimationFrame(() => this.loop());
     }
 
     worldPoint(clientX, clientY) {
+        // ブラウザー座標をズーム・パン補正後のワールド座標へ変換する。
         const point = this.canvasPoint(clientX, clientY);
         return {
             x: (point.x - this.canvas.width / 2) / this.state.zoomScale - this.state.offsetX,
@@ -47,6 +54,7 @@ export class CanvasRenderer {
     }
 
     canvasPoint(clientX, clientY) {
+        // CSS表示サイズと内部キャンバス解像度の差を吸収してキャンバス座標へ変換する。
         const rect = this.canvas.getBoundingClientRect();
         return {
             x: (clientX - rect.left) * this.canvas.width / rect.width,
@@ -55,6 +63,7 @@ export class CanvasRenderer {
     }
 
     render() {
+        // 背景、グリッド、配置ギア、ループ表示、ゴーストをこの順番で描画する。
         const { width, height } = this.canvas;
         this.ctx.clearRect(0, 0, width, height);
         this.ctx.fillStyle = '#120e0c';
@@ -76,6 +85,7 @@ export class CanvasRenderer {
     }
 
     drawLoops() {
+        // GearNetworkが検出したループの接続線と輪郭を可視化する。
         const loopIds = this.state.network?.loopGearIds || new Set();
         if (loopIds.size < 2) return;
         const drawn = new Set();
@@ -114,6 +124,7 @@ export class CanvasRenderer {
     }
 
     drawGhostConnections(ghost) {
+        // 配置候補と接続・重複ブロック対象を色分けして表示する。
         const connected = new Set(ghost.connectionIds || []);
         const blocked = new Set(ghost.blockedIds || []);
         const count = connected.size;
@@ -145,6 +156,7 @@ export class CanvasRenderer {
     }
 
     drawHexGrid() {
+        // ズーム・パン・配置軸が変わったときだけグリッドを再生成し、通常は画像を再利用する。
         const { width, height } = this.canvas;
         const gearKey = this.state.placedGears.map(gear => `${gear.q},${gear.r}`).join('|');
         const key = `${width}x${height}:${this.state.zoomScale}:${this.state.offsetX}:${this.state.offsetY}:${gearKey}`;
@@ -191,10 +203,12 @@ export class CanvasRenderer {
     }
 
     hexToPixel(q, r) {
+        // GearManagerと同じピッチで六角座標をワールド座標へ変換する。
         return { x: 2 * Math.sqrt(3) * (q + r / 2), y: 3 * r };
     }
 
     metalGradient(radius, palette, isCore) {
+        // ギア本体の金属感を出す放射グラデーションを作る。
         const gradient = this.ctx.createRadialGradient(-radius * 0.35, -radius * 0.4, radius * 0.08, 0, 0, radius * 1.15);
         gradient.addColorStop(0, isCore ? '#fff4a8' : palette.stroke);
         gradient.addColorStop(0.28, palette.fill);
@@ -204,6 +218,7 @@ export class CanvasRenderer {
     }
 
     getTintedImage(name, color) {
+        // 元画像を指定色でマスクしたオフスクリーンキャンバスをキャッシュする。
         const key = `${name}:${color}`;
         if (this.tintedImages[key]) return this.tintedImages[key];
         const source = this.gearImages[name];
@@ -221,6 +236,7 @@ export class CanvasRenderer {
     }
 
     drawGearImage(name, radius, color, alpha) {
+        // 画像アセットが利用可能なら、ギア本体を画像で描画する。
         const image = this.getTintedImage(name, color);
         if (!image) return false;
         this.ctx.globalAlpha = alpha;
@@ -233,6 +249,7 @@ export class CanvasRenderer {
     }
 
     drawTeeth(gear, radius, color, isGhost) {
+        // ギアの歯数に応じた矩形歯を円周上へ配置する。
         const toothLength = Math.max(6, Math.min(10, radius * 0.1));
         const bodyRadius = radius - toothLength;
         const toothWidth = Math.max(3, Math.min(12, (Math.PI * 2 * radius / gear.teeth) * 0.45));
@@ -251,6 +268,7 @@ export class CanvasRenderer {
     }
 
     drawGear(gear, isGhost = false) {
+        // 状態に応じた色を選び、画像またはフォールバック図形で1個のギアを描画する。
         const ctx = this.ctx;
         const radius = gear.radius;
         const palette = this.layerColors[gear.layer % 3];
@@ -346,6 +364,7 @@ export class CanvasRenderer {
     }
 
     drawProcessIndicator(gear, radius, isGhost) {
+        // 処理設定があるギアへ、処理種別を示す発光リングを重ねる。
         if (isGhost || gear.processMode === 'NONE' || gear.processMode === 'POWER' || gear.isCore) return;
         const color = gear.processMode === 'FOG_COLLECTION' ? '#8eeaff' : '#78b9ff';
         this.ctx.save();
@@ -363,6 +382,7 @@ export class CanvasRenderer {
     }
 
     drawCoreDetails(radius) {
+        // メインギア専用の同心円・スポーク・ボルト装飾を描画する。
         const ctx = this.ctx;
         ctx.strokeStyle = '#d2a43b';
         ctx.lineWidth = Math.max(1.5, radius * 0.018);
@@ -386,6 +406,7 @@ export class CanvasRenderer {
     }
 
     drawPattern(radius, pattern, isGhost, sizeKey) {
+        // サイズ定義のパターン名に応じて、ギア中心部の意匠を切り替える。
         const ctx = this.ctx;
         const dark = isGhost ? 'rgba(0,0,0,0.18)' : '#1a1614';
         ctx.fillStyle = dark;
@@ -533,6 +554,7 @@ export class CanvasRenderer {
     }
 
     drawBoltRing(radius, count, scale, isGhost) {
+        // 指定数のボルトを円周上へ配置する共通描画部品。
         const ctx = this.ctx;
         for (let i = 0; i < count; i++) {
             const angle = i * Math.PI * 2 / count + Math.PI / count;
@@ -546,6 +568,7 @@ export class CanvasRenderer {
     }
 
     drawRing(radius, isGhost) {
+        // 中心リングを1本描画する。
         const ctx = this.ctx;
         ctx.beginPath();
         ctx.arc(0, 0, radius, 0, Math.PI * 2);
@@ -555,6 +578,7 @@ export class CanvasRenderer {
     }
 
     drawSpokeLines(radius, count, inner, outer, isGhost, heavy = false) {
+        // 指定本数のスポークを内周から外周へ描画する。
         const ctx = this.ctx;
         ctx.strokeStyle = isGhost ? 'rgba(255,255,255,0.6)' : '#c19332';
         ctx.lineWidth = Math.max(1.5, radius * (heavy ? 0.055 : 0.03));
@@ -568,6 +592,7 @@ export class CanvasRenderer {
     }
 
     drawHole(x, y, radius, isGhost) {
+        // ギア意匠用の円形穴を描画する。
         const ctx = this.ctx;
         ctx.beginPath();
         ctx.arc(x, y, radius, 0, Math.PI * 2);
@@ -579,6 +604,7 @@ export class CanvasRenderer {
     }
 
     drawWedgeSpokes(radius, count, gap, outer, inner, isGhost, chunky = false) {
+        // 扇形のスポークを連続配置する意匠用ヘルパー。
         const ctx = this.ctx;
         for (let i = 0; i < count; i++) {
             const start = i * Math.PI * 2 / count + gap;

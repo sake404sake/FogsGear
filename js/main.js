@@ -6,6 +6,7 @@ import { GearManager } from './GearManager.js';
 import { CanvasRenderer } from './CanvasRenderer.js';
 import { UIController } from './UIController.js';
 
+// DOMの準備後に、状態・ギア操作・描画・入力操作を同じGameStateへ接続する。
 document.addEventListener('DOMContentLoaded', () => {
     // 1. 状態の初期化
     const gameState = new GameState();
@@ -19,7 +20,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // 4. UIコントローラーの初期化
     const uiController = new UIController(gameState, gearManager, renderer);
 
-    // 初期状態の反映
+    // 保存データの復元結果を、ステータス表示と各種ボタンへ反映する。
     uiController.updateUI();
 
     console.log('Fog Thermodynamics Engine initialized.');
