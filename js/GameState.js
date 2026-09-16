@@ -164,6 +164,7 @@ export class GameState {
             creativeSnapshot: this.creativeSnapshot,
             belts: this.belts,
             gears: this.placedGears.map(gear => ({
+                id: gear.id,
                 q: gear.q,
                 r: gear.r,
                 size: gear.sizeKey,
@@ -256,6 +257,7 @@ export class GameState {
             creativeSnapshot: this.creativeSnapshot,
             belts: this.belts,
             gears: this.placedGears.map(gear => ({
+                id: gear.id,
                 q: gear.q, r: gear.r, size: gear.sizeKey, layer: gear.layer,
                 isCore: Boolean(gear.isCore), angle: gear.angle, isLocked: gear.isLocked, designType: gear.designType, processMode: gear.processMode
             })),

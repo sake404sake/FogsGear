@@ -35,7 +35,7 @@ export class GearManager {
             const sizeKey = data.sizeKey || data.size || 'M';
             const hasHexPosition = Number.isFinite(data.q) && Number.isFinite(data.r);
             const position = hasHexPosition ? { q: data.q, r: data.r } : pixelToHex(data.x || 0, data.y || 0);
-            const gear = this.createGear(position.q, position.r, sizeKey, data.layer, data.isCore, data.angle);
+            const gear = this.createGear(position.q, position.r, sizeKey, data.layer, data.isCore, data.angle, data.id);
             gear.isLocked = data.isLocked ?? Boolean(data.isCore);
             gear.designType = data.designType || gear.designType;
             gear.processMode = data.processMode === 'GAS_TO_LIQUID_METAL' ? 'FOG_TO_LIQUID_METAL' : data.processMode || gear.processMode;
@@ -46,11 +46,11 @@ export class GearManager {
         this.state.saveGameData();
     }
 
-    createGear(q = 0, r = 0, sizeKey, layer = 0, isCore = false, angle = 0) {
+    createGear(q = 0, r = 0, sizeKey, layer = 0, isCore = false, angle = 0, id = null) {
         // サイズ定義から、独立したGearオブジェクトと描画用メタデータを作る。
         const config = GEAR_CONFIG[sizeKey] || GEAR_CONFIG.M;
         const position = hexToPixel(q, r);
-        const gear = new Gear({ size: config.teeth, layer, position: { q, r }, isCore, angle });
+        const gear = new Gear({id, size: config.teeth, layer, position: { q, r }, isCore, angle });
         return Object.assign(gear, { x: position.x, y: position.y, sizeKey, radius: config.radius, cost: config.cost, pattern: config.pattern });
     }
 
