@@ -31,8 +31,10 @@ export class Gear {
         this.angleError = false;
     }
 
-    get brassCost() { return this.size; }
-    get steamLoad() { return Math.floor(Math.sqrt(this.teeth)); }
+    // ギアサイズに応じた設置コストと駆動負荷を返す。
+    get brassCost() { return Number.isFinite(this.size) ? this.size : Number(this.teeth) || 0; }
+    get steamLoad() { return Math.floor(Math.sqrt(Number(this.teeth) || 0)); }
+
 }
 
 export class Axis {
@@ -49,15 +51,17 @@ export class Axis {
 
 export class GearNetwork {
     // ギア間の接続グラフ、同軸、ループ、回転状態を再計算する物理モデル。
-    constructor(gears = []) { this.rebuild(gears); }
-    rebuild(gears) {
+    constructor(gears = [], belts = []) { this.rebuild(gears, belts); }
+    rebuild(gears, belts = []) {
         // 配置済みギアをIDで管理し、軸と接続関係を毎回再構築する。
         this.gears = new Map(gears.map(gear => [gear.id, gear]));
         this.axes = new Map();
         this.connections = new Map();
+        this.beltEdges = new Set();
+        this.belts = belts;
         this.loopGearIds = new Set();
         gears.forEach(gear => { const key = `${gear.q},${gear.r}`; if (!this.axes.has(key)) this.axes.set(key, new Axis(gear.q, gear.r)); this.axes.get(key).add(gear); });
-        this.rebuildConnections();
+        this.rebuildConnections(belts);
         this.rebuildLoops();
         return this;
     }
@@ -68,15 +72,26 @@ export class GearNetwork {
         this.connections.get(first.id).add(second.id);
         this.connections.get(second.id).add(first.id);
     }
-    rebuildConnections() {
+    rebuildConnections(belts = []) {
         // 同軸のロック接続と、同一層で噛み合う物理接続だけを作る。
         this.connections.clear();
+        this.beltEdges.clear();
         const gears = [...this.gears.values()];
         gears.forEach((gear, index) => gears.slice(index + 1).forEach(other => {
             const axis = gear.q === other.q && gear.r === other.r && gear.layer !== other.layer && gear.isLocked && other.isLocked;
             const mesh = gear.layer === other.layer && Math.hypot(gear.x - other.x, gear.y - other.y) <= gear.radius + other.radius + 2;
             if (axis || mesh) this.connect(gear, other);
         }));
+        belts.forEach(belt => {
+            const gearIds = belt.gearIds || [];
+            for (let index = 1; index < gearIds.length; index++) {
+                const first = this.gears.get(gearIds[index - 1]);
+                const second = this.gears.get(gearIds[index]);
+                if (!first || !second || first.id === second.id) continue;
+                this.connect(first, second);
+                this.beltEdges.add([first.id, second.id].sort().join(':'));
+            }
+        });
         this.rebuildLoops();
     }
     rebuildLoops() {
@@ -133,7 +148,7 @@ export class GearNetwork {
     }
     updateRotation() {
         // 接続グラフから各ギアの回転方向・速度を決める。処理設定は変更しない。
-        this.rebuildConnections();
+        this.rebuildConnections(this.belts || []);
         const invalidLockedAxes = new Set();
         for (const axis of this.axes.values()) {
             const locked = axis.lockedGears;
@@ -165,7 +180,9 @@ export class GearNetwork {
             if (known) {
                 const speedMismatch = Math.abs(known.speed - current.speed) > 0.001;
                 const directionMismatch = known.direction !== current.direction;
-                if (speedMismatch || directionMismatch) {
+                // 同じギアへ別経路が戻ってきても、すでに確定した状態は維持する。
+                // 速度・方向が異なる場合だけ、物理的に矛盾する閉路として停止させる。
+                if ((speedMismatch || directionMismatch) && !current.gear.isDeadlocked) {
                     conflicts.add(current.gear.id);
                 }
                 continue;
@@ -178,7 +195,8 @@ export class GearNetwork {
             for (const id of this.connections.get(current.gear.id) || []) {
                 const other = this.gears.get(id);
                 const axis = current.gear.q === other.q && current.gear.r === other.r && current.gear.layer !== other.layer;
-                queue.push({ gear: other, speed: axis ? current.speed : current.speed * current.gear.size / other.size, direction: axis ? current.direction : -current.direction });
+                const belt = this.beltEdges.has([current.gear.id, other.id].sort().join(':'));
+                queue.push({ gear: other, speed: axis ? current.speed : current.speed * current.gear.size / other.size, direction: axis || belt ? current.direction : -current.direction });
             }
         }
         conflicts.forEach(id => {

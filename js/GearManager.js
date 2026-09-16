@@ -41,7 +41,7 @@ export class GearManager {
             gear.processMode = data.processMode === 'GAS_TO_LIQUID_METAL' ? 'FOG_TO_LIQUID_METAL' : data.processMode || gear.processMode;
             return gear;
         });
-        this.network.rebuild(this.state.placedGears);
+        this.network.rebuild(this.state.placedGears, this.state.belts);
         this.state.updatePowerGrid();
         this.state.saveGameData();
     }
@@ -59,6 +59,7 @@ export class GearManager {
         if (!gear || gear.isCore) return false;
         this.state.saveState();
         this.state.placedGears = this.state.placedGears.filter(other => other.id !== gear.id);
+        this.state.belts = this.state.belts.filter(belt => !belt.gearIds?.includes(gear.id));
         if (!this.state.creativeMode) this.state.brass += Math.floor(gear.cost * 0.8);
         this.state.updatePowerGrid();
         this.state.saveGameData();
@@ -120,6 +121,18 @@ export class GearManager {
         if (!gear || !this.state.placedGears.includes(gear)) return false;
         if (Object.hasOwn(settings, 'designType')) gear.designType = settings.designType;
         if (Object.hasOwn(settings, 'processMode')) gear.processMode = settings.processMode;
+        this.state.saveGameData();
+        this.state.notify();
+        return true;
+    }
+
+    addBelt(gears) {
+        const gearIds = [...new Set((gears || []).filter(Boolean).map(gear => gear.id))];
+        if (gearIds.length < 2) return false;
+        if (this.state.belts.some(belt => belt.gearIds?.slice().sort().join(':') === gearIds.slice().sort().join(':'))) return false;
+        this.state.saveState();
+        this.state.belts.push({ id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, gearIds });
+        this.state.updatePowerGrid();
         this.state.saveGameData();
         this.state.notify();
         return true;

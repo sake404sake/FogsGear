@@ -33,6 +33,11 @@ export class UIController {
                 this.closeGearPopover();
             } else if (button.dataset.layer !== undefined) {
                 this.state.setSelectedLayer(button.dataset.layer);
+            } else if (button.dataset.item) {
+                this.state.setSelectedItem(this.state.selectedItem === button.dataset.item ? 'NONE' : button.dataset.item);
+            } else if (button.dataset.action === 'confirm-belt') {
+                const gears = this.state.beltSelection.map(id => this.gearManager.findGearById(id)).filter(Boolean);
+                if (this.gearManager.addBelt(gears)) this.state.setBeltSelection([]);
             } else if (button.dataset.action === 'toggle-creative') {
                 this.state.setCreativeMode(!this.state.creativeMode);
             } else if (button.dataset.action === 'undo') {
@@ -92,6 +97,10 @@ export class UIController {
         this.canvas.addEventListener('pointerup', event => this.pointerUp(event));
         this.canvas.addEventListener('contextmenu', event => {
             event.preventDefault();
+            if (this.state.selectedItem === 'BELT') {
+                this.state.setSelectedItem('NONE');
+                return;
+            }
             this.state.setSelectedSize(null);
             this.state.ghostGear = null;
             this.closeGearPopover();
@@ -116,6 +125,11 @@ export class UIController {
         // ギアを押した場合は編集対象を確定し、それ以外はパン・ピンチ・配置操作を開始する。
         if (event.button === 2) return;
         const point = this.renderer.worldPoint(event.clientX, event.clientY);
+        if (this.state.selectedItem === 'BELT') {
+            const gear = this.selectGearAt(point.x, point.y);
+            if (gear && !this.state.beltSelection.includes(gear.id)) this.state.setBeltSelection([...this.state.beltSelection, gear.id]);
+            return;
+        }
         this.pointerDownGear = this.state.selectedSize ? null : this.selectGearAt(point.x, point.y);
         if (this.pointerDownGear) {
             this.updateAxisLayerOptions(this.pointerDownGear);
@@ -174,6 +188,7 @@ export class UIController {
     pointerUp(event) {
         // ギア編集、配置確定、または通常の盤面操作を終了する。
         if (event.button === 2) return;
+        if (this.state.selectedItem === 'BELT') return;
         if (this.pointerDownGear) {
             this.pointerDownGear = null;
             return;
@@ -311,6 +326,9 @@ export class UIController {
         });
         const selectedGear = this.gearManager.findGearById(this.state.selectedGearId);
         if (selectedGear) this.updateProcessInfo(selectedGear);
+        document.querySelectorAll('.btn-item').forEach(button => button.classList.toggle('active', button.dataset.item === this.state.selectedItem));
+        const beltConfirm = document.getElementById('belt-confirm-button');
+        if (beltConfirm) beltConfirm.hidden = this.state.selectedItem !== 'BELT' || this.state.beltSelection.length < 2;
         const creative = document.getElementById('creativeBtn');
         if (creative) {
             creative.classList.toggle('active', this.state.creativeMode);

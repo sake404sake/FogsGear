@@ -38,6 +38,9 @@ export class GameState {
         this.selectedLayer = 0;
         
         this.placedGears = [];
+        this.belts = [];
+        this.selectedItem = 'NONE';
+        this.beltSelection = [];
         this.ghostGear = null;
         this.showLoops = false;
         this.dashboardOpen = false;
@@ -118,6 +121,19 @@ export class GameState {
         this.notify();
     }
 
+    setSelectedItem(item) {
+        this.selectedItem = item;
+        this.selectedSize = null;
+        this.ghostGear = null;
+        this.beltSelection = [];
+        this.notify();
+    }
+
+    setBeltSelection(gearIds) {
+        this.beltSelection = [...new Set(gearIds)];
+        this.notify();
+    }
+
     toggleMainGear() {
         // メインギアの稼働状態を反転し、接続グラフへ再計算を依頼する。
         this.mainGearRunning = !this.mainGearRunning;
@@ -146,6 +162,7 @@ export class GameState {
             mainGearRunning: this.mainGearRunning,
             creativeMode: this.creativeMode,
             creativeSnapshot: this.creativeSnapshot,
+            belts: this.belts,
             gears: this.placedGears.map(gear => ({
                 q: gear.q,
                 r: gear.r,
@@ -160,7 +177,7 @@ export class GameState {
     restoreSnapshot(snapshot) {
         // JSONスナップショットからギア実体を再生成し、ネットワークを再構築する。
         const data = JSON.parse(snapshot);
-        this.steamPower = data.steamPower;
+        this.steamPower = Number.isFinite(data.steamPower) ? data.steamPower : 100;
         this.water = data.water ?? 200;
         this.fog = data.fog ?? 0;
         this.liquidMetal = data.liquidMetal ?? 0;
@@ -169,6 +186,7 @@ export class GameState {
         this.mainGearRunning = data.mainGearRunning ?? true;
         this.creativeMode = data.creativeMode ?? false;
         this.creativeSnapshot = data.creativeSnapshot ?? null;
+        this.belts = data.belts ?? [];
         const gears = data.gears || data.placedGears || [];
         this.placedGears = this.createGear
             ? gears.map(gear => this.createGear(gear))
@@ -217,6 +235,8 @@ export class GameState {
         this.mainGearRunning = true;
         this.undoStack = [];
         this.redoStack = [];
+        this.belts = [];
+        this.beltSelection = [];
         this.updatePowerGrid();
         this.saveGameData();
         this.notify();
@@ -234,6 +254,7 @@ export class GameState {
             mainGearRunning: this.mainGearRunning,
             creativeMode: this.creativeMode,
             creativeSnapshot: this.creativeSnapshot,
+            belts: this.belts,
             gears: this.placedGears.map(gear => ({
                 q: gear.q, r: gear.r, size: gear.sizeKey, layer: gear.layer,
                 isCore: Boolean(gear.isCore), angle: gear.angle, isLocked: gear.isLocked, designType: gear.designType, processMode: gear.processMode
@@ -251,7 +272,7 @@ export class GameState {
         if (saved) {
             try {
                 const data = JSON.parse(saved);
-                this.steamPower = data.steamPower ?? 100;
+                this.steamPower = Number.isFinite(data.steamPower) ? data.steamPower : 100;
                 this.water = data.water ?? 200;
                 this.fog = data.fog ?? data.gasMetal ?? 0;
                 this.liquidMetal = data.liquidMetal ?? 0;
@@ -260,6 +281,7 @@ export class GameState {
                 this.mainGearRunning = data.mainGearRunning ?? true;
                 this.creativeMode = data.creativeMode ?? false;
                 this.creativeSnapshot = data.creativeSnapshot ?? null;
+                this.belts = Array.isArray(data.belts) ? data.belts.filter(belt => Array.isArray(belt?.gearIds) && belt.gearIds.length >= 2) : [];
                 this.placedGears = (data.gears || data.placedGears || []).map(createGear);
                 if (this.placedGears.length > 0 && !this.placedGears.some(gear => gear.isCore)) {
                     this.placedGears = [this.createGear({ q: 0, r: 0, size: 'LL', layer: 0, isCore: true })];
@@ -403,7 +425,7 @@ export class GameState {
 
     updatePowerGrid() {
         if (this.network) {
-            this.network.rebuild(this.placedGears).updateRotation();
+            this.network.rebuild(this.placedGears, this.belts).updateRotation();
             if (!this.mainGearRunning || this.steamPower <= 0) this.placedGears.forEach(gear => { gear.powered = false; gear.rotationDir = 0; gear.angularVelocity = 0; });
             return;
         }

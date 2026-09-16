@@ -1,3 +1,6 @@
+// ベルト点線の見た目上の移動速度。小さくするほどゆっくりになる。
+const BELT_ANIMATION_SPEED = 0.00035;
+
 /**
  * CanvasRenderer - ギア盤面の描画、アニメーション、座標変換を担当する。
  * GameStateを変更せず、現在の状態をキャンバスへ投影する表示専用モジュール。
@@ -77,10 +80,82 @@ export class CanvasRenderer {
             this.sortedGears = [...this.state.placedGears].sort((a, b) => a.layer - b.layer);
             this.sortedGearKey = sortedKey;
         }
+        this.drawBeltSelection();
         this.sortedGears.forEach(gear => this.drawGear(gear));
+        this.drawBelts();
         if (this.state.showLoops) this.drawLoops();
         if (this.state.ghostGear && this.state.selectedSize) this.drawGear(this.state.ghostGear, true);
         if (this.state.ghostGear) this.drawGhostConnections(this.state.ghostGear);
+        this.ctx.restore();
+    }
+
+    drawBelts() {
+        // 選択された複数ギア全体の外周を、1本の茶色い点線で囲む。
+        const gears = new Map(this.state.placedGears.map(gear => [gear.id, gear]));
+        const belts = Array.isArray(this.state.belts) ? this.state.belts : [];
+        this.ctx.save();
+        this.ctx.strokeStyle = '#b07a45';
+        this.ctx.lineWidth = 4 / this.state.zoomScale;
+        this.ctx.setLineDash([12 / this.state.zoomScale, 4 / this.state.zoomScale]);
+        belts.forEach(belt => {
+            if (!Array.isArray(belt?.gearIds)) return;
+            const beltGears = belt.gearIds.map(id => gears.get(id)).filter(Boolean);
+            if (beltGears.length < 2) return;
+            const points = [];
+            beltGears.forEach(gear => {
+                const radius = gear.radius + 8 / this.state.zoomScale;
+                for (let index = 0; index < 24; index++) {
+                    const angle = index * Math.PI * 2 / 24;
+                    points.push({ x: gear.x + Math.cos(angle) * radius, y: gear.y + Math.sin(angle) * radius });
+                }
+            });
+            points.sort((first, second) => first.x - second.x || first.y - second.y);
+            const cross = (origin, first, second) => (first.x - origin.x) * (second.y - origin.y) - (first.y - origin.y) * (second.x - origin.x);
+            const lower = [];
+            points.forEach(point => {
+                while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], point) <= 0) lower.pop();
+                lower.push(point);
+            });
+            const upper = [];
+            [...points].reverse().forEach(point => {
+                while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], point) <= 0) upper.pop();
+                upper.push(point);
+            });
+            const outline = lower.slice(0, -1).concat(upper.slice(0, -1));
+            if (outline.length < 3) return;
+            // ベルトは角速度ではなく、各ギアの外周速度（半径×角速度）で移動する。
+            const beltSpeed = beltGears.reduce((sum, gear) => sum + gear.radius * Math.abs(gear.angularVelocity || 0), 0) / beltGears.length;
+            const beltDirection = beltGears.find(gear => gear.rotationDir)?.rotationDir || 1;
+            // ギアの1フレームあたりの回転角（0.012）に合わせて点線を移動する。
+            this.ctx.lineDashOffset = -performance.now() * beltSpeed * beltDirection * BELT_ANIMATION_SPEED;
+            this.ctx.beginPath();
+            this.ctx.moveTo(outline[0].x, outline[0].y);
+            outline.slice(1).forEach(point => this.ctx.lineTo(point.x, point.y));
+            this.ctx.closePath();
+            this.ctx.stroke();
+        });
+        this.ctx.setLineDash([]);
+        this.ctx.restore();
+    }
+
+    drawBeltSelection() {
+        // ベルト選択中のギアを黄色の点線で囲み、選択順を視認できるようにする。
+        if (this.state.selectedItem !== 'BELT' || !this.state.beltSelection.length) return;
+        const gears = new Map(this.state.placedGears.map(gear => [gear.id, gear]));
+        this.ctx.save();
+        this.ctx.strokeStyle = '#f2c96d';
+        this.ctx.setLineDash([6 / this.state.zoomScale, 4 / this.state.zoomScale]);
+        this.ctx.lineWidth = 3 / this.state.zoomScale;
+        this.state.beltSelection.forEach((id, index) => {
+            const gear = gears.get(id);
+            if (!gear) return;
+            this.ctx.beginPath();
+            this.ctx.arc(gear.x, gear.y, gear.radius + 12 / this.state.zoomScale, 0, Math.PI * 2);
+            this.ctx.stroke();
+            this.ctx.fillStyle = '#f2c96d';
+            this.ctx.font = 'bold 14px monospace';
+            this.ctx.fillText(String(index + 1), gear.x + gear.radius, gear.y - gear.radius);
+        });
         this.ctx.restore();
     }
 

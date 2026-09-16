@@ -10,12 +10,8 @@
     <!-- 上部パネル：ステータス・ギアサイズ選択 -->
     <div class="panel">
         <h1>Fog Thermodynamics</h1>
-        <div class="status-container">
-            <div class="status-steam">スチーム残量: <span id="steamPower" class="status-value">100</span></div>
-            <div class="status-brass">真鍮資材: <span id="brass" class="status-value">300</span></div>
-            <div class="status-water">水: <span id="water" class="status-value">0</span></div>
-            <div>現在コスト：真鍮 <span id="currentBrassCost" class="status-value">0</span>、消費スチーム <span id="currentSteamCost" class="status-value">0</span></div>
-            <div><button id="creativeBtn" class="creative-toggle" data-action="toggle-creative">クリエイティブ: OFF</button></div>
+        <div class="status-container creative-only">
+            <button id="creativeBtn" class="creative-toggle" data-action="toggle-creative">クリエイティブ: OFF</button>
         </div>
         <button class="dashboard-toggle" data-action="toggle-dashboard" aria-expanded="false">動力ダッシュボード <span>+</span></button>
         <section class="dashboard" aria-label="動力ダッシュボード" hidden>
@@ -58,7 +54,14 @@
                 <button class="btn btn-size" data-size="MAX">MAX(48)</button>
             </div>
         </div>
+        <div class="control-group">
+            <span class="group-label">— Item Selector —</span>
+            <div class="button-row item-selector-row">
+                <button class="btn btn-item" data-item="BELT">ベルト</button>
+            </div>
+        </div>
     </div>
+    <button id="belt-confirm-button" class="btn btn-item-confirm" data-action="confirm-belt" hidden>ベルトを接続</button>
 
     <!-- マップ描画エリア -->
     <div id="canvas-container">
