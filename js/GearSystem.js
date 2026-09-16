@@ -150,6 +150,19 @@ export class GearNetwork {
         // 接続グラフから各ギアの回転方向・速度を決める。処理設定は変更しない。
         this.rebuildConnections(this.belts || []);
         const invalidLockedAxes = new Set();
+        for (const edge of this.beltEdges) {
+            const [firstId, secondId] = edge.split(':');
+            const first = this.gears.get(firstId);
+            const second = this.gears.get(secondId);
+            const sameAxis = first && second
+                && first.q === second.q
+                && first.r === second.r
+                && first.layer !== second.layer;
+            if (sameAxis && !(first.isLocked && second.isLocked)) {
+                invalidLockedAxes.add(first.id);
+                invalidLockedAxes.add(second.id);
+            }
+        }
         for (const axis of this.axes.values()) {
             const locked = axis.lockedGears;
             if (locked.length < 2) continue;
@@ -194,9 +207,16 @@ export class GearNetwork {
             current.gear.angularVelocity = current.speed;
             for (const id of this.connections.get(current.gear.id) || []) {
                 const other = this.gears.get(id);
-                const axis = current.gear.q === other.q && current.gear.r === other.r && current.gear.layer !== other.layer;
+                const axis = current.gear.q === other.q && current.gear.r === other.r && current.gear.layer !== other.layer
+                    && current.gear.isLocked && other.isLocked;
                 const belt = this.beltEdges.has([current.gear.id, other.id].sort().join(':'));
-                queue.push({ gear: other, speed: axis ? current.speed : current.speed * current.gear.size / other.size, direction: axis || belt ? current.direction : -current.direction });
+                const driver = axis ? current.gear : this.getTransmissionGear(current.gear, other);
+                const speed = axis
+                    ? current.speed
+                    : belt
+                        ? current.speed * other.size / driver.size
+                        : current.speed * driver.size / other.size;
+                queue.push({ gear: other, speed, direction: axis || belt ? current.direction : -current.direction });
             }
         }
         conflicts.forEach(id => {
@@ -222,5 +242,13 @@ export class GearNetwork {
             gear.isDeadlocked = true;
             gear.angleError = true;
         });
+    }
+
+    getTransmissionGear(current, other) {
+        // 同軸固定ギアから外部へ出る場合は、実際に接続された同軸ギアを駆動側にする。
+        const axis = this.axes.get(`${current.q},${current.r}`);
+        if (!axis || !current.isLocked) return current;
+        const connected = [...axis.gears.values()].find(gear => gear.id === current.id);
+        return connected || current;
     }
 }

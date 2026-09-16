@@ -60,6 +60,14 @@
                 <button class="btn btn-item" data-item="BELT">ベルト</button>
             </div>
         </div>
+        <div class="control-group">
+            <span class="group-label">— Layer Selector —</span>
+            <div class="button-row">
+                <button class="btn btn-layer active" id="btn-layer-0" data-layer="0">1段目 (金)</button>
+                <button class="btn btn-layer" id="btn-layer-1" data-layer="1">2段目 (銀)</button>
+                <button class="btn btn-layer" id="btn-layer-2" data-layer="2">3段目 (銅)</button>
+            </div>
+        </div>
     </div>
     <button id="belt-confirm-button" class="btn btn-item-confirm" data-action="confirm-belt" hidden>ベルトを接続</button>
 
@@ -70,8 +78,13 @@
         <aside id="gear-popover" class="gear-popover">
             <h2 id="gear-popover-title">ギア設定</h2>
             <p id="gear-popover-meta"></p>
-            <label id="axis-layer-row" class="main-gear-hidden">軸レイヤー <select id="axis-layer-select"></select></label>
-            <details class="popover-section" open>
+            <p id="gear-popover-id" class="gear-popover-id"></p>
+            <button id="gear-cycle-button" type="button" hidden>同軸ギアを切替</button>
+            <details id="gear-layer-section">
+                <summary>設置段を変更</summary>
+                <label id="gear-layer-row">設置段 <select id="gear-layer-select"><option value="0">1段目 (金)</option><option value="1">2段目 (銀)</option><option value="2">3段目 (銅)</option></select></label>
+            </details>
+            <details class="popover-section">
                 <summary>コスト</summary>
                 <div id="gear-popover-cost" class="cost-panel"></div>
             </details>
@@ -87,20 +100,23 @@
                     <div class="process-info-row"><span>生成 / 回収</span><strong id="gear-process-info-output">-</strong></div>
                 </div>
             </details>
+            <button id="belt-add-button" type="button" hidden>このギアをベルト対象に追加</button>
             <button id="gear-delete-button" class="danger-button" data-action="delete-gear" type="button">ギアを撤去</button>
             <button id="gear-popover-close" type="button">閉じる</button>
         </aside>
         </div>
     </div>
 
-    <!-- 下部パネル：レイヤー選択・アクション操作盤 -->
+    <!-- 下部パネル：可視化・アクション操作盤 -->
     <div class="panel">
         <div class="control-group" style="margin-bottom: 8px;">
-            <span class="group-label">— Layer Selector —</span>
+            <span class="group-label">— Visualization —</span>
             <div class="button-row">
-                <button class="btn btn-layer active" id="btn-layer-0" data-layer="0">1段目 (金)</button>
-                <button class="btn btn-layer" id="btn-layer-1" data-layer="1">2段目 (銀)</button>
-                <button class="btn btn-layer" id="btn-layer-2" data-layer="2">3段目 (銅)</button>
+                <button class="btn btn-visibility active" data-visibility-layer="0" aria-pressed="true">1段目 (金)</button>
+                <button class="btn btn-visibility active" data-visibility-layer="1" aria-pressed="true">2段目 (銀)</button>
+                <button class="btn btn-visibility active" data-visibility-layer="2" aria-pressed="true">3段目 (銅)</button>
+                <button class="btn btn-visibility active" data-visibility="belts" aria-pressed="true">ベルト</button>
+                <button class="btn btn-loop-visualize" data-action="toggle-loops" aria-pressed="false">環機構</button>
             </div>
         </div>
         
@@ -109,7 +125,6 @@
             <div class="button-row" style="width: 100%;">
                 <button class="btn btn-action" id="btn-undo" data-action="undo" disabled>↩ Undo</button>
                 <button class="btn btn-action" id="btn-redo" data-action="redo" disabled>Redo ↪</button>
-                <button class="btn btn-loop-visualize" data-action="toggle-loops" aria-pressed="false">環機構可視化: OFF</button>
                 <button class="btn btn-main-gear" data-action="toggle-main-gear" aria-pressed="true">メインギア: 起動中</button>
                 <button class="btn btn-reset" data-action="reset">盤面リセット</button>
             </div>

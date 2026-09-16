@@ -31,6 +31,12 @@ export class UIController {
                 this.state.setSelectedSize(this.state.selectedSize === button.dataset.size ? null : button.dataset.size);
                 this.state.ghostGear = null;
                 this.closeGearPopover();
+            } else if (button.dataset.visibilityLayer !== undefined) {
+                const layer = Number(button.dataset.visibilityLayer);
+                this.state.toggleLayerVisibility(layer);
+                if (!this.state.visibleLayers[layer]) this.closeGearPopover();
+            } else if (button.dataset.visibility === 'belts') {
+                this.state.toggleBeltsVisibility();
             } else if (button.dataset.layer !== undefined) {
                 this.state.setSelectedLayer(button.dataset.layer);
             } else if (button.dataset.item) {
@@ -74,10 +80,23 @@ export class UIController {
             this.updateSelectedGear({ designType: event.target.value, processMode });
         });
         document.getElementById('gear-process-select').addEventListener('change', event => this.updateSelectedGear({ processMode: event.target.value }));
-        document.getElementById('axis-layer-select').addEventListener('change', event => {
-            // 同じ軸にある別レイヤーを、IDで直接選択し直す。
-            const gear = this.gearManager.findGearById(event.target.value);
-            if (gear) this.openGearPopover(gear);
+        document.getElementById('gear-layer-select').addEventListener('change', event => {
+            const gear = this.gearManager.findGearById(this.state.selectedGearId);
+            if (!gear) return;
+            if (!this.gearManager.changeGearLayer(gear, Number(event.target.value))) this.openGearPopover(gear);
+        });
+        document.getElementById('gear-cycle-button')?.addEventListener('click', () => {
+            const gear = this.gearManager.findGearById(this.state.selectedGearId);
+            if (!gear) return;
+            const axisGears = this.getAxisGears(gear);
+            const index = axisGears.findIndex(item => item.id === gear.id);
+            this.openGearPopover(axisGears[(index + 1) % axisGears.length]);
+        });
+        document.getElementById('belt-add-button')?.addEventListener('click', () => {
+            const gear = this.gearManager.findGearById(this.state.selectedGearId);
+            if (!gear || this.state.selectedItem !== 'BELT' || this.state.beltSelection.includes(gear.id)) return;
+            this.state.setBeltSelection([...this.state.beltSelection, gear.id]);
+            this.closeGearPopover();
         });
         document.getElementById('gear-popover-close').addEventListener('click', () => this.closeGearPopover());
         document.getElementById('gear-modal').addEventListener('click', event => {
@@ -86,7 +105,7 @@ export class UIController {
 
         // キャンバス外を押したときは配置候補と吹き出しを閉じる。
         document.addEventListener('pointerdown', event => {
-            if (!this.canvas.contains(event.target) && !event.target.closest('.panel') && !event.target.closest('.gear-popover')) {
+            if (!this.canvas.contains(event.target) && !event.target.closest('.panel') && !event.target.closest('.gear-popover') && !event.target.closest('#belt-confirm-button')) {
                 this.state.setSelectedSize(null);
                 this.state.ghostGear = null;
                 this.closeGearPopover();
@@ -94,6 +113,7 @@ export class UIController {
         });
         this.canvas.addEventListener('pointerdown', event => this.pointerDown(event));
         this.canvas.addEventListener('pointermove', event => this.pointerMove(event));
+        this.canvas.addEventListener('pointerleave', () => { this.state.hoveredGearIds = []; });
         this.canvas.addEventListener('pointerup', event => this.pointerUp(event));
         this.canvas.addEventListener('contextmenu', event => {
             event.preventDefault();
@@ -111,6 +131,19 @@ export class UIController {
             this.state.ghostGear = null;
         });
         this.canvas.addEventListener('wheel', event => {
+            const point = this.renderer.worldPoint(event.clientX, event.clientY);
+            const stackedGears = this.getStackedGearsAt(point.x, point.y);
+            if (stackedGears.length > 1) {
+                event.preventDefault();
+                const direction = event.deltaY > 0 ? 1 : -1;
+                const currentIndex = stackedGears.findIndex(gear => gear.id === this.state.selectedGearId);
+                const nextIndex = (currentIndex + direction + stackedGears.length) % stackedGears.length;
+                const nextGear = stackedGears[nextIndex];
+                this.state.selectedGearId = nextGear.id;
+                this.state.hoveredGearIds = [nextGear.id];
+                if (this.state.selectedItem === 'BELT') this.openGearPopover(nextGear);
+                return;
+            }
             event.preventDefault();
             const zoom = this.pendingZoom ?? this.state.zoomScale;
             this.pendingZoom = Math.max(0.4, Math.min(2.5, zoom * Math.exp(-event.deltaY * 0.0015)));
@@ -127,12 +160,11 @@ export class UIController {
         const point = this.renderer.worldPoint(event.clientX, event.clientY);
         if (this.state.selectedItem === 'BELT') {
             const gear = this.selectGearAt(point.x, point.y);
-            if (gear && !this.state.beltSelection.includes(gear.id)) this.state.setBeltSelection([...this.state.beltSelection, gear.id]);
+            if (gear) this.openGearPopover(gear);
             return;
         }
         this.pointerDownGear = this.state.selectedSize ? null : this.selectGearAt(point.x, point.y);
         if (this.pointerDownGear) {
-            this.updateAxisLayerOptions(this.pointerDownGear);
             this.openGearPopover(this.pointerDownGear);
             this.state.ghostGear = null;
             this.activeTouches.clear();
@@ -160,9 +192,14 @@ export class UIController {
         // 押下中のタッチ位置を更新し、実際の移動処理を次フレームへ送る。
         if (event.buttons === 2 || event.button === 2) return;
         if (this.activeTouches.has(event.pointerId)) this.activeTouches.set(event.pointerId, { x: event.clientX, y: event.clientY });
+        const point = this.renderer.worldPoint(event.clientX, event.clientY);
+        const hovered = this.getStackedGearsAt(point.x, point.y);
+        const selected = hovered.find(gear => gear.id === this.state.selectedGearId) || hovered[0];
+        this.state.hoveredGearIds = selected ? [selected.id] : [];
         this.pendingPointer = event;
         this.scheduleInputFrame();
     }
+
 
     applyPointerMove(event) {
         // サイズ選択中はゴーストを更新し、通常時は1本指パンまたは2本指ズームを行う。
@@ -215,25 +252,23 @@ export class UIController {
     selectGearAt(x, y) {
         // 横に並んだギアはクリック位置に最も近いものだけを選ぶ。
         // 同じ座標に重なった同軸ギアだけは、クリックごとに循環選択する。
-        const gears = this.gearManager.findGearsAt(x, y);
-        if (gears.length === 0) return null;
-        const nearestDistance = Math.min(...gears.map(gear => Math.hypot(gear.x - x, gear.y - y)));
-        const stackedGears = gears.filter(gear => Math.abs(Math.hypot(gear.x - x, gear.y - y) - nearestDistance) < 1);
-        if (stackedGears.length === 1) return stackedGears[0];
+        const stackedGears = this.getStackedGearsAt(x, y);
+        if (stackedGears.length === 0) return null;
         const currentIndex = stackedGears.findIndex(gear => gear.id === this.state.selectedGearId);
         return stackedGears[currentIndex >= 0 ? (currentIndex + 1) % stackedGears.length : 0];
     }
 
-    updateAxisLayerOptions(gear) {
-        // ドロップダウンには、指定ギアと同じq/rに実在するレイヤーだけを表示する。
-        const row = document.getElementById('axis-layer-row');
-        const select = document.getElementById('axis-layer-select');
-        const axisGears = this.state.placedGears
-            .filter(other => other.q === gear.q && other.r === gear.r)
+    getStackedGearsAt(x, y) {
+        const gears = this.gearManager.findGearsAt(x, y);
+        if (gears.length === 0) return [];
+        const nearestDistance = Math.min(...gears.map(gear => Math.hypot(gear.x - x, gear.y - y)));
+        return gears.filter(gear => Math.abs(Math.hypot(gear.x - x, gear.y - y) - nearestDistance) < 1);
+    }
+
+    getAxisGears(gear) {
+        return this.state.placedGears
+            .filter(other => other.q === gear.q && other.r === gear.r && (this.state.visibleLayers?.[other.layer] ?? true))
             .sort((first, second) => first.layer - second.layer);
-        select.replaceChildren(...axisGears.map(axisGear => new Option(`L${axisGear.layer + 1} (${['金', '銀', '銅'][axisGear.layer]})`, axisGear.id)));
-        select.value = gear.id;
-        row.classList.toggle('main-gear-hidden', axisGears.length < 2);
     }
 
     getProcessOptions(designType) {
@@ -269,6 +304,25 @@ export class UIController {
         document.getElementById('gear-process-info-output').textContent = info.output === '-'
             ? '-'
             : `${info.output} ${info.outputRate.toFixed(2)} /秒`;
+        queueMicrotask(() => {
+            if (this.state.selectedGearId !== gear.id) return;
+            const layerLabel = `${gear.layer + 1}段目 (${['金', '銀', '銅'][gear.layer]})`;
+            document.getElementById('gear-popover-meta').textContent = gear.isCore
+                ? `${layerLabel} / ${gear.teeth}歯`
+                : `${layerLabel} / ${gear.teeth}歯 / ${gear.designType} / ${gear.processMode}`;
+            document.getElementById('gear-popover-id').textContent = `ID: ${gear.id}`;
+            const cycleButton = document.getElementById('gear-cycle-button');
+            if (cycleButton) cycleButton.hidden = this.getAxisGears(gear).length < 2;
+            this.updateBeltMarker(gear);
+        });
+    }
+
+    updateBeltMarker(gear) {
+        const title = document.getElementById('gear-popover-title');
+        if (!title) return;
+        const baseTitle = gear.isCore ? 'メインギア' : `${gear.sizeKey} ギア設定`;
+        const beltLinked = this.state.belts.some(belt => belt.gearIds?.includes(gear.id));
+        title.textContent = `${baseTitle}${beltLinked ? '  🔗' : ''}`;
     }
     updateSelectedGear(settings) { const gear = this.gearManager.findGearById(this.state.selectedGearId); if (gear) this.gearManager.updateGearSettings(gear, settings); }
     closeGearPopover() {
@@ -325,7 +379,14 @@ export class UIController {
             element.textContent = displayValue + (id.startsWith('dashboard') ? '' : ' /秒');
         });
         const selectedGear = this.gearManager.findGearById(this.state.selectedGearId);
-        if (selectedGear) this.updateProcessInfo(selectedGear);
+        if (selectedGear) {
+            this.updateProcessInfo(selectedGear);
+            this.updateBeltMarker(selectedGear);
+            const layerSelect = document.getElementById('gear-layer-select');
+            if (layerSelect) layerSelect.value = String(selectedGear.layer);
+        }
+        const beltAddButton = document.getElementById('belt-add-button');
+        if (beltAddButton) beltAddButton.hidden = this.state.selectedItem !== 'BELT';
         document.querySelectorAll('.btn-item').forEach(button => button.classList.toggle('active', button.dataset.item === this.state.selectedItem));
         const beltConfirm = document.getElementById('belt-confirm-button');
         if (beltConfirm) beltConfirm.hidden = this.state.selectedItem !== 'BELT' || this.state.beltSelection.length < 2;
@@ -340,9 +401,19 @@ export class UIController {
         document.getElementById('btn-redo').disabled = this.state.redoStack.length === 0;
         const loopButton = document.querySelector('[data-action="toggle-loops"]');
         if (loopButton) {
-            loopButton.textContent = `環機構可視化: ${this.state.showLoops ? 'ON' : 'OFF'}`;
             loopButton.classList.toggle('active', this.state.showLoops);
             loopButton.setAttribute('aria-pressed', String(this.state.showLoops));
+        }
+        document.querySelectorAll('[data-visibility-layer]').forEach(button => {
+            const layer = Number(button.dataset.visibilityLayer);
+            const visible = this.state.visibleLayers[layer];
+            button.classList.toggle('active', visible);
+            button.setAttribute('aria-pressed', String(visible));
+        });
+        const beltVisibilityButton = document.querySelector('[data-visibility="belts"]');
+        if (beltVisibilityButton) {
+            beltVisibilityButton.classList.toggle('active', this.state.showBelts);
+            beltVisibilityButton.setAttribute('aria-pressed', String(this.state.showBelts));
         }
         const mainGearButton = document.querySelector('[data-action="toggle-main-gear"]');
         if (mainGearButton) {

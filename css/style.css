@@ -222,6 +222,7 @@ h1 {
 
 .btn-layer {
     border-color: var(--border-sub);
+    min-width: 94px;
 }
 
 #btn-layer-0.active {
@@ -262,8 +263,14 @@ h1 {
     color: #fff;
 }
 
-.btn-loop-visualize { color: #b8f4ff; background: rgba(77, 194, 218, 0.12); border-color: #62cbe4; }
+.btn-loop-visualize { min-width: 94px; color: #b8f4ff; background: rgba(77, 194, 218, 0.12); border-color: #62cbe4; }
 .btn-loop-visualize:hover:not(:disabled), .btn-loop-visualize.active { color: #08242b; background: #8eeaff; border-color: #c1f6ff; box-shadow: 0 0 10px rgba(98, 203, 228, 0.45); }
+.btn-visibility { min-width: 94px; color: #d9fff2; background: rgba(98, 194, 170, 0.08); border-color: rgba(98, 194, 170, 0.4); }
+.btn-visibility.active { color: #08242b; background: #8eeaff; border-color: #c1f6ff; box-shadow: 0 0 10px rgba(98, 203, 228, 0.45); }
+.btn-visibility[data-visibility-layer="0"].active { color: #2d2100; background: #f3c653; border-color: #fff0a5; box-shadow: 0 0 10px rgba(243, 198, 83, 0.5); }
+.btn-visibility[data-visibility-layer="1"].active { color: #202020; background: #e6eae3; border-color: #fff; box-shadow: 0 0 10px rgba(230, 234, 227, 0.45); }
+.btn-visibility[data-visibility-layer="2"].active { color: #2d1708; background: #e8a87c; border-color: #ffd0a8; box-shadow: 0 0 10px rgba(232, 168, 124, 0.45); }
+.gear-popover #belt-add-button[hidden] { display: none; }
 
 .btn-reset {
     background: #261515;
@@ -350,6 +357,11 @@ canvas {
 .gear-popover::before { width: 56px; height: 56px; }
 .gear-popover::after { width: 30px; height: 30px; right: -5px; top: 31px; }
 .popover-section { margin: 8px 0; border: 1px solid rgba(198, 154, 82, 0.35); background: rgba(98, 194, 170, 0.04); }
+.gear-popover > details { margin: 8px 0; border: 1px solid rgba(198, 154, 82, 0.35); background: rgba(98, 194, 170, 0.04); }
+.gear-popover > details > summary { padding: 6px 8px; color: #a7f0d9; font: 0.7rem monospace; cursor: pointer; list-style: none; }
+.gear-popover > details > summary::-webkit-details-marker { display: none; }
+.gear-popover > details > summary::after { content: '+'; float: right; }
+.gear-popover > details[open] > summary::after { content: '-'; }
 .popover-section[hidden] { display: none; }
 .popover-section summary { padding: 6px 8px; color: #a7f0d9; font: 0.7rem monospace; cursor: pointer; list-style: none; }
 .popover-section summary::-webkit-details-marker { display: none; }
@@ -361,6 +373,7 @@ canvas {
 .gear-popover h2::before { content: '✦  ARCANE GEAR CONFIGURATION  ✦'; display: block; margin-bottom: 5px; color: #62c2aa; font: 8px/1.2 monospace; letter-spacing: 1px; }
 .gear-popover p { margin: 6px 0; color: #b9aa91; font-size: 0.72rem; }
 .gear-popover p:nth-of-type(2) { padding: 7px 8px; color: #f2c96d; background: rgba(98, 194, 170, 0.08); border-left: 2px solid #62c2aa; font-family: monospace; }
+.gear-popover-id { margin: 2px 0 6px !important; padding: 0 !important; color: #8e8070 !important; background: transparent !important; border-left: 0 !important; font: 0.62rem monospace; overflow-wrap: anywhere; }
 .cost-panel { margin: 8px 0 10px; padding: 7px 10px; color: #e7d7b2; background: rgba(98, 194, 170, 0.08); border-left: 2px solid #62c2aa; font-family: monospace; font-size: 0.72rem; }
 .cost-row { display: flex; justify-content: space-between; align-items: baseline; gap: 14px; min-width: 0; min-height: 22px; border-bottom: 1px solid rgba(198, 154, 82, 0.18); }
 .cost-row:last-child { border-bottom: 0; }
@@ -388,6 +401,7 @@ canvas {
 .process-info-row span { color: var(--text-muted); }
 .process-info-row strong { max-width: 68%; color: #d9fff2; font-family: monospace; text-align: right; overflow-wrap: anywhere; }
 .gear-popover label:first-of-type { padding: 7px 8px; color: #f0d69b; background: rgba(185, 138, 66, 0.1); border: 1px solid rgba(185, 138, 66, 0.42); }
+.gear-popover #gear-layer-row { padding: 7px 8px; color: #f0d69b; background: rgba(185, 138, 66, 0.1); border: 1px solid rgba(185, 138, 66, 0.42); }
 .gear-popover .sync-control { display: flex; align-items: center; justify-content: space-between; gap: 10px; cursor: pointer; }
 .sync-control input { position: absolute; opacity: 0; pointer-events: none; }
 .switch-track { position: relative; width: 34px; height: 18px; flex: 0 0 auto; background: #211914; border: 1px solid #80663d; border-radius: 10px; transition: background .15s, border-color .15s; }

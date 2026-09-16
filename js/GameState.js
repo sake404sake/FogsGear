@@ -43,6 +43,8 @@ export class GameState {
         this.beltSelection = [];
         this.ghostGear = null;
         this.showLoops = false;
+        this.visibleLayers = [true, true, true];
+        this.showBelts = true;
         this.dashboardOpen = false;
         this.rateTableOpen = false;
         this.zoomScale = 1;
@@ -53,6 +55,7 @@ export class GameState {
         this.maxHistory = 30;
         this.createGear = null;
         this.selectedGearId = null;
+        this.hoveredGearIds = [];
         
         this.listeners = [];
     }
@@ -112,6 +115,10 @@ export class GameState {
     setSelectedSize(size) {
         // 配置するサイズ選択を更新する。
         this.selectedSize = size;
+        if (size !== null) {
+            this.selectedItem = 'NONE';
+            this.beltSelection = [];
+        }
         this.notify();
     }
 
@@ -126,6 +133,24 @@ export class GameState {
         this.selectedSize = null;
         this.ghostGear = null;
         this.beltSelection = [];
+        this.notify();
+    }
+
+    toggleLayerVisibility(layer) {
+        this.visibleLayers[layer] = !this.visibleLayers[layer];
+        if (!this.visibleLayers[layer]) {
+            const selectedGear = this.placedGears.find(gear => gear.id === this.selectedGearId);
+            if (selectedGear?.layer === layer) this.selectedGearId = null;
+            this.beltSelection = this.beltSelection.filter(id => {
+                const gear = this.placedGears.find(item => item.id === id);
+                return gear && this.visibleLayers[gear.layer];
+            });
+        }
+        this.notify();
+    }
+
+    toggleBeltsVisibility() {
+        this.showBelts = !this.showBelts;
         this.notify();
     }
 

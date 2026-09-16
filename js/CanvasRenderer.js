@@ -81,8 +81,12 @@ export class CanvasRenderer {
             this.sortedGearKey = sortedKey;
         }
         this.drawBeltSelection();
-        this.sortedGears.forEach(gear => this.drawGear(gear));
-        this.drawBelts();
+        this.sortedGears.forEach(gear => {
+            if (!this.state.visibleLayers?.[gear.layer]) return;
+            this.drawGear(gear);
+        });
+        this.drawSelectableGears();
+        if (this.state.showBelts) this.drawBelts();
         if (this.state.showLoops) this.drawLoops();
         if (this.state.ghostGear && this.state.selectedSize) this.drawGear(this.state.ghostGear, true);
         if (this.state.ghostGear) this.drawGhostConnections(this.state.ghostGear);
@@ -135,6 +139,21 @@ export class CanvasRenderer {
             this.ctx.stroke();
         });
         this.ctx.setLineDash([]);
+        this.ctx.restore();
+    }
+
+    drawSelectableGears() {
+        const selectableIds = new Set(this.state.hoveredGearIds || []);
+        this.ctx.save();
+        this.ctx.lineWidth = 2 / this.state.zoomScale;
+        this.ctx.setLineDash([5 / this.state.zoomScale, 4 / this.state.zoomScale]);
+        this.state.placedGears.forEach(gear => {
+            if (!selectableIds.has(gear.id) || !this.state.visibleLayers?.[gear.layer]) return;
+            this.ctx.strokeStyle = this.layerColors[gear.layer % this.layerColors.length].stroke;
+            this.ctx.beginPath();
+            this.ctx.arc(gear.x, gear.y, gear.radius + 19 / this.state.zoomScale, 0, Math.PI * 2);
+            this.ctx.stroke();
+        });
         this.ctx.restore();
     }
 
@@ -203,7 +222,7 @@ export class CanvasRenderer {
         const connected = new Set(ghost.connectionIds || []);
         const blocked = new Set(ghost.blockedIds || []);
         const count = connected.size;
-        const outlineColor = count >= 2 ? '#74f0c2' : count === 1 ? '#f2c96d' : '#e88b7d';
+        const outlineColor = count >= 1 ? '#74f0c2' : '#e88b7d';
         this.ctx.save();
         this.ctx.translate(ghost.x, ghost.y);
         this.ctx.strokeStyle = outlineColor;

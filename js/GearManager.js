@@ -126,6 +126,22 @@ export class GearManager {
         return true;
     }
 
+    changeGearLayer(gear, layer) {
+        if (!gear || !this.state.placedGears.includes(gear) || !Number.isInteger(layer) || layer < 0 || layer > 2 || gear.layer === layer) return false;
+        const occupied = this.state.placedGears.some(other => {
+            if (other === gear || other.layer !== layer) return false;
+            return other.q === gear.q && other.r === gear.r
+                || Math.hypot(other.x - gear.x, other.y - gear.y) < other.radius + gear.radius - 4;
+        });
+        if (occupied) return false;
+        this.state.saveState();
+        gear.layer = layer;
+        this.state.updatePowerGrid();
+        this.state.saveGameData();
+        this.state.notify();
+        return true;
+    }
+
     addBelt(gears) {
         const gearIds = [...new Set((gears || []).filter(Boolean).map(gear => gear.id))];
         if (gearIds.length < 2) return false;
@@ -144,6 +160,7 @@ export class GearManager {
     findGearsAt(x, y) {
         // クリック位置に重なるギアを返す。同軸選択用に層順を保持する。
         return [...this.state.placedGears].filter(gear => {
+            if (this.state.visibleLayers && !this.state.visibleLayers[gear.layer]) return false;
             const dx = gear.x - x;
             const dy = gear.y - y;
             return Math.hypot(dx, dy) < Math.max(40, gear.radius);
