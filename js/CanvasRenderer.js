@@ -235,11 +235,11 @@ export class CanvasRenderer {
     drawTeeth(gear, radius, color, isGhost) {
         const toothLength = Math.max(6, Math.min(10, radius * 0.1));
         const bodyRadius = radius - toothLength;
-        const toothWidth = Math.max(3, Math.min(12, (Math.PI * 2 * radius / gear.teeth) * 0.48));
+        const toothWidth = Math.max(3, Math.min(12, (Math.PI * 2 * radius / gear.teeth) * 0.45));
         const toothStart = bodyRadius - Math.max(5, toothLength * 0.55);
         const toothDepth = toothLength + Math.max(5, toothLength * 0.55);
         this.ctx.fillStyle = color;
-        this.ctx.strokeStyle = isGhost ? 'rgba(255,255,255,0.7)' : color;
+        this.ctx.strokeStyle = isGhost ? 'rgb(102,102,102)' : color;
         this.ctx.lineWidth = isGhost ? 1 : Math.max(1, toothWidth * 0.12);
         for (let i = 0; i < gear.teeth; i++) {
             this.ctx.save();
@@ -305,7 +305,7 @@ export class CanvasRenderer {
         ctx.beginPath();
         ctx.arc(0, 0, radius * 0.78, 0, Math.PI * 2);
         ctx.fill();
-        const toothWidth = radius > 100 ? 5 : radius > 60 ? 6 : 7;
+        const toothWidth = radius > 100 ? 4 : radius > 60 ? 5 : 6;
         const toothHeight = radius > 100 ? 7 : radius > 60 ? 8 : 6;
         for (let i = 0; i < gear.teeth; i++) {
             ctx.save();
@@ -350,10 +350,14 @@ export class CanvasRenderer {
         const color = gear.processMode === 'FOG_COLLECTION' ? '#8eeaff' : '#78b9ff';
         this.ctx.save();
         this.ctx.strokeStyle = color;
-        this.ctx.lineWidth = Math.max(2, radius * 0.025);
+        // 太さを調整（お好みで変更してください）
+        this.ctx.lineWidth = Math.max(2, radius * 0.05);
+        // === 発光（グロー）効果の追加 ===
+        this.ctx.shadowColor = color; // 光の色をラインと同色にする
+        this.ctx.shadowBlur = 12;     // ぼかしの強さ（数値を大きくすると広範囲に光る）
         this.ctx.globalAlpha = gear.powered && !gear.isDeadlocked ? 0.95 : 0.5;
         this.ctx.beginPath();
-        this.ctx.arc(0, 0, radius - Math.max(8, radius * 0.12), -Math.PI * 0.78, -Math.PI * 0.2);
+        this.ctx.arc(0, 0, radius - Math.max(10, radius * 0.12), -Math.PI * 0, -Math.PI * 2);
         this.ctx.stroke();
         this.ctx.restore();
     }

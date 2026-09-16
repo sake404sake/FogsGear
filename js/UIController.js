@@ -40,6 +40,9 @@ export class UIController {
             } else if (button.dataset.action === 'toggle-dashboard') {
                 this.state.dashboardOpen = !this.state.dashboardOpen;
                 this.state.notify();
+            } else if (button.dataset.action === 'toggle-rate-table') {
+                this.state.rateTableOpen = !this.state.rateTableOpen;
+                this.state.notify();
             } else if (button.dataset.action === 'toggle-main-gear') {
                 this.state.toggleMainGear();
             } else if (button.dataset.action === 'reset' && confirm('盤面のギアと資材を初期状態にリセットしますか？')) {
@@ -186,7 +189,7 @@ export class UIController {
 
     getProcessOptions(designType) {
         if (designType === 'PRODUCTION') return [['NONE', '処理なし'], ['FOG_COLLECTION', '霧の回収']];
-        if (designType === 'ALCHEMICAL') return [['NONE', '処理なし'], ['TRANSFORM', '水→スチーム'], ['FOG_TO_WATER', '霧→水'], ['FOG_TO_LIQUID_METAL', '霧→液体金属'], ['LIQUID_TO_SOLID_METAL', '液体金属→固体金属']];
+        if (designType === 'ALCHEMICAL') return [['NONE', '処理なし'], ['TRANSFORM', '水→スチーム'], ['FOG_TO_WATER', '霧→水'], ['FOG_TO_LIQUID_METAL', '霧→液体金属'], ['LIQUID_TO_SOLID_METAL', '液体金属→固体金属'], ['SOLID_TO_BRASS', '固体金属→真鍮資材']];
         return [['NONE', '処理なし']];
     }
     updateProcessOptions(designType, selectedMode = null) {
@@ -222,7 +225,6 @@ export class UIController {
         const powerOutput = document.getElementById('powerOutput');
         const activeGears = document.getElementById('activeGears');
         const productionRate = document.getElementById('productionRate');
-        const dashboardSteam = document.getElementById('dashboardSteam');
         const water = document.getElementById('water');
         const waterRecoveryRate = document.getElementById('waterRecoveryRate');
         const fog = document.getElementById('fog');
@@ -232,11 +234,13 @@ export class UIController {
         const fogToWaterRate = document.getElementById('fogToWaterRate');
         const solidMetal = document.getElementById('solidMetal');
         const solidMetalRate = document.getElementById('solidMetalRate');
+        const solidMetalToBrassRate = document.getElementById('solidMetalToBrassRate');
         const steamTransformRate = document.getElementById('steamTransformRate');
+        const generatedSteamRate = document.getElementById('generatedSteamRate');
+        const dashboardSteamCost = document.getElementById('dashboardSteamCost');
         if (powerOutput) powerOutput.textContent = Math.floor(this.state.powerOutput || 0);
         if (activeGears) activeGears.textContent = this.state.placedGears.filter(gear => gear.powered && !gear.isDeadlocked).length;
         if (productionRate) productionRate.textContent = (this.state.productionRate || 0).toFixed(1);
-        if (dashboardSteam) dashboardSteam.textContent = Math.floor(this.state.steamPower);
         if (water) water.textContent = Math.floor(this.state.water || 0);
         if (waterRecoveryRate) waterRecoveryRate.textContent = (this.state.waterRecoveryRate || 0).toFixed(1);
         if (fog) fog.textContent = (this.state.fog || 0).toFixed(1);
@@ -246,7 +250,10 @@ export class UIController {
         if (fogToWaterRate) fogToWaterRate.textContent = (this.state.fogToWaterRate || 0).toFixed(1);
         if (solidMetal) solidMetal.textContent = (this.state.solidMetal || 0).toFixed(1);
         if (solidMetalRate) solidMetalRate.textContent = (this.state.solidMetalRate || 0).toFixed(1);
+        if (solidMetalToBrassRate) solidMetalToBrassRate.textContent = (this.state.solidMetalToBrassRate || 0).toFixed(1);
         if (steamTransformRate) steamTransformRate.textContent = (this.state.steamTransformRate || 0).toFixed(1);
+        if (generatedSteamRate) generatedSteamRate.textContent = (this.state.generatedSteamRate || 0).toFixed(1);
+        if (dashboardSteamCost) dashboardSteamCost.textContent = Math.round(costs.steam);
         const creative = document.getElementById('creativeBtn');
         if (creative) {
             creative.classList.toggle('active', this.state.creativeMode);
@@ -274,6 +281,13 @@ export class UIController {
             dashboard.hidden = !this.state.dashboardOpen;
             dashboardToggle.setAttribute('aria-expanded', String(this.state.dashboardOpen));
             dashboardToggle.querySelector('span').textContent = this.state.dashboardOpen ? '−' : '+';
+        }
+        const rateTable = document.querySelector('.rate-table-panel');
+        const rateTableToggle = document.querySelector('[data-action="toggle-rate-table"]');
+        if (rateTable && rateTableToggle) {
+            rateTable.hidden = !this.state.rateTableOpen;
+            rateTableToggle.setAttribute('aria-expanded', String(this.state.rateTableOpen));
+            rateTableToggle.querySelector('span').textContent = this.state.rateTableOpen ? '−' : '+';
         }
     }
 }

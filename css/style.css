@@ -101,6 +101,12 @@ h1 {
 .dashboard-grid span { color: var(--text-muted); font-size: 0.68rem; }
 .dashboard-grid strong { color: #d9fff2; font: bold 0.95rem monospace; }
 .dashboard-grid small { color: #8edbc6; font-size: 0.62rem; }
+.rate-table-panel { max-width: 650px; margin: 0 auto 10px; padding: 8px 10px; color: var(--text-main); background: rgba(98, 194, 170, 0.05); border: 1px solid rgba(98, 194, 170, 0.28); border-left: 3px solid #62c2aa; }
+.rate-table-panel[hidden] { display: none; }
+.rate-table { width: 100%; border-collapse: collapse; font-size: 0.72rem; text-align: left; }
+.rate-table th { padding: 5px 6px; color: #a7f0d9; font-weight: 600; border-bottom: 1px solid rgba(98, 194, 170, 0.45); }
+.rate-table td { padding: 5px 6px; color: var(--text-muted); border-bottom: 1px solid rgba(198, 154, 82, 0.16); }
+.rate-table td:last-child { color: #d9fff2; font-family: monospace; }
 @media (max-width: 600px) {
     body { padding: 6px; }
     .panel { width: 100%; box-sizing: border-box; padding: 10px 8px; }

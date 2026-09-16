@@ -4,7 +4,7 @@
 export class GameState {
     constructor() {
         this.steamPower = 100;
-        this.water = 0;
+        this.water = 200;
         this.fog = 0;
         this.liquidMetal = 0;
         this.solidMetal = 0;
@@ -18,7 +18,9 @@ export class GameState {
         this.fogToWaterRate = 0;
         this.liquidMetalRate = 0;
         this.solidMetalRate = 0;
+        this.solidMetalToBrassRate = 0;
         this.steamTransformRate = 0;
+        this.generatedSteamRate = 0;
         this.mainGearRunning = true;
         this.lastTickAt = performance.now();
         
@@ -29,6 +31,7 @@ export class GameState {
         this.ghostGear = null;
         this.showLoops = false;
         this.dashboardOpen = false;
+        this.rateTableOpen = false;
         this.zoomScale = 1;
         this.offsetX = 0;
         this.offsetY = 0;
@@ -57,6 +60,9 @@ export class GameState {
 
     setCreativeMode(active) {
         this.creativeMode = active;
+        this.steamPower = 200;
+        this.water = active ? 400 : 200;
+        this.saveGameData();
         this.notify();
     }
 
@@ -107,7 +113,7 @@ export class GameState {
     restoreSnapshot(snapshot) {
         const data = JSON.parse(snapshot);
         this.steamPower = data.steamPower;
-        this.water = data.water ?? 0;
+        this.water = data.water ?? 200;
         this.fog = data.fog ?? 0;
         this.liquidMetal = data.liquidMetal ?? 0;
         this.solidMetal = data.solidMetal ?? 0;
@@ -150,7 +156,7 @@ export class GameState {
             ? this.createGear({ q: 0, r: 0, size: 'LL', layer: 0, isCore: true })
             : { q: 0, r: 0, sizeKey: 'LL', layer: 0, isCore: true, angle: 0 }];
         this.steamPower = 100;
-        this.water = 0;
+        this.water = 200;
         this.fog = 0;
         this.liquidMetal = 0;
         this.solidMetal = 0;
@@ -189,7 +195,7 @@ export class GameState {
             try {
                 const data = JSON.parse(saved);
                 this.steamPower = data.steamPower ?? 100;
-                this.water = data.water ?? 0;
+                this.water = data.water ?? 200;
                 this.fog = data.fog ?? data.gasMetal ?? 0;
                 this.liquidMetal = data.liquidMetal ?? 0;
                 this.solidMetal = data.solidMetal ?? 0;
@@ -223,15 +229,19 @@ export class GameState {
         if (this.network) this.network.updateRotation();
         const activeCount = this.placedGears.filter(gear => gear.powered && !gear.isDeadlocked).length;
         const activeGears = this.placedGears.filter(gear => gear.powered && !gear.isDeadlocked);
+        this.water += elapsed;
         this.powerOutput = activeGears.reduce((sum, gear) => sum + Math.abs(gear.angularVelocity || 0) * gear.size, 0);
         this.productionRate = 0;
         this.fogRecoveryRate = activeGears.filter(gear => gear.designType === 'PRODUCTION' && gear.processMode === 'FOG_COLLECTION').reduce((sum, gear) => sum + gear.teeth * Math.abs(gear.angularVelocity || 0) / (Math.PI * 2), 0);
         this.liquidMetalRate = activeGears.filter(gear => gear.designType === 'ALCHEMICAL' && gear.processMode === 'FOG_TO_LIQUID_METAL').reduce((sum, gear) => sum + gear.teeth * 0.1 * Math.abs(gear.angularVelocity || 0) / (Math.PI * 2), 0);
         this.fogToWaterRate = activeGears.filter(gear => gear.designType === 'ALCHEMICAL' && gear.processMode === 'FOG_TO_WATER').reduce((sum, gear) => sum + gear.teeth * 0.1 * Math.abs(gear.angularVelocity || 0) / (Math.PI * 2), 0);
         this.solidMetalRate = activeGears.filter(gear => gear.designType === 'ALCHEMICAL' && gear.processMode === 'LIQUID_TO_SOLID_METAL').reduce((sum, gear) => sum + gear.teeth * Math.abs(gear.angularVelocity || 0) / (Math.PI * 2), 0);
+        this.solidMetalToBrassRate = activeGears.filter(gear => gear.designType === 'ALCHEMICAL' && gear.processMode === 'SOLID_TO_BRASS').reduce((sum, gear) => sum + gear.teeth * Math.abs(gear.angularVelocity || 0) / (Math.PI * 2), 0);
         this.steamTransformRate = activeGears.filter(gear => gear.designType === 'ALCHEMICAL' && gear.processMode === 'TRANSFORM').reduce((sum, gear) => sum + gear.teeth * Math.abs(gear.angularVelocity || 0) / (Math.PI * 2), 0);
+        this.generatedSteamRate = Math.min(this.steamTransformRate * 10, this.water * 10);
         if (this.creativeMode) {
             this.steamPower = 200;
+            this.water = 400;
             this.brass = 9999;
         } else {
             const steamConsumption = this.network && this.mainGearRunning && activeCount > 0
@@ -269,7 +279,7 @@ export class GameState {
                         this.steamPower = Math.min(200, this.steamPower + transformed * 10);
                     }
                 }
-                if (gear.designType === 'ALCHEMICAL' && (gear.processMode === 'FOG_TO_WATER' || gear.processMode === 'FOG_TO_LIQUID_METAL' || gear.processMode === 'LIQUID_TO_SOLID_METAL')) {
+                if (gear.designType === 'ALCHEMICAL' && (gear.processMode === 'FOG_TO_WATER' || gear.processMode === 'FOG_TO_LIQUID_METAL' || gear.processMode === 'LIQUID_TO_SOLID_METAL' || gear.processMode === 'SOLID_TO_BRASS')) {
                     const progressKey = `${gear.id}:${gear.processMode}`;
                     const progress = (this.rotationProgress.get(progressKey) || 0) + Math.abs(rotationDelta);
                     const completedRotations = Math.floor(progress / (Math.PI * 2));
@@ -284,10 +294,14 @@ export class GameState {
                             const transformed = Math.min(this.fog, amount * 10);
                             this.fog -= transformed;
                             this.liquidMetal += transformed * 0.1;
-                        } else {
+                        } else if (gear.processMode === 'LIQUID_TO_SOLID_METAL') {
                             const transformed = Math.min(this.liquidMetal, amount);
                             this.liquidMetal -= transformed;
                             this.solidMetal += transformed;
+                        } else {
+                            const transformed = Math.min(this.solidMetal, amount);
+                            this.solidMetal -= transformed;
+                            this.brass += transformed;
                         }
                     }
                 }

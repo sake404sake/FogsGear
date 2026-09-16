@@ -11,7 +11,7 @@
     <div class="panel">
         <h1>Fog Thermodynamics</h1>
         <div class="status-container">
-            <div class="status-steam">スチーム力: <span id="steamPower" class="status-value">100</span></div>
+            <div class="status-steam">スチーム残量: <span id="steamPower" class="status-value">100</span></div>
             <div class="status-brass">真鍮資材: <span id="brass" class="status-value">300</span></div>
             <div class="status-water">水: <span id="water" class="status-value">0</span></div>
             <div>現在コスト：真鍮 <span id="currentBrassCost" class="status-value">0</span>、消費スチーム <span id="currentSteamCost" class="status-value">0</span></div>
@@ -31,9 +31,24 @@
                 <div><span>霧→水</span><strong id="fogToWaterRate">0</strong><small> /秒</small></div>
                 <div><span>固体金属</span><strong id="solidMetal">0</strong><small> 保有量</small></div>
                 <div><span>固体金属生成</span><strong id="solidMetalRate">0</strong><small> /秒</small></div>
+                <div><span>真鍮資材生成</span><strong id="solidMetalToBrassRate">0</strong><small> /秒</small></div>
                 <div><span>水→スチーム</span><strong id="steamTransformRate">0</strong><small> /秒</small></div>
-                <div><span>スチーム残量</span><strong id="dashboardSteam">100</strong></div>
+                <div><span>生成スチーム</span><strong id="generatedSteamRate">0</strong><small> /秒</small></div>
+                <div><span>消費スチーム</span><strong id="dashboardSteamCost">0</strong><small> スチーム</small></div>
             </div>
+        </section>
+        <button class="dashboard-toggle rate-table-toggle" data-action="toggle-rate-table" aria-expanded="false">変換レート表 <span>+</span></button>
+        <section class="rate-table-panel" aria-label="変換レート表" hidden>
+            <table class="rate-table">
+                <thead><tr><th>処理</th><th>入力</th><th>出力</th></tr></thead>
+                <tbody>
+                    <tr><td>水→スチーム</td><td>水 1</td><td>スチーム 10</td></tr>
+                    <tr><td>霧→水</td><td>霧 10</td><td>水 1</td></tr>
+                    <tr><td>霧→液体金属</td><td>霧 10</td><td>液体金属 1</td></tr>
+                    <tr><td>液体金属→固体金属</td><td>液体金属 1</td><td>固体金属 1</td></tr>
+                    <tr><td>固体金属→真鍮資材</td><td>固体金属 1</td><td>真鍮資材 1</td></tr>
+                </tbody>
+            </table>
         </section>
         <div class="control-group">
             <span class="group-label">— Gear Type Selector —</span>
