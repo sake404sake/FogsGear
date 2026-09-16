@@ -23,5 +23,5 @@ document.addEventListener('DOMContentLoaded', () => {
     // 保存データの復元結果を、ステータス表示と各種ボタンへ反映する。
     uiController.updateUI();
 
-    console.log('Fog Thermodynamics Engine initialized.');
+    console.log('Fogs Gear Engine initialized.');
 });
