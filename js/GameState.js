@@ -333,8 +333,7 @@ export class GameState {
     getGearProcessInfo(gear) {
         // ギア単体の処理名、入力、出力、毎秒レートをUI用の共通形式で返す。
         // 処理ごとの表示情報をここに集約し、吹き出し側が個別の計算式を持たないようにする。
-        const elapsed = Math.max(this.lastTickElapsed, 1 / 240);
-        const rotationRate = gear ? gear.teeth * Math.abs(gear.angularVelocity || 0) * 0.012 / elapsed / (Math.PI * 2) : 0;
+        const rotationRate = gear ? gear.teeth * Math.abs(gear.angularVelocity || 0) * 0.012 * 60 / (Math.PI * 2) : 0;
         const processInfo = {
             NONE: { name: '処理なし', input: '-', output: '-', rate: 0 },
             FOG_COLLECTION: { name: '霧の回収', input: '-', output: '霧', rate: rotationRate * 10 },
@@ -345,7 +344,7 @@ export class GameState {
             SOLID_TO_BRASS: { name: '固体金属→真鍮資材', input: '固体金属', output: '真鍮資材', rate: rotationRate }
         };
         const info = processInfo[gear?.processMode] || processInfo.NONE;
-        const inputMultiplier = ['FOG_TO_WATER', 'FOG_TO_LIQUID_METAL'].includes(gear?.processMode) ? 100 : 1;
+        const inputMultiplier = ['FOG_TO_WATER', 'FOG_TO_LIQUID_METAL'].includes(gear?.processMode) ? 10 : 1;
         return { ...info, inputRate: info.rate * inputMultiplier, outputRate: info.rate };
     }
 
@@ -378,8 +377,8 @@ export class GameState {
         // 水1に対してスチーム10を生成するため、水→スチームの出力は水消費量から直接算出する。
         this.generatedSteamRate = this.waterConsumptionRate * 10;
         // 霧→水・霧→液体金属は、出力1に対して霧10を消費する。
-        // 各出力レートはすでに0.1倍後なので、入力レートへ戻すにはさらに100倍する。
-        this.fogConsumptionRate = (this.fogToWaterRate + this.liquidMetalRate) * 100;
+        // 各出力レートはすでに0.1倍後なので、入力レートへ戻すには10倍する。
+        this.fogConsumptionRate = (this.fogToWaterRate + this.liquidMetalRate) * 10;
         this.liquidMetalConsumptionRate = this.solidMetalRate;
         this.solidMetalConsumptionRate = this.solidMetalToBrassRate;
         this.brassGenerationRate = this.solidMetalToBrassRate;
@@ -402,7 +401,7 @@ export class GameState {
         // 回転中の各ギアを個別に処理する。同じ軸でも資源処理は共有しない。
         this.placedGears.forEach(gear => {
             if (gear.powered && !gear.isDeadlocked && this.steamPower > 0 && this.mainGearRunning) {
-                const rotationDelta = 0.012 * (gear.angularVelocity || 1) * gear.rotationDir;
+                const rotationDelta = 0.012 * 60 * (gear.angularVelocity || 1) * elapsed * gear.rotationDir;
                 gear.angle += rotationDelta;
                 // 霧回収は1回転の完了を待たず、回転角に比例して連続的に加算する。
                 if (gear.processMode === 'FOG_COLLECTION') {

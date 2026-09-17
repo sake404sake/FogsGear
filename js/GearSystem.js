@@ -214,7 +214,7 @@ export class GearNetwork {
                 const speed = axis
                     ? current.speed
                     : belt
-                        ? current.speed * other.size / driver.size
+                        ? current.speed * driver.size / other.size
                         : current.speed * driver.size / other.size;
                 queue.push({ gear: other, speed, direction: axis || belt ? current.direction : -current.direction });
             }

@@ -18,6 +18,7 @@ export class UIController {
         this.inputFrame = 0;
         this.pendingZoom = null;
         this.pointerDownGear = null;
+        this.pointerDownPoint = null;
         this.initEvents();
         this.state.subscribe(() => this.updateUI());
     }
@@ -128,6 +129,8 @@ export class UIController {
         this.canvas.addEventListener('pointercancel', event => {
             this.activeTouches.delete(event.pointerId);
             this.initialPinchDist = null;
+            this.pointerDownGear = null;
+            this.pointerDownPoint = null;
             this.state.ghostGear = null;
         });
         this.canvas.addEventListener('wheel', event => {
@@ -165,9 +168,9 @@ export class UIController {
         }
         this.pointerDownGear = this.state.selectedSize ? null : this.selectGearAt(point.x, point.y);
         if (this.pointerDownGear) {
-            this.openGearPopover(this.pointerDownGear);
+            this.pointerDownPoint = { x: event.clientX, y: event.clientY };
             this.state.ghostGear = null;
-            this.activeTouches.clear();
+            this.canvas.setPointerCapture(event.pointerId);
             return;
         }
         this.closeGearPopover();
@@ -191,6 +194,11 @@ export class UIController {
     pointerMove(event) {
         // 押下中のタッチ位置を更新し、実際の移動処理を次フレームへ送る。
         if (event.buttons === 2 || event.button === 2) return;
+        if (this.pointerDownGear && this.pointerDownPoint
+            && Math.hypot(event.clientX - this.pointerDownPoint.x, event.clientY - this.pointerDownPoint.y) > 8) {
+            this.pointerDownGear = null;
+            this.pointerDownPoint = null;
+        }
         if (this.activeTouches.has(event.pointerId)) this.activeTouches.set(event.pointerId, { x: event.clientX, y: event.clientY });
         const point = this.renderer.worldPoint(event.clientX, event.clientY);
         const hovered = this.getStackedGearsAt(point.x, point.y);
@@ -227,7 +235,11 @@ export class UIController {
         if (event.button === 2) return;
         if (this.state.selectedItem === 'BELT') return;
         if (this.pointerDownGear) {
+            const point = this.renderer.worldPoint(event.clientX, event.clientY);
+            const releasedGear = this.gearManager.findGearAt(point.x, point.y);
+            if (releasedGear?.id === this.pointerDownGear.id) this.openGearPopover(releasedGear);
             this.pointerDownGear = null;
+            this.pointerDownPoint = null;
             return;
         }
         this.activeTouches.delete(event.pointerId);
@@ -369,13 +381,22 @@ export class UIController {
             steamGenerationRate: this.state.steamGenerationRate,
             steamConsumptionRate: this.state.steamConsumptionRate
         };
+        const formatCompact = value => {
+            const number = Number(value) || 0;
+            const absolute = Math.abs(number);
+            const units = [[1e9, 'B'], [1e6, 'M'], [1e3, 'K']];
+            const unit = units.find(([threshold]) => absolute >= threshold);
+            if (!unit) return number.toFixed(2);
+            const [threshold, suffix] = unit;
+            return `${(number / threshold).toFixed(2).replace(/\.00$/, '').replace(/(\.[0-9])0$/, '$1')}${suffix}`;
+        };
         const integerDashboardIds = new Set(['dashboardBrass', 'dashboardSteamPower']);
         Object.entries(dashboardValues).forEach(([id, value]) => {
             const element = document.getElementById(id);
             if (!element) return;
-            const displayValue = id.startsWith('dashboard') && integerDashboardIds.has(id)
+            const displayValue = formatCompact(id.startsWith('dashboard') && integerDashboardIds.has(id)
                 ? Math.floor(value || 0)
-                : (value || 0).toFixed(2);
+                : value);
             element.textContent = displayValue + (id.startsWith('dashboard') ? '' : ' /秒');
         });
         const selectedGear = this.gearManager.findGearById(this.state.selectedGearId);
