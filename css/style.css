@@ -125,7 +125,8 @@ h1 {
 .dashboard-toggle span { color: #d9fff2; font-size: 1rem; }
 .item-selector-row { align-items: center; }
 .btn-item.active { color: #120e0c; background: #62c2aa; border-color: #a7f0d9; font-weight: bold; }
-.btn-item-confirm { position: fixed; right: 14px; bottom: 14px; z-index: 30; color: #120e0c; background: #62c2aa; border-color: #a7f0d9; font-weight: bold; box-shadow: 0 0 14px rgba(98, 194, 170, 0.35); }
+.btn-item-confirm { position: absolute; top: 12px; right: 12px; z-index: 30; min-height: 40px; padding: 9px 14px; color: #fff5ef; background: #8b2626; border: 2px solid #f09b86; font-weight: bold; letter-spacing: 0.04em; box-shadow: 0 0 0 2px rgba(18, 14, 12, 0.72), 0 0 18px rgba(240, 120, 96, 0.58); }
+.btn-item-confirm:hover { color: #fff; background: #b43d32; box-shadow: 0 0 0 2px rgba(18, 14, 12, 0.72), 0 0 22px rgba(240, 120, 96, 0.75); }
 .btn-item-confirm[hidden] { display: none; }
 .dashboard-title { margin-bottom: 6px; color: #a7f0d9; font: 0.65rem monospace; letter-spacing: 2px; }
 .dashboard-resource-table { display: grid; gap: 0; font-size: 0.68rem; }
@@ -151,6 +152,7 @@ h1 {
     .button-row { gap: 5px; }
     .btn { flex: 1 1 auto; min-width: 0; padding: 6px 7px; font-size: 0.68rem; }
     .btn-action, .btn-reset { flex: 1 1 44%; min-width: 0; padding: 7px 5px; }
+    .btn-item-confirm { top: 8px; right: 8px; min-height: 42px; padding: 9px 11px; font-size: 0.72rem; }
     .dashboard-resource-row { grid-template-columns: 0.95fr repeat(3, 1fr); gap: 4px; font-size: 0.6rem; }
     h1 { letter-spacing: 2px; }
 }
@@ -266,6 +268,7 @@ h1 {
 .btn-loop-visualize { min-width: 94px; color: #b8f4ff; background: rgba(77, 194, 218, 0.12); border-color: #62cbe4; }
 .btn-loop-visualize:hover:not(:disabled), .btn-loop-visualize.active { color: #08242b; background: #8eeaff; border-color: #c1f6ff; box-shadow: 0 0 10px rgba(98, 203, 228, 0.45); }
 .btn-visibility { min-width: 94px; color: #d9fff2; background: rgba(98, 194, 170, 0.08); border-color: rgba(98, 194, 170, 0.4); }
+.btn-visibility[data-visibility="belts"]:not(.active) { color: #f1e7d7; background: rgba(48, 35, 27, 0.92); border-color: #9b7950; }
 .btn-visibility.active { color: #08242b; background: #8eeaff; border-color: #c1f6ff; box-shadow: 0 0 10px rgba(98, 203, 228, 0.45); }
 .btn-visibility[data-visibility-layer="0"].active { color: #2d2100; background: #f3c653; border-color: #fff0a5; box-shadow: 0 0 10px rgba(243, 198, 83, 0.5); }
 .btn-visibility[data-visibility-layer="1"].active { color: #202020; background: #e6eae3; border-color: #fff; box-shadow: 0 0 10px rgba(230, 234, 227, 0.45); }

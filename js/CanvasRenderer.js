@@ -20,6 +20,7 @@ export class CanvasRenderer {
         this.gridKey = '';
         this.sortedGears = [];
         this.sortedGearKey = '';
+        this.sortedGearSource = null;
         this.gearImages = {};
         this.tintedImages = {};
         this.loadGearImages();
@@ -76,8 +77,9 @@ export class CanvasRenderer {
         this.ctx.scale(this.state.zoomScale, this.state.zoomScale);
         this.ctx.translate(this.state.offsetX, this.state.offsetY);
         const sortedKey = this.state.placedGears.map(gear => `${gear.id}:${gear.layer}`).join('|');
-        if (sortedKey !== this.sortedGearKey) {
+        if (this.state.placedGears !== this.sortedGearSource || sortedKey !== this.sortedGearKey) {
             this.sortedGears = [...this.state.placedGears].sort((a, b) => a.layer - b.layer);
+            this.sortedGearSource = this.state.placedGears;
             this.sortedGearKey = sortedKey;
         }
         this.drawBeltSelection();

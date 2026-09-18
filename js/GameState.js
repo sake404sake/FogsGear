@@ -212,19 +212,31 @@ export class GameState {
         this.mainGearRunning = data.mainGearRunning ?? true;
         this.creativeMode = data.creativeMode ?? false;
         this.creativeSnapshot = data.creativeSnapshot ?? null;
-        this.belts = data.belts ?? [];
         const gears = data.gears || data.placedGears || [];
         this.placedGears = this.createGear
             ? gears.map(gear => this.createGear(gear))
             : gears.map(gear => ({ ...gear, sizeKey: gear.sizeKey || gear.size }));
+        const gearIds = new Set(this.placedGears.map(gear => gear.id));
+        this.belts = Array.isArray(data.belts)
+            ? data.belts
+                .map(belt => ({ id: belt.id, gearIds: [...new Set(belt.gearIds || [])].filter(id => gearIds.has(id)) }))
+                .filter(belt => belt.gearIds.length >= 2)
+            : [];
         this.placedGears.forEach((gear, index) => {
             const savedGear = gears[index];
             gear.isLocked = savedGear.isLocked ?? gear.isCore;
             gear.designType = savedGear.designType || gear.designType;
             gear.processMode = savedGear.processMode || gear.processMode;
+            gear.powered = false;
+            gear.rotationDir = 0;
+            gear.angularVelocity = 0;
+            gear.isDeadlocked = false;
+            gear.angleError = false;
         });
         this.rotationProgress = new Map();
         this.updatePowerGrid();
+        if (this.network) this.network.rebuild(this.placedGears, this.belts).updateRotation();
+        this.lastTickAt = performance.now();
         this.notify();
     }
 
@@ -235,6 +247,12 @@ export class GameState {
         this.redoStack.push(this.createSnapshot());
         this.restoreSnapshot(this.undoStack.pop());
         this.saveGameData();
+        this.selectedGearId = null;
+        this.selectedItem = 'NONE';
+        this.selectedSize = null;
+        this.beltSelection = [];
+        this.ghostGear = null;
+        this.notify();
     }
 
     redo() {
@@ -244,6 +262,12 @@ export class GameState {
         this.undoStack.push(this.createSnapshot());
         this.restoreSnapshot(this.redoStack.pop());
         this.saveGameData();
+        this.selectedGearId = null;
+        this.selectedItem = 'NONE';
+        this.selectedSize = null;
+        this.beltSelection = [];
+        this.ghostGear = null;
+        this.notify();
     }
 
     reset() {

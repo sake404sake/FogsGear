@@ -19,6 +19,7 @@ export class UIController {
         this.pendingZoom = null;
         this.pointerDownGear = null;
         this.pointerDownPoint = null;
+        this.longPressTimer = null;
         this.initEvents();
         this.state.subscribe(() => this.updateUI());
     }
@@ -114,7 +115,7 @@ export class UIController {
         });
         this.canvas.addEventListener('pointerdown', event => this.pointerDown(event));
         this.canvas.addEventListener('pointermove', event => this.pointerMove(event));
-        this.canvas.addEventListener('pointerleave', () => { this.state.hoveredGearIds = []; });
+        this.canvas.addEventListener('pointerleave', () => { this.state.hoveredGearIds = []; this.cancelLongPress(); });
         this.canvas.addEventListener('pointerup', event => this.pointerUp(event));
         this.canvas.addEventListener('contextmenu', event => {
             event.preventDefault();
@@ -127,6 +128,7 @@ export class UIController {
             this.closeGearPopover();
         });
         this.canvas.addEventListener('pointercancel', event => {
+            this.cancelLongPress();
             this.activeTouches.delete(event.pointerId);
             this.initialPinchDist = null;
             this.pointerDownGear = null;
@@ -163,12 +165,17 @@ export class UIController {
         const point = this.renderer.worldPoint(event.clientX, event.clientY);
         if (this.state.selectedItem === 'BELT') {
             const gear = this.selectGearAt(point.x, point.y);
-            if (gear) this.openGearPopover(gear);
+            if (gear && this.isTouchPointer(event)) {
+                this.startLongPress(gear, event);
+                this.canvas.setPointerCapture(event.pointerId);
+            }
+            else if (gear) this.openGearPopover(gear);
             return;
         }
         this.pointerDownGear = this.state.selectedSize ? null : this.selectGearAt(point.x, point.y);
         if (this.pointerDownGear) {
             this.pointerDownPoint = { x: event.clientX, y: event.clientY };
+            if (this.isTouchPointer(event)) this.startLongPress(this.pointerDownGear, event);
             this.state.ghostGear = null;
             this.canvas.setPointerCapture(event.pointerId);
             return;
@@ -194,10 +201,18 @@ export class UIController {
     pointerMove(event) {
         // 押下中のタッチ位置を更新し、実際の移動処理を次フレームへ送る。
         if (event.buttons === 2 || event.button === 2) return;
+        if (this.longPressTimer && event.pointerId === this.longPressPointerId
+            && Math.hypot(event.clientX - this.longPressPoint.x, event.clientY - this.longPressPoint.y) > 8) {
+            this.cancelLongPress();
+        }
         if (this.pointerDownGear && this.pointerDownPoint
             && Math.hypot(event.clientX - this.pointerDownPoint.x, event.clientY - this.pointerDownPoint.y) > 8) {
+            this.cancelLongPress();
             this.pointerDownGear = null;
             this.pointerDownPoint = null;
+            this.activeTouches.set(event.pointerId, { x: event.clientX, y: event.clientY });
+            this.startX = event.clientX;
+            this.startY = event.clientY;
         }
         if (this.activeTouches.has(event.pointerId)) this.activeTouches.set(event.pointerId, { x: event.clientX, y: event.clientY });
         const point = this.renderer.worldPoint(event.clientX, event.clientY);
@@ -233,11 +248,15 @@ export class UIController {
     pointerUp(event) {
         // ギア編集、配置確定、または通常の盤面操作を終了する。
         if (event.button === 2) return;
-        if (this.state.selectedItem === 'BELT') return;
+        if (this.state.selectedItem === 'BELT') {
+            this.cancelLongPress();
+            return;
+        }
         if (this.pointerDownGear) {
             const point = this.renderer.worldPoint(event.clientX, event.clientY);
             const releasedGear = this.gearManager.findGearAt(point.x, point.y);
-            if (releasedGear?.id === this.pointerDownGear.id) this.openGearPopover(releasedGear);
+            if (!this.isTouchPointer(event) && releasedGear?.id === this.pointerDownGear.id) this.openGearPopover(releasedGear);
+            this.cancelLongPress();
             this.pointerDownGear = null;
             this.pointerDownPoint = null;
             return;
@@ -348,6 +367,23 @@ export class UIController {
     pointerOffset(event) {
         // タッチ操作だけ、指でUIが隠れないよう入力位置を上方向へ補正する。
         return event.pointerType === 'mouse' ? 0 : 110;
+    }
+
+    isTouchPointer(event) { return event.pointerType === 'touch' || event.pointerType === 'pen'; }
+    startLongPress(gear, event) {
+        this.cancelLongPress();
+        this.longPressTimer = setTimeout(() => {
+            this.longPressTimer = null;
+            this.openGearPopover(gear);
+        }, 550);
+        this.longPressPointerId = event.pointerId;
+        this.longPressPoint = { x: event.clientX, y: event.clientY };
+    }
+    cancelLongPress() {
+        if (this.longPressTimer) clearTimeout(this.longPressTimer);
+        this.longPressTimer = null;
+        this.longPressPointerId = null;
+        this.longPressPoint = null;
     }
 
     updateUI() {
