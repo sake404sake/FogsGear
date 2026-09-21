@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Steampunk Explorer - Settings</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <main class="panel settings-panel">
+        <h1>EXPLORATION SETTINGS</h1>
+        <p class="rule-text">島の生成条件とメインマップの初期表示を設定します。</p>
+        <div class="settings-form">
+            <label for="worldSeed">ワールドシード</label>
+            <div class="setting-control">
+                <input id="worldSeed" type="text" maxlength="80" placeholder="SteampunkIsland_01">
+                <button class="btn btn-action" id="randomSeed" type="button">ランダム</button>
+            </div>
+            <label for="defaultZoom">メインマップの初期ズーム</label>
+            <div class="setting-control">
+                <input id="defaultZoom" type="range" min="0.25" max="2.5" step="0.05">
+                <output id="zoomLabel" for="defaultZoom">0.80x</output>
+            </div>
+            <label for="minZoom">メインマップの最小ズーム</label>
+            <select id="minZoom">
+                <option value="0.1">0.10x (遠景)</option>
+                <option value="0.25">0.25x (標準)</option>
+                <option value="0.5">0.50x (近景)</option>
+            </select>
+        </div>
+        <div class="button-row settings-actions">
+            <button class="btn btn-action" id="saveSettings" type="button">設定を保存</button>
+            <button class="btn btn-reset" id="backToGame" type="button">ゲーム画面へ戻る</button>
+        </div>
+        <p id="saveMessage" class="rule-text" aria-live="polite"></p>
+    </main>
+    <script type="module">
+        const defaults = { seed: 'SteampunkIsland_01', zoom: 0.8, minZoom: 0.25 };
+        const getSettings = () => {
+            try {
+                return { ...defaults, ...JSON.parse(localStorage.getItem('steampunk_explorer_settings') || '{}') };
+            } catch (error) {
+                return { ...defaults };
+            }
+        };
+        const seedInput = document.getElementById('worldSeed');
+        const zoomInput = document.getElementById('defaultZoom');
+        const zoomLabel = document.getElementById('zoomLabel');
+        const minZoomInput = document.getElementById('minZoom');
+        const settings = getSettings();
+        seedInput.value = settings.seed;
+        zoomInput.value = settings.zoom;
+        minZoomInput.value = settings.minZoom;
+        zoomInput.addEventListener('input', () => {
+            zoomLabel.value = `${Number(zoomInput.value).toFixed(2)}x`;
+            zoomLabel.textContent = zoomLabel.value;
+        });
+        zoomInput.dispatchEvent(new Event('input'));
+        document.getElementById('randomSeed').onclick = () => {
+            seedInput.value = `Island_${Date.now().toString(36)}`;
+        };
+        document.getElementById('saveSettings').onclick = () => {
+            const minZoom = Number(minZoomInput.value);
+            const zoom = Math.max(minZoom, Number(zoomInput.value));
+            localStorage.setItem('steampunk_explorer_settings', JSON.stringify({
+                seed: seedInput.value.trim() || defaults.seed,
+                zoom,
+                minZoom
+            }));
+            zoomInput.value = zoom;
+            zoomInput.dispatchEvent(new Event('input'));
+            document.getElementById('saveMessage').textContent = '設定を保存しました。';
+        };
+        document.getElementById('backToGame').onclick = () => {
+            window.location.href = 'index.html';
+        };
+    </script>
+</body>
+</html>

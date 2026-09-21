@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Steampunk Explorer</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <!-- 上部パネル：プレイヤー情報 -->
+    <div class="panel">
+        <div class="title-bar">
+            <span class="title-side title-side-left" id="currentTerritory">-</span>
+            <h1>STEAMPUNK EXPLORER</h1>
+            <span class="title-side title-side-right" id="currentCellType">-</span>
+        </div>
+        <button class="dashboard-toggle" data-action="toggle-status" aria-expanded="false">ステータス <span>+</span></button>
+        <section class="dashboard" id="status-panel" hidden>
+            <div class="status-container">
+                <div class="status-water">HP: <span id="playerHP" class="status-value">100</span> / 100</div>
+                <div class="status-steam">STEAM: <span id="playerSteam" class="status-value">50</span> / 50</div>
+                <div class="status-brass">COORD: <span id="playerCoord" class="status-value">(0, 0)</span></div>
+            </div>
+        </section>
+        
+        <button class="dashboard-toggle" data-action="toggle-inventory" aria-expanded="false">インベントリ <span>+</span></button>
+        <section class="dashboard" id="inventory-panel" hidden>
+            <div class="dashboard-title">COLLECTED RESOURCES</div>
+            <div class="dashboard-resource-table">
+                <div class="dashboard-resource-row"><span>真鍮の歯車</span><strong id="invBrass">5</strong></div>
+                <div class="dashboard-resource-row"><span>古びたネジ</span><strong id="invScrew">12</strong></div>
+                <div class="dashboard-resource-row"><span>圧力計</span><strong id="invGauge">1</strong></div>
+                <div class="dashboard-resource-row inventory-scroll-row"><span>スクロール（紙）</span><strong id="invPaperScroll">10</strong><button type="button" class="inventory-scroll-button" onclick="window.location.href='../GearSystem/index.html'">編集</button></div>
+                <div class="dashboard-resource-row inventory-scroll-row"><span>スクロール（布）</span><strong id="invClothScroll">10</strong><button type="button" class="inventory-scroll-button" onclick="window.location.href='../GearSystem/index.html'">編集</button></div>
+            </div>
+            <div class="saved-scroll-section">
+                <div class="saved-scroll-head">保存済みスクロール</div>
+                <div id="saved-scroll-list" class="saved-scroll-list"></div>
+            </div>
+        </section>
+    </div>
+
+    <!-- ゲーム画面エリア -->
+    <div id="canvas-container">
+        <div id="interaction-prompt" class="btn-item-confirm" style="display: none;">調べる [E]</div>
+        <canvas id="gameCanvas" width="640" height="480"></canvas>
+    </div>
+
+    <!-- 下部パネル：操作・メニュー -->
+    <div class="panel">
+        <div class="control-group">
+            <span class="group-label">— Movement —</span>
+            <div class="button-row">
+                <button class="btn btn-action" id="move-up">↑</button>
+            </div>
+            <div class="button-row">
+                <button class="btn btn-action" id="move-left">←</button>
+                <button class="btn btn-action" id="move-down">↓</button>
+                <button class="btn btn-action" id="move-right">→</button>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <span class="group-label">— Navigation —</span>
+            <div class="button-row">
+                <button class="btn btn-action" onclick="window.location.href='worldmap.html'">世界全体マップを開く (World Map)</button>
+                <button class="btn btn-action" onclick="window.location.href='settings.html'">設定を開く (Settings)</button>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <span class="group-label">— Skin Settings —</span>
+            <div class="button-row">
+                <input type="text" id="skinUrl" style="background:#1c1511; color:var(--text-main); border:1px solid var(--border-sub); padding:4px;" placeholder="Skin URL" value="https://mineskin.org/download/639735497">
+                <button class="btn btn-action" id="applySkin" style="min-width:auto; padding:4px 8px;">Apply</button>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <div class="button-row" style="width: 100%;">
+                <button class="btn btn-visibility active" data-action="save">記録 (Save)</button>
+                <button class="btn btn-reset" data-action="rest">休息 (Rest)</button>
+            </div>
+        </div>
+        <div class="rule-text">
+            WASD / 方向ボタンで移動。マウスホイールまたはピンチ操作で拡大縮小、ドラッグでマップを移動できます。シード値と初期ズームは設定画面で変更できます。
+        </div>
+    </div>
+
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>
