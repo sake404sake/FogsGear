@@ -78,7 +78,7 @@ export class MapManager {
             SEA: '#1e4d6b',
             PLAINS: '#8db87c',
             FOREST: '#3e6b48',
-            MOUNTAIN: '#6b7280',
+            MOUNTAIN: '#a8947d',
             LAKE: '#3b82f6'
         };
 
@@ -246,7 +246,7 @@ export class MapManager {
                     SEA: '#1e4d6b',
                     PLAINS: '#8db87c',
                     FOREST: '#3e6b48',
-                    MOUNTAIN: '#6b7280',
+                    MOUNTAIN: '#a8947d',
                     LAKE: '#3b82f6'
                 }[tile.type] || '#8db87c';
             }

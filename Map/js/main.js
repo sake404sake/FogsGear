@@ -1,6 +1,7 @@
 // js/main.js - Steampunk Explorer Game Logic
-import { MapGenerator, BIOME_COLORS } from './mapGenerator.js';
+import { MapGenerator, BIOME_COLORS, saveMapSnapshot } from './mapGenerator.js?v=4';
 import { SkinRenderer } from './skinRenderer.js?v=2';
+import { CELL_DEFINITIONS, canEnterCell, getCellEntryRule, getMosaicColor } from './cellRules.js';
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
@@ -28,7 +29,9 @@ const state = {
     rows: 1000,
     worldSeed: 'SteampunkIsland_01',
     generator: new MapGenerator(1000, 1000),
-    skin: new SkinRenderer()
+    skin: new SkinRenderer(),
+    inventoryItems: new Set(),
+    cellEntryRules: { types: {}, cells: {} }
 };
 
 const activePointers = new Map();
@@ -110,6 +113,38 @@ function renderSavedScrolls() {
     });
 }
 
+function renderCellLegend() {
+    const legend = document.getElementById('cell-legend');
+    if (!legend) return;
+    legend.innerHTML = '';
+    Object.entries(CELL_DEFINITIONS).forEach(([typeKey, definition]) => {
+        const item = document.createElement('div');
+        item.className = 'cell-legend-item';
+        item.title = getCellEntryRule({ type: typeKey }, state.cellEntryRules).requiredItems.length
+            ? '侵入に必要なアイテムがあります'
+            : '侵入条件なし';
+        const color = document.createElement('span');
+        color.className = 'cell-legend-color';
+        color.style.backgroundColor = definition.color;
+        const label = document.createElement('span');
+        label.textContent = definition.label;
+        item.append(color, label);
+        legend.appendChild(item);
+    });
+}
+
+function loadCellEntryRules() {
+    try {
+        const stored = JSON.parse(localStorage.getItem('fogsgear_cell_entry_rules') || '{}');
+        return {
+            types: stored.types && typeof stored.types === 'object' ? stored.types : {},
+            cells: stored.cells && typeof stored.cells === 'object' ? stored.cells : {}
+        };
+    } catch (error) {
+        return { types: {}, cells: {} };
+    }
+}
+
 function buildLabelEntries() {
     const labels = [];
     const seen = new Set();
@@ -131,11 +166,53 @@ function buildLabelEntries() {
     return labels;
 }
 
-async function loadAndApplySkin(url) {
+function readFileAsDataUrl(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ''));
+        reader.onerror = () => reject(new Error('ファイルの読み込みに失敗しました'));
+        reader.readAsDataURL(file);
+    });
+}
+
+function getSkinNameFromSource(source) {
+    if (source.startsWith('data:')) return 'ローカル画像';
+    const sourcePath = source.split(/[?#]/)[0];
+    const fileName = sourcePath.substring(sourcePath.lastIndexOf('/') + 1);
+    return fileName || '既定スキン';
+}
+
+function updateSkinName(name) {
+    const skinName = document.getElementById('skinName');
+    if (skinName) skinName.textContent = `選択中: ${name || '未選択'}`;
+}
+
+async function loadAndApplySkin(url, name = '') {
+    if (!url) {
+        state.skin.isLoaded = false;
+        return;
+    }
     await state.skin.loadSkin(url);
     try {
         localStorage.setItem('steampunk_explorer_skin_url', url);
+        localStorage.setItem('steampunk_explorer_skin_name', name || getSkinNameFromSource(url));
     } catch(e) {}
+    updateSkinName(name || getSkinNameFromSource(url));
+}
+
+async function applySelectedSkinSource(source, sourceType = 'url', name = '') {
+    const value = typeof source === 'string' ? source.trim() : '';
+    if (!value) return;
+    const skinInput = document.getElementById('skinUrl');
+    if (skinInput) skinInput.value = value;
+    const skinName = name || getSkinNameFromSource(value);
+    await loadAndApplySkin(value, skinName);
+    try {
+        localStorage.setItem('steampunk_explorer_skin_source', sourceType);
+        localStorage.setItem('steampunk_explorer_skin_name', skinName);
+    } catch (error) {
+    }
+    updateSkinName(skinName);
 }
 
 async function init() {
@@ -144,6 +221,7 @@ async function init() {
         settings = { ...settings, ...JSON.parse(localStorage.getItem('steampunk_explorer_settings') || '{}') };
     } catch (error) {}
     state.minZoom = Number(settings.minZoom);
+    state.cellEntryRules = loadCellEntryRules();
     state.zoom = Math.max(state.minZoom, Number(settings.zoom));
     state.worldSeed = String(settings.seed || 'SteampunkIsland_01');
     const generated = state.generator.generate(state.worldSeed);
@@ -153,22 +231,21 @@ async function init() {
     state.ruins = generated.ruins || [];
     state.routes = generated.routes || [];
     state.labels = buildLabelEntries();
+    saveMapSnapshot(generated, state.worldSeed).catch(() => {});
 
     findSafeSpawn();
 
-    let savedSkin = 'https://mineskin.org/download/639735497';
+    let savedSkin = './5504543579.png';
+    let savedSkinName = '5504543579.png';
     try {
         const stored = localStorage.getItem('steampunk_explorer_skin_url');
-        if (stored) savedSkin = stored;
+        if (stored && stored !== 'https://mineskin.org/download/639735497') savedSkin = stored;
+        const storedName = localStorage.getItem('steampunk_explorer_skin_name');
+        if (storedName && savedSkin !== './5504543579.png') savedSkinName = storedName;
     } catch(e) {}
 
-    const skinInput = document.getElementById('skinUrl');
-    if (skinInput) {
-        skinInput.value = savedSkin;
-    }
-
     try {
-        await loadAndApplySkin(savedSkin);
+        await loadAndApplySkin(savedSkin, savedSkinName);
     } catch(e) {
         console.warn('Skin load failed, using fallback');
     }
@@ -178,6 +255,7 @@ async function init() {
     updateUI();
     setupControls();
     renderSavedScrolls();
+    renderCellLegend();
     gameLoop();
 }
 
@@ -193,7 +271,7 @@ function findSafeSpawn() {
         const ty = savedPlayer.y;
         if (tx >= 0 && tx < state.cols && ty >= 0 && ty < state.rows) {
             const tile = state.map[ty][tx];
-            if (tile && !tile.isOcean && !tile.isLake) {
+            if (tile && tile.isIsland && !tile.isOcean && !tile.isLake) {
                 state.player.x = tx;
                 state.player.y = ty;
                 savePlayerPos();
@@ -330,7 +408,7 @@ function draw() {
     for (let y = startRow; y < endRow; y++) {
         for (let x = startCol; x < endCol; x++) {
             const tile = state.map[y][x];
-            ctx.fillStyle = tile.color || '#526f4e';
+            ctx.fillStyle = getMosaicColor(tile.color || '#526f4e', x, y);
             const px = Math.floor(x * state.tileSize);
             const py = Math.floor(y * state.tileSize);
             const pSize = Math.ceil(state.tileSize);
@@ -606,17 +684,7 @@ function movePlayer(dx, dy) {
 
     if (newX >= 0 && newX < state.cols && newY >= 0 && newY < state.rows) {
         const targetTile = state.map[newY][newX];
-        const isWaterTile = !!targetTile && (
-            targetTile.isSea ||
-            targetTile.isOcean ||
-            targetTile.isLake ||
-            targetTile.type === 'SEA' ||
-            targetTile.type === 'LAKE' ||
-            targetTile.type === 3 ||
-            targetTile.type === 'OCEAN'
-        );
-        const isMountainTile = !!targetTile && (targetTile.type === 1 || targetTile.type === 'MOUNTAIN');
-        if (!isWaterTile && !isMountainTile) {
+        if (canEnterCell(targetTile, { rules: state.cellEntryRules, items: state.inventoryItems })) {
             state.player.x = newX;
             state.player.y = newY;
             savePlayerPos();
@@ -702,6 +770,8 @@ document.getElementById('move-right').onclick = () => movePlayer(1, 0);
 // インベントリトグルボタンのイベントリスナー設定
 const inventoryToggleBtn = document.querySelector('[data-action="toggle-inventory"]');
 const inventoryPanel = document.getElementById('inventory-panel');
+const cellLegendToggleBtn = document.querySelector('[data-action="toggle-cell-legend"]');
+const cellLegendPanel = document.getElementById('cell-legend-panel');
 const statusToggleBtn = document.querySelector('[data-action="toggle-status"]');
 const statusPanel = document.getElementById('status-panel');
 
@@ -717,6 +787,7 @@ function setupDashboardToggle(toggleButton, panel) {
 }
 
 setupDashboardToggle(statusToggleBtn, statusPanel);
+setupDashboardToggle(cellLegendToggleBtn, cellLegendPanel);
 
 if (inventoryToggleBtn && inventoryPanel) {
     inventoryToggleBtn.addEventListener('click', () => {
@@ -729,11 +800,6 @@ if (inventoryToggleBtn && inventoryPanel) {
         }
     });
 }
-
-document.getElementById('applySkin').onclick = async () => {
-    const url = document.getElementById('skinUrl').value;
-    await loadAndApplySkin(url);
-};
 
 const minZoomSelect = document.getElementById('minZoomSelect');
 if (minZoomSelect) {

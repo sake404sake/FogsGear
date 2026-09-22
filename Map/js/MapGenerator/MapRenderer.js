@@ -1,7 +1,7 @@
 export const BIOME_COLORS = Object.freeze({
     PLAINS: '#8db87c',
     FOREST: '#3e6b48',
-    MOUNTAIN: '#6b7280',
+    MOUNTAIN: '#a8947d',
     SEA: '#123a5a',
     LAKE: '#3b82f6',
     RUINS: '#ef4444',

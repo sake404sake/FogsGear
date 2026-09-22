@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Steampunk Explorer</title>
-    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/style.css?v=4">
 </head>
 <body>
     <!-- 上部パネル：プレイヤー情報 -->
@@ -38,6 +38,10 @@
                 <div id="saved-scroll-list" class="saved-scroll-list"></div>
             </div>
         </section>
+        <button class="dashboard-toggle" data-action="toggle-cell-legend" aria-expanded="false">地形情報 <span>+</span></button>
+        <section class="dashboard" id="cell-legend-panel" hidden>
+            <div id="cell-legend" class="cell-legend" aria-label="セルの凡例"></div>
+        </section>
     </div>
 
     <!-- ゲーム画面エリア -->
@@ -69,14 +73,6 @@
         </div>
 
         <div class="control-group">
-            <span class="group-label">— Skin Settings —</span>
-            <div class="button-row">
-                <input type="text" id="skinUrl" style="background:#1c1511; color:var(--text-main); border:1px solid var(--border-sub); padding:4px;" placeholder="Skin URL" value="https://mineskin.org/download/639735497">
-                <button class="btn btn-action" id="applySkin" style="min-width:auto; padding:4px 8px;">Apply</button>
-            </div>
-        </div>
-
-        <div class="control-group">
             <div class="button-row" style="width: 100%;">
                 <button class="btn btn-visibility active" data-action="save">記録 (Save)</button>
                 <button class="btn btn-reset" data-action="rest">休息 (Rest)</button>
@@ -87,6 +83,6 @@
         </div>
     </div>
 
-    <script type="module" src="js/main.js"></script>
+    <script type="module" src="js/main.js?v=3"></script>
 </body>
 </html>

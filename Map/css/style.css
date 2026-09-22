@@ -223,9 +223,13 @@ h1 {
     font-size: 0.7rem;
 }
 .saved-scroll-empty { color: var(--text-muted); font-size: 0.72rem; }
+.cell-legend { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px 10px; }
+.cell-legend-item { display: flex; align-items: center; gap: 6px; color: var(--text-muted); font-size: 0.7rem; }
+.cell-legend-color { width: 12px; height: 12px; flex: 0 0 12px; border: 1px solid rgba(255, 255, 255, 0.25); border-radius: 2px; }
 
 @media (max-width: 620px) {
     .dashboard-resource-table { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .cell-legend { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 /* ==========================================================================
@@ -391,6 +395,13 @@ canvas {
     color: var(--accent-gold);
     text-align: center;
     font-family: monospace;
+}
+
+.skin-help {
+    margin: 1px 0 0;
+    color: #888888;
+    font-size: 0.7rem;
+    opacity: 0.45;
 }
 
 .settings-actions {
