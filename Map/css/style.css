@@ -31,6 +31,75 @@ body {
     touch-action: pan-y; /* タッチデバイスでの縦スクロールを許可 */
 }
 
+:fullscreen {
+    background: var(--bg-deep);
+}
+
+:fullscreen body {
+    min-height: 100%;
+}
+
+.loading-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: grid;
+    place-items: center;
+    background: rgba(18, 14, 12, 0.96);
+    color: var(--text-main);
+}
+
+.loading-overlay[hidden] {
+    display: none;
+}
+
+.loading-panel {
+    min-width: 220px;
+    padding: 24px 30px;
+    border: 1px solid var(--border-gold);
+    border-radius: 8px;
+    background: var(--panel-bg);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+}
+
+.loading-progress {
+    width: 220px;
+    height: 5px;
+    margin-top: 16px;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 3px;
+}
+
+.loading-progress::after {
+    display: block;
+    width: 42%;
+    height: 100%;
+    content: '';
+    background: var(--accent-gold);
+    border-radius: inherit;
+    animation: loading-progress 1.2s ease-in-out infinite;
+}
+
+@keyframes loading-progress {
+    0% { transform: translateX(-110%); }
+    100% { transform: translateX(270%); }
+}
+
+.loading-spinner {
+    width: 28px;
+    height: 28px;
+    margin: 0 auto 14px;
+    border: 3px solid rgba(243, 198, 83, 0.25);
+    border-top-color: var(--accent-gold);
+    border-radius: 50%;
+    animation: loading-spin 0.8s linear infinite;
+}
+
+@keyframes loading-spin {
+    to { transform: rotate(360deg); }
+}
+
 /* スチームパンク風カスタムスクロールバー（Firefox用） */
 * {
     scrollbar-color: #8b6b3f #1a1410;
@@ -191,6 +260,14 @@ h1 {
     text-align: left;
 }
 
+.navigation-panel {
+    margin: 0 auto 10px;
+    padding: 8px 10px;
+    background: rgba(98, 194, 170, 0.07);
+    border: 1px solid rgba(98, 194, 170, 0.35);
+    border-left: 3px solid #62c2aa;
+}
+
 .dashboard-title { margin-bottom: 6px; color: #a7f0d9; font: 0.65rem monospace; letter-spacing: 2px; }
 .dashboard-resource-table { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; font-size: 0.75rem; }
 .dashboard-resource-row { display: flex; justify-content: space-between; align-items: center; gap: 6px; border: 1px solid rgba(98, 194, 170, 0.14); padding: 4px 6px; min-width: 0; }
@@ -258,6 +335,69 @@ h1 {
     flex-wrap: wrap;
 }
 
+.movement-pad {
+    display: grid;
+    grid-template-columns: repeat(3, 60px);
+    grid-template-rows: repeat(3, 48px);
+    gap: 10px;
+    place-items: center;
+}
+
+.movement-button {
+    min-width: 0;
+    width: 58px;
+    height: 48px;
+    padding: 0;
+    font-size: 1.05rem;
+    line-height: 1;
+}
+
+.movement-up { grid-column: 2; grid-row: 1; }
+.movement-left { grid-column: 1; grid-row: 2; }
+.movement-right { grid-column: 3; grid-row: 2; }
+.movement-down { grid-column: 2; grid-row: 3; }
+
+.movement-joystick {
+    grid-column: 2;
+    grid-row: 2;
+    position: relative;
+    width: 48px;
+    height: 48px;
+    border: 1px solid rgba(98, 194, 170, 0.65);
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, rgba(98, 194, 170, 0.28), rgba(18, 32, 25, 0.9));
+    box-shadow: inset 0 0 0 5px rgba(10, 15, 12, 0.35), 0 2px 8px rgba(0, 0, 0, 0.35);
+    touch-action: none;
+    user-select: none;
+}
+
+.movement-joystick-knob {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 22px;
+    height: 22px;
+    border: 1px solid rgba(243, 198, 83, 0.9);
+    border-radius: 50%;
+    background: #b58b36;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.45);
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+}
+
+@media (max-width: 620px) {
+    .movement-pad {
+        grid-template-columns: repeat(3, 60px);
+        grid-template-rows: repeat(3, 50px);
+        gap: 9px;
+    }
+
+    .movement-button {
+        width: 54px;
+        height: 44px;
+    }
+}
+
 /* 汎用ボタン基本スタイル */
 .btn {
     background: #1c1511;
@@ -282,6 +422,22 @@ h1 {
     color: #b0d4b0;
     font-weight: bold;
     min-width: 60px;
+}
+
+.movement-button {
+    min-width: 0;
+}
+
+.movement-up,
+.movement-down {
+    width: 52px;
+    height: 38px;
+}
+
+.movement-left,
+.movement-right {
+    width: 46px;
+    height: 44px;
 }
 
 /* アクティブ状態のボタン */

@@ -7,6 +7,9 @@
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
+    <div id="loadingOverlay" class="loading-overlay" role="status" aria-live="polite">
+        <div class="loading-panel"><div class="loading-spinner"></div><div>設定画面を読み込んでいます...</div></div>
+    </div>
     <main class="panel settings-panel">
         <h1>EXPLORATION SETTINGS</h1>
         <p class="rule-text">島の生成条件とメインマップの初期表示を設定します。</p>
@@ -44,7 +47,12 @@
         <p id="saveMessage" class="rule-text" aria-live="polite"></p>
     </main>
     <script type="module">
-        const defaults = { seed: 'SteampunkIsland_01', zoom: 0.8, minZoom: 0.25 };
+        const createRandomSeed = () => {
+            const values = new Uint32Array(4);
+            crypto.getRandomValues(values);
+            return `Island_${Array.from(values, (value) => value.toString(36).padStart(7, '0')).join('')}`;
+        };
+        const defaults = { seed: '', zoom: 0.8, minZoom: 0.25 };
         const getSettings = () => {
             try {
                 return { ...defaults, ...JSON.parse(localStorage.getItem('steampunk_explorer_settings') || '{}') };
@@ -89,6 +97,10 @@
         skinUrlInput.value = storedSkin.url;
         skinName.textContent = `選択中: ${storedSkin.name}`;
         const settings = getSettings();
+        if (!settings.seed || settings.seed === 'SteampunkIsland_01') {
+            settings.seed = createRandomSeed();
+            localStorage.setItem('steampunk_explorer_settings', JSON.stringify(settings));
+        }
         seedInput.value = settings.seed;
         zoomInput.value = settings.zoom;
         minZoomInput.value = settings.minZoom;
@@ -97,8 +109,9 @@
             zoomLabel.textContent = zoomLabel.value;
         });
         zoomInput.dispatchEvent(new Event('input'));
+        document.getElementById('loadingOverlay')?.setAttribute('hidden', '');
         document.getElementById('randomSeed').onclick = () => {
-            seedInput.value = `Island_${Date.now().toString(36)}`;
+            seedInput.value = createRandomSeed();
         };
         document.getElementById('applySkin').onclick = () => {
             setSkin(skinUrlInput.value, 'url');
@@ -115,8 +128,17 @@
         document.getElementById('saveSettings').onclick = () => {
             const minZoom = Number(minZoomInput.value);
             const zoom = Math.max(minZoom, Number(zoomInput.value));
+            const currentSettings = getSettings();
+            const nextSeed = seedInput.value.trim() || defaults.seed;
+            if (String(nextSeed) !== String(currentSettings.seed || defaults.seed)) {
+                const confirmed = window.confirm('ワールドシードを変更すると、現在の地図とゲーム内の進行位置が新しい世界用に切り替わります。変更してよろしいですか？');
+                if (!confirmed) {
+                    seedInput.value = currentSettings.seed || defaults.seed;
+                    return;
+                }
+            }
             localStorage.setItem('steampunk_explorer_settings', JSON.stringify({
-                seed: seedInput.value.trim() || defaults.seed,
+                seed: nextSeed,
                 zoom,
                 minZoom
             }));
@@ -125,6 +147,7 @@
             document.getElementById('saveMessage').textContent = '設定を保存しました。';
         };
         document.getElementById('backToGame').onclick = () => {
+            document.getElementById('loadingOverlay')?.removeAttribute('hidden');
             if (document.referrer.endsWith('/Map/index.html')) {
                 window.history.back();
                 return;

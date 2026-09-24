@@ -7,6 +7,9 @@
     <link rel="stylesheet" href="css/style.css?v=4">
 </head>
 <body>
+    <div id="loadingOverlay" class="loading-overlay" role="status" aria-live="polite">
+        <div class="loading-panel"><div class="loading-spinner"></div><div>マップを生成しています...</div><div class="loading-progress" aria-label="マップ生成中"></div></div>
+    </div>
     <!-- 上部パネル：プレイヤー情報 -->
     <div class="panel">
         <div class="title-bar">
@@ -54,22 +57,26 @@
     <div class="panel">
         <div class="control-group">
             <span class="group-label">— Movement —</span>
-            <div class="button-row">
-                <button class="btn btn-action" id="move-up">↑</button>
-            </div>
-            <div class="button-row">
-                <button class="btn btn-action" id="move-left">←</button>
-                <button class="btn btn-action" id="move-down">↓</button>
-                <button class="btn btn-action" id="move-right">→</button>
+            <div class="movement-pad" aria-label="移動コントローラー">
+                <button class="btn btn-action movement-button movement-up" id="move-up" aria-label="上へ移動">▲</button>
+                <button class="btn btn-action movement-button movement-left" id="move-left" aria-label="左へ移動">◀</button>
+                <div class="movement-joystick" id="move-joystick" role="slider" aria-label="ドラッグして移動" aria-valuemin="-1" aria-valuemax="1" aria-valuenow="0" tabindex="0">
+                    <span class="movement-joystick-knob"></span>
+                </div>
+                <button class="btn btn-action movement-button movement-right" id="move-right" aria-label="右へ移動">▶</button>
+                <button class="btn btn-action movement-button movement-down" id="move-down" aria-label="下へ移動">▼</button>
             </div>
         </div>
 
         <div class="control-group">
-            <span class="group-label">— Navigation —</span>
-            <div class="button-row">
-                <button class="btn btn-action" onclick="window.location.href='worldmap.html'">世界全体マップを開く (World Map)</button>
-                <button class="btn btn-action" onclick="window.location.href='settings.html'">設定を開く (Settings)</button>
-            </div>
+            <button class="dashboard-toggle navigation-toggle" data-action="toggle-navigation" aria-expanded="false">ナビゲーション <span>+</span></button>
+            <section class="navigation-panel" id="navigation-panel" hidden>
+                <div class="button-row">
+                    <button class="btn btn-action" onclick="window.location.href='worldmap.html'">世界全体マップを開く (World Map)</button>
+                    <button class="btn btn-action" onclick="window.location.href='settings.html'">設定を開く (Settings)</button>
+                    <button class="btn btn-action" data-action="toggle-fullscreen" aria-pressed="false">全画面表示</button>
+                </div>
+            </section>
         </div>
 
         <div class="control-group">

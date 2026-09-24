@@ -1,7 +1,8 @@
 // js/main.js - Steampunk Explorer Game Logic
-import { MapGenerator, BIOME_COLORS, saveMapSnapshot } from './mapGenerator.js?v=4';
+import { MapGenerator, BIOME_COLORS, loadMapSnapshot, saveMapSnapshot } from './mapGenerator.js?v=84';
 import { SkinRenderer } from './skinRenderer.js?v=2';
 import { CELL_DEFINITIONS, canEnterCell, getCellEntryRule, getMosaicColor } from './cellRules.js';
+import { buildTerritoryBorderSegments } from './territoryBorders.js?v=35';
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
@@ -24,11 +25,12 @@ const state = {
     rivers: [],
     ruins: [],
     routes: [],
+    territoryBorderSegments: [],
     tileSize: 32,
-    cols: 1000,
+    cols: 2000,
     rows: 1000,
-    worldSeed: 'SteampunkIsland_01',
-    generator: new MapGenerator(1000, 1000),
+    worldSeed: '',
+    generator: new MapGenerator(2000, 1000),
     skin: new SkinRenderer(),
     inventoryItems: new Set(),
     cellEntryRules: { types: {}, cells: {} }
@@ -215,23 +217,56 @@ async function applySelectedSkinSource(source, sourceType = 'url', name = '') {
     updateSkinName(skinName);
 }
 
+function generateMapInWorker(seed) {
+    return new Promise((resolve, reject) => {
+        const worker = new Worker('./js/mapWorker.js?v=84', { type: 'module' });
+        worker.onmessage = (event) => {
+            if (event.data?.type === 'complete') {
+                worker.terminate();
+                resolve(event.data.generated);
+            } else if (event.data?.type === 'error') {
+                worker.terminate();
+                reject(new Error(event.data.message));
+            }
+        };
+        worker.onerror = (error) => {
+            worker.terminate();
+            reject(error);
+        };
+        worker.postMessage({ seed });
+    });
+}
+
 async function init() {
-    let settings = { seed: 'SteampunkIsland_01', zoom: 0.8, minZoom: 0.25 };
+    const createRandomSeed = () => {
+        const values = new Uint32Array(4);
+        crypto.getRandomValues(values);
+        return `Island_${Array.from(values, (value) => value.toString(36).padStart(7, '0')).join('')}`;
+    };
+    let settings = { seed: '', zoom: 0.8, minZoom: 0.25 };
     try {
         settings = { ...settings, ...JSON.parse(localStorage.getItem('steampunk_explorer_settings') || '{}') };
     } catch (error) {}
+    if (!settings.seed || settings.seed === 'SteampunkIsland_01') {
+        settings.seed = createRandomSeed();
+        localStorage.setItem('steampunk_explorer_settings', JSON.stringify(settings));
+    }
     state.minZoom = Number(settings.minZoom);
     state.cellEntryRules = loadCellEntryRules();
     state.zoom = Math.max(state.minZoom, Number(settings.zoom));
     state.worldSeed = String(settings.seed || 'SteampunkIsland_01');
-    const generated = state.generator.generate(state.worldSeed);
+    let generated = await loadMapSnapshot(state.worldSeed);
+    if (!generated) {
+        generated = await generateMapInWorker(state.worldSeed).catch(() => state.generator.generate(state.worldSeed));
+        saveMapSnapshot(generated, state.worldSeed).catch(() => {});
+    }
     state.map = generated.grid;
     state.territories = generated.territories || [];
     state.rivers = generated.rivers || [];
     state.ruins = generated.ruins || [];
     state.routes = generated.routes || [];
+    state.territoryBorderSegments = buildTerritoryBorderSegments(state.map);
     state.labels = buildLabelEntries();
-    saveMapSnapshot(generated, state.worldSeed).catch(() => {});
 
     findSafeSpawn();
 
@@ -257,6 +292,7 @@ async function init() {
     renderSavedScrolls();
     renderCellLegend();
     gameLoop();
+    document.getElementById('loadingOverlay')?.setAttribute('hidden', '');
 }
 
 function findSafeSpawn() {
@@ -265,13 +301,47 @@ function findSafeSpawn() {
         savedPlayer = JSON.parse(localStorage.getItem('steampunk_explorer_player_pos'));
     } catch(e) {}
 
-    const hasSavedPosition = savedPlayer && savedPlayer.seed === state.worldSeed && typeof savedPlayer.x === 'number' && typeof savedPlayer.y === 'number';
+    const visited = new Set();
+    const islandComponents = [];
+    const isIslandLand = (x, y) => {
+        const tile = state.map[y]?.[x];
+        return Boolean(tile?.isIsland && tile.isLand && !tile.isOcean && !tile.isLake);
+    };
+    for (let y = 0; y < state.rows; y++) {
+        for (let x = 0; x < state.cols; x++) {
+            const startKey = `${x},${y}`;
+            if (visited.has(startKey) || !isIslandLand(x, y)) continue;
+            const component = [];
+            const queue = [[x, y]];
+            visited.add(startKey);
+            while (queue.length) {
+                const [currentX, currentY] = queue.pop();
+                component.push({ x: currentX, y: currentY });
+                for (const [offsetX, offsetY] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+                    const nextX = currentX + offsetX;
+                    const nextY = currentY + offsetY;
+                    const nextKey = `${nextX},${nextY}`;
+                    if (visited.has(nextKey) || !isIslandLand(nextX, nextY)) continue;
+                    visited.add(nextKey);
+                    queue.push([nextX, nextY]);
+                }
+            }
+            islandComponents.push(component);
+        }
+    }
+    const largestIsland = islandComponents.reduce(
+        (largest, component) => component.length > largest.length ? component : largest,
+        []
+    );
+    const largestIslandSet = new Set(largestIsland.map(({ x, y }) => `${x},${y}`));
+
+    const hasSavedPosition = savedPlayer && savedPlayer.spawnVersion === 3 && savedPlayer.seed === state.worldSeed && typeof savedPlayer.x === 'number' && typeof savedPlayer.y === 'number';
     if (hasSavedPosition) {
         const tx = savedPlayer.x;
         const ty = savedPlayer.y;
         if (tx >= 0 && tx < state.cols && ty >= 0 && ty < state.rows) {
             const tile = state.map[ty][tx];
-            if (tile && tile.isIsland && !tile.isOcean && !tile.isLake) {
+            if (tile && largestIslandSet.has(`${tx},${ty}`)) {
                 state.player.x = tx;
                 state.player.y = ty;
                 savePlayerPos();
@@ -280,18 +350,26 @@ function findSafeSpawn() {
         }
     }
 
-    const islandCenterX = Math.floor(state.cols * 0.83);
-    const islandCenterY = Math.floor(state.rows * 0.58);
+    const islandCenterX = Math.floor(state.cols * 0.86);
+    const islandCenterY = Math.floor(state.rows * 0.56);
     let best = null;
     let bestScore = -Infinity;
+
+    const isWestCoastLand = (x, y) => {
+        const tile = state.map[y]?.[x];
+        if (!tile || !largestIslandSet.has(`${x},${y}`) || tile.type === 'MOUNTAIN') return false;
+        return [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([offsetX, offsetY]) => {
+            const neighbor = state.map[y + offsetY]?.[x + offsetX];
+            return neighbor?.isSea || neighbor?.isOcean;
+        });
+    };
 
     for (let y = 1; y < state.rows - 1; y++) {
         for (let x = 1; x < state.cols - 1; x++) {
             const tile = state.map[y][x];
-            if (!tile || tile.isOcean || tile.isLake || !tile.isIsland) continue;
-            if (tile.height < 0.25 || tile.height > 0.75) continue;
-            const dist = Math.hypot(x - islandCenterX, y - islandCenterY);
-            const score = (1 / (dist + 1)) + tile.height;
+            if (!isWestCoastLand(x, y)) continue;
+            const distFromPreferredLatitude = Math.abs(y - islandCenterY);
+            const score = (state.cols - x) * 1000 - distFromPreferredLatitude;
             if (score > bestScore) {
                 bestScore = score;
                 best = { x, y };
@@ -310,7 +388,7 @@ function findSafeSpawn() {
                     const y = islandCenterY + dy;
                     if (x >= 0 && x < state.cols && y >= 0 && y < state.rows) {
                         const tile = state.map[y][x];
-                        if (tile && !tile.isOcean && !tile.isLake && tile.isIsland) {
+                        if (tile && tile.type !== 'MOUNTAIN' && largestIslandSet.has(`${x},${y}`)) {
                             state.player.x = x;
                             state.player.y = y;
                             dx = radius + 999;
@@ -331,15 +409,28 @@ function savePlayerPos() {
         localStorage.setItem('steampunk_explorer_player_pos', JSON.stringify({
             seed: state.worldSeed,
             x: state.player.x,
-            y: state.player.y
+            y: state.player.y,
+            spawnVersion: 3
         }));
     } catch(e) {}
 }
 
 function resize() {
     const container = canvas.parentElement;
-    canvas.width = container.clientWidth || 640;
-    canvas.height = 480;
+    const width = container.clientWidth || 640;
+    const isCompactViewport = window.matchMedia('(max-width: 620px)').matches;
+    let height = 480;
+
+    if (isCompactViewport) {
+        const panels = document.querySelectorAll('.panel');
+        const panelHeight = Array.from(panels).reduce((total, panel) => total + panel.getBoundingClientRect().height, 0);
+        const viewportHeight = window.visualViewport?.height || window.innerHeight;
+        const availableHeight = viewportHeight - panelHeight - 40;
+        height = Math.max(160, Math.min(480, Math.floor(availableHeight)));
+    }
+
+    canvas.width = width;
+    canvas.height = height;
 }
 
 function centerCameraOnPlayer() {
@@ -468,11 +559,14 @@ function drawTerrainDetails(startCol, endCol, startRow, endRow) {
 
 function buildJaggedRuinPath(centerX, centerY, size, seed) {
     const points = [];
-    const pointCount = 4;
+    const pointCount = 9;
     for (let i = 0; i < pointCount; i++) {
         const angle = (i / pointCount) * Math.PI * 2;
-        const x = centerX + Math.cos(angle) * size * (0.75 + Math.sin(seed + i) * 0.22);
-        const y = centerY + Math.sin(angle) * size * (0.75 + Math.cos(seed * 0.8 + i) * 0.22);
+        const lowFrequencyWarp = Math.sin(angle * 1.2 + seed * 0.7) * 0.42
+            + Math.cos(angle * 2.0 + seed * 1.4) * 0.28
+            + Math.sin(angle * 3.0 + seed * 0.3) * 0.16;
+        const x = centerX + Math.cos(angle) * size * (0.92 + lowFrequencyWarp);
+        const y = centerY + Math.sin(angle) * size * (0.92 + lowFrequencyWarp);
         points.push({ x, y });
     }
     return points;
@@ -516,7 +610,6 @@ function drawRuins(startCol, endCol, startRow, endRow) {
 
 function drawTerritoryOverlay(startCol, endCol, startRow, endRow) {
     ctx.save();
-    const passableLand = (tile) => Boolean(tile && tile.isLand && !tile.isSea && !tile.isLake && !tile.isOcean && tile.type !== 'SEA' && tile.type !== 'LAKE');
     const drawBorderSegment = (x1, y1, x2, y2) => {
         ctx.beginPath();
         ctx.moveTo(x1, y1);
@@ -525,28 +618,20 @@ function drawTerritoryOverlay(startCol, endCol, startRow, endRow) {
     };
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
-    for (let y = startRow; y < endRow; y++) {
-        for (let x = startCol; x < endCol; x++) {
-            const tile = state.map[y][x];
-            if (!tile || tile.territoryId < 0 || !passableLand(tile)) continue;
-            const left = x > 0 ? state.map[y][x - 1] : null;
-            const right = x < state.cols - 1 ? state.map[y][x + 1] : null;
-            const up = y > 0 ? state.map[y - 1][x] : null;
-            const down = y < state.rows - 1 ? state.map[y + 1][x] : null;
-            const px = x * state.tileSize;
-            const py = y * state.tileSize;
-                const shouldDraw = (dir) => passableLand(dir) && dir.territoryId >= 0 && dir.territoryId !== tile.territoryId;
-                ctx.strokeStyle = 'rgba(20,20,20,0.42)';
-                ctx.lineWidth = 3.2 / state.zoom;
-                ctx.setLineDash([5 / state.zoom, 7 / state.zoom]);
-                if (shouldDraw(right)) drawBorderSegment(px + state.tileSize, py, px + state.tileSize, py + state.tileSize);
-                if (shouldDraw(down)) drawBorderSegment(px, py + state.tileSize, px + state.tileSize, py + state.tileSize);
-                ctx.strokeStyle = '#ffffff';
-                ctx.lineWidth = 1.4 / state.zoom;
-                ctx.setLineDash([5 / state.zoom, 5 / state.zoom]);
-                if (shouldDraw(right)) drawBorderSegment(px + state.tileSize, py, px + state.tileSize, py + state.tileSize);
-                if (shouldDraw(down)) drawBorderSegment(px, py + state.tileSize, px + state.tileSize, py + state.tileSize);
-        }
+    const segments = state.territoryBorderSegments;
+    ctx.strokeStyle = 'rgba(90, 12, 18, 0.72)';
+    ctx.lineWidth = 3.2 / state.zoom;
+    ctx.setLineDash([5 / state.zoom, 7 / state.zoom]);
+    for (const segment of segments) {
+        if (Math.max(segment.x1, segment.x2) < startCol || Math.min(segment.x1, segment.x2) > endCol || Math.max(segment.y1, segment.y2) < startRow || Math.min(segment.y1, segment.y2) > endRow) continue;
+        drawBorderSegment(segment.x1 * state.tileSize, segment.y1 * state.tileSize, segment.x2 * state.tileSize, segment.y2 * state.tileSize);
+    }
+    ctx.strokeStyle = '#e34242';
+    ctx.lineWidth = 1.4 / state.zoom;
+    ctx.setLineDash([5 / state.zoom, 5 / state.zoom]);
+    for (const segment of segments) {
+        if (Math.max(segment.x1, segment.x2) < startCol || Math.min(segment.x1, segment.x2) > endCol || Math.max(segment.y1, segment.y2) < startRow || Math.min(segment.y1, segment.y2) > endRow) continue;
+        drawBorderSegment(segment.x1 * state.tileSize, segment.y1 * state.tileSize, segment.x2 * state.tileSize, segment.y2 * state.tileSize);
     }
 
     ctx.setLineDash([]);
@@ -721,11 +806,29 @@ function updateUI() {
         PLAINS: '草原',
         FOREST: '森林',
         MOUNTAIN: '山岳',
+        SAND: '砂地',
         RUIN: '古代遺跡'
     };
     const cellType = cellTypes[tile.type] || (tile.type === 1 ? '山岳' : tile.type === 2 ? '森林' : tile.type === 0 ? '草原' : '地形');
     territoryElement.textContent = territory;
     cellTypeElement.textContent = cellType;
+}
+
+function updateFullscreenButton() {
+    const button = document.querySelector('[data-action="toggle-fullscreen"]');
+    if (!button) return;
+    const isFullscreen = Boolean(document.fullscreenElement);
+    button.textContent = isFullscreen ? '全画面を解除' : '全画面表示';
+    button.setAttribute('aria-pressed', String(isFullscreen));
+}
+
+async function toggleFullscreen() {
+    if (!document.fullscreenEnabled) return;
+    if (document.fullscreenElement) {
+        await document.exitFullscreen();
+    } else {
+        await document.documentElement.requestFullscreen();
+    }
 }
 
 document.addEventListener('click', (event) => {
@@ -742,6 +845,15 @@ document.addEventListener('click', (event) => {
         const scroll = getStoredSavedScrolls().find(item => item.id === scrollId);
         if (scroll) applySavedScrollEffect(scroll);
     }
+    if (button.dataset.action === 'toggle-fullscreen') {
+        toggleFullscreen().catch(() => {});
+    }
+});
+
+document.addEventListener('fullscreenchange', () => {
+    updateFullscreenButton();
+    resize();
+    scheduleDraw();
 });
 
 window.addEventListener('storage', () => {
@@ -767,6 +879,84 @@ document.getElementById('move-down').onclick = () => movePlayer(0, 1);
 document.getElementById('move-left').onclick = () => movePlayer(-1, 0);
 document.getElementById('move-right').onclick = () => movePlayer(1, 0);
 
+const joystick = document.getElementById('move-joystick');
+const joystickKnob = joystick?.querySelector('.movement-joystick-knob');
+let joystickDirection = '';
+let joystickSuppressClicksUntil = 0;
+
+function resetJoystick() {
+    joystickDirection = '';
+    if (joystickKnob) joystickKnob.style.transform = 'translate(-50%, -50%)';
+    joystick?.setAttribute('aria-valuenow', '0');
+}
+
+function updateJoystick(event) {
+    if (!joystick || !joystickKnob) return;
+    const rect = joystick.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    const maxDistance = Math.max(8, rect.width * 0.28);
+    const deltaX = event.clientX - centerX;
+    const deltaY = event.clientY - centerY;
+    const distance = Math.hypot(deltaX, deltaY);
+    const scale = distance > maxDistance ? maxDistance / distance : 1;
+    const knobX = deltaX * scale;
+    const knobY = deltaY * scale;
+    joystickKnob.style.transform = `translate(calc(-50% + ${knobX}px), calc(-50% + ${knobY}px))`;
+
+    const threshold = Math.max(10, rect.width * 0.2);
+    if (distance < threshold) {
+        joystickDirection = '';
+        joystick.setAttribute('aria-valuenow', '0');
+        return;
+    }
+
+    const nextDirection = Math.abs(deltaX) > Math.abs(deltaY)
+        ? (deltaX > 0 ? 'right' : 'left')
+        : (deltaY > 0 ? 'down' : 'up');
+    if (nextDirection === joystickDirection) return;
+    joystickDirection = nextDirection;
+    joystick.setAttribute('aria-valuenow', nextDirection === 'right' || nextDirection === 'down' ? '1' : '-1');
+    const movement = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] }[nextDirection];
+    movePlayer(movement[0], movement[1]);
+}
+
+if (joystick) {
+    joystick.addEventListener('pointerdown', (event) => {
+        event.preventDefault();
+        joystickSuppressClicksUntil = Date.now() + 500;
+        joystick.setPointerCapture(event.pointerId);
+        updateJoystick(event);
+    });
+    joystick.addEventListener('pointermove', (event) => {
+        if (joystick.hasPointerCapture(event.pointerId)) updateJoystick(event);
+    });
+    joystick.addEventListener('pointerup', (event) => {
+        if (joystick.hasPointerCapture(event.pointerId)) joystick.releasePointerCapture(event.pointerId);
+        joystickSuppressClicksUntil = Date.now() + 300;
+        resetJoystick();
+    });
+    joystick.addEventListener('pointercancel', () => {
+        joystickSuppressClicksUntil = Date.now() + 300;
+        resetJoystick();
+    });
+}
+
+document.addEventListener('click', (event) => {
+    if (Date.now() >= joystickSuppressClicksUntil) return;
+    const button = event.target.closest('#move-up, #move-down, #move-left, #move-right');
+    if (!button) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+}, true);
+
+document.addEventListener('click', (event) => {
+    const link = event.target.closest('a, button[onclick]');
+    if (link && /location\.(href|replace)|window\.location/.test(link.getAttribute('onclick') || '')) {
+        document.getElementById('loadingOverlay')?.removeAttribute('hidden');
+    }
+});
+
 // インベントリトグルボタンのイベントリスナー設定
 const inventoryToggleBtn = document.querySelector('[data-action="toggle-inventory"]');
 const inventoryPanel = document.getElementById('inventory-panel');
@@ -774,6 +964,8 @@ const cellLegendToggleBtn = document.querySelector('[data-action="toggle-cell-le
 const cellLegendPanel = document.getElementById('cell-legend-panel');
 const statusToggleBtn = document.querySelector('[data-action="toggle-status"]');
 const statusPanel = document.getElementById('status-panel');
+const navigationToggleBtn = document.querySelector('[data-action="toggle-navigation"]');
+const navigationPanel = document.getElementById('navigation-panel');
 
 function setupDashboardToggle(toggleButton, panel) {
     if (!toggleButton || !panel) return;
@@ -788,6 +980,7 @@ function setupDashboardToggle(toggleButton, panel) {
 
 setupDashboardToggle(statusToggleBtn, statusPanel);
 setupDashboardToggle(cellLegendToggleBtn, cellLegendPanel);
+setupDashboardToggle(navigationToggleBtn, navigationPanel);
 
 if (inventoryToggleBtn && inventoryPanel) {
     inventoryToggleBtn.addEventListener('click', () => {

@@ -3,7 +3,8 @@ export const CELL_DEFINITIONS = Object.freeze({
     LAKE: { label: '湖沼', color: '#3b82f6', allowed: false, requiredItems: [] },
     PLAINS: { label: '草原', color: '#8db87c', allowed: true, requiredItems: [] },
     FOREST: { label: '森林', color: '#3e6b48', allowed: true, requiredItems: [] },
-    MOUNTAIN: { label: '山岳', color: '#a8947d', allowed: true, requiredItems: [] },
+    MOUNTAIN: { label: '山岳', color: '#746b60', allowed: true, requiredItems: [] },
+    SAND: { label: '砂地', color: '#d5bd8a', allowed: true, requiredItems: [] },
     RUIN: { label: '古代遺跡', color: '#6f2c2c', allowed: true, requiredItems: [] }
 });
 
@@ -25,7 +26,8 @@ const NUMERIC_CELL_TYPES = {
     0: 'PLAINS',
     1: 'MOUNTAIN',
     2: 'FOREST',
-    3: 'SEA'
+    3: 'SEA',
+    4: 'SAND'
 };
 
 export function getCellTypeKey(tile) {

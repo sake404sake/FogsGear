@@ -7,6 +7,9 @@
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
+    <div id="loadingOverlay" class="loading-overlay" role="status" aria-live="polite">
+        <div class="loading-panel"><div class="loading-spinner"></div><div>ギア編集画面を読み込んでいます...</div></div>
+    </div>
     <div class="panel">
         <div class="button-row" style="justify-content:flex-end; margin-bottom: 10px;">
             <button class="btn btn-action" type="button" onclick="window.location.href='../index.html'">マップへ戻る</button>
@@ -150,5 +153,13 @@
     </div>
 
     <script type="module" src="js/main.js"></script>
+    <script>
+        document.addEventListener('click', (event) => {
+            const target = event.target.closest('a, button[onclick]');
+            if (target && /location\.(href|replace)|window\.location/.test(target.getAttribute('onclick') || '')) {
+                document.getElementById('loadingOverlay')?.removeAttribute('hidden');
+            }
+        });
+    </script>
 </body>
 </html>

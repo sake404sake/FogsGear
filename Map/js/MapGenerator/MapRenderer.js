@@ -1,18 +1,21 @@
+import { buildTerritoryBorderSegments } from '../territoryBorders.js?v=35';
+
 export const BIOME_COLORS = Object.freeze({
     PLAINS: '#8db87c',
     FOREST: '#3e6b48',
-    MOUNTAIN: '#a8947d',
+    MOUNTAIN: '#746b60',
+    SAND: '#d5bd8a',
     SEA: '#123a5a',
     LAKE: '#3b82f6',
     RUINS: '#ef4444',
     PLAYER: '#ff0000',
-    TERRITORY: 'rgba(255, 220, 145, 0.30)',
+    TERRITORY: 'rgba(210, 45, 45, 0.78)',
     LABEL_BG: 'rgba(10, 10, 10, 0.78)',
     LABEL_TEXT: '#ffffff',
     grid: 'rgba(146, 122, 92, 0.16)',
     waterLine: '#5db7d8',
     grassland: '#8db87c',
-    territoryBorder: 'rgba(255, 220, 145, 0.55)',
+    territoryBorder: 'rgba(210, 45, 45, 0.86)',
     labelBg: 'rgba(10, 10, 10, 0.78)'
 });
 
@@ -42,6 +45,7 @@ export class MapRenderer {
             { label: '草原・平地', color: BIOME_COLORS.PLAINS },
             { label: '森林・丘陵', color: BIOME_COLORS.FOREST },
             { label: '山地・崖', color: BIOME_COLORS.MOUNTAIN },
+            { label: '砂地', color: BIOME_COLORS.SAND },
             { label: '海', color: BIOME_COLORS.SEA },
             { label: '湖沼', color: BIOME_COLORS.LAKE },
             { label: '古代遺跡', color: BIOME_COLORS.RUINS },
@@ -65,6 +69,7 @@ export class MapRenderer {
             '草原・平地': BIOME_COLORS.PLAINS,
             '森林・丘陵': BIOME_COLORS.FOREST,
             '山地・崖': BIOME_COLORS.MOUNTAIN,
+            '砂地': BIOME_COLORS.SAND,
             '海': BIOME_COLORS.SEA,
             '湖沼': BIOME_COLORS.LAKE,
             '古代遺跡': BIOME_COLORS.RUINS,
@@ -84,6 +89,7 @@ export class MapRenderer {
         this.grid = grid;
         this.territories = territories;
         this.ruins = ruins;
+        this.territoryBorderSegments = buildTerritoryBorderSegments(this.grid);
         if (this.grid.length && this.grid[0].length) {
             const centerX = (this.grid[0].length * this.tileSize) / 2;
             const centerY = (this.grid.length * this.tileSize) / 2;
@@ -158,42 +164,19 @@ export class MapRenderer {
         this.ctx.strokeStyle = BIOME_COLORS.TERRITORY;
         this.ctx.lineWidth = 1.2;
         this.ctx.setLineDash([6, 6]);
-
-        for (let y = startRow; y < endRow; y++) {
-            for (let x = startCol; x < endCol; x++) {
-                const tile = this.grid[y][x];
-                if (!tile || tile.territoryId < 0) continue;
-                const px = x * this.tileSize;
-                const py = y * this.tileSize;
-                const leftTile = x > 0 ? this.grid[y][x - 1] : null;
-                const rightTile = x < this.grid[0].length - 1 ? this.grid[y][x + 1] : null;
-                const upTile = y > 0 ? this.grid[y - 1][x] : null;
-                const downTile = y < this.grid.length - 1 ? this.grid[y + 1][x] : null;
-
-                const drawLine = (x1, y1, x2, y2) => {
-                    const sx1 = (x1 - this.camera.x + this.canvas.width / 2) * this.zoom;
-                    const sy1 = (y1 - this.camera.y + this.canvas.height / 2) * this.zoom;
-                    const sx2 = (x2 - this.camera.x + this.canvas.width / 2) * this.zoom;
-                    const sy2 = (y2 - this.camera.y + this.canvas.height / 2) * this.zoom;
-                    this.ctx.beginPath();
-                    this.ctx.moveTo(sx1, sy1);
-                    this.ctx.lineTo(sx2, sy2);
-                    this.ctx.stroke();
-                };
-
-                if (leftTile && leftTile.territoryId !== tile.territoryId) {
-                    drawLine(px, py, px, py + this.tileSize);
-                }
-                if (rightTile && rightTile.territoryId !== tile.territoryId) {
-                    drawLine(px + this.tileSize, py, px + this.tileSize, py + this.tileSize);
-                }
-                if (upTile && upTile.territoryId !== tile.territoryId) {
-                    drawLine(px, py, px + this.tileSize, py);
-                }
-                if (downTile && downTile.territoryId !== tile.territoryId) {
-                    drawLine(px, py + this.tileSize, px + this.tileSize, py + this.tileSize);
-                }
-            }
+        const drawLine = (x1, y1, x2, y2) => {
+            const sx1 = (x1 * this.tileSize - this.camera.x + this.canvas.width / 2) * this.zoom;
+            const sy1 = (y1 * this.tileSize - this.camera.y + this.canvas.height / 2) * this.zoom;
+            const sx2 = (x2 * this.tileSize - this.camera.x + this.canvas.width / 2) * this.zoom;
+            const sy2 = (y2 * this.tileSize - this.camera.y + this.canvas.height / 2) * this.zoom;
+            this.ctx.beginPath();
+            this.ctx.moveTo(sx1, sy1);
+            this.ctx.lineTo(sx2, sy2);
+            this.ctx.stroke();
+        };
+        for (const segment of this.territoryBorderSegments) {
+            if (Math.max(segment.x1, segment.x2) < startCol || Math.min(segment.x1, segment.x2) > endCol || Math.max(segment.y1, segment.y2) < startRow || Math.min(segment.y1, segment.y2) > endRow) continue;
+            drawLine(segment.x1, segment.y1, segment.x2, segment.y2);
         }
 
         this.ctx.restore();
@@ -251,12 +234,13 @@ export class MapRenderer {
             const radiusY = Math.max(10, ((maxY - minY) + 1) * this.tileSize * 0.28);
             const seed = Number(ruin.id ?? 0);
             const points = [];
-            const pointCount = 12;
+            const pointCount = 9;
             for (let i = 0; i < pointCount; i++) {
                 const angle = (i / pointCount) * Math.PI * 2;
-                const rippleA = Math.sin(angle * 3 + seed * 0.7) * 0.35;
-                const rippleB = Math.cos(angle * 5 + seed * 1.4) * 0.22;
-                const distort = 1 + rippleA + rippleB;
+                const lowFrequencyWarp = Math.sin(angle * 1.2 + seed * 0.7) * 0.42
+                    + Math.cos(angle * 2.0 + seed * 1.4) * 0.28
+                    + Math.sin(angle * 3.0 + seed * 0.3) * 0.16;
+                const distort = 1 + lowFrequencyWarp;
                 const worldX = (cx + 0.5) * this.tileSize + Math.cos(angle) * radiusX * distort;
                 const worldY = (cy + 0.5) * this.tileSize + Math.sin(angle) * radiusY * distort;
                 const sx = (worldX - this.camera.x + this.canvas.width / 2) * this.zoom;
@@ -313,6 +297,7 @@ export class MapRenderer {
                     PLAINS: BIOME_COLORS.PLAINS,
                     FOREST: BIOME_COLORS.FOREST,
                     MOUNTAIN: BIOME_COLORS.MOUNTAIN,
+                    SAND: BIOME_COLORS.SAND,
                     LAKE: BIOME_COLORS.LAKE
                 }[tile.type] || BIOME_COLORS.PLAINS : BIOME_COLORS.SEA;
                 const px = x * this.tileSize;

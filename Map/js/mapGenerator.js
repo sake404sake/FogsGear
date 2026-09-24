@@ -1,10 +1,11 @@
-import { MapManager as MapManagerClass, BIOME_COLORS as SharedBiomeColors } from './MapGenerator/index.js';
+import { MapManager as MapManagerClass, BIOME_COLORS as SharedBiomeColors } from './MapGenerator/index.js?v=77';
 
 export { SharedBiomeColors as BIOME_COLORS };
 export const MapManager = MapManagerClass;
 
-const MAP_CACHE_DB = 'fogsgear-map-cache';
+const MAP_CACHE_DB = 'fogsgear-map-cache-v21';
 const MAP_CACHE_STORE = 'snapshots';
+const MAP_CACHE_VERSION = 'coastal-landing-v86';
 
 function openMapCache() {
     return new Promise((resolve, reject) => {
@@ -26,6 +27,7 @@ function tileTypeCode(tile) {
     if (tile?.type === 'RUIN' || tile?.isRuin) return 5;
     if (tile?.type === 'MOUNTAIN') return 3;
     if (tile?.type === 'FOREST') return 2;
+    if (tile?.type === 'SAND') return 6;
     if (tile?.type === 'PLAINS') return 1;
     return 0;
 }
@@ -34,13 +36,14 @@ function colorForType(typeCode) {
     return {
         1: '#8db87c',
         2: '#3e6b48',
-        3: '#a8947d',
+        3: '#746b60',
+        6: '#d5bd8a',
         4: '#3b82f6',
         5: '#6f2c2c'
     }[typeCode] || '#1e4d6b';
 }
 
-export async function saveMapSnapshot(generated, seed, width = 1000, height = 1000) {
+export async function saveMapSnapshot(generated, seed, width = 2000, height = 1000) {
     if (!generated?.grid?.length) return;
     try {
         const rows = generated.grid.length;
@@ -67,8 +70,9 @@ export async function saveMapSnapshot(generated, seed, width = 1000, height = 10
                 height: rows,
                 types,
                 territories,
-                territoryList: generated.territories || []
-            }, `${String(seed)}:${width}:${height}`);
+                territoryList: generated.territories || [],
+                playerPos: generated.playerPos || generated.spawn || null
+            }, `${MAP_CACHE_VERSION}:${String(seed)}:${width}:${height}`);
             transaction.oncomplete = resolve;
             transaction.onerror = () => reject(transaction.error);
         });
@@ -78,11 +82,11 @@ export async function saveMapSnapshot(generated, seed, width = 1000, height = 10
     }
 }
 
-export async function loadMapSnapshot(seed, width = 1000, height = 1000) {
+export async function loadMapSnapshot(seed, width = 2000, height = 1000) {
     try {
         const database = await openMapCache();
         const snapshot = await new Promise((resolve, reject) => {
-            const request = database.transaction(MAP_CACHE_STORE).objectStore(MAP_CACHE_STORE).get(`${String(seed)}:${width}:${height}`);
+            const request = database.transaction(MAP_CACHE_STORE).objectStore(MAP_CACHE_STORE).get(`${MAP_CACHE_VERSION}:${String(seed)}:${width}:${height}`);
             request.onsuccess = () => resolve(request.result);
             request.onerror = () => reject(request.error);
         });
@@ -102,7 +106,7 @@ export async function loadMapSnapshot(seed, width = 1000, height = 1000) {
                 row[x] = {
                     x,
                     y,
-                    type: ['SEA', 'PLAINS', 'FOREST', 'MOUNTAIN', 'LAKE', 'RUIN'][typeCode] || 'SEA',
+                    type: ['SEA', 'PLAINS', 'FOREST', 'MOUNTAIN', 'LAKE', 'RUIN', 'SAND'][typeCode] || 'SEA',
                     typeCode: isSea || isLake ? 3 : typeCode === 3 ? 1 : typeCode === 2 ? 2 : 0,
                     isSea,
                     isOcean: isSea,
@@ -116,7 +120,7 @@ export async function loadMapSnapshot(seed, width = 1000, height = 1000) {
             }
             return row;
         });
-        return { grid, worldMap: grid, territories: snapshot.territoryList || [], ruins: [] };
+        return { grid, worldMap: grid, territories: snapshot.territoryList || [], ruins: [], playerPos: snapshot.playerPos || null };
     } catch (error) {
         return null;
     }
@@ -135,7 +139,8 @@ export class MapGenerator extends MapManagerClass {
             this.COLORS = {
                 SEA: '#123a5a',
                 PLAINS: '#8db87c',
-                MOUNTAIN: '#a8947d',
+                MOUNTAIN: '#746b60',
+                SAND: '#d5bd8a',
                 FOREST: '#3e6b48',
                 LAKE: '#3b82f6',
                 RUINS: '#ef4444',

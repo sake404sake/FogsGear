@@ -44,7 +44,6 @@ export class BiomeGenerator {
         let amp = 0.55;
         let freq = frequencyBase;
         let ampTotal = 0;
-
         for (let i = 0; i < octaves; i++) {
             result += this.valueNoise(x, y, freq, seed + i * 1013) * amp;
             ampTotal += amp;
@@ -96,10 +95,11 @@ export class BiomeGenerator {
                 const lowFreq = this.fbm(x * 0.024 + 100, y * 0.024 + 200, this.seed + 330, 5, 0.8);
                 const highFreq = this.fbm(x * 0.085 + 900, y * 0.085 + 1300, this.seed + 520, 4, 1.2);
                 const lakeNoise = lowFreq * 0.7 + highFreq * 0.3;
+                const sandField = this.fbm(x * 0.010 + 760, y * 0.010 + 520, this.seed + 612, 4, 0.8);
 
-                const islandCenterX = 0.80;
-                const islandCenterY = 0.52;
-                const islandness = Math.exp(-(((nx - islandCenterX) / 0.20) ** 2 + ((ny - islandCenterY) / 0.18) ** 2) * 1.0);
+                const islandCenterX = 0.86;
+                const islandCenterY = 0.56;
+                const islandness = Math.exp(-(((nx - islandCenterX) / 0.14) ** 2 + ((ny - islandCenterY) / 0.27) ** 2) * 1.0);
 
                 const lakeCenterX = 0.68;
                 const lakeCenterY = 0.58;
@@ -110,17 +110,29 @@ export class BiomeGenerator {
                 let isLake = false;
 
                 const lakeDepression = height < 0.40 && lakeField > 0.25 && basinField > 0.05;
-                const northMountainBoost = ny < 0.35 && height >= 0.52 && (0.35 - ny) * 2.0 + ridge > 0.5;
+                const westernNorthernMountainBoost = ny < 0.50
+                    && nx < 0.60
+                    && height >= 0.52
+                    && (0.50 - ny) * 1.7
+                    + Math.max(0, 0.60 - nx) * 0.8
+                    + ridge > 0.5;
+                const coastalSand = height > 0.18 && height < 0.36 && moisture < 0.54 && temperature > 0.46;
+                const inlandSand = height >= 0.26 && moisture < 0.48 && temperature > 0.56 && sandField > -0.08;
+                const westernSandSuppression = nx < 0.28 && sandField < 0.10;
 
                 if (lakeDepression) {
                     type = 'LAKE';
                     isLake = true;
                 } else if (height <= 0.12) {
                     type = 'SEA';
-                } else if (height >= 0.75 || northMountainBoost) {
+                } else if (height >= 0.75 || westernNorthernMountainBoost) {
                     type = 'MOUNTAIN';
+                } else if (!westernSandSuppression && (coastalSand || inlandSand)) {
+                    type = 'SAND';
                 } else if (moisture > 0.56 && height > 0.34) {
                     type = 'FOREST';
+                } else if (temperature > 0.62 && moisture < 0.38 && height > 0.26) {
+                    type = 'SAND';
                 } else {
                     type = 'PLAINS';
                 }
@@ -133,7 +145,8 @@ export class BiomeGenerator {
                     SEA: '#1e4d6b',
                     PLAINS: '#8db87c',
                     FOREST: '#3e6b48',
-                    MOUNTAIN: '#a8947d',
+                    MOUNTAIN: '#746b60',
+                    SAND: '#d5bd8a',
                     LAKE: '#3b82f6'
                 };
 
@@ -144,7 +157,7 @@ export class BiomeGenerator {
                     moisture,
                     temperature,
                     type,
-                    typeCode: isSea ? 3 : isLake ? 3 : type === 'MOUNTAIN' ? 1 : type === 'FOREST' ? 2 : 0,
+                    typeCode: isSea ? 3 : isLake ? 3 : type === 'MOUNTAIN' ? 1 : type === 'FOREST' ? 2 : type === 'SAND' ? 4 : 0,
                     isSea,
                     isOcean: isSea,
                     isLake,

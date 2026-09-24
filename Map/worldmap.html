@@ -64,6 +64,9 @@
     </style>
 </head>
 <body>
+    <div id="loadingOverlay" class="loading-overlay" role="status" aria-live="polite">
+        <div class="loading-panel"><div class="loading-spinner"></div><div>全体マップを生成しています...</div><div class="loading-progress" aria-label="全体マップ生成中"></div></div>
+    </div>
     <div class="panel map-wrapper">
         <h1>STEAMPUNK WORLD MAP</h1>
         <div class="rule-text" style="margin-bottom: 10px;">
@@ -83,14 +86,16 @@
     </div>
 
     <script type="module">
-        import { MapGenerator, loadMapSnapshot, saveMapSnapshot } from './js/mapGenerator.js?v=4';
-        import { CELL_DEFINITIONS, getMosaicColor } from './js/cellRules.js?v=2';
+        import { MapGenerator, loadMapSnapshot, saveMapSnapshot } from './js/mapGenerator.js?v=85';
+        import { CELL_DEFINITIONS, getMosaicColor } from './js/cellRules.js?v=4';
+        import { buildTerritoryBorderSegments } from './js/territoryBorders.js?v=35';
 
         const legendEl = document.getElementById('worldLegend');
         const legendItems = [
             { label: CELL_DEFINITIONS.PLAINS.label, color: CELL_DEFINITIONS.PLAINS.color },
             { label: CELL_DEFINITIONS.MOUNTAIN.label, color: CELL_DEFINITIONS.MOUNTAIN.color },
             { label: CELL_DEFINITIONS.FOREST.label, color: CELL_DEFINITIONS.FOREST.color },
+            { label: CELL_DEFINITIONS.SAND.label, color: CELL_DEFINITIONS.SAND.color },
             { label: CELL_DEFINITIONS.SEA.label, color: CELL_DEFINITIONS.SEA.color },
             { label: CELL_DEFINITIONS.LAKE.label, color: CELL_DEFINITIONS.LAKE.color },
             { label: CELL_DEFINITIONS.RUIN.label, color: CELL_DEFINITIONS.RUIN.color },
@@ -113,10 +118,27 @@
         try {
             settings = { ...settings, ...JSON.parse(localStorage.getItem('steampunk_explorer_settings') || '{}') };
         } catch (error) {}
-        const generator = new MapGenerator(1000, 1000);
+        const generator = new MapGenerator(2000, 1000);
+        const generateMapInWorker = (seed) => new Promise((resolve, reject) => {
+            const worker = new Worker('./js/mapWorker.js?v=85', { type: 'module' });
+            worker.onmessage = (event) => {
+                if (event.data?.type === 'complete') {
+                    worker.terminate();
+                    resolve(event.data.generated);
+                } else if (event.data?.type === 'error') {
+                    worker.terminate();
+                    reject(new Error(event.data.message));
+                }
+            };
+            worker.onerror = (error) => {
+                worker.terminate();
+                reject(error);
+            };
+            worker.postMessage({ seed });
+        });
         let generated = await loadMapSnapshot(settings.seed);
         if (!generated) {
-            generated = generator.generate(settings.seed);
+            generated = await generateMapInWorker(settings.seed).catch(() => generator.generate(settings.seed));
             saveMapSnapshot(generated, settings.seed).catch(() => {});
         }
         const mapData = generated.worldMap || generated.grid;
@@ -177,7 +199,7 @@
             ctx.save();
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.font = 'bold 14px sans-serif';
+            ctx.font = '600 16px Georgia, "Times New Roman", serif';
 
             for (const label of labels) {
                 if (!label || !label.text || !String(label.text).trim()) continue;
@@ -189,12 +211,46 @@
                 const screenX = (worldX - viewLeft) * zoom;
                 const screenY = (worldY - viewTop) * zoom;
                 if (screenX < -140 || screenX > canvas.width + 140 || screenY < -30 || screenY > canvas.height + 30) continue;
-                const labelWidth = ctx.measureText(String(label.text)).width + 28;
-                const labelHeight = 30;
-                ctx.fillStyle = 'rgba(20, 15, 12, 0.86)';
-                ctx.fillRect(screenX - labelWidth / 2, screenY - labelHeight / 2, labelWidth, labelHeight);
-                ctx.fillStyle = '#ffffff';
+                const labelWidth = ctx.measureText(String(label.text)).width + 44;
+                const labelHeight = 34;
+                const left = screenX - labelWidth / 2;
+                const top = screenY - labelHeight / 2;
+                const radius = 5;
+
+                ctx.save();
+                ctx.shadowColor = 'rgba(0, 0, 0, 0.55)';
+                ctx.shadowBlur = 10;
+                ctx.shadowOffsetY = 3;
+                ctx.beginPath();
+                ctx.roundRect(left, top, labelWidth, labelHeight, radius);
+                const plate = ctx.createLinearGradient(left, top, left, top + labelHeight);
+                plate.addColorStop(0, 'rgba(31, 52, 42, 0.94)');
+                plate.addColorStop(1, 'rgba(18, 29, 25, 0.94)');
+                ctx.fillStyle = plate;
+                ctx.fill();
+                ctx.shadowColor = 'transparent';
+                ctx.lineWidth = 1.2;
+                ctx.strokeStyle = 'rgba(238, 199, 111, 0.92)';
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.roundRect(left + 3, top + 3, labelWidth - 6, labelHeight - 6, radius - 1);
+                ctx.lineWidth = 0.7;
+                ctx.strokeStyle = 'rgba(238, 199, 111, 0.28)';
+                ctx.stroke();
+
+                ctx.strokeStyle = 'rgba(238, 199, 111, 0.72)';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(left + 10, screenY);
+                ctx.lineTo(left + 17, screenY);
+                ctx.moveTo(left + labelWidth - 17, screenY);
+                ctx.lineTo(left + labelWidth - 10, screenY);
+                ctx.stroke();
+
+                ctx.fillStyle = '#f4dfad';
                 ctx.fillText(String(label.text), screenX, screenY + 1);
+                ctx.restore();
             }
             ctx.restore();
         }
@@ -283,23 +339,23 @@
             });
         };
 
-        let playerX = Math.floor(focusCenterX);
-        let playerY = Math.floor(focusCenterY);
+        let playerX = Number.isInteger(generated.playerPos?.x) ? generated.playerPos.x : Math.floor(focusCenterX);
+        let playerY = Number.isInteger(generated.playerPos?.y) ? generated.playerPos.y : Math.floor(focusCenterY);
         let savedPlayer = null;
         try {
             savedPlayer = JSON.parse(localStorage.getItem('steampunk_explorer_player_pos') || 'null');
         } catch (error) {}
-        if (savedPlayer && savedPlayer.seed === settings.seed && Number.isInteger(savedPlayer.x) && Number.isInteger(savedPlayer.y) && savedPlayer.x >= 0 && savedPlayer.x < cols && savedPlayer.y >= 0 && savedPlayer.y < rows && mapData[savedPlayer.y][savedPlayer.x].type !== 1 && mapData[savedPlayer.y][savedPlayer.x].type !== 3) {
+        if (savedPlayer && savedPlayer.spawnVersion === 3 && savedPlayer.seed === settings.seed && Number.isInteger(savedPlayer.x) && Number.isInteger(savedPlayer.y) && savedPlayer.x >= 0 && savedPlayer.x < cols && savedPlayer.y >= 0 && savedPlayer.y < rows && mapData[savedPlayer.y][savedPlayer.x].isLand && !mapData[savedPlayer.y][savedPlayer.x].isLake) {
             playerX = savedPlayer.x;
             playerY = savedPlayer.y;
-        } else {
+        } else if (!Number.isInteger(generated.playerPos?.x) || !Number.isInteger(generated.playerPos?.y)) {
             for (let radius = 0; radius < Math.max(cols, rows); radius++) {
                 let found = false;
                 for (let dy = -radius; dy <= radius && !found; dy++) {
                     for (let dx = -radius; dx <= radius; dx++) {
                         const x = Math.floor(cols / 2) + dx;
                         const y = Math.floor(rows / 2) + dy;
-                        if (x >= 0 && x < cols && y >= 0 && y < rows && mapData[y][x].type !== 1 && mapData[y][x].type !== 3) {
+                        if (x >= 0 && x < cols && y >= 0 && y < rows && mapData[y][x].isLand && !mapData[y][x].isLake) {
                             playerX = x;
                             playerY = y;
                             found = true;
@@ -323,23 +379,8 @@
 
         function drawTerritoryBorders(startCol, endCol, startRow, endRow) {
             const tileSize = 32;
-            const passableLand = (tile) => Boolean(tile && tile.isLand && !tile.isSea && !tile.isLake && !tile.isOcean && tile.type !== 'SEA' && tile.type !== 'LAKE');
             if (cachedTerritoryBorders === null) {
-                cachedTerritoryBorders = [];
-                for (let y = 1; y < rows - 1; y++) {
-                    for (let x = 1; x < cols - 1; x++) {
-                        const tile = mapData[y][x];
-                        if (!tile || tile.territoryId < 0 || !passableLand(tile) || !primaryMainland.has(`${x},${y}`)) continue;
-                        const right = mapData[y][x + 1];
-                        const down = mapData[y + 1][x];
-                        if (right && primaryMainland.has(`${x + 1},${y}`) && passableLand(right) && right.territoryId >= 0 && right.territoryId !== tile.territoryId) {
-                            cachedTerritoryBorders.push({ x1: x + 1, y1: y, x2: x + 1, y2: y + 1 });
-                        }
-                        if (down && primaryMainland.has(`${x},${y + 1}`) && passableLand(down) && down.territoryId >= 0 && down.territoryId !== tile.territoryId) {
-                            cachedTerritoryBorders.push({ x1: x, y1: y + 1, x2: x + 1, y2: y + 1 });
-                        }
-                    }
-                }
+                cachedTerritoryBorders = buildTerritoryBorderSegments(mapData);
             }
             const drawBorder = (x1, y1, x2, y2) => {
                 ctx.beginPath();
@@ -349,10 +390,10 @@
             };
             ctx.save();
             ctx.lineCap = 'butt';
-            ctx.strokeStyle = zoom < 0.05 ? 'rgba(150, 150, 150, 0.72)' : zoom < 0.12 ? 'rgba(205, 205, 205, 0.88)' : '#ffffff';
-            ctx.lineWidth = 1.2 / zoom;
+            ctx.strokeStyle = zoom < 0.05 ? 'rgba(210, 45, 45, 0.92)' : '#d22d2d';
+            ctx.lineWidth = 1.8 / zoom;
             ctx.setLineDash([6 / zoom, 6 / zoom]);
-            cachedTerritoryBorders.forEach(({ x1, y1, x2, y2 }) => {
+            cachedTerritoryBorders.forEach(({ x1, y1, x2, y2, pair }) => {
                 if (Math.max(x1, x2) < startCol || Math.min(x1, x2) > endCol || Math.max(y1, y2) < startRow || Math.min(y1, y2) > endRow) return;
                 drawBorder(x1, y1, x2, y2);
             });
@@ -481,6 +522,7 @@
         canvas.addEventListener('pointercancel', handlePointerUp);
 
         document.getElementById('backToGame').onclick = () => {
+            document.getElementById('loadingOverlay')?.removeAttribute('hidden');
             if (document.referrer.endsWith('/Map/index.html')) {
                 window.history.back();
                 return;
@@ -489,6 +531,7 @@
         };
 
         scheduleRender();
+        requestAnimationFrame(() => document.getElementById('loadingOverlay')?.setAttribute('hidden', ''));
     </script>
 </body>
 </html>

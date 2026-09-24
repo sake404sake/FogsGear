@@ -24,4 +24,5 @@ document.addEventListener('DOMContentLoaded', () => {
     uiController.updateUI();
 
     console.log('Fogs Gear Engine initialized.');
+    document.getElementById('loadingOverlay')?.setAttribute('hidden', '');
 });

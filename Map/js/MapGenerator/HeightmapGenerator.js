@@ -55,7 +55,6 @@ export class HeightmapGenerator {
         let amp = 0.55;
         let freq = frequencyBase;
         let ampTotal = 0;
-
         for (let i = 0; i < octaves; i++) {
             result += this.valueNoise(x, y, freq, seed + i * 1013) * amp;
             ampTotal += amp;
@@ -93,23 +92,27 @@ export class HeightmapGenerator {
                 const mainlandNoise = this.fbm(warped.x * 0.013 + 90, warped.y * 0.013 + 30, this.seed + 100, 6, 1.0);
                 const mainlandRidge = this.fbm(warped.x * 0.020 + 160, warped.y * 0.020 + 90, this.seed + 41, 5, 1.1);
                 const northernRidge = this.fbm(warped.x * 0.016 + 220, warped.y * 0.023 + 140, this.seed + 201, 6, 1.1);
-                const northernMountainMask = Math.max(0, 1.0 - ny / 0.35) * (0.65 + northernRidge * 0.55) * (0.7 + mainlandNoise * 0.9);
+                const westernNorthernMountainMask = Math.max(0, 1.0 - ny / 0.42)
+                    * Math.max(0, 1.0 - Math.max(0, nx - 0.12) / 0.42)
+                    * (0.72 + northernRidge * 0.60)
+                    * (0.75 + mainlandNoise * 0.85);
 
-                const mainlandCenter = 0.38 + 0.08 * Math.sin((warped.y * 0.014) + this.seed * 0.0008);
-                const mainlandDistance = Math.hypot((warpedNX - mainlandCenter) / 0.42, (warpedNY - 0.52) / 0.48);
+                const mainlandCenter = 0.30 + 0.06 * Math.sin((warped.y * 0.014) + this.seed * 0.0008);
+                const mainlandDistance = Math.hypot((warpedNX - mainlandCenter) / 0.34, (warpedNY - 0.52) / 0.48);
                 const mainlandMask = Math.exp(-Math.pow(mainlandDistance, 2) * 2.2);
 
-                const islandCenterX = 0.80 + 0.06 * Math.sin(warped.y * 0.016 + this.seed * 0.0012);
-                const islandCenterY = 0.52 + 0.06 * Math.cos(warped.x * 0.014 + this.seed * 0.0016);
-                const islandDistance = Math.hypot((warpedNX - islandCenterX) / 0.22, (warpedNY - islandCenterY) / 0.18);
+                const islandCenterX = 0.86 + 0.025 * Math.sin(warped.y * 0.016 + this.seed * 0.0012);
+                const islandCenterY = 0.56 + 0.04 * Math.cos(warped.x * 0.014 + this.seed * 0.0016);
+                const islandDistance = Math.hypot((warpedNX - islandCenterX) / 0.14, (warpedNY - islandCenterY) / 0.27);
                 const islandMask = Math.exp(-Math.pow(islandDistance, 2) * 4.0);
 
-                const straitCenter = 0.62 + 0.08 * Math.sin((ny * 16.0) + this.seed * 0.0009) + 0.04 * Math.cos((nx * 22.0) - this.seed * 0.0007);
-                const straitDistance = Math.abs(nx - straitCenter) + Math.abs(ny - 0.52) * 0.72;
-                const straitMask = 1.0 - this.smoothstep(0.06, 0.90, straitDistance + (1.0 - islandMask) * 0.24);
+                const straitCenter = 0.62 + 0.03 * Math.sin((ny * 12.0) + this.seed * 0.0009);
+                const straitWidth = 1.0 - this.smoothstep(0.015, 0.055, Math.abs(nx - straitCenter));
+                const straitLatitude = 1.0 - this.smoothstep(0.16, 0.38, Math.abs(ny - 0.52));
+                const straitMask = straitWidth * straitLatitude * (1.0 - islandMask);
 
                 const coastNoise = Math.sin((warped.x * 0.025) + this.seed * 0.003) * 0.12 + Math.cos((warped.y * 0.028) - this.seed * 0.002) * 0.10;
-                const mainlandBase = 0.18 + mainlandNoise * 0.52 + mainlandRidge * 0.24 + mainlandMask * 0.28 + northernMountainMask * 0.52 + coastNoise;
+                const mainlandBase = 0.18 + mainlandNoise * 0.52 + mainlandRidge * 0.24 + mainlandMask * 0.28 + westernNorthernMountainMask * 0.52 + coastNoise;
                 const islandBase = islandMask * 1.12;
                 const lakeCenterX = 0.68 + 0.07 * Math.sin((ny * 12.0) + this.seed * 0.0015);
                 const lakeCenterY = 0.52 + 0.08 * Math.cos((nx * 16.0) - this.seed * 0.0021);
@@ -118,7 +121,6 @@ export class HeightmapGenerator {
 
                 let height = 0.06 + mainlandBase * (0.65 + ((1.0 - nx) * 0.65)) + islandBase;
                 height += this.fbm(warped.x * 0.020 + 40, warped.y * 0.020 + 120, this.seed + 12, 5, 1.1) * 0.14;
-                height -= straitMask * 0.88 * (1.0 - islandMask);
                 height -= lakeMask * 0.30;
                 height += (1.0 - Math.abs(nx - 0.68)) * 0.10 * Math.sin((ny * 18.0) + this.seed * 0.0015);
 
