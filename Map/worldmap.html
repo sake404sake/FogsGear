@@ -61,6 +61,14 @@
         .current-area strong {
             color: var(--accent-gold);
         }
+        .map-options {
+            display: flex;
+            justify-content: center;
+            margin: 8px 0 12px;
+        }
+        .map-options .btn {
+            min-width: 170px;
+        }
     </style>
 </head>
 <body>
@@ -75,6 +83,9 @@
 
         <div id="worldLegend" class="legend"></div>
         <div id="currentArea" class="current-area" aria-live="polite"></div>
+        <div class="map-options">
+            <button class="btn btn-action" id="toggleLabels" type="button" aria-pressed="true">地域ラベルを非表示</button>
+        </div>
 
         <div style="position: relative;">
             <canvas id="fullMapCanvas" width="800" height="600"></canvas>
@@ -328,6 +339,11 @@
         let dragStart = { x: 0, y: 0 };
         let cameraStart = { x: 0, y: 0 };
         const activePointers = new Map();
+        let pinchStartDistance = 0;
+        let pinchStartZoom = zoom;
+        let pinchStartCenter = { x: 0, y: 0 };
+        let pinchStartWorldCenter = { x: cameraX, y: cameraY };
+        let labelsVisible = true;
         let renderQueued = false;
 
         const scheduleRender = () => {
@@ -337,6 +353,51 @@
                 renderQueued = false;
                 drawFullMap();
             });
+        };
+
+        const getPointerCenter = () => {
+            const points = [...activePointers.values()];
+            return {
+                x: points.reduce((sum, point) => sum + point.x, 0) / points.length,
+                y: points.reduce((sum, point) => sum + point.y, 0) / points.length
+            };
+        };
+
+        const getPointerDistance = () => {
+            const points = [...activePointers.values()];
+            if (points.length < 2) return 0;
+            return Math.hypot(points[1].x - points[0].x, points[1].y - points[0].y);
+        };
+
+        const beginPinch = () => {
+            const rect = canvas.getBoundingClientRect();
+            const center = getPointerCenter();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            pinchStartDistance = Math.max(1, getPointerDistance());
+            pinchStartZoom = zoom;
+            pinchStartCenter = {
+                x: (center.x - rect.left) * scaleX,
+                y: (center.y - rect.top) * scaleY
+            };
+            pinchStartWorldCenter = {
+                x: cameraX - canvas.width / (2 * zoom) + pinchStartCenter.x / zoom,
+                y: cameraY - canvas.height / (2 * zoom) + pinchStartCenter.y / zoom
+            };
+        };
+
+        const updatePinch = () => {
+            const rect = canvas.getBoundingClientRect();
+            const center = getPointerCenter();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            const centerX = (center.x - rect.left) * scaleX;
+            const centerY = (center.y - rect.top) * scaleY;
+            const targetZoom = Math.min(4.0, Math.max(minAllowedZoom, pinchStartZoom * getPointerDistance() / pinchStartDistance));
+            zoom = targetZoom;
+            cameraX = pinchStartWorldCenter.x - centerX / zoom + canvas.width / (2 * zoom);
+            cameraY = pinchStartWorldCenter.y - centerY / zoom + canvas.height / (2 * zoom);
+            scheduleRender();
         };
 
         let playerX = Number.isInteger(generated.playerPos?.x) ? generated.playerPos.x : Math.floor(focusCenterX);
@@ -423,7 +484,7 @@
             drawTerritoryBorders(startCol, endCol, startRow, endRow);
             ctx.restore();
 
-            drawMapLabels(left, top);
+            if (labelsVisible) drawMapLabels(left, top);
 
             const playerWorldX = (playerX + 0.5) * tileSize;
             const playerWorldY = (playerY + 0.5) * tileSize;
@@ -482,12 +543,15 @@
         canvas.addEventListener('pointerdown', (e) => {
             e.preventDefault();
             activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-            canvas.setPointerCapture(e.pointerId);
+            try { canvas.setPointerCapture(e.pointerId); } catch (error) {}
 
             if (activePointers.size === 1) {
                 isDragging = true;
                 dragStart = { x: e.clientX, y: e.clientY };
                 cameraStart = { x: cameraX, y: cameraY };
+            } else if (activePointers.size === 2) {
+                isDragging = false;
+                beginPinch();
             }
         });
 
@@ -496,7 +560,9 @@
             e.preventDefault();
             activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
-            if (activePointers.size === 1 && isDragging) {
+            if (activePointers.size >= 2) {
+                updatePinch();
+            } else if (activePointers.size === 1 && isDragging) {
                 const rect = canvas.getBoundingClientRect();
                 const scaleX = canvas.width / rect.width;
                 const scaleY = canvas.height / rect.height;
@@ -515,11 +581,26 @@
                 try { canvas.releasePointerCapture(e.pointerId); } catch(err) {}
             }
             activePointers.delete(e.pointerId);
-            isDragging = activePointers.size > 0;
+            if (activePointers.size === 1) {
+                const remaining = [...activePointers.values()][0];
+                isDragging = true;
+                dragStart = { x: remaining.x, y: remaining.y };
+                cameraStart = { x: cameraX, y: cameraY };
+            } else {
+                isDragging = false;
+                pinchStartDistance = 0;
+            }
         };
 
         canvas.addEventListener('pointerup', handlePointerUp);
         canvas.addEventListener('pointercancel', handlePointerUp);
+
+        document.getElementById('toggleLabels').addEventListener('click', (event) => {
+            labelsVisible = !labelsVisible;
+            event.currentTarget.textContent = labelsVisible ? '地域ラベルを非表示' : '地域ラベルを表示';
+            event.currentTarget.setAttribute('aria-pressed', String(labelsVisible));
+            scheduleRender();
+        });
 
         document.getElementById('backToGame').onclick = () => {
             document.getElementById('loadingOverlay')?.removeAttribute('hidden');
