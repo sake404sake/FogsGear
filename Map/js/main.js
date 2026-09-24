@@ -423,9 +423,10 @@ function resize() {
 
     if (isCompactViewport) {
         const panels = document.querySelectorAll('.panel');
-        const panelHeight = Array.from(panels).reduce((total, panel) => total + panel.getBoundingClientRect().height, 0);
+        const topPanelHeight = panels[0]?.getBoundingClientRect().height || 0;
+        const movementHeight = document.querySelector('.movement-control-group')?.getBoundingClientRect().height || 0;
         const viewportHeight = window.visualViewport?.height || window.innerHeight;
-        const availableHeight = viewportHeight - panelHeight - 40;
+        const availableHeight = viewportHeight - topPanelHeight - movementHeight - 56;
         height = Math.max(160, Math.min(480, Math.floor(availableHeight)));
     }
 
@@ -883,9 +884,24 @@ const joystick = document.getElementById('move-joystick');
 const joystickKnob = joystick?.querySelector('.movement-joystick-knob');
 let joystickDirection = '';
 let joystickSuppressClicksUntil = 0;
+let joystickMoveTimer = null;
+
+function moveJoystickInDirection() {
+    const movement = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] }[joystickDirection];
+    if (movement) movePlayer(movement[0], movement[1]);
+}
+
+function startJoystickMovement() {
+    if (joystickMoveTimer || !joystickDirection) return;
+    joystickMoveTimer = window.setInterval(moveJoystickInDirection, 180);
+}
 
 function resetJoystick() {
     joystickDirection = '';
+    if (joystickMoveTimer) {
+        window.clearInterval(joystickMoveTimer);
+        joystickMoveTimer = null;
+    }
     if (joystickKnob) joystickKnob.style.transform = 'translate(-50%, -50%)';
     joystick?.setAttribute('aria-valuenow', '0');
 }
@@ -907,6 +923,10 @@ function updateJoystick(event) {
     const threshold = Math.max(10, rect.width * 0.2);
     if (distance < threshold) {
         joystickDirection = '';
+        if (joystickMoveTimer) {
+            window.clearInterval(joystickMoveTimer);
+            joystickMoveTimer = null;
+        }
         joystick.setAttribute('aria-valuenow', '0');
         return;
     }
@@ -917,8 +937,8 @@ function updateJoystick(event) {
     if (nextDirection === joystickDirection) return;
     joystickDirection = nextDirection;
     joystick.setAttribute('aria-valuenow', nextDirection === 'right' || nextDirection === 'down' ? '1' : '-1');
-    const movement = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] }[nextDirection];
-    movePlayer(movement[0], movement[1]);
+    moveJoystickInDirection();
+    startJoystickMovement();
 }
 
 if (joystick) {
