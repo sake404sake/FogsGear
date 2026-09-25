@@ -531,7 +531,7 @@ export class GameState {
             NONE: { name: '処理なし', input: '-', output: '-', rate: 0 },
             FOG_COLLECTION: { name: '霧の回収', input: '-', output: '霧', rate: rotationRate * 10 },
             TRANSFORM: { name: '水→スチーム', input: '水', output: 'スチーム', rate: rotationRate * 10 },
-            FOG_TO_WATER: { name: '霧→水', input: '霧', output: '水', rate: rotationRate * 0.1 },
+            FOG_TO_WATER: { name: '霧→水', input: '霧', output: '水', rate: rotationRate * 0.5 },
             FOG_TO_LIQUID_METAL: { name: '霧→液体金属', input: '霧', output: '液体金属', rate: rotationRate * 0.1 },
             LIQUID_TO_SOLID_METAL: { name: '液体金属→固体金属', input: '液体金属', output: '固体金属', rate: rotationRate },
             SOLID_TO_BRASS: { name: '固体金属→真鍮資材', input: '固体金属', output: '真鍮資材', rate: rotationRate }
@@ -569,7 +569,7 @@ export class GameState {
         const gearRate = gear => gear.teeth * Math.abs(gear.angularVelocity || 0) * 0.012 / Math.max(elapsed, 1 / 240) / (Math.PI * 2);
         this.fogRecoveryRate = activeGears.filter(gear => gear.processMode === 'FOG_COLLECTION').reduce((sum, gear) => sum + gearRate(gear) * 10, 0);
         this.liquidMetalRate = activeGears.filter(gear => gear.designType === 'ALCHEMICAL' && gear.processMode === 'FOG_TO_LIQUID_METAL').reduce((sum, gear) => sum + gearRate(gear) * 0.1, 0);
-        this.fogToWaterRate = activeGears.filter(gear => gear.designType === 'ALCHEMICAL' && gear.processMode === 'FOG_TO_WATER').reduce((sum, gear) => sum + gearRate(gear) * 0.1, 0);
+        this.fogToWaterRate = activeGears.filter(gear => gear.designType === 'ALCHEMICAL' && gear.processMode === 'FOG_TO_WATER').reduce((sum, gear) => sum + gearRate(gear) * 0.5, 0);
         this.solidMetalRate = activeGears.filter(gear => gear.designType === 'ALCHEMICAL' && gear.processMode === 'LIQUID_TO_SOLID_METAL').reduce((sum, gear) => sum + gearRate(gear), 0);
         this.solidMetalToBrassRate = activeGears.filter(gear => gear.designType === 'ALCHEMICAL' && gear.processMode === 'SOLID_TO_BRASS').reduce((sum, gear) => sum + gearRate(gear), 0);
         this.steamTransformRate = activeGears.filter(gear => gear.designType === 'ALCHEMICAL' && gear.processMode === 'TRANSFORM').reduce((sum, gear) => sum + gearRate(gear), 0);
@@ -649,7 +649,7 @@ export class GameState {
                         if (gear.processMode === 'FOG_TO_WATER') {
                             const transformed = Math.min(this.fog, amount * 10);
                             this.fog -= transformed;
-                            this.water += transformed * 0.1;
+                            this.water += transformed * 0.5;
                         } else if (gear.processMode === 'FOG_TO_LIQUID_METAL') {
                             const transformed = Math.min(this.fog, amount * 10);
                             this.fog -= transformed;

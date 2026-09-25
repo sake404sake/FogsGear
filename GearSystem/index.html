@@ -150,6 +150,18 @@
         </div>
     </div>
 
+    <script>
+        (() => {
+            const overlay = document.getElementById('loadingOverlay');
+            const label = overlay?.querySelector('.loading-panel > div:last-child');
+            if (location.protocol === 'file:') {
+                if (label) {
+                    label.textContent = 'モバイル Safari では file:// からの JS 読み込みが制限されます。ローカルサーバーで開いてください。';
+                }
+                overlay?.removeAttribute('hidden');
+            }
+        })();
+    </script>
     <script type="module" src="js/main.js?v=scroll-edit-7"></script>
     <script>
         document.addEventListener('click', (event) => {
