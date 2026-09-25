@@ -41,6 +41,16 @@ export class GearManager {
             gear.processMode = data.processMode === 'GAS_TO_LIQUID_METAL' ? 'FOG_TO_LIQUID_METAL' : data.processMode || gear.processMode;
             return gear;
         });
+        this.state.loadScrollEditorSession(data => {
+            const sizeKey = data.sizeKey || data.size || 'M';
+            const hasHexPosition = Number.isFinite(data.q) && Number.isFinite(data.r);
+            const position = hasHexPosition ? { q: data.q, r: data.r } : pixelToHex(data.x || 0, data.y || 0);
+            const gear = this.createGear(position.q, position.r, sizeKey, data.layer, data.isCore, data.angle, data.id);
+            gear.isLocked = data.isLocked ?? Boolean(data.isCore);
+            gear.designType = data.designType || gear.designType;
+            gear.processMode = data.processMode || gear.processMode;
+            return gear;
+        });
         this.network.rebuild(this.state.placedGears, this.state.belts);
         this.state.updatePowerGrid();
         this.state.saveGameData();

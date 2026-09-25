@@ -46,8 +46,6 @@ export class UIController {
             } else if (button.dataset.action === 'confirm-belt') {
                 const gears = this.state.beltSelection.map(id => this.gearManager.findGearById(id)).filter(Boolean);
                 if (this.gearManager.addBelt(gears)) this.state.setBeltSelection([]);
-            } else if (button.dataset.action === 'toggle-creative') {
-                this.state.setCreativeMode(!this.state.creativeMode);
             } else if (button.dataset.action === 'undo') {
                 this.state.undo();
             } else if (button.dataset.action === 'redo') {
@@ -278,9 +276,7 @@ export class UIController {
             return;
         }
         if (this.pointerDownGear) {
-            const point = this.renderer.worldPoint(event.clientX, event.clientY);
-            const releasedGear = this.gearManager.findGearAt(point.x, point.y);
-            if (!this.isTouchPointer(event) && releasedGear?.id === this.pointerDownGear.id) this.openGearPopover(releasedGear);
+            if (!this.isTouchPointer(event)) this.openGearPopover(this.pointerDownGear);
             this.cancelLongPress();
             this.pointerDownGear = null;
             this.pointerDownPoint = null;
@@ -416,6 +412,17 @@ export class UIController {
         const steam = document.getElementById('steamPower');
         const brass = document.getElementById('brass');
         const costs = this.state.getCurrentCosts();
+            const scrollNameInput = document.getElementById('named-scroll-name');
+            const scrollEffectSelect = document.getElementById('scroll-effect-select');
+            const editId = new URLSearchParams(window.location.search).get('editScroll');
+            const scrollId = this.state.currentScrollId || editId;
+            if (scrollId && scrollNameInput && !scrollNameInput.value) {
+                const scroll = this.state.getNamedScrollLibrary().find(item => item.id === scrollId);
+                if (scroll) {
+                    scrollNameInput.value = scroll.name || '';
+                    if (scrollEffectSelect && scroll.effect?.type) scrollEffectSelect.value = scroll.effect.type;
+                }
+            }
         if (steam) steam.textContent = Math.floor(this.state.steamPower);
         if (brass) brass.textContent = this.state.creativeMode ? 'MAX' : Math.floor(this.state.brass);
         const waterStatus = document.getElementById('water');
@@ -472,11 +479,8 @@ export class UIController {
         document.querySelectorAll('.btn-item').forEach(button => button.classList.toggle('active', button.dataset.item === this.state.selectedItem));
         const beltConfirm = document.getElementById('belt-confirm-button');
         if (beltConfirm) beltConfirm.hidden = this.state.selectedItem !== 'BELT' || this.state.beltSelection.length < 2;
-        const creative = document.getElementById('creativeBtn');
-        if (creative) {
-            creative.classList.toggle('active', this.state.creativeMode);
-            creative.textContent = `クリエイティブ: ${this.state.creativeMode ? 'ON' : 'OFF'}`;
-        }
+        const creativeIndicator = document.getElementById('creative-mode-indicator');
+        if (creativeIndicator) creativeIndicator.hidden = !this.state.creativeMode;
         document.querySelectorAll('.btn-size').forEach(button => button.classList.toggle('active', button.dataset.size === this.state.selectedSize));
         document.querySelectorAll('.btn-layer').forEach(button => button.classList.toggle('active', Number(button.dataset.layer) === this.state.selectedLayer));
         document.getElementById('btn-undo').disabled = this.state.undoStack.length === 0;

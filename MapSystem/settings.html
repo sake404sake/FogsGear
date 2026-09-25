@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Steampunk Explorer - Settings</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div id="loadingOverlay" class="loading-overlay" role="status" aria-live="polite">
+        <div class="loading-panel"><div class="loading-spinner"></div><div>設定画面を読み込んでいます...</div></div>
+    </div>
+    <main class="panel settings-panel">
+        <h1>EXPLORATION SETTINGS</h1>
+        <p class="rule-text">島の生成条件とメインマップの初期表示を設定します。</p>
+        <div class="settings-form">
+            <label for="worldSeed">ワールドシード</label>
+            <div class="setting-control">
+                <input id="worldSeed" type="text" maxlength="80" placeholder="SteampunkIsland_01">
+                <button class="btn btn-action" id="randomSeed" type="button">ランダム</button>
+            </div>
+            <label for="defaultZoom">メインマップの初期ズーム</label>
+            <div class="setting-control">
+                <input id="defaultZoom" type="range" min="0.25" max="2.5" step="0.05">
+                <output id="zoomLabel" for="defaultZoom">0.80x</output>
+            </div>
+            <label for="minZoom">メインマップの最小ズーム</label>
+            <select id="minZoom">
+                <option value="0.1">0.10x (遠景)</option>
+                <option value="0.25">0.25x (標準)</option>
+                <option value="0.5">0.50x (近景)</option>
+            </select>
+            <label for="skinUrl">スキン</label>
+            <div class="setting-control skin-setting-control">
+                <input id="skinUrl" type="text" placeholder="Skin URL">
+                <button class="btn btn-action" id="applySkin" type="button">Apply</button>
+                <label class="btn btn-action" for="skinFile">ファイル選択</label>
+                <input id="skinFile" type="file" accept="image/*" hidden>
+            </div>
+            <p class="skin-help">URLを使う場合は入力して Apply、画像を使う場合はファイル選択から画像を選びます。</p>
+            <p id="skinName" class="rule-text" aria-live="polite">選択中: 5504543579.png</p>
+            <label for="creativeModeToggle">クリエイティブモード</label>
+            <div class="setting-control creative-setting-control">
+                <button class="btn btn-action" id="creativeModeToggle" type="button" aria-pressed="false">クリエイティブモード: OFF</button>
+                <span id="creativeModeStatus" class="rule-text">ギア編集で資材制限を無効化します。</span>
+            </div>
+        </div>
+        <div class="button-row settings-actions">
+            <button class="btn btn-action" id="saveSettings" type="button">設定を保存</button>
+            <button class="btn btn-reset" id="backToGame" type="button">ゲーム画面へ戻る</button>
+        </div>
+        <p id="saveMessage" class="rule-text" aria-live="polite"></p>
+    </main>
+    <script type="module">
+        const createRandomSeed = () => {
+            const values = new Uint32Array(4);
+            crypto.getRandomValues(values);
+            return `Island_${Array.from(values, (value) => value.toString(36).padStart(7, '0')).join('')}`;
+        };
+        const defaults = { seed: '', zoom: 0.8, minZoom: 0.25 };
+        const getSettings = () => {
+            try {
+                return { ...defaults, ...JSON.parse(localStorage.getItem('steampunk_explorer_settings') || '{}') };
+            } catch (error) {
+                return { ...defaults };
+            }
+        };
+        const seedInput = document.getElementById('worldSeed');
+        const zoomInput = document.getElementById('defaultZoom');
+        const zoomLabel = document.getElementById('zoomLabel');
+        const minZoomInput = document.getElementById('minZoom');
+        const skinUrlInput = document.getElementById('skinUrl');
+        const skinName = document.getElementById('skinName');
+        const creativeModeToggle = document.getElementById('creativeModeToggle');
+        const creativeModeStatus = document.getElementById('creativeModeStatus');
+        const defaultSkin = './5504543579.png';
+        const oldDefaultSkin = 'https://mineskin.org/download/639735497';
+        const getSkinName = (source) => {
+            if (source.startsWith('data:')) return 'ローカル画像';
+            const sourcePath = source.split(/[?#]/)[0];
+            return sourcePath.substring(sourcePath.lastIndexOf('/') + 1) || '既定スキン';
+        };
+        const getStoredSkin = () => {
+            try {
+                const storedUrl = localStorage.getItem('steampunk_explorer_skin_url');
+                const storedName = localStorage.getItem('steampunk_explorer_skin_name');
+                if (storedUrl && storedUrl !== oldDefaultSkin) {
+                    return { url: storedUrl, name: storedName || getSkinName(storedUrl) };
+                }
+            } catch (error) {}
+            return { url: defaultSkin, name: '5504543579.png' };
+        };
+        const setSkin = (source, type, name = '') => {
+            const url = source.trim();
+            if (!url) return;
+            const selectedName = name || getSkinName(url);
+            localStorage.setItem('steampunk_explorer_skin_url', url);
+            localStorage.setItem('steampunk_explorer_skin_source', type);
+            localStorage.setItem('steampunk_explorer_skin_name', selectedName);
+            skinUrlInput.value = url;
+            skinName.textContent = `選択中: ${selectedName}`;
+        };
+        const storedSkin = getStoredSkin();
+        skinUrlInput.value = storedSkin.url;
+        skinName.textContent = `選択中: ${storedSkin.name}`;
+        const resourceDefaults = { steamPower: 100, water: 200, fog: 0, liquidMetal: 0, solidMetal: 0, brass: 300 };
+        const getGearSave = () => {
+            try {
+                const saved = JSON.parse(localStorage.getItem('fog_thermo_save') || '{}');
+                return saved && typeof saved === 'object' ? saved : {};
+            } catch (error) {
+                return {};
+            }
+        };
+        const updateCreativeModeView = () => {
+            const active = Boolean(getGearSave().creativeMode);
+            creativeModeToggle.textContent = `クリエイティブモード: ${active ? 'ON' : 'OFF'}`;
+            creativeModeToggle.classList.toggle('active', active);
+            creativeModeToggle.setAttribute('aria-pressed', String(active));
+            creativeModeStatus.textContent = active ? '資材制限を無効化中です。' : 'ギア編集で資材制限を無効化します。';
+        };
+        creativeModeToggle.onclick = () => {
+            const data = getGearSave();
+            const active = !Boolean(data.creativeMode);
+            if (active && !data.creativeMode) {
+                data.creativeSnapshot = Object.fromEntries(Object.keys(resourceDefaults).map(key => [key, data[key] ?? resourceDefaults[key]]));
+            } else if (!active && data.creativeMode && data.creativeSnapshot) {
+                Object.assign(data, data.creativeSnapshot);
+                data.creativeSnapshot = null;
+            }
+            data.creativeMode = active;
+            localStorage.setItem('fog_thermo_save', JSON.stringify(data));
+            updateCreativeModeView();
+        };
+        updateCreativeModeView();
+        const settings = getSettings();
+        if (!settings.seed || settings.seed === 'SteampunkIsland_01') {
+            settings.seed = createRandomSeed();
+            localStorage.setItem('steampunk_explorer_settings', JSON.stringify(settings));
+        }
+        seedInput.value = settings.seed;
+        zoomInput.value = settings.zoom;
+        minZoomInput.value = settings.minZoom;
+        zoomInput.addEventListener('input', () => {
+            zoomLabel.value = `${Number(zoomInput.value).toFixed(2)}x`;
+            zoomLabel.textContent = zoomLabel.value;
+        });
+        zoomInput.dispatchEvent(new Event('input'));
+        document.getElementById('loadingOverlay')?.setAttribute('hidden', '');
+        document.getElementById('randomSeed').onclick = () => {
+            seedInput.value = createRandomSeed();
+        };
+        document.getElementById('applySkin').onclick = () => {
+            setSkin(skinUrlInput.value, 'url');
+        };
+        document.getElementById('skinFile').addEventListener('change', (event) => {
+            const file = event.target.files?.[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = () => setSkin(String(reader.result || ''), 'file', file.name);
+            reader.onerror = () => window.alert('スキン画像を読み込めませんでした。');
+            reader.readAsDataURL(file);
+            event.target.value = '';
+        });
+        document.getElementById('saveSettings').onclick = () => {
+            const minZoom = Number(minZoomInput.value);
+            const zoom = Math.max(minZoom, Number(zoomInput.value));
+            const currentSettings = getSettings();
+            const nextSeed = seedInput.value.trim() || defaults.seed;
+            if (String(nextSeed) !== String(currentSettings.seed || defaults.seed)) {
+                const confirmed = window.confirm('ワールドシードを変更すると、現在の地図とゲーム内の進行位置が新しい世界用に切り替わります。変更してよろしいですか？');
+                if (!confirmed) {
+                    seedInput.value = currentSettings.seed || defaults.seed;
+                    return;
+                }
+            }
+            localStorage.setItem('steampunk_explorer_settings', JSON.stringify({
+                seed: nextSeed,
+                zoom,
+                minZoom
+            }));
+            zoomInput.value = zoom;
+            zoomInput.dispatchEvent(new Event('input'));
+            document.getElementById('saveMessage').textContent = '設定を保存しました。';
+        };
+        document.getElementById('backToGame').onclick = () => {
+            document.getElementById('loadingOverlay')?.removeAttribute('hidden');
+            if (document.referrer.endsWith('/MapSystem/index.html')) {
+                window.history.back();
+                return;
+            }
+            window.location.href = 'index.html';
+        };
+    </script>
+</body>
+</html>

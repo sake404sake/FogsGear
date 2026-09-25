@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Steampunk Explorer</title>
+    <meta name="theme-color" content="#120e0c">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="icon" href="../MainSystem/icons/app-icon.jpg" type="image/jpeg">
+    <link rel="stylesheet" href="css/style.css?v=7">
+</head>
+<body>
+    <div id="loadingOverlay" class="loading-overlay" role="status" aria-live="polite">
+        <div class="loading-panel"><div class="loading-spinner"></div><div id="loadingMessage">マップを読み込んでいます...</div><div class="loading-progress" aria-label="マップ読み込み中"></div></div>
+    </div>
+    <!-- 上部パネル：プレイヤー情報 -->
+    <div class="panel">
+        <div class="title-bar">
+            <span class="title-side title-side-left" id="currentTerritory">-</span>
+            <h1>STEAMPUNK EXPLORER</h1>
+            <span class="title-side title-side-right" id="currentCellType">-</span>
+        </div>
+        <div class="dashboard-shortcuts">
+            <button class="dashboard-toggle" data-action="toggle-status" aria-expanded="false">ステータス</button>
+            <button class="dashboard-toggle" data-action="toggle-inventory" aria-expanded="false">インベントリ</button>
+        </div>
+        <section class="dashboard dashboard-popup" id="status-panel" hidden>
+            <div class="dashboard-popup-head"><div class="dashboard-title">STATUS</div><button class="dashboard-popup-close" type="button" data-action="toggle-status" aria-label="ステータスを閉じる">×</button></div>
+            <div class="status-container">
+                <div class="status-water">HP: <span id="playerHP" class="status-value">100</span> / 100</div>
+                <div class="status-steam">STEAM: <span id="playerSteam" class="status-value">50</span> / 50</div>
+                <div class="status-brass">COORD: <span id="playerCoord" class="status-value">(0, 0)</span></div>
+            </div>
+        </section>
+        
+        <section class="dashboard dashboard-popup" id="inventory-panel" hidden>
+            <div class="dashboard-popup-head"><div class="dashboard-title">COLLECTED RESOURCES</div><button class="dashboard-popup-close" type="button" data-action="toggle-inventory" aria-label="インベントリを閉じる">×</button></div>
+            <div class="dashboard-resource-table">
+                <button class="dashboard-resource-row inventory-item-card" type="button" data-action="inspect-inventory-item" data-item-key="brass_gear"><span>真鍮の歯車</span><strong id="invBrass">5</strong></button>
+                <button class="dashboard-resource-row inventory-item-card" type="button" data-action="inspect-inventory-item" data-item-key="old_screw"><span>古びたネジ</span><strong id="invScrew">12</strong></button>
+                <button class="dashboard-resource-row inventory-item-card" type="button" data-action="inspect-inventory-item" data-item-key="pressure_gauge"><span>圧力計</span><strong id="invGauge">1</strong></button>
+                <button class="dashboard-resource-row inventory-item-card" type="button" data-action="inspect-inventory-item" data-item-key="paper_scroll"><span>スクロール（紙）</span><strong id="invPaperScroll">10</strong></button>
+                <button class="dashboard-resource-row inventory-item-card" type="button" data-action="inspect-inventory-item" data-item-key="cloth_scroll"><span>スクロール（布）</span><strong id="invClothScroll">10</strong></button>
+                <button class="dashboard-resource-row inventory-item-card" type="button" data-action="inspect-inventory-item" data-item-key="scroll_book"><span>スクロールブック</span><strong>1</strong></button>
+            </div>
+        </section>
+        <button class="dashboard-toggle" data-action="toggle-cell-legend" aria-expanded="false">地形情報 <span>+</span></button>
+        <section class="dashboard" id="cell-legend-panel" hidden>
+            <div id="cell-legend" class="cell-legend" aria-label="セルの凡例"></div>
+        </section>
+    </div>
+
+    <div id="inventory-item-modal" class="inventory-modal" hidden role="dialog" aria-modal="true" aria-labelledby="inventory-modal-title">
+        <div class="inventory-modal-panel">
+            <button class="inventory-modal-close" type="button" data-action="close-inventory-modal" aria-label="閉じる">×</button>
+            <div id="inventory-modal-icon" class="inventory-modal-icon" aria-hidden="true"></div>
+            <div class="inventory-modal-kicker">ITEM INFORMATION</div>
+            <h2 id="inventory-modal-title">アイテム名</h2>
+            <p id="inventory-modal-description"></p>
+            <div id="inventory-modal-meta" class="inventory-modal-meta"></div>
+            <div class="inventory-modal-actions">
+                <button id="inventory-modal-use" class="saved-scroll-use" type="button" data-action="use-scroll-from-modal" hidden>使用</button>
+                <button id="inventory-modal-edit" class="inventory-scroll-button" type="button" data-action="open-gear-editor" hidden>ギア編集</button>
+                <button class="inventory-modal-secondary" type="button" data-action="close-inventory-modal">閉じる</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ゲーム画面エリア -->
+    <div id="canvas-container">
+        <div id="interaction-prompt" class="btn-item-confirm" style="display: none;">調べる [E]</div>
+        <canvas id="gameCanvas" width="640" height="480"></canvas>
+        <canvas id="gearCanvas" class="engine-runtime-canvas" width="800" height="600" aria-hidden="true"></canvas>
+    </div>
+
+    <!-- 下部パネル：操作・メニュー -->
+    <div class="panel">
+        <div class="main-control-pager" id="main-control-pager" aria-label="メイン画面ページ">
+            <button class="main-page-arrow" type="button" data-main-page="previous" aria-label="前のメイン画面ページ">‹</button>
+            <div class="main-page-viewport" id="main-page-viewport">
+                <div class="main-page-track" id="main-page-track">
+                    <section class="main-page" aria-label="操作ページ">
+        <div class="control-group movement-control-group">
+            <span class="group-label">— Movement —</span>
+            <div class="movement-pad" aria-label="移動コントローラー">
+                <button class="btn btn-action movement-button movement-up" id="move-up" aria-label="上へ移動">▲</button>
+                <button class="btn btn-action movement-button movement-left" id="move-left" aria-label="左へ移動">◀</button>
+                <div class="movement-joystick" id="move-joystick" role="slider" aria-label="ドラッグして移動" aria-valuemin="-1" aria-valuemax="1" aria-valuenow="0" tabindex="0">
+                    <span class="movement-joystick-knob"></span>
+                </div>
+                <button class="btn btn-action movement-button movement-right" id="move-right" aria-label="右へ移動">▶</button>
+                <button class="btn btn-action movement-button movement-down" id="move-down" aria-label="下へ移動">▼</button>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <button class="dashboard-toggle navigation-toggle" data-action="toggle-navigation" aria-expanded="false">ナビゲーション <span>+</span></button>
+            <section class="navigation-panel" id="navigation-panel" hidden>
+                <div class="button-row">
+                    <button class="btn btn-action" onclick="window.location.href='worldmap.html'">世界全体マップを開く (World Map)</button>
+                    <button class="btn btn-action" onclick="window.location.href='settings.html'">設定を開く (Settings)</button>
+                    <button class="btn btn-action" data-action="toggle-fullscreen" aria-pressed="false">全画面表示</button>
+                </div>
+            </section>
+        </div>
+
+        <div class="control-group">
+            <div class="button-row" style="width: 100%;">
+                <button class="btn btn-visibility active" data-action="save">記録 (Save)</button>
+                <button class="btn btn-reset" data-action="rest">休息 (Rest)</button>
+            </div>
+        </div>
+        <div class="rule-text">
+            WASD / 方向ボタンで移動。マウスホイールまたはピンチ操作で拡大縮小、ドラッグでマップを移動できます。シード値と初期ズームは設定画面で変更できます。
+        </div>
+                    </section>
+                    <section class="main-page gear-preview-page" aria-label="保存ギアプレビューページ">
+                        <iframe src="../GearSystem/scroll-library.html?embed=1&v=3" title="保存スクロールのギアプレビュー"></iframe>
+                    </section>
+                    <section class="main-page engine-dashboard-page" aria-label="動力ダッシュボードページ">
+                        <div class="dashboard main-engine-dashboard">
+                            <div class="dashboard-title-row"><div class="dashboard-title">LIVE ENGINE DASHBOARD</div><span id="main-creative-mode-indicator" class="creative-mode-indicator" hidden>CREATIVE MODE: ON</span></div>
+                            <div class="dashboard-resource-table">
+                                <div class="dashboard-resource-row dashboard-resource-header"><span>資源</span><span>保有量</span><span>生成 / 回収</span><span>消費</span></div>
+                                <div class="dashboard-resource-row"><span>水</span><strong id="main-engine-water">0</strong><span id="main-water-generation">0 /秒</span><span id="main-water-consumption">0 /秒</span></div>
+                                <div class="dashboard-resource-row"><span>霧</span><strong id="main-engine-fog">0</strong><span id="main-fog-generation">0 /秒</span><span id="main-fog-consumption">0 /秒</span></div>
+                                <div class="dashboard-resource-row"><span>液体金属</span><strong id="main-engine-liquid-metal">0</strong><span id="main-liquid-generation">0 /秒</span><span id="main-liquid-consumption">0 /秒</span></div>
+                                <div class="dashboard-resource-row"><span>固体金属</span><strong id="main-engine-solid-metal">0</strong><span id="main-solid-generation">0 /秒</span><span id="main-solid-consumption">0 /秒</span></div>
+                                <div class="dashboard-resource-row"><span>真鍮資材</span><strong id="main-engine-brass">0</strong><span id="main-brass-generation">0 /秒</span><span>-</span></div>
+                                <div class="dashboard-resource-row"><span>スチーム</span><strong id="main-engine-steam">0</strong><span id="main-steam-generation">0 /秒</span><span id="main-steam-consumption">0 /秒</span></div>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            </div>
+            <button class="main-page-arrow" type="button" data-main-page="next" aria-label="次のメイン画面ページ">›</button>
+        </div>
+        <div class="main-page-dots" aria-label="メイン画面ページ選択">
+            <button class="main-page-dot active" type="button" data-main-page="0" aria-label="操作ページ" aria-current="page"></button>
+            <button class="main-page-dot" type="button" data-main-page="1" aria-label="保存ギアプレビューページ"></button>
+            <button class="main-page-dot" type="button" data-main-page="2" aria-label="動力ダッシュボードページ"></button>
+        </div>
+    </div>
+
+    <script type="module" src="js/main.js?v=12"></script>
+</body>
+</html>

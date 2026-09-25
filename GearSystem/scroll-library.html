@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scroll Library | Fogs Gear</title>
+    <link rel="stylesheet" href="css/style.css?v=scroll-10">
+</head>
+<body class="scroll-library-page">
+    <main class="scroll-library-shell">
+        <header class="scroll-library-header">
+            <div>
+                <div class="scroll-library-kicker">ARCHIVE / BLUEPRINT VAULT</div>
+                <h1>保存スクロール</h1>
+                <p>記録したギア構成を確認し、起動するスクロールを選択します。</p>
+            </div>
+            <a class="btn btn-action" href="index.html">ギア編集へ戻る</a>
+        </header>
+
+        <nav class="scroll-tabs" aria-label="スクロールの種類">
+            <button class="scroll-tab active" type="button" data-material="all" aria-selected="true">すべて</button>
+            <button class="scroll-tab" type="button" data-material="paper" aria-selected="false">紙</button>
+            <button class="scroll-tab" type="button" data-material="cloth" aria-selected="false">布</button>
+        </nav>
+
+        <section class="scroll-library-layout">
+            <aside class="scroll-list-panel" aria-label="保存スクロール一覧">
+                <div class="scroll-list-heading"><span>保存済みスクロール</span><strong id="scroll-count">0</strong></div>
+                <div id="scroll-list" class="scroll-list"></div>
+            </aside>
+
+            <section class="scroll-detail-panel" aria-live="polite">
+                <div id="scroll-empty" class="scroll-empty">スクロールを選択してください。</div>
+                <div id="scroll-detail" hidden>
+                    <div class="scroll-detail-heading">
+                        <div>
+                            <div id="scroll-material-label" class="scroll-material-label">紙のスクロール</div>
+                            <h2 id="scroll-name">-</h2>
+                        </div>
+                        <button id="scroll-toggle" class="btn btn-visibility" type="button">スクロールを起動</button>
+                    </div>
+                    <div class="scroll-meta" id="scroll-meta"></div>
+                    <div class="scroll-preview-frame">
+                        <canvas id="previewCanvas" width="760" height="430" aria-label="保存ギア全体のプレビュー"></canvas>
+                        <div class="preview-lock-label">PREVIEW / 固定表示</div>
+                    </div>
+                    <div class="scroll-detail-footer">
+                        <p id="scroll-status" class="scroll-status">このスクロールは停止中です。</p>
+                    </div>
+                </div>
+            </section>
+        </section>
+    </main>
+    <div id="scroll-choice-modal" class="scroll-choice-modal" hidden role="dialog" aria-modal="true" aria-labelledby="scroll-choice-title">
+        <div class="scroll-choice-panel">
+            <button id="scroll-choice-close" class="scroll-choice-close" type="button" aria-label="閉じる">×</button>
+            <div class="scroll-library-kicker">SCROLL BOOK</div>
+            <h2 id="scroll-choice-title">保存済みスクロール</h2>
+            <p id="scroll-choice-description"></p>
+            <div class="scroll-choice-actions">
+                <button id="scroll-choice-edit" class="btn btn-action" type="button">ギア編集</button>
+            </div>
+        </div>
+    </div>
+    <script type="module" src="js/scroll-library.js?v=9"></script>
+</body>
+</html>

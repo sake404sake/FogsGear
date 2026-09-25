@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Steampunk Explorer - World Map (全体マップ)</title>
+    <link rel="stylesheet" href="css/style.css?v=4">
+    <style>
+        body {
+            padding: 20px;
+            overflow-y: auto;
+        }
+        .map-wrapper {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        #fullMapCanvas {
+            background: #120e0c;
+            border: 2px solid var(--border-gold);
+            border-radius: 6px;
+            width: 100%;
+            height: auto;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.8);
+            cursor: grab;
+        }
+        #fullMapCanvas:active {
+            cursor: grabbing;
+        }
+        .legend {
+            display: flex;
+            justify-content: center;
+            gap: 16px;
+            flex-wrap: wrap;
+            margin: 12px 0;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .legend-color {
+            width: 14px;
+            height: 14px;
+            border-radius: 2px;
+            border: 1px solid var(--border-sub);
+        }
+        .actions-bar {
+            margin: 16px 0;
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+        }
+        .current-area {
+            margin: 8px 0 12px;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+        }
+        .current-area strong {
+            color: var(--accent-gold);
+        }
+        .map-options {
+            display: flex;
+            justify-content: center;
+            margin: 8px 0 12px;
+        }
+        .map-options .btn {
+            min-width: 170px;
+        }
+    </style>
+</head>
+<body>
+    <div id="loadingOverlay" class="loading-overlay" role="status" aria-live="polite">
+        <div class="loading-panel"><div class="loading-spinner"></div><div id="loadingMessage">全体マップを読み込んでいます...</div><div class="loading-progress" aria-label="全体マップ読み込み中"></div></div>
+    </div>
+    <div class="panel map-wrapper">
+        <h1>STEAMPUNK WORLD MAP</h1>
+        <div class="rule-text" style="margin-bottom: 10px;">
+            外洋孤島の全体マップです。ドラッグで移動、マウスホイールまたはピンチ操作で拡大縮小できます。
+        </div>
+
+        <div id="worldLegend" class="legend"></div>
+        <div id="currentArea" class="current-area" aria-live="polite"></div>
+        <div class="map-options">
+            <button class="btn btn-action" id="toggleLabels" type="button" aria-pressed="true">地域ラベルを非表示</button>
+        </div>
+
+        <div style="position: relative;">
+            <canvas id="fullMapCanvas" width="800" height="600"></canvas>
+        </div>
+
+        <div class="actions-bar">
+            <button class="btn btn-action" id="backToGame">ゲーム画面に戻る</button>
+        </div>
+    </div>
+
+    <script type="module">
+        import { MapGenerator, loadMapSnapshot, saveMapSnapshot } from './js/mapGenerator.js?v=85';
+        import { CELL_DEFINITIONS, getMosaicColor } from './js/cellRules.js?v=4';
+        import { buildTerritoryBorderSegments } from './js/territoryBorders.js?v=35';
+
+        const legendEl = document.getElementById('worldLegend');
+        const legendItems = [
+            { label: CELL_DEFINITIONS.PLAINS.label, color: CELL_DEFINITIONS.PLAINS.color },
+            { label: CELL_DEFINITIONS.MOUNTAIN.label, color: CELL_DEFINITIONS.MOUNTAIN.color },
+            { label: CELL_DEFINITIONS.FOREST.label, color: CELL_DEFINITIONS.FOREST.color },
+            { label: CELL_DEFINITIONS.SAND.label, color: CELL_DEFINITIONS.SAND.color },
+            { label: CELL_DEFINITIONS.SEA.label, color: CELL_DEFINITIONS.SEA.color },
+            { label: CELL_DEFINITIONS.LAKE.label, color: CELL_DEFINITIONS.LAKE.color },
+            { label: CELL_DEFINITIONS.RUIN.label, color: CELL_DEFINITIONS.RUIN.color },
+            { label: '現在地 (Player)', color: '#ff0000' }
+        ];
+        legendEl.innerHTML = legendItems.map(item => `
+            <div class="legend-item"><div class="legend-color" style="background-color:${item.color};"></div>${item.label}</div>
+        `).join('');
+        Array.from(document.querySelectorAll('.legend-color')).forEach((node) => {
+            const label = node.parentElement?.textContent?.trim() || '';
+            const match = legendItems.find((item) => label.startsWith(item.label));
+            if (match) node.style.backgroundColor = match.color;
+        });
+
+        const canvas = document.getElementById('fullMapCanvas');
+        const ctx = canvas.getContext('2d');
+        const currentAreaEl = document.getElementById('currentArea');
+
+        let settings = { seed: 'SteampunkIsland_01' };
+        try {
+            settings = { ...settings, ...JSON.parse(localStorage.getItem('steampunk_explorer_settings') || '{}') };
+        } catch (error) {}
+        const generator = new MapGenerator(2000, 1000);
+        const generateMapInWorker = (seed) => new Promise((resolve, reject) => {
+            const worker = new Worker('./js/mapWorker.js?v=85', { type: 'module' });
+            worker.onmessage = (event) => {
+                if (event.data?.type === 'complete') {
+                    worker.terminate();
+                    resolve(event.data.generated);
+                } else if (event.data?.type === 'error') {
+                    worker.terminate();
+                    reject(new Error(event.data.message));
+                }
+            };
+            worker.onerror = (error) => {
+                worker.terminate();
+                reject(error);
+            };
+            worker.postMessage({ seed });
+        });
+        const loadingMessage = document.getElementById('loadingMessage');
+        if (loadingMessage) loadingMessage.textContent = '保存済みの全体マップを読み込んでいます...';
+        let generated = await loadMapSnapshot(settings.seed);
+        if (!generated) {
+            if (loadingMessage) loadingMessage.textContent = '全体マップを生成しています...';
+            generated = await generateMapInWorker(settings.seed).catch(() => generator.generate(settings.seed));
+            saveMapSnapshot(generated, settings.seed).catch(() => {});
+        }
+        const mapData = generated.worldMap || generated.grid;
+        const cols = mapData[0].length;
+        const rows = mapData.length;
+        const territories = generated.territories || [];
+        const mainlandRegions = generated.mainlandRegions || [];
+
+        const labels = [];
+        const labelSeen = new Set();
+        for (const territory of territories) {
+            if (!territory || !territory.name || !territory.labelPos) continue;
+            const labelPos = territory.labelPos;
+            const key = `territory:${territory.id}:${territory.name}`;
+            if (!labelSeen.has(key)) {
+                labelSeen.add(key);
+                const x = Number(labelPos.x);
+                const y = Number(labelPos.y);
+                if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+                const tile = mapData[Math.floor(y)]?.[Math.floor(x)];
+                if (!tile || !tile.isLand || tile.isSea || tile.isLake || !tile.isMainland) continue;
+                labels.push({ x, y, text: territory.name, kind: 'territory' });
+            }
+        }
+
+        const primaryMainland = new Set();
+        const visitedMainland = new Set();
+        const isMainlandLand = (x, y) => {
+            const tile = mapData[y]?.[x];
+            return Boolean(tile && tile.isMainland && tile.isLand && !tile.isSea && !tile.isLake);
+        };
+        let largestMainland = [];
+        for (let y = 0; y < rows; y++) {
+            for (let x = 0; x < cols; x++) {
+                const startKey = `${x},${y}`;
+                if (visitedMainland.has(startKey) || !isMainlandLand(x, y)) continue;
+                const component = [];
+                const queue = [[x, y]];
+                visitedMainland.add(startKey);
+                while (queue.length) {
+                    const [currentX, currentY] = queue.pop();
+                    component.push([currentX, currentY]);
+                    for (const [offsetX, offsetY] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+                        const nextX = currentX + offsetX;
+                        const nextY = currentY + offsetY;
+                        const nextKey = `${nextX},${nextY}`;
+                        if (visitedMainland.has(nextKey) || !isMainlandLand(nextX, nextY)) continue;
+                        visitedMainland.add(nextKey);
+                        queue.push([nextX, nextY]);
+                    }
+                }
+                if (component.length > largestMainland.length) largestMainland = component;
+            }
+        }
+        largestMainland.forEach(([x, y]) => primaryMainland.add(`${x},${y}`));
+
+        function drawMapLabels(viewLeft, viewTop) {
+            ctx.save();
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.font = '600 16px Georgia, "Times New Roman", serif';
+
+            for (const label of labels) {
+                if (!label || !label.text || !String(label.text).trim()) continue;
+                const x = Number(label.x);
+                const y = Number(label.y);
+                if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+                const worldX = (x >= 0 && x <= cols) ? x * 32 + 16 : x;
+                const worldY = (y >= 0 && y <= rows) ? y * 32 + 16 : y;
+                const screenX = (worldX - viewLeft) * zoom;
+                const screenY = (worldY - viewTop) * zoom;
+                if (screenX < -140 || screenX > canvas.width + 140 || screenY < -30 || screenY > canvas.height + 30) continue;
+                const labelWidth = ctx.measureText(String(label.text)).width + 44;
+                const labelHeight = 34;
+                const left = screenX - labelWidth / 2;
+                const top = screenY - labelHeight / 2;
+                const radius = 5;
+
+                ctx.save();
+                ctx.shadowColor = 'rgba(0, 0, 0, 0.55)';
+                ctx.shadowBlur = 10;
+                ctx.shadowOffsetY = 3;
+                ctx.beginPath();
+                ctx.roundRect(left, top, labelWidth, labelHeight, radius);
+                const plate = ctx.createLinearGradient(left, top, left, top + labelHeight);
+                plate.addColorStop(0, 'rgba(31, 52, 42, 0.94)');
+                plate.addColorStop(1, 'rgba(18, 29, 25, 0.94)');
+                ctx.fillStyle = plate;
+                ctx.fill();
+                ctx.shadowColor = 'transparent';
+                ctx.lineWidth = 1.2;
+                ctx.strokeStyle = 'rgba(238, 199, 111, 0.92)';
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.roundRect(left + 3, top + 3, labelWidth - 6, labelHeight - 6, radius - 1);
+                ctx.lineWidth = 0.7;
+                ctx.strokeStyle = 'rgba(238, 199, 111, 0.28)';
+                ctx.stroke();
+
+                ctx.strokeStyle = 'rgba(238, 199, 111, 0.72)';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(left + 10, screenY);
+                ctx.lineTo(left + 17, screenY);
+                ctx.moveTo(left + labelWidth - 17, screenY);
+                ctx.lineTo(left + labelWidth - 10, screenY);
+                ctx.stroke();
+
+                ctx.fillStyle = '#f4dfad';
+                ctx.fillText(String(label.text), screenX, screenY + 1);
+                ctx.restore();
+            }
+            ctx.restore();
+        }
+
+        const overviewCanvas = document.createElement('canvas');
+        overviewCanvas.width = cols;
+        overviewCanvas.height = rows;
+        const overviewCtx = overviewCanvas.getContext('2d');
+        for (let y = 0; y < rows; y++) {
+            for (let x = 0; x < cols; x++) {
+                const tile = mapData[y][x];
+                overviewCtx.fillStyle = getMosaicColor(tile.color || '#526f4e', x, y);
+                overviewCtx.fillRect(x, y, 1, 1);
+            }
+        }
+
+        const smoothOverviewCanvas = document.createElement('canvas');
+        smoothOverviewCanvas.width = cols * 2;
+        smoothOverviewCanvas.height = rows * 2;
+        const smoothOverviewCtx = smoothOverviewCanvas.getContext('2d');
+        const smoothImage = smoothOverviewCtx.createImageData(smoothOverviewCanvas.width, smoothOverviewCanvas.height);
+        for (let y = 0; y < smoothOverviewCanvas.height; y++) {
+            const mapY = y / 2;
+            const y0 = Math.min(rows - 2, Math.floor(mapY));
+            const ty = mapY - y0;
+            for (let x = 0; x < smoothOverviewCanvas.width; x++) {
+                const mapX = x / 2;
+                const x0 = Math.min(cols - 2, Math.floor(mapX));
+                const tx = mapX - x0;
+                const waterAt = (sampleX, sampleY) => mapData[sampleY][sampleX].isOcean || mapData[sampleY][sampleX].isLake ? 1 : 0;
+                const waterTop = waterAt(x0, y0) * (1 - tx) + waterAt(x0 + 1, y0) * tx;
+                const waterBottom = waterAt(x0, y0 + 1) * (1 - tx) + waterAt(x0 + 1, y0 + 1) * tx;
+                const water = waterTop * (1 - ty) + waterBottom * ty >= 0.5;
+                const tile = mapData[Math.min(rows - 1, Math.round(mapY))][Math.min(cols - 1, Math.round(mapX))];
+                const color = tile && tile.isSea ? CELL_DEFINITIONS.SEA.color : tile && tile.isLake ? CELL_DEFINITIONS.LAKE.color : (water ? '#5db7d8' : tile.color || CELL_DEFINITIONS.PLAINS.color);
+                const index = (y * smoothOverviewCanvas.width + x) * 4;
+                smoothImage.data[index] = parseInt(color.slice(1, 3), 16);
+                smoothImage.data[index + 1] = parseInt(color.slice(3, 5), 16);
+                smoothImage.data[index + 2] = parseInt(color.slice(5, 7), 16);
+                smoothImage.data[index + 3] = 255;
+            }
+        }
+        smoothOverviewCtx.putImageData(smoothImage, 0, 0);
+
+        const minAllowedZoom = Math.min(canvas.width / (cols * 32), canvas.height / (rows * 32));
+        let landMinX = Infinity;
+        let landMaxX = -Infinity;
+        let landMinY = Infinity;
+        let landMaxY = -Infinity;
+        for (let y = 0; y < rows; y++) {
+            for (let x = 0; x < cols; x++) {
+                const tile = mapData[y][x];
+                if (!tile || tile.isOcean || tile.isLake) continue;
+                landMinX = Math.min(landMinX, x);
+                landMaxX = Math.max(landMaxX, x);
+                landMinY = Math.min(landMinY, y);
+                landMaxY = Math.max(landMaxY, y);
+            }
+        }
+
+        const worldMinX = Number.isFinite(landMinX) ? landMinX - 1 : 0;
+        const worldMaxX = Number.isFinite(landMaxX) ? landMaxX + 1 : cols - 1;
+        const worldMinY = Number.isFinite(landMinY) ? landMinY - 1 : 0;
+        const worldMaxY = Number.isFinite(landMaxY) ? landMaxY + 1 : rows - 1;
+        const worldSpanX = Math.max(1, (worldMaxX - worldMinX + 1) * 32);
+        const worldSpanY = Math.max(1, (worldMaxY - worldMinY + 1) * 32);
+        const fitZoom = Math.min(canvas.width / worldSpanX, canvas.height / worldSpanY);
+
+        const focusCenterX = Number.isFinite(landMinX) ? (worldMinX + worldMaxX) / 2 : Math.floor(cols * 0.76);
+        const focusCenterY = Number.isFinite(landMinY) ? (worldMinY + worldMaxY) / 2 : Math.floor(rows * 0.60);
+        let zoom = Math.max(minAllowedZoom, Math.min(4.0, fitZoom * 0.94));
+        let cameraX = (focusCenterX + 0.5) * 32;
+        let cameraY = (focusCenterY + 0.5) * 32;
+        let isDragging = false;
+        let dragStart = { x: 0, y: 0 };
+        let cameraStart = { x: 0, y: 0 };
+        const activePointers = new Map();
+        let pinchStartDistance = 0;
+        let pinchStartZoom = zoom;
+        let pinchStartCenter = { x: 0, y: 0 };
+        let pinchStartWorldCenter = { x: cameraX, y: cameraY };
+        let labelsVisible = true;
+        let renderQueued = false;
+
+        const scheduleRender = () => {
+            if (renderQueued) return;
+            renderQueued = true;
+            requestAnimationFrame(() => {
+                renderQueued = false;
+                drawFullMap();
+            });
+        };
+
+        const getPointerCenter = () => {
+            const points = [...activePointers.values()];
+            return {
+                x: points.reduce((sum, point) => sum + point.x, 0) / points.length,
+                y: points.reduce((sum, point) => sum + point.y, 0) / points.length
+            };
+        };
+
+        const getPointerDistance = () => {
+            const points = [...activePointers.values()];
+            if (points.length < 2) return 0;
+            return Math.hypot(points[1].x - points[0].x, points[1].y - points[0].y);
+        };
+
+        const beginPinch = () => {
+            const rect = canvas.getBoundingClientRect();
+            const center = getPointerCenter();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            pinchStartDistance = Math.max(1, getPointerDistance());
+            pinchStartZoom = zoom;
+            pinchStartCenter = {
+                x: (center.x - rect.left) * scaleX,
+                y: (center.y - rect.top) * scaleY
+            };
+            pinchStartWorldCenter = {
+                x: cameraX - canvas.width / (2 * zoom) + pinchStartCenter.x / zoom,
+                y: cameraY - canvas.height / (2 * zoom) + pinchStartCenter.y / zoom
+            };
+        };
+
+        const updatePinch = () => {
+            const rect = canvas.getBoundingClientRect();
+            const center = getPointerCenter();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            const centerX = (center.x - rect.left) * scaleX;
+            const centerY = (center.y - rect.top) * scaleY;
+            const targetZoom = Math.min(4.0, Math.max(minAllowedZoom, pinchStartZoom * getPointerDistance() / pinchStartDistance));
+            zoom = targetZoom;
+            cameraX = pinchStartWorldCenter.x - centerX / zoom + canvas.width / (2 * zoom);
+            cameraY = pinchStartWorldCenter.y - centerY / zoom + canvas.height / (2 * zoom);
+            scheduleRender();
+        };
+
+        let playerX = Number.isInteger(generated.playerPos?.x) ? generated.playerPos.x : Math.floor(focusCenterX);
+        let playerY = Number.isInteger(generated.playerPos?.y) ? generated.playerPos.y : Math.floor(focusCenterY);
+        let savedPlayer = null;
+        try {
+            savedPlayer = JSON.parse(localStorage.getItem('steampunk_explorer_player_pos') || 'null');
+        } catch (error) {}
+        if (savedPlayer && savedPlayer.spawnVersion === 3 && savedPlayer.seed === settings.seed && Number.isInteger(savedPlayer.x) && Number.isInteger(savedPlayer.y) && savedPlayer.x >= 0 && savedPlayer.x < cols && savedPlayer.y >= 0 && savedPlayer.y < rows && mapData[savedPlayer.y][savedPlayer.x].isLand && !mapData[savedPlayer.y][savedPlayer.x].isLake) {
+            playerX = savedPlayer.x;
+            playerY = savedPlayer.y;
+        } else if (!Number.isInteger(generated.playerPos?.x) || !Number.isInteger(generated.playerPos?.y)) {
+            for (let radius = 0; radius < Math.max(cols, rows); radius++) {
+                let found = false;
+                for (let dy = -radius; dy <= radius && !found; dy++) {
+                    for (let dx = -radius; dx <= radius; dx++) {
+                        const x = Math.floor(cols / 2) + dx;
+                        const y = Math.floor(rows / 2) + dy;
+                        if (x >= 0 && x < cols && y >= 0 && y < rows && mapData[y][x].isLand && !mapData[y][x].isLake) {
+                            playerX = x;
+                            playerY = y;
+                            found = true;
+                            break;
+                        }
+                    }
+                }
+                if (found) break;
+            }
+        }
+
+        const getCurrentArea = () => {
+            const tile = mapData[playerY]?.[playerX];
+            if (!tile || tile.isSea || tile.isOcean || tile.isLake || tile.type === 'SEA' || tile.type === 'LAKE') return '海';
+            if (!tile.isMainland || tile.territoryId < 0) return '孤島';
+            return territories.find((territory) => territory.territoryId === tile.territoryId || territory.id === tile.territoryId)?.name || '不明な領域';
+        };
+        currentAreaEl.innerHTML = `現在地の領域: <strong>${getCurrentArea()}</strong>`;
+
+        let cachedTerritoryBorders = null;
+
+        function drawTerritoryBorders(startCol, endCol, startRow, endRow) {
+            const tileSize = 32;
+            if (cachedTerritoryBorders === null) {
+                cachedTerritoryBorders = buildTerritoryBorderSegments(mapData);
+            }
+            const drawBorder = (x1, y1, x2, y2) => {
+                ctx.beginPath();
+                ctx.moveTo(x1 * tileSize, y1 * tileSize);
+                ctx.lineTo(x2 * tileSize, y2 * tileSize);
+                ctx.stroke();
+            };
+            ctx.save();
+            ctx.lineCap = 'butt';
+            ctx.strokeStyle = zoom < 0.05 ? 'rgba(210, 45, 45, 0.92)' : '#d22d2d';
+            ctx.lineWidth = 1.8 / zoom;
+            ctx.setLineDash([6 / zoom, 6 / zoom]);
+            cachedTerritoryBorders.forEach(({ x1, y1, x2, y2, pair }) => {
+                if (Math.max(x1, x2) < startCol || Math.min(x1, x2) > endCol || Math.max(y1, y2) < startRow || Math.min(y1, y2) > endRow) return;
+                drawBorder(x1, y1, x2, y2);
+            });
+            ctx.restore();
+        }
+
+        function drawFullMap() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const viewW = canvas.width / zoom;
+            const viewH = canvas.height / zoom;
+            const left = cameraX - viewW / 2;
+            const top = cameraY - viewH / 2;
+
+            ctx.save();
+            ctx.scale(zoom, zoom);
+            ctx.translate(-left, -top);
+
+            const tileSize = 32;
+            const startCol = Math.max(0, Math.floor(left / tileSize));
+            const endCol = Math.min(cols, Math.ceil((left + viewW) / tileSize));
+            const startRow = Math.max(0, Math.floor(top / tileSize));
+            const endRow = Math.min(rows, Math.ceil((top + viewH) / tileSize));
+
+            ctx.imageSmoothingEnabled = false;
+            ctx.drawImage(overviewCanvas, 0, 0, cols, rows, 0, 0, cols * tileSize, rows * tileSize);
+            drawTerritoryBorders(startCol, endCol, startRow, endRow);
+            ctx.restore();
+
+            if (labelsVisible) drawMapLabels(left, top);
+
+            const playerWorldX = (playerX + 0.5) * tileSize;
+            const playerWorldY = (playerY + 0.5) * tileSize;
+            const screenX = (playerWorldX - left) * zoom;
+            const screenY = (playerWorldY - top) * zoom;
+
+            if (screenX >= -10 && screenX <= canvas.width + 10 && screenY >= -10 && screenY <= canvas.height + 10) {
+                ctx.save();
+                ctx.fillStyle = '#ff0000';
+                ctx.beginPath();
+                ctx.arc(screenX, screenY, 6, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                ctx.strokeStyle = 'rgba(255, 0, 0, 0.55)';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.arc(screenX, screenY, 10, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.restore();
+            }
+
+        }
+
+        function drawWaterCoastline(startCol, endCol, startRow, endRow, tileSize) {
+            return;
+        }
+
+        canvas.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const rect = canvas.getBoundingClientRect();
+            const pivotX = (e.clientX - rect.left) * (canvas.width / rect.width);
+            const pivotY = (e.clientY - rect.top) * (canvas.height / rect.height);
+
+            const zoomFactor = e.deltaY < 0 ? 1.15 : 0.85;
+            const targetZoom = Math.min(4.0, Math.max(minAllowedZoom, zoom * zoomFactor));
+            if (targetZoom === zoom) return;
+
+            const viewW = canvas.width / zoom;
+            const viewH = canvas.height / zoom;
+            const worldPivotX = (cameraX - viewW / 2) + pivotX / zoom;
+            const worldPivotY = (cameraY - viewH / 2) + pivotY / zoom;
+
+            zoom = targetZoom;
+
+            const newViewW = canvas.width / zoom;
+            const newViewH = canvas.height / zoom;
+            cameraX = worldPivotX - pivotX / zoom + newViewW / 2;
+            cameraY = worldPivotY - pivotY / zoom + newViewH / 2;
+            scheduleRender();
+        }, { passive: false });
+
+        canvas.addEventListener('pointerdown', (e) => {
+            e.preventDefault();
+            activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+            try { canvas.setPointerCapture(e.pointerId); } catch (error) {}
+
+            if (activePointers.size === 1) {
+                isDragging = true;
+                dragStart = { x: e.clientX, y: e.clientY };
+                cameraStart = { x: cameraX, y: cameraY };
+            } else if (activePointers.size === 2) {
+                isDragging = false;
+                beginPinch();
+            }
+        });
+
+        canvas.addEventListener('pointermove', (e) => {
+            if (!activePointers.has(e.pointerId)) return;
+            e.preventDefault();
+            activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+            if (activePointers.size >= 2) {
+                updatePinch();
+            } else if (activePointers.size === 1 && isDragging) {
+                const rect = canvas.getBoundingClientRect();
+                const scaleX = canvas.width / rect.width;
+                const scaleY = canvas.height / rect.height;
+
+                const dx = (e.clientX - dragStart.x) * scaleX / zoom;
+                const dy = (e.clientY - dragStart.y) * scaleY / zoom;
+
+                cameraX = cameraStart.x - dx;
+                cameraY = cameraStart.y - dy;
+                scheduleRender();
+            }
+        });
+
+        const handlePointerUp = (e) => {
+            if (canvas.hasPointerCapture(e.pointerId)) {
+                try { canvas.releasePointerCapture(e.pointerId); } catch(err) {}
+            }
+            activePointers.delete(e.pointerId);
+            if (activePointers.size === 1) {
+                const remaining = [...activePointers.values()][0];
+                isDragging = true;
+                dragStart = { x: remaining.x, y: remaining.y };
+                cameraStart = { x: cameraX, y: cameraY };
+            } else {
+                isDragging = false;
+                pinchStartDistance = 0;
+            }
+        };
+
+        canvas.addEventListener('pointerup', handlePointerUp);
+        canvas.addEventListener('pointercancel', handlePointerUp);
+
+        document.getElementById('toggleLabels').addEventListener('click', (event) => {
+            labelsVisible = !labelsVisible;
+            event.currentTarget.textContent = labelsVisible ? '地域ラベルを非表示' : '地域ラベルを表示';
+            event.currentTarget.setAttribute('aria-pressed', String(labelsVisible));
+            scheduleRender();
+        });
+
+        document.getElementById('backToGame').onclick = () => {
+            document.getElementById('loadingOverlay')?.removeAttribute('hidden');
+            if (document.referrer.endsWith('/MapSystem/index.html')) {
+                window.history.back();
+                return;
+            }
+            window.location.href = 'index.html';
+        };
+
+        scheduleRender();
+        requestAnimationFrame(() => document.getElementById('loadingOverlay')?.setAttribute('hidden', ''));
+    </script>
+</body>
+</html>

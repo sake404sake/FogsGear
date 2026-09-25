@@ -12,15 +12,12 @@
     </div>
     <div class="panel">
         <div class="button-row" style="justify-content:flex-end; margin-bottom: 10px;">
-            <button class="btn btn-action" type="button" onclick="window.location.href='../index.html'">マップへ戻る</button>
+            <button class="btn btn-action" type="button" onclick="window.location.href='../MapSystem/index.html'">マップへ戻る</button>
         </div>
         <h1>Fogs Gear</h1>
-        <div class="status-container creative-only">
-            <button id="creativeBtn" class="creative-toggle" data-action="toggle-creative">クリエイティブ: OFF</button>
-        </div>
         <button class="dashboard-toggle" data-action="toggle-dashboard" aria-expanded="false">動力ダッシュボード <span>+</span></button>
         <section class="dashboard" aria-label="動力ダッシュボード" hidden>
-            <div class="dashboard-title">LIVE ENGINE DASHBOARD</div>
+            <div class="dashboard-title-row"><div class="dashboard-title">LIVE ENGINE DASHBOARD</div><span id="creative-mode-indicator" class="creative-mode-indicator" hidden>CREATIVE MODE: ON</span></div>
             <div class="dashboard-resource-table">
                 <div class="dashboard-resource-row dashboard-resource-header"><span>資源</span><span>保有量</span><span>生成 / 回収</span><span>消費</span></div>
                 <div class="dashboard-resource-row"><span>水</span><strong id="dashboardWater">0</strong><span id="waterGenerationRate">0 /秒</span><span id="waterConsumptionRate">0 /秒</span></div>
@@ -152,7 +149,7 @@
         </div>
     </div>
 
-    <script type="module" src="js/main.js"></script>
+    <script type="module" src="js/main.js?v=scroll-edit-7"></script>
     <script>
         document.addEventListener('click', (event) => {
             const target = event.target.closest('a, button[onclick]');

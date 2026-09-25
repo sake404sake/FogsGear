@@ -31,8 +31,11 @@ export class GameState {
         this.steamConsumptionRate = 0;
         this.brassGenerationRate = 0;
         this.mainGearRunning = true;
+        this.autoStoppedBySteam = false;
         this.lastTickAt = performance.now();
         this.lastTickElapsed = 1 / 60;
+        this.lastStorageSaveAt = 0;
+        this.lastExternalSaveAt = 0;
         
         this.selectedSize = null;
         this.selectedLayer = 0;
@@ -56,6 +59,8 @@ export class GameState {
         this.createGear = null;
         this.selectedGearId = null;
         this.hoveredGearIds = [];
+        this.currentScrollId = null;
+        this.currentScrollMaterial = null;
         
         this.listeners = [];
     }
@@ -162,6 +167,7 @@ export class GameState {
     toggleMainGear() {
         // メインギアの稼働状態を反転し、接続グラフへ再計算を依頼する。
         this.mainGearRunning = !this.mainGearRunning;
+        this.autoStoppedBySteam = false;
         this.updatePowerGrid();
         this.saveGameData();
         this.notify();
@@ -185,8 +191,20 @@ export class GameState {
             solidMetal: this.solidMetal,
             brass: this.brass,
             mainGearRunning: this.mainGearRunning,
+            autoStoppedBySteam: this.autoStoppedBySteam,
             creativeMode: this.creativeMode,
             creativeSnapshot: this.creativeSnapshot,
+            waterGenerationRate: this.waterGenerationRate,
+            waterConsumptionRate: this.waterConsumptionRate,
+            fogRecoveryRate: this.fogRecoveryRate,
+            fogConsumptionRate: this.fogConsumptionRate,
+            liquidMetalRate: this.liquidMetalRate,
+            liquidMetalConsumptionRate: this.liquidMetalConsumptionRate,
+            solidMetalRate: this.solidMetalRate,
+            solidMetalConsumptionRate: this.solidMetalConsumptionRate,
+            brassGenerationRate: this.brassGenerationRate,
+            steamGenerationRate: this.steamGenerationRate,
+            steamConsumptionRate: this.steamConsumptionRate,
             belts: this.belts,
             gears: this.placedGears.map(gear => ({
                 id: gear.id,
@@ -210,6 +228,8 @@ export class GameState {
         this.solidMetal = data.solidMetal ?? 0;
         this.brass = data.brass;
         this.mainGearRunning = data.mainGearRunning ?? true;
+        this.autoStoppedBySteam = data.autoStoppedBySteam ?? (data.mainGearRunning === false && this.steamPower > 0);
+        this.lastExternalSaveAt = Number(data.updatedAt) || 0;
         this.creativeMode = data.creativeMode ?? false;
         this.creativeSnapshot = data.creativeSnapshot ?? null;
         const gears = data.gears || data.placedGears || [];
@@ -283,6 +303,7 @@ export class GameState {
         this.solidMetal = 0;
         this.brass = 300;
         this.mainGearRunning = true;
+        this.autoStoppedBySteam = false;
         this.undoStack = [];
         this.redoStack = [];
         this.belts = [];
@@ -295,6 +316,7 @@ export class GameState {
     saveGameData() {
         // 次回起動で復元する資源・ギア・履歴をlocalStorageへ保存する。
         const data = {
+            updatedAt: Date.now(),
             steamPower: this.steamPower,
             water: this.water,
             fog: this.fog,
@@ -302,8 +324,20 @@ export class GameState {
             solidMetal: this.solidMetal,
             brass: this.brass,
             mainGearRunning: this.mainGearRunning,
+            autoStoppedBySteam: this.autoStoppedBySteam,
             creativeMode: this.creativeMode,
             creativeSnapshot: this.creativeSnapshot,
+            waterGenerationRate: this.waterGenerationRate,
+            waterConsumptionRate: this.waterConsumptionRate,
+            fogRecoveryRate: this.fogRecoveryRate,
+            fogConsumptionRate: this.fogConsumptionRate,
+            liquidMetalRate: this.liquidMetalRate,
+            liquidMetalConsumptionRate: this.liquidMetalConsumptionRate,
+            solidMetalRate: this.solidMetalRate,
+            solidMetalConsumptionRate: this.solidMetalConsumptionRate,
+            brassGenerationRate: this.brassGenerationRate,
+            steamGenerationRate: this.steamGenerationRate,
+            steamConsumptionRate: this.steamConsumptionRate,
             belts: this.belts,
             gears: this.placedGears.map(gear => ({
                 id: gear.id,
@@ -314,6 +348,67 @@ export class GameState {
             redoStack: this.redoStack
         };
         localStorage.setItem('fog_thermo_save', JSON.stringify(data));
+        this.saveScrollDraft();
+    }
+
+    getScrollBlueprint() {
+        return {
+            gears: this.placedGears.map(gear => ({
+                id: gear.id,
+                q: gear.q,
+                r: gear.r,
+                size: gear.sizeKey,
+                layer: gear.layer,
+                isCore: Boolean(gear.isCore),
+                angle: gear.angle,
+                isLocked: gear.isLocked,
+                designType: gear.designType,
+                processMode: gear.processMode
+            })),
+            belts: this.belts
+        };
+    }
+
+    getScrollDraftKey(material) {
+        return `fogsgear_scroll_draft_${material === 'cloth' ? 'cloth' : 'paper'}`;
+    }
+
+    saveScrollDraft() {
+        if (!this.currentScrollMaterial || this.currentScrollId) return;
+        localStorage.setItem(this.getScrollDraftKey(this.currentScrollMaterial), JSON.stringify(this.getScrollBlueprint()));
+    }
+
+    loadScrollEditorSession(createGear) {
+        const params = new URLSearchParams(window.location.search);
+        const editId = params.get('editScroll');
+        const requestedMaterial = params.get('newScroll') === 'cloth' ? 'cloth' : 'paper';
+        const library = this.getNamedScrollLibrary();
+        const savedScroll = editId ? library.find(scroll => scroll.id === editId) : null;
+        this.currentScrollId = savedScroll?.id || null;
+        this.currentScrollMaterial = savedScroll?.material === 'cloth' || savedScroll?.scrollType === 'cloth'
+            ? 'cloth'
+            : savedScroll ? 'paper' : params.has('newScroll') ? requestedMaterial : null;
+        const blueprint = savedScroll?.blueprint || (this.currentScrollMaterial && !this.currentScrollId
+            ? (() => {
+                try { return JSON.parse(localStorage.getItem(this.getScrollDraftKey(this.currentScrollMaterial)) || 'null'); }
+                catch (error) { return null; }
+            })()
+            : null);
+        if (!blueprint) {
+            if (params.has('newScroll')) {
+                this.placedGears = [createGear({ q: 0, r: 0, size: 'LL', layer: 0, isCore: true })];
+                this.belts = [];
+                this.updatePowerGrid();
+                this.notify();
+            }
+            return;
+        }
+        const gears = Array.isArray(blueprint.gears) ? blueprint.gears : [];
+        this.placedGears = gears.map(gear => createGear(gear));
+        this.belts = Array.isArray(blueprint.belts) ? blueprint.belts : [];
+        this.updatePowerGrid();
+        if (this.network) this.network.rebuild(this.placedGears, this.belts).updateRotation();
+        this.notify();
     }
 
     getNamedScrollLibrary() {
@@ -330,21 +425,7 @@ export class GameState {
         if (!trimmedName) return null;
         const library = this.getNamedScrollLibrary();
         const now = Date.now();
-        const finalBlueprint = blueprint || {
-            gears: this.placedGears.map(gear => ({
-                id: gear.id,
-                q: gear.q,
-                r: gear.r,
-                size: gear.sizeKey,
-                layer: gear.layer,
-                isCore: Boolean(gear.isCore),
-                angle: gear.angle,
-                isLocked: gear.isLocked,
-                designType: gear.designType,
-                processMode: gear.processMode
-            })),
-            belts: this.belts
-        };
+        const finalBlueprint = blueprint || this.getScrollBlueprint();
         const effectType = effect?.type || 'custom';
         const effectConfig = effect?.config || {};
         const effectLabels = {
@@ -363,18 +444,23 @@ export class GameState {
                 config: effectConfig
             },
             blueprint: finalBlueprint,
+            material: this.currentScrollMaterial || 'paper',
             metadata: {
                 source: 'gear-editor',
                 version: 1
             }
         };
-        const index = library.findIndex(scroll => String(scroll.name).toLowerCase() === trimmedName.toLowerCase());
+        const index = this.currentScrollId
+            ? library.findIndex(scroll => scroll.id === this.currentScrollId)
+            : library.findIndex(scroll => String(scroll.name).toLowerCase() === trimmedName.toLowerCase());
         if (index >= 0) {
             library[index] = { ...library[index], ...entry, id: library[index].id || entry.id };
         } else {
             library.unshift(entry);
         }
         localStorage.setItem('fogsgear_scroll_library', JSON.stringify(library));
+        this.currentScrollId = library[index >= 0 ? index : 0]?.id || entry.id;
+        localStorage.removeItem(this.getScrollDraftKey(this.currentScrollMaterial));
         return entry;
     }
 
@@ -392,6 +478,8 @@ export class GameState {
                 this.solidMetal = data.solidMetal ?? 0;
                 this.brass = data.brass ?? 300;
                 this.mainGearRunning = data.mainGearRunning ?? true;
+                this.autoStoppedBySteam = data.autoStoppedBySteam ?? (data.mainGearRunning === false && this.steamPower > 0);
+                this.lastExternalSaveAt = Number(data.updatedAt) || 0;
                 this.creativeMode = data.creativeMode ?? false;
                 this.creativeSnapshot = data.creativeSnapshot ?? null;
                 this.belts = Array.isArray(data.belts) ? data.belts.filter(belt => Array.isArray(belt?.gearIds) && belt.gearIds.length >= 2) : [];
@@ -440,7 +528,16 @@ export class GameState {
         const elapsed = Math.min(0.25, Math.max(0, (now - this.lastTickAt) / 1000));
         this.lastTickAt = now;
         this.lastTickElapsed = elapsed;
-        if (this.network) this.network.updateRotation();
+        this.syncExternalEngineControl();
+        if (this.network && this.mainGearRunning && this.steamPower > 0) {
+            this.network.updateRotation();
+        } else {
+            this.placedGears.forEach(gear => {
+                gear.powered = false;
+                gear.rotationDir = 0;
+                gear.angularVelocity = 0;
+            });
+        }
         // 連結していても、処理設定は各ギア自身の値だけを参照する。
         const activeCount = this.placedGears.filter(gear => gear.powered && !gear.isDeadlocked).length;
         const activeGears = this.placedGears.filter(gear => gear.powered && !gear.isDeadlocked);
@@ -476,7 +573,24 @@ export class GameState {
         } else {
             this.steamPower = Math.max(0, this.steamPower + elapsed - steamConsumption * elapsed);
         }
-        if (this.steamPower <= 0) this.mainGearRunning = false;
+        if (this.steamPower <= 0) {
+            const stoppedNow = this.mainGearRunning;
+            this.mainGearRunning = false;
+            this.autoStoppedBySteam = true;
+            this.fogRecoveryRate = 0;
+            this.fogToWaterRate = 0;
+            this.liquidMetalRate = 0;
+            this.solidMetalRate = 0;
+            this.solidMetalToBrassRate = 0;
+            this.steamTransformRate = 0;
+            this.waterConsumptionRate = 0;
+            this.fogConsumptionRate = 0;
+            this.liquidMetalConsumptionRate = 0;
+            this.solidMetalConsumptionRate = 0;
+            this.brassGenerationRate = 0;
+            this.steamConsumptionRate = 0;
+            if (stoppedNow) this.saveGameData();
+        }
         if (!this.mainGearRunning) {
             this.placedGears.forEach(gear => {
                 gear.powered = false;
@@ -532,7 +646,12 @@ export class GameState {
             }
         });
         if (this.network) this.network.synchronizeLockedAxes();
-        if (performance.now() - (this.lastUiNotifyAt || 0) > 100) { this.lastUiNotifyAt = performance.now(); this.notify(); }
+        const currentTime = performance.now();
+        if (currentTime - (this.lastStorageSaveAt || 0) > 500) {
+            this.lastStorageSaveAt = currentTime;
+            this.saveGameData();
+        }
+        if (currentTime - (this.lastUiNotifyAt || 0) > 100) { this.lastUiNotifyAt = currentTime; this.notify(); }
     }
 
     updatePowerGrid() {
@@ -593,5 +712,16 @@ export class GameState {
                 });
             });
         }
+    }
+
+    syncExternalEngineControl() {
+        try {
+            const saved = JSON.parse(localStorage.getItem('fog_thermo_save') || '{}');
+            const updatedAt = Number(saved.updatedAt) || 0;
+            if (updatedAt <= this.lastExternalSaveAt || saved.mainGearRunning === undefined) return;
+            this.mainGearRunning = saved.mainGearRunning !== false;
+            this.autoStoppedBySteam = saved.autoStoppedBySteam === true;
+            this.lastExternalSaveAt = updatedAt;
+        } catch (error) {}
     }
 }
