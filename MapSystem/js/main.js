@@ -484,6 +484,7 @@ function resize() {
     const container = canvas.parentElement;
     const width = container.clientWidth || 640;
     const isCompactViewport = window.matchMedia('(max-width: 620px)').matches;
+    const isWideLandscape = window.matchMedia('(min-aspect-ratio: 1/1)').matches;
     let height = 480;
 
     if (isCompactViewport) {
@@ -493,6 +494,8 @@ function resize() {
         const viewportHeight = window.visualViewport?.height || window.innerHeight;
         const availableHeight = viewportHeight - topPanelHeight - movementHeight - 56;
         height = Math.max(160, Math.min(480, Math.floor(availableHeight)));
+    } else if (isWideLandscape) {
+        height = Math.max(180, Math.min(container.clientHeight || 480, 480));
     }
 
     canvas.width = width;
@@ -547,6 +550,8 @@ function drawGridOverlay(startCol, endCol, startRow, endRow) {
 
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#071317';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     const viewW = canvas.width / state.zoom;
     const viewH = canvas.height / state.zoom;
@@ -1178,6 +1183,20 @@ const mainPageArrows = [...document.querySelectorAll('.main-page-arrow')];
 let currentMainPage = 0;
 let mainPagePointerStart = null;
 
+function isWideMainLayout() {
+    return window.matchMedia('(min-aspect-ratio: 1/1)').matches;
+}
+
+function syncMainPageViewportHeight() {
+    if (!mainPageViewport || !mainPageTrack) return;
+    const activePage = mainPageTrack.children[currentMainPage];
+    if (!activePage) return;
+    const nextHeight = activePage.scrollHeight || activePage.offsetHeight || 0;
+    const viewportHeight = isWideMainLayout() ? 'auto' : `${nextHeight}px`;
+    mainPageViewport.style.height = viewportHeight;
+    mainPageViewport.style.minHeight = viewportHeight === 'auto' ? '' : viewportHeight;
+}
+
 function setMainPage(page) {
     currentMainPage = Math.max(0, Math.min(2, page));
     if (mainPageTrack) mainPageTrack.style.transform = `translateX(-${currentMainPage * 33.3333}%)`;
@@ -1187,6 +1206,7 @@ function setMainPage(page) {
         if (active) dot.setAttribute('aria-current', 'page');
         else dot.removeAttribute('aria-current');
     });
+    syncMainPageViewportHeight();
 }
 
 mainPageDots.forEach(dot => dot.addEventListener('click', () => setMainPage(Number(dot.dataset.mainPage))));
@@ -1194,7 +1214,7 @@ mainPageArrows.forEach(arrow => arrow.addEventListener('click', () => {
     setMainPage(currentMainPage + (arrow.dataset.mainPage === 'next' ? 1 : -1));
 }));
 mainPageViewport?.addEventListener('pointerdown', event => {
-    if (event.target.closest('button, input, select, iframe, .movement-joystick')) return;
+    if (event.target.closest('button, input, select, .movement-joystick')) return;
     mainPagePointerStart = { x: event.clientX, y: event.clientY };
 });
 mainPageViewport?.addEventListener('pointerup', event => {
@@ -1206,7 +1226,8 @@ mainPageViewport?.addEventListener('pointerup', event => {
     setMainPage(currentMainPage + (deltaX < 0 ? 1 : -1));
 });
 mainPageViewport?.addEventListener('pointercancel', () => { mainPagePointerStart = null; });
-setMainPage(0);
+window.addEventListener('resize', syncMainPageViewportHeight);
+setMainPage(isWideMainLayout() ? 1 : 0);
 
 // インベントリトグルボタンのイベントリスナー設定
 const inventoryToggleBtn = document.querySelector('[data-action="toggle-inventory"]');

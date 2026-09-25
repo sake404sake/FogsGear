@@ -537,7 +537,19 @@ canvas {
 .embedded-library .scroll-list-item { grid-template-columns: minmax(0, 1fr); padding-right: 0; }
 .embedded-library .scroll-list-edit { display: none; }
 .embedded-library .scroll-detail-panel { min-width: 0; height: calc(100vh - 36px); box-sizing: border-box; padding: 8px; }
-.embedded-library .scroll-empty { display: none; }
+.embedded-library .scroll-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 220px;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    letter-spacing: 1px;
+    text-align: center;
+    border: 1px dashed rgba(197, 160, 89, 0.28);
+    background: rgba(18, 14, 12, 0.38);
+    border-radius: 6px;
+}
 .embedded-library .scroll-detail-heading { position: absolute; z-index: 2; top: 8px; left: 14px; right: 14px; pointer-events: none; }
 .embedded-library .scroll-detail-heading h2 { margin: 0; font-size: 1.1rem; text-shadow: 0 0 8px rgba(243, 198, 83, 0.45), 0 2px 5px #000; }
 .embedded-library .scroll-detail-heading #scroll-toggle { pointer-events: auto; }
