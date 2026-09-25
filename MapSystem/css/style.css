@@ -694,14 +694,14 @@ canvas.engine-runtime-canvas { display: none; }
     body:has(#gameCanvas) {
         display: grid;
         grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
-        grid-template-rows: auto minmax(0, 1fr);
+        grid-template-rows: auto auto;
         grid-template-areas: "status controls" "map controls";
         align-items: stretch;
         gap: 12px;
-        height: 100dvh;
-        min-height: 0;
+        height: auto;
+        min-height: 100dvh;
         box-sizing: border-box;
-        overflow: hidden;
+        overflow: visible;
     }
     body:has(#gameCanvas) > .panel:nth-of-type(2) {
         grid-area: status;
@@ -737,6 +737,7 @@ canvas.engine-runtime-canvas { display: none; }
         width: auto;
         max-width: none;
         min-width: 0;
+        height: 100%;
         margin: 0;
         overflow-y: auto;
     }
