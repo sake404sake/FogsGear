@@ -638,8 +638,17 @@ canvas.engine-runtime-canvas { display: none; }
 }
 
 @media (max-width: 620px) {
-    body { padding: 8px; }
-    .panel { padding: 12px 10px; }
+    body {
+        padding: 8px;
+        overflow-x: hidden;
+        overflow-y: auto;
+        min-height: 100dvh;
+    }
+    .panel {
+        width: auto;
+        max-width: none;
+        padding: 12px 10px;
+    }
     .button-row { gap: 7px; }
     .btn { min-height: 42px; padding: 9px 8px; font-size: 0.76rem; line-height: 1.2; }
     .btn-action, .btn-reset { min-height: 44px; padding: 9px 7px; }
@@ -658,10 +667,30 @@ canvas.engine-runtime-canvas { display: none; }
     .setting-control output { width: 100%; }
     .settings-actions { flex-direction: column; }
     .settings-actions .btn { width: 100%; }
+    #canvas-container {
+        width: 100%;
+        max-width: none;
+        min-height: 220px;
+    }
+    #gameCanvas {
+        width: 100%;
+        height: clamp(260px, 52vh, 440px);
+        max-height: none;
+    }
+    .main-page {
+        width: 100%;
+        min-width: 100%;
+    }
+    .main-page-track {
+        width: 300%;
+    }
+    .main-page:first-child .movement-pad {
+        margin: 0 auto;
+    }
 }
 
 /* 横長画面では、地図を主領域、操作を右側のコントロールデッキにする。 */
-@media (min-width: 901px), (orientation: landscape) and (min-width: 600px), (orientation: landscape) and (max-height: 700px) {
+@media (min-width: 901px) and (orientation: landscape) {
     body:has(#gameCanvas) {
         display: grid;
         grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
@@ -779,7 +808,7 @@ canvas.engine-runtime-canvas { display: none; }
     }
 }
 
-@media (orientation: landscape) and (max-width: 1000px) {
+@media (orientation: landscape) and (min-width: 900px) and (max-width: 1000px) {
     body:has(#gameCanvas) {
         grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
     }
