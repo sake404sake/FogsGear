@@ -442,6 +442,8 @@ h1 {
 
 @media (max-width: 620px) {
     .main-page-arrow { flex-basis: 24px; height: 64px; }
+    .main-page-viewport { height: clamp(220px, 32vh, 360px); }
+    .main-page-track, .main-page { height: 100%; }
     .gear-preview-page iframe { height: 620px; min-height: 560px; }
     .movement-pad {
         grid-template-columns: repeat(3, 60px);
@@ -639,10 +641,14 @@ canvas.engine-runtime-canvas { display: none; }
 
 @media (max-width: 620px) {
     body {
-        padding: 8px;
+        padding: 0;
         overflow-x: hidden;
-        overflow-y: auto;
+        overflow-y: hidden;
         min-height: 100dvh;
+        height: 100dvh;
+        display: flex;
+        flex-direction: column;
+        gap: 0;
     }
     .panel {
         width: auto;
@@ -654,10 +660,11 @@ canvas.engine-runtime-canvas { display: none; }
     .btn-action, .btn-reset { min-height: 44px; padding: 9px 7px; }
     .dashboard-shortcuts { gap: 7px; }
     .dashboard-shortcuts .dashboard-toggle { min-height: 44px; }
-    .main-control-pager { gap: 0; }
+    .main-control-pager { gap: 0; height: clamp(180px, 23vh, 240px); }
     .main-page-arrow { display: none; }
-    .main-page-viewport { touch-action: pan-y pinch-zoom; }
-    .main-page-dots { gap: 12px; margin-top: 10px; }
+    .main-page-viewport { touch-action: pan-y pinch-zoom; height: 100%; min-height: 0; }
+    .main-page-track, .main-page { height: 100%; }
+    .main-page-dots { gap: 12px; margin-top: 8px; }
     .main-page-dot { width: 12px; height: 12px; }
     .gear-preview-page iframe { height: 620px; min-height: 0; }
     .engine-dashboard-page { min-height: 500px; padding: 18px 5px; }
@@ -670,12 +677,21 @@ canvas.engine-runtime-canvas { display: none; }
     #canvas-container {
         width: 100%;
         max-width: none;
-        min-height: 220px;
+        min-height: 180px;
+        height: clamp(180px, 24vh, 220px);
+        flex: 0 0 auto;
+        min-height: 0;
     }
     #gameCanvas {
         width: 100%;
-        height: clamp(260px, 52vh, 440px);
+        height: 100%;
         max-height: none;
+    }
+    body > .panel:last-of-type {
+        flex: 0 0 auto;
+        min-height: 0;
+        max-height: clamp(180px, 26vh, 230px);
+        overflow: hidden;
     }
     .main-page {
         width: 100%;
@@ -718,7 +734,7 @@ canvas.engine-runtime-canvas { display: none; }
         align-items: stretch;
         justify-content: stretch;
         width: 100%;
-        height: min(660px, calc(100dvh - 160px));
+        height: var(--landscape-map-height, min(660px, calc(100dvh - 160px)));
         max-width: none;
         min-width: 0;
         min-height: 0;
@@ -736,13 +752,16 @@ canvas.engine-runtime-canvas { display: none; }
         grid-area: controls;
         display: flex;
         flex-direction: column;
-        width: auto;
+        width: min(100%, 400px);
         max-width: none;
         min-width: 0;
-        height: min(660px, calc(100dvh - 160px));
-        max-height: min(660px, calc(100dvh - 160px));
+        height: var(--landscape-controls-height, min(660px, calc(100dvh - 160px))) !important;
+        min-height: var(--landscape-controls-height, min(660px, calc(100dvh - 160px))) !important;
+        max-height: var(--landscape-controls-height, min(660px, calc(100dvh - 160px))) !important;
         margin: 0;
         overflow: hidden;
+        justify-self: stretch;
+        box-sizing: border-box;
     }
     body:has(#gameCanvas) > .panel:last-of-type .main-page:first-child {
         display: flex;
@@ -766,9 +785,20 @@ canvas.engine-runtime-canvas { display: none; }
     body:has(#gameCanvas) > .panel:last-of-type .main-control-pager {
         flex: 1 1 auto;
         min-height: 0;
-        height: auto;
+        height: calc(var(--landscape-controls-height, min(660px, calc(100dvh - 160px))) - 16px) !important;
+        max-height: calc(var(--landscape-controls-height, min(660px, calc(100dvh - 160px))) - 16px) !important;
+        align-items: stretch;
     }
-    body:has(#gameCanvas) > .panel:last-of-type .main-page-viewport,
+    body:has(#gameCanvas) > .panel:last-of-type .main-page-viewport {
+        flex: 1 1 auto;
+        height: 100% !important;
+        min-height: 0;
+        overflow: hidden;
+    }
+    body:has(#gameCanvas) > .panel:last-of-type .main-page-dots {
+        flex: 0 0 auto;
+        margin-top: 4px;
+    }
     body:has(#gameCanvas) > .panel:last-of-type .main-page-track,
     body:has(#gameCanvas) > .panel:last-of-type .main-page {
         height: 100%;
@@ -777,6 +807,8 @@ canvas.engine-runtime-canvas { display: none; }
     }
     body:has(#gameCanvas) > .panel:last-of-type .main-page {
         padding: 0 2px;
+        display: flex;
+        flex-direction: column;
     }
     body:has(#gameCanvas) > .panel:last-of-type .main-page-arrow {
         display: none;

@@ -480,6 +480,19 @@ function savePlayerPos() {
     } catch(e) {}
 }
 
+function syncLandscapePanelHeights() {
+    const isWideLandscape = window.matchMedia('(min-aspect-ratio: 1/1)').matches;
+    if (!isWideLandscape) {
+        document.documentElement.style.setProperty('--landscape-map-height', '');
+        document.documentElement.style.setProperty('--landscape-controls-height', '');
+        return;
+    }
+
+    const targetHeight = Math.min(660, Math.max(220, window.innerHeight - 160));
+    document.documentElement.style.setProperty('--landscape-map-height', `${targetHeight}px`);
+    document.documentElement.style.setProperty('--landscape-controls-height', `${targetHeight}px`);
+}
+
 function resize() {
     const container = canvas.parentElement;
     const width = container.clientWidth || 640;
@@ -492,12 +505,13 @@ function resize() {
         const topPanelHeight = panels[0]?.getBoundingClientRect().height || 0;
         const movementHeight = document.querySelector('.movement-control-group')?.getBoundingClientRect().height || 0;
         const viewportHeight = window.visualViewport?.height || window.innerHeight;
-        const availableHeight = viewportHeight - topPanelHeight - movementHeight - 56;
-        height = Math.max(160, Math.min(480, Math.floor(availableHeight)));
+        const availableHeight = viewportHeight - topPanelHeight - movementHeight - 88;
+        height = Math.max(150, Math.min(290, Math.floor(availableHeight * 0.52)));
     } else if (isWideLandscape) {
         height = Math.max(180, Math.min(container.clientHeight || 480, 480));
     }
 
+    syncLandscapePanelHeights();
     canvas.width = width;
     canvas.height = height;
 }
@@ -1193,13 +1207,14 @@ function syncMainPageViewportHeight() {
     if (!activePage) return;
     const nextHeight = activePage.scrollHeight || activePage.offsetHeight || 0;
     if (isWideMainLayout()) {
-        const wideHeight = Math.min(660, Math.max(260, window.innerHeight - 160));
+        const wideHeight = Math.min(660, Math.max(220, window.innerHeight - 160));
         mainPageViewport.style.height = `${wideHeight}px`;
         mainPageViewport.style.minHeight = `${wideHeight}px`;
         return;
     }
-    mainPageViewport.style.height = `${nextHeight}px`;
-    mainPageViewport.style.minHeight = `${nextHeight}px`;
+    const portraitHeight = Math.min(Math.max(nextHeight, 150), Math.min(window.innerHeight * 0.20, 180));
+    mainPageViewport.style.height = `${portraitHeight}px`;
+    mainPageViewport.style.minHeight = `${portraitHeight}px`;
 }
 
 function setMainPage(page) {
