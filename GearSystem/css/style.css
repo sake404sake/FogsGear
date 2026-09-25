@@ -553,3 +553,88 @@ canvas {
 .embedded-library.scroll-is-running .scroll-detail-heading h2 { display: inline-block; }
 .embedded-library .scroll-preview-frame { height: calc(100vh - 92px); background: transparent; border: 0; box-shadow: none; }
 .embedded-library .scroll-detail-footer { bottom: 12px; }
+
+/* レスポンシブ操作レイアウト */
+@media (min-width: 901px) {
+    body:not(.scroll-library-page) { padding: 20px 28px; }
+    body:not(.scroll-library-page) > .panel { max-width: 1080px; }
+    body:not(.scroll-library-page) .dashboard,
+    body:not(.scroll-library-page) .dashboard-toggle,
+    body:not(.scroll-library-page) .rate-table-panel { max-width: 1080px; }
+    body:not(.scroll-library-page) #canvas-container { width: min(100%, 1000px); }
+    body:not(.scroll-library-page) #canvas-container > canvas { max-width: none; }
+    .scroll-library-page { padding: 28px; }
+    .scroll-library-layout { min-height: min(720px, calc(100vh - 190px)); }
+}
+
+@media (max-width: 600px) {
+    body { padding: 8px; }
+    .panel { padding: 12px 10px; }
+    .button-row { gap: 7px; }
+    .btn { min-height: 42px; padding: 9px 8px; font-size: 0.76rem; line-height: 1.2; }
+    .btn-action, .btn-reset { flex: 1 1 46%; min-height: 44px; padding: 9px 7px; }
+    .dashboard-toggle { min-height: 42px; padding: 10px 11px; }
+    .group-label { font-size: 0.68rem; }
+    .rule-text { line-height: 1.55; }
+    .scroll-library-page { padding: 8px; }
+    .scroll-library-header { gap: 12px; }
+    .scroll-library-header .btn { width: 100%; }
+    .scroll-tab { min-height: 44px; }
+    .scroll-list-item { min-height: 46px; }
+    .scroll-list-select { padding-top: 8px; padding-bottom: 8px; }
+    .scroll-list-edit { min-height: 34px; }
+}
+
+/* 横長画面では、設定と盤面を同時に見られるワークベンチ構成にする。 */
+@media (min-width: 901px), (orientation: landscape) and (min-width: 600px) {
+    body:not(.scroll-library-page):not(.embedded-library):has(#gearCanvas) {
+        display: grid;
+        grid-template-columns: minmax(270px, 360px) minmax(0, 1fr);
+        grid-template-rows: minmax(0, 1fr) auto;
+        grid-template-areas: "config board" "config operations";
+        align-items: stretch;
+        gap: 12px;
+        height: 100dvh;
+        min-height: 0;
+        box-sizing: border-box;
+        overflow: hidden;
+    }
+    body:not(.scroll-library-page):not(.embedded-library):has(#gearCanvas) > .panel:nth-of-type(2) {
+        grid-area: config;
+        width: auto;
+        max-width: none;
+        min-width: 0;
+        margin: 0;
+        justify-self: stretch;
+        overflow-y: auto;
+    }
+    body:not(.scroll-library-page):not(.embedded-library):has(#gearCanvas) #canvas-container {
+        grid-area: board;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        min-width: 0;
+        min-height: 0;
+        margin: 0;
+    }
+    body:not(.scroll-library-page):not(.embedded-library):has(#gearCanvas) #canvas-container > canvas {
+        width: auto;
+        max-width: 100%;
+        max-height: 100%;
+    }
+    body:not(.scroll-library-page):not(.embedded-library):has(#gearCanvas) > .panel:last-of-type {
+        grid-area: operations;
+        width: auto;
+        max-width: none;
+        min-width: 0;
+        margin: 0;
+        padding: 10px 14px;
+    }
+    body:not(.scroll-library-page):not(.embedded-library):has(#gearCanvas) > .panel:last-of-type .control-group {
+        margin-bottom: 0;
+    }
+    body:not(.scroll-library-page):not(.embedded-library):has(#gearCanvas) > .panel:last-of-type .rule-text {
+        display: none;
+    }
+}

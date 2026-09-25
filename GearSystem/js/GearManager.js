@@ -51,7 +51,11 @@ export class GearManager {
             gear.processMode = data.processMode || gear.processMode;
             return gear;
         });
+        if (this.state.isScrollEditing) {
+            this.state.runtimeNetwork = new GearNetwork(this.state.runtimeGears, this.state.runtimeBelts);
+        }
         this.network.rebuild(this.state.placedGears, this.state.belts);
+        if (!this.state.runtimeNetwork) this.state.runtimeNetwork = this.network;
         this.state.updatePowerGrid();
         this.state.saveGameData();
     }

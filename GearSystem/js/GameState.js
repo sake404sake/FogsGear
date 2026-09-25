@@ -61,6 +61,10 @@ export class GameState {
         this.hoveredGearIds = [];
         this.currentScrollId = null;
         this.currentScrollMaterial = null;
+        this.isScrollEditing = false;
+        this.runtimeGears = null;
+        this.runtimeBelts = null;
+        this.runtimeNetwork = null;
         
         this.listeners = [];
     }
@@ -80,6 +84,14 @@ export class GameState {
         return this.network
             ? { brass: this.network.calculateBrassCost(), steam: this.network.calculateSteamConsumption() }
             : { brass: this.placedGears.filter(gear => !gear.isCore).reduce((sum, gear) => sum + (gear.cost || 0), 0), steam: this.placedGears.filter(gear => !gear.isCore).reduce((sum, gear) => sum + (gear.teeth || 0), 0) };
+    }
+
+    getRuntimeGears() {
+        return this.isScrollEditing ? (this.runtimeGears || []) : this.placedGears;
+    }
+
+    getRuntimeBelts() {
+        return this.isScrollEditing ? (this.runtimeBelts || []) : this.belts;
     }
 
     setCreativeMode(active) {
@@ -338,8 +350,8 @@ export class GameState {
             brassGenerationRate: this.brassGenerationRate,
             steamGenerationRate: this.steamGenerationRate,
             steamConsumptionRate: this.steamConsumptionRate,
-            belts: this.belts,
-            gears: this.placedGears.map(gear => ({
+            belts: this.getRuntimeBelts(),
+            gears: this.getRuntimeGears().map(gear => ({
                 id: gear.id,
                 q: gear.q, r: gear.r, size: gear.sizeKey, layer: gear.layer,
                 isCore: Boolean(gear.isCore), angle: gear.angle, isLocked: gear.isLocked, designType: gear.designType, processMode: gear.processMode
@@ -388,6 +400,10 @@ export class GameState {
         this.currentScrollMaterial = savedScroll?.material === 'cloth' || savedScroll?.scrollType === 'cloth'
             ? 'cloth'
             : savedScroll ? 'paper' : params.has('newScroll') ? requestedMaterial : null;
+        this.isScrollEditing = Boolean(this.currentScrollMaterial);
+        if (!this.isScrollEditing) return;
+        this.runtimeGears = this.placedGears;
+        this.runtimeBelts = this.belts;
         const blueprint = savedScroll?.blueprint || (this.currentScrollMaterial && !this.currentScrollId
             ? (() => {
                 try { return JSON.parse(localStorage.getItem(this.getScrollDraftKey(this.currentScrollMaterial)) || 'null'); }
@@ -501,7 +517,10 @@ export class GameState {
         this.placedGears = [this.createGear
             ? this.createGear({ q: 0, r: 0, size: 'LL', layer: 0, isCore: true })
             : { q: 0, r: 0, sizeKey: 'LL', layer: 0, isCore: true, angle: 0 }];
-        this.saveGameData();
+        const runtimeGears = this.getRuntimeGears();
+        const runtimeBelts = this.getRuntimeBelts();
+        const runtimeNetwork = this.runtimeNetwork || this.network;
+        if (runtimeNetwork) runtimeNetwork.rebuild(runtimeGears, runtimeBelts).updateRotation();
     }
 
     getGearProcessInfo(gear) {
@@ -529,18 +548,21 @@ export class GameState {
         this.lastTickAt = now;
         this.lastTickElapsed = elapsed;
         this.syncExternalEngineControl();
-        if (this.network && this.mainGearRunning && this.steamPower > 0) {
-            this.network.updateRotation();
+        const runtimeGears = this.getRuntimeGears();
+        const runtimeBelts = this.getRuntimeBelts();
+        const runtimeNetwork = this.runtimeNetwork || this.network;
+        if (runtimeNetwork && this.mainGearRunning && (this.creativeMode || this.steamPower > 0)) {
+            runtimeNetwork.rebuild(runtimeGears, runtimeBelts).updateRotation();
         } else {
-            this.placedGears.forEach(gear => {
+            runtimeGears.forEach(gear => {
                 gear.powered = false;
                 gear.rotationDir = 0;
                 gear.angularVelocity = 0;
             });
         }
         // 連結していても、処理設定は各ギア自身の値だけを参照する。
-        const activeCount = this.placedGears.filter(gear => gear.powered && !gear.isDeadlocked).length;
-        const activeGears = this.placedGears.filter(gear => gear.powered && !gear.isDeadlocked);
+        const activeCount = runtimeGears.filter(gear => gear.powered && !gear.isDeadlocked).length;
+        const activeGears = runtimeGears.filter(gear => gear.powered && !gear.isDeadlocked);
         this.water += elapsed;
         this.waterRecoveryRate = elapsed > 0 ? 1 : 0;
         this.productionRate = 0;
@@ -551,8 +573,8 @@ export class GameState {
         this.solidMetalRate = activeGears.filter(gear => gear.designType === 'ALCHEMICAL' && gear.processMode === 'LIQUID_TO_SOLID_METAL').reduce((sum, gear) => sum + gearRate(gear), 0);
         this.solidMetalToBrassRate = activeGears.filter(gear => gear.designType === 'ALCHEMICAL' && gear.processMode === 'SOLID_TO_BRASS').reduce((sum, gear) => sum + gearRate(gear), 0);
         this.steamTransformRate = activeGears.filter(gear => gear.designType === 'ALCHEMICAL' && gear.processMode === 'TRANSFORM').reduce((sum, gear) => sum + gearRate(gear), 0);
-        const steamConsumption = this.network && this.mainGearRunning && activeCount > 0
-            ? this.network.calculateSteamConsumption()
+        const steamConsumption = runtimeNetwork && this.mainGearRunning && !this.creativeMode && activeCount > 0
+            ? runtimeNetwork.calculateSteamConsumption()
             : 0;
         // ダッシュボードの3列目・4列目用のレートを、変換の入力と出力に分けて集計する。
         this.waterGenerationRate = this.waterRecoveryRate + this.fogToWaterRate;
@@ -592,14 +614,14 @@ export class GameState {
             if (stoppedNow) this.saveGameData();
         }
         if (!this.mainGearRunning) {
-            this.placedGears.forEach(gear => {
+            runtimeGears.forEach(gear => {
                 gear.powered = false;
                 gear.rotationDir = 0;
                 gear.angularVelocity = 0;
             });
         }
         // 回転中の各ギアを個別に処理する。同じ軸でも資源処理は共有しない。
-        this.placedGears.forEach(gear => {
+        runtimeGears.forEach(gear => {
             if (gear.powered && !gear.isDeadlocked && this.steamPower > 0 && this.mainGearRunning) {
                 const rotationDelta = 0.012 * 60 * (gear.angularVelocity || 1) * elapsed * gear.rotationDir;
                 gear.angle += rotationDelta;
@@ -645,7 +667,7 @@ export class GameState {
                 }
             }
         });
-        if (this.network) this.network.synchronizeLockedAxes();
+        if (runtimeNetwork) runtimeNetwork.synchronizeLockedAxes();
         const currentTime = performance.now();
         if (currentTime - (this.lastStorageSaveAt || 0) > 500) {
             this.lastStorageSaveAt = currentTime;
@@ -657,7 +679,7 @@ export class GameState {
     updatePowerGrid() {
         if (this.network) {
             this.network.rebuild(this.placedGears, this.belts).updateRotation();
-            if (!this.mainGearRunning || this.steamPower <= 0) this.placedGears.forEach(gear => { gear.powered = false; gear.rotationDir = 0; gear.angularVelocity = 0; });
+            if (!this.mainGearRunning || (!this.creativeMode && this.steamPower <= 0)) this.placedGears.forEach(gear => { gear.powered = false; gear.rotationDir = 0; gear.angularVelocity = 0; });
             return;
         }
         this.placedGears.forEach(gear => {

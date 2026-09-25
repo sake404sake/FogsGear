@@ -1042,10 +1042,19 @@ window.addEventListener('keydown', (e) => {
     if (handled && e.key.toLowerCase().startsWith('arrow')) e.preventDefault();
 });
 
-document.getElementById('move-up').onclick = () => movePlayer(0, -1);
-document.getElementById('move-down').onclick = () => movePlayer(0, 1);
-document.getElementById('move-left').onclick = () => movePlayer(-1, 0);
-document.getElementById('move-right').onclick = () => movePlayer(1, 0);
+function triggerMovementHaptic(duration = 8) {
+    if (typeof navigator.vibrate === 'function') navigator.vibrate(duration);
+}
+
+const moveByButton = (x, y) => {
+    triggerMovementHaptic();
+    movePlayer(x, y);
+};
+
+document.getElementById('move-up').onclick = () => moveByButton(0, -1);
+document.getElementById('move-down').onclick = () => moveByButton(0, 1);
+document.getElementById('move-left').onclick = () => moveByButton(-1, 0);
+document.getElementById('move-right').onclick = () => moveByButton(1, 0);
 
 const joystick = document.getElementById('move-joystick');
 const joystickKnob = joystick?.querySelector('.movement-joystick-knob');
@@ -1103,6 +1112,7 @@ function updateJoystick(event) {
         : (deltaY > 0 ? 'down' : 'up');
     if (nextDirection === joystickDirection) return;
     joystickDirection = nextDirection;
+    triggerMovementHaptic();
     joystick.setAttribute('aria-valuenow', nextDirection === 'right' || nextDirection === 'down' ? '1' : '-1');
     moveJoystickInDirection();
     startJoystickMovement();

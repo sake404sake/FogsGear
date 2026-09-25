@@ -11,7 +11,7 @@
             overflow-y: auto;
         }
         .map-wrapper {
-            max-width: 900px;
+            max-width: 1100px;
             margin: 0 auto;
         }
         #fullMapCanvas {
@@ -68,6 +68,23 @@
         }
         .map-options .btn {
             min-width: 170px;
+        }
+        @media (max-width: 620px) {
+            body {
+                padding: 8px;
+            }
+            .map-wrapper {
+                width: 100%;
+                box-sizing: border-box;
+            }
+            .map-options .btn,
+            .actions-bar .btn {
+                width: 100%;
+                min-width: 0;
+            }
+            .actions-bar {
+                margin: 12px 0 4px;
+            }
         }
     </style>
 </head>

@@ -61,6 +61,8 @@ export class UIController {
                 this.state.notify();
             } else if (button.dataset.action === 'toggle-main-gear') {
                 this.state.toggleMainGear();
+            } else if (button.dataset.action === 'toggle-creative') {
+                this.state.setCreativeMode(!this.state.creativeMode);
             } else if (button.dataset.action === 'save-scroll') {
                 const input = document.getElementById('named-scroll-name');
                 const effectSelect = document.getElementById('scroll-effect-select');
@@ -506,6 +508,12 @@ export class UIController {
             mainGearButton.textContent = `メインギア: ${this.state.mainGearRunning ? '起動中' : '停止中'}`;
             mainGearButton.classList.toggle('active', this.state.mainGearRunning);
             mainGearButton.setAttribute('aria-pressed', String(this.state.mainGearRunning));
+        }
+        const creativeButton = document.querySelector('[data-action="toggle-creative"]');
+        if (creativeButton) {
+            creativeButton.textContent = `テストモード: ${this.state.creativeMode ? 'ON' : 'OFF'}`;
+            creativeButton.classList.toggle('active', this.state.creativeMode);
+            creativeButton.setAttribute('aria-pressed', String(this.state.creativeMode));
         }
         const dashboard = document.querySelector('.dashboard');
         const dashboardToggle = document.querySelector('[data-action="toggle-dashboard"]');
