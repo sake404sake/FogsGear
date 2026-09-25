@@ -690,7 +690,7 @@ canvas.engine-runtime-canvas { display: none; }
 }
 
 /* 横長画面では、地図を主領域、操作を右側のコントロールデッキにする。 */
-@media (min-width: 901px) and (orientation: landscape) {
+@media (min-aspect-ratio: 1/1) {
     body:has(#gameCanvas) {
         display: grid;
         grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
@@ -808,7 +808,7 @@ canvas.engine-runtime-canvas { display: none; }
     }
 }
 
-@media (orientation: landscape) and (min-width: 900px) and (max-width: 1000px) {
+@media (min-aspect-ratio: 1/1) and (max-width: 1000px) {
     body:has(#gameCanvas) {
         grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
     }
