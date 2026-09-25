@@ -554,6 +554,46 @@ canvas {
 .embedded-library .scroll-preview-frame { height: calc(100vh - 92px); background: transparent; border: 0; box-shadow: none; }
 .embedded-library .scroll-detail-footer { bottom: 12px; }
 
+@media (max-width: 700px) {
+    .embedded-library .scroll-tabs { height: 28px; padding: 0 3px; }
+    .embedded-library .scroll-tab { padding: 4px 2px; font-size: 0.58rem; }
+    .embedded-library .scroll-list-panel { display: none; }
+    .embedded-library .scroll-detail-panel { width: 100%; height: calc(100vh - 28px); padding: 4px; }
+    .embedded-library .scroll-preview-frame { height: calc(100vh - 36px); }
+    .embedded-library .scroll-detail-heading { top: 4px; left: 6px; right: 6px; }
+    .embedded-library .scroll-detail-heading h2,
+    .embedded-library.scroll-is-running .scroll-detail-heading h2 {
+        display: none;
+    }
+    .embedded-library .scroll-detail-heading #scroll-toggle {
+        min-height: 32px;
+        padding: 4px 6px;
+        font-size: 0.58rem;
+    }
+}
+
+@media (min-width: 320px) and (max-width: 700px) {
+    .embedded-library .scroll-detail-heading > div:first-child {
+        flex: 0 0 34%;
+        min-width: 0;
+        overflow: hidden;
+    }
+    .embedded-library .scroll-detail-heading h2,
+    .embedded-library.scroll-is-running .scroll-detail-heading h2 {
+        display: inline-block;
+        max-width: 100%;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: 0.82rem;
+    }
+    .embedded-library .scroll-detail-heading #scroll-toggle {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+}
+
 /* レスポンシブ操作レイアウト */
 @media (min-width: 901px) {
     body:not(.scroll-library-page) { padding: 20px 28px; }
@@ -589,7 +629,7 @@ canvas {
 @media (min-width: 901px), (orientation: landscape) and (min-width: 600px) {
     body:not(.scroll-library-page):not(.embedded-library):has(#gearCanvas) {
         display: grid;
-        grid-template-columns: minmax(270px, 360px) minmax(0, 1fr);
+        grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
         grid-template-rows: minmax(0, 1fr) auto;
         grid-template-areas: "config board" "config operations";
         align-items: stretch;

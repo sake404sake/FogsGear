@@ -68,7 +68,11 @@ const previewState = {
         this.network.synchronizeLockedAxes();
     }
 };
-const renderer = new CanvasRenderer('previewCanvas', previewState);
+const renderer = new CanvasRenderer('previewCanvas', previewState, false);
+setInterval(() => {
+    previewState.tick();
+    renderer.render();
+}, 16);
 let currentMaterial = 'all';
 let selectedScrollId = null;
 let library = [];

@@ -1,5 +1,5 @@
 // js/main.js - Steampunk Explorer Game Logic
-import { MapGenerator, BIOME_COLORS, loadMapSnapshot, saveMapSnapshot } from './mapGenerator.js?v=84';
+import { MapGenerator, BIOME_COLORS, loadMapSnapshot, saveMapSnapshot } from './mapGenerator.js?v=88';
 import { SkinRenderer } from './skinRenderer.js?v=2';
 import { CELL_DEFINITIONS, canEnterCell, getCellEntryRule, getMosaicColor } from './cellRules.js';
 import { buildTerritoryBorderSegments } from './territoryBorders.js?v=35';
@@ -32,13 +32,25 @@ const state = {
     cols: 2000,
     rows: 1000,
     worldSeed: '',
-    generator: new MapGenerator(2000, 1000),
+    generator: null,
     skin: new SkinRenderer(),
     inventoryItems: new Set(),
     cellEntryRules: { types: {}, cells: {} }
 };
 
 const activePointers = new Map();
+const MAP_UNLOCK_KEY = 'fogsgear_world_unlocks';
+const COASTAL_MAP_SIZE = { width: 640, height: 360 };
+const FULL_MAP_SIZE = { width: 2000, height: 1000 };
+
+function isMainlandUnlocked() {
+    try {
+        const unlocks = JSON.parse(localStorage.getItem(MAP_UNLOCK_KEY) || '{}');
+        return unlocks.mainland === true;
+    } catch (error) {
+        return false;
+    }
+}
 let isDragging = false;
 let dragStart = { x: 0, y: 0 };
 let cameraStart = { x: 0, y: 0 };
@@ -264,7 +276,7 @@ async function applySelectedSkinSource(source, sourceType = 'url', name = '') {
 
 function generateMapInWorker(seed) {
     return new Promise((resolve, reject) => {
-        const worker = new Worker('./js/mapWorker.js?v=84', { type: 'module' });
+        const worker = new Worker('./js/mapWorker.js?v=88', { type: 'module' });
         worker.onmessage = (event) => {
             if (event.data?.type === 'complete') {
                 worker.terminate();
@@ -278,7 +290,7 @@ function generateMapInWorker(seed) {
             worker.terminate();
             reject(error);
         };
-        worker.postMessage({ seed });
+        worker.postMessage({ seed, width: state.cols, height: state.rows, coastalOnly: !isMainlandUnlocked() });
     });
 }
 
@@ -300,13 +312,18 @@ async function init() {
     state.cellEntryRules = loadCellEntryRules();
     state.zoom = Math.max(state.minZoom, Number(settings.zoom));
     state.worldSeed = String(settings.seed || 'SteampunkIsland_01');
+    const mainlandUnlocked = isMainlandUnlocked();
+    const mapSize = mainlandUnlocked ? FULL_MAP_SIZE : COASTAL_MAP_SIZE;
+    state.cols = mapSize.width;
+    state.rows = mapSize.height;
+    state.generator = new MapGenerator({ ...mapSize, seed: state.worldSeed, coastalOnly: !mainlandUnlocked });
     const loadingMessage = document.getElementById('loadingMessage');
     if (loadingMessage) loadingMessage.textContent = '保存済みのマップを読み込んでいます...';
-    let generated = await loadMapSnapshot(state.worldSeed);
+    let generated = await loadMapSnapshot(state.worldSeed, mapSize.width, mapSize.height);
     if (!generated) {
         if (loadingMessage) loadingMessage.textContent = 'マップを生成しています...';
         generated = await generateMapInWorker(state.worldSeed).catch(() => state.generator.generate(state.worldSeed));
-        saveMapSnapshot(generated, state.worldSeed).catch(() => {});
+        saveMapSnapshot(generated, state.worldSeed, mapSize.width, mapSize.height).catch(() => {});
     }
     state.map = generated.grid;
     state.territories = generated.territories || [];

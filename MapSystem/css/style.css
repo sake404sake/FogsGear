@@ -661,10 +661,10 @@ canvas.engine-runtime-canvas { display: none; }
 }
 
 /* 横長画面では、地図を主領域、操作を右側のコントロールデッキにする。 */
-@media (min-width: 901px), (orientation: landscape) and (min-width: 600px) {
+@media (min-width: 901px), (orientation: landscape) and (min-width: 600px), (orientation: landscape) and (max-height: 700px) {
     body:has(#gameCanvas) {
         display: grid;
-        grid-template-columns: minmax(0, 1fr) minmax(330px, 380px);
+        grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
         grid-template-rows: auto minmax(0, 1fr);
         grid-template-areas: "status controls" "map controls";
         align-items: stretch;
@@ -776,6 +776,79 @@ canvas.engine-runtime-canvas { display: none; }
     }
     body:has(#gameCanvas) > .panel:last-of-type .main-page-dots {
         margin-top: 10px;
+    }
+}
+
+@media (orientation: landscape) and (max-width: 1000px) {
+    body:has(#gameCanvas) {
+        grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+    }
+    body:has(#gameCanvas) > .panel:last-of-type .movement-pad {
+        grid-template-columns: repeat(3, 52px);
+        grid-template-rows: repeat(3, 44px);
+        gap: 6px;
+    }
+    body:has(#gameCanvas) > .panel:last-of-type .movement-button {
+        width: 48px;
+        height: 40px;
+        font-size: 0.95rem;
+    }
+    body:has(#gameCanvas) > .panel:last-of-type .movement-joystick {
+        width: 46px;
+        height: 46px;
+    }
+    body:has(#gameCanvas) > .panel:last-of-type .movement-joystick-knob {
+        width: 20px;
+        height: 20px;
+    }
+    body:has(#gameCanvas) > .panel:last-of-type [data-action="save"],
+    body:has(#gameCanvas) > .panel:last-of-type [data-action="rest"] {
+        min-height: 34px;
+        padding: 6px 4px;
+        font-size: 0.62rem;
+    }
+    body:has(#gameCanvas) > .panel:last-of-type .rule-text {
+        margin-top: 4px;
+        font-size: 0.58rem;
+        line-height: 1.25;
+        display: none;
+    }
+    body:has(#gameCanvas) > .panel:last-of-type .engine-dashboard-page {
+        padding: 4px 2px;
+    }
+    body:has(#gameCanvas) > .panel:last-of-type .engine-dashboard-page .dashboard-title {
+        font-size: 0.5rem;
+        letter-spacing: 0.5px;
+    }
+    body:has(#gameCanvas) > .panel:last-of-type .engine-dashboard-page .dashboard-resource-header {
+        display: none;
+    }
+    body:has(#gameCanvas) > .panel:last-of-type .engine-dashboard-page .dashboard-resource-row {
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-rows: auto auto;
+        gap: 1px 3px;
+        min-height: 27px;
+        font-size: 0.5rem;
+    }
+    body:has(#gameCanvas) > .panel:last-of-type .engine-dashboard-page .dashboard-resource-row > :first-child {
+        grid-column: 1;
+        grid-row: 1;
+        text-align: left;
+    }
+    body:has(#gameCanvas) > .panel:last-of-type .engine-dashboard-page .dashboard-resource-row > strong {
+        grid-column: 2;
+        grid-row: 1;
+        font-size: 0.62rem;
+    }
+    body:has(#gameCanvas) > .panel:last-of-type .engine-dashboard-page .dashboard-resource-row > :nth-child(3) {
+        grid-column: 1;
+        grid-row: 2;
+        text-align: left;
+    }
+    body:has(#gameCanvas) > .panel:last-of-type .engine-dashboard-page .dashboard-resource-row > :nth-child(4) {
+        grid-column: 2;
+        grid-row: 2;
+        text-align: right;
     }
 }
 

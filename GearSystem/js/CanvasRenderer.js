@@ -7,7 +7,7 @@ const BELT_ANIMATION_SPEED = 0.00035;
  */
 export class CanvasRenderer {
     // キャンバス、レイヤー色、画像キャッシュを初期化して描画ループを開始する。
-    constructor(canvasId, state) {
+    constructor(canvasId, state, autoAnimate = true) {
         this.canvas = document.getElementById(canvasId);
         this.ctx = this.canvas.getContext('2d');
         this.state = state;
@@ -24,7 +24,7 @@ export class CanvasRenderer {
         this.gearImages = {};
         this.tintedImages = {};
         this.loadGearImages();
-        requestAnimationFrame(() => this.loop());
+        if (autoAnimate) requestAnimationFrame(() => this.loop());
     }
 
     loadGearImages() {

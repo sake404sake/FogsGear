@@ -5,16 +5,16 @@ const APP_SHELL = [
     './manifest.webmanifest',
     './css/style.css?v=4',
     './js/main.js?v=3',
-    './js/mapGenerator.js?v=84',
+    './js/mapGenerator.js?v=88',
     './js/skinRenderer.js?v=2',
     './js/cellRules.js',
     './js/territoryBorders.js?v=35',
-    './js/MapGenerator/index.js?v=77',
+    './js/MapGenerator/index.js?v=79',
     './js/MapGenerator/BiomeGenerator.js',
     './js/MapGenerator/HeightmapGenerator.js',
     './js/MapGenerator/MapRenderer.js',
     './js/MapGenerator/TerritoryGenerator.js',
-    './js/mapWorker.js?v=84',
+    './js/mapWorker.js?v=88',
     '../MainSystem/icons/app-icon.jpg'
 ];
 

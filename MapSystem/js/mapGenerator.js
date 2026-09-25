@@ -1,11 +1,11 @@
-import { MapManager as MapManagerClass, BIOME_COLORS as SharedBiomeColors } from './MapGenerator/index.js?v=77';
+import { MapManager as MapManagerClass, BIOME_COLORS as SharedBiomeColors } from './MapGenerator/index.js?v=79';
 
 export { SharedBiomeColors as BIOME_COLORS };
 export const MapManager = MapManagerClass;
 
 const MAP_CACHE_DB = 'fogsgear-map-cache-v21';
 const MAP_CACHE_STORE = 'snapshots';
-const MAP_CACHE_VERSION = 'coastal-landing-v86';
+const MAP_CACHE_VERSION = 'coastal-landing-v88';
 
 function openMapCache() {
     return new Promise((resolve, reject) => {

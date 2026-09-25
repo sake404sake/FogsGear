@@ -114,7 +114,7 @@
     </div>
 
     <script type="module">
-        import { MapGenerator, loadMapSnapshot, saveMapSnapshot } from './js/mapGenerator.js?v=85';
+        import { MapGenerator, loadMapSnapshot, saveMapSnapshot } from './js/mapGenerator.js?v=88';
         import { CELL_DEFINITIONS, getMosaicColor } from './js/cellRules.js?v=4';
         import { buildTerritoryBorderSegments } from './js/territoryBorders.js?v=35';
 
@@ -146,9 +146,15 @@
         try {
             settings = { ...settings, ...JSON.parse(localStorage.getItem('steampunk_explorer_settings') || '{}') };
         } catch (error) {}
-        const generator = new MapGenerator(2000, 1000);
+        const unlocks = (() => {
+            try { return JSON.parse(localStorage.getItem('fogsgear_world_unlocks') || '{}'); }
+            catch (error) { return {}; }
+        })();
+        const mainlandUnlocked = unlocks.mainland === true;
+        const mapSize = mainlandUnlocked ? { width: 2000, height: 1000 } : { width: 640, height: 360 };
+        const generator = new MapGenerator({ ...mapSize, seed: settings.seed, coastalOnly: !mainlandUnlocked });
         const generateMapInWorker = (seed) => new Promise((resolve, reject) => {
-            const worker = new Worker('./js/mapWorker.js?v=85', { type: 'module' });
+            const worker = new Worker('./js/mapWorker.js?v=88', { type: 'module' });
             worker.onmessage = (event) => {
                 if (event.data?.type === 'complete') {
                     worker.terminate();
@@ -162,15 +168,15 @@
                 worker.terminate();
                 reject(error);
             };
-            worker.postMessage({ seed });
+            worker.postMessage({ ...mapSize, seed, coastalOnly: !mainlandUnlocked });
         });
         const loadingMessage = document.getElementById('loadingMessage');
         if (loadingMessage) loadingMessage.textContent = '保存済みの全体マップを読み込んでいます...';
-        let generated = await loadMapSnapshot(settings.seed);
+        let generated = await loadMapSnapshot(settings.seed, mapSize.width, mapSize.height);
         if (!generated) {
             if (loadingMessage) loadingMessage.textContent = '全体マップを生成しています...';
             generated = await generateMapInWorker(settings.seed).catch(() => generator.generate(settings.seed));
-            saveMapSnapshot(generated, settings.seed).catch(() => {});
+            saveMapSnapshot(generated, settings.seed, mapSize.width, mapSize.height).catch(() => {});
         }
         const mapData = generated.worldMap || generated.grid;
         const cols = mapData[0].length;

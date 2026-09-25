@@ -12,12 +12,14 @@ export class MapManager {
             this.width = Number(widthOrOptions.width) || 2000;
             this.height = Number(widthOrOptions.height) || 1000;
             this.seed = widthOrOptions.seed || seed;
+            this.coastalOnly = Boolean(widthOrOptions.coastalOnly);
             this.canvas = widthOrOptions.canvas || null;
             this.legendSelector = widthOrOptions.legendSelector || null;
         } else {
             this.width = Number(widthOrOptions) || 2000;
             this.height = Number(height) || 1000;
             this.seed = seed;
+            this.coastalOnly = false;
             this.canvas = null;
             this.legendSelector = null;
         }
@@ -47,8 +49,12 @@ export class MapManager {
         const cols = grid[0]?.length || 0;
         if (!rows || !cols) return;
 
-        const islandCenter = { x: cols * 0.86, y: rows * 0.56 };
-        const islandRadius = { x: cols * 0.075, y: rows * 0.16 };
+        const islandCenter = this.coastalOnly
+            ? { x: cols * 0.75, y: rows * 0.5 }
+            : { x: cols * 0.86, y: rows * 0.56 };
+        const islandRadius = this.coastalOnly
+            ? { x: 150, y: 160 }
+            : { x: cols * 0.075, y: rows * 0.16 };
         const colorByType = {
             SEA: '#1e4d6b',
             LAKE: '#3b82f6',
@@ -163,6 +169,23 @@ export class MapManager {
                 tile.hasIsland = false;
                 tile.isMainland = tile.isLand;
                 tile.hasMainland = tile.isLand;
+            }
+        }
+
+        if (this.coastalOnly) {
+            for (let y = 0; y < rows; y++) {
+                for (let x = 0; x < cols; x++) {
+                    const tile = grid[y][x];
+                    if (!tile || tile.isIsland) continue;
+                    tile.type = 'SEA';
+                    tile.isLand = false;
+                    tile.isSea = true;
+                    tile.isOcean = true;
+                    tile.isLake = false;
+                    tile.isMainland = false;
+                    tile.hasMainland = false;
+                    tile.color = colorByType.SEA;
+                }
             }
         }
 
@@ -748,10 +771,12 @@ export class MapManager {
         const heightmap = new HeightmapGenerator(this.width, this.height, seedValue).generate();
         this.grid = this.biomeGenerator.generate(heightmap);
         this.applyIslandLayout(this.grid);
-        this.retainLargestMainland(this.grid);
-        this.protectCentralTradeCity(this.grid);
-        this.normalizeInlandWater(this.grid);
-        this.removeCoastalLakes(this.grid);
+        if (!this.coastalOnly) {
+            this.retainLargestMainland(this.grid);
+            this.protectCentralTradeCity(this.grid);
+            this.normalizeInlandWater(this.grid);
+            this.removeCoastalLakes(this.grid);
+        }
 
         for (let y = 0; y < this.grid.length; y++) {
             for (let x = 0; x < this.grid[y].length; x++) {
@@ -775,7 +800,9 @@ export class MapManager {
             }
         }
 
-        const regionData = this.territoryGenerator.generate(this.grid);
+        const regionData = this.coastalOnly
+            ? { grid: this.grid, territories: [] }
+            : this.territoryGenerator.generate(this.grid);
         this.grid = regionData.grid;
         this.territories = regionData.territories;
         this.normalizeGridMetadata();
