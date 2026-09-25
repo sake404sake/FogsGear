@@ -470,7 +470,7 @@ canvas {
 .scroll-library-header p { margin: 0; color: var(--text-muted); font-size: 0.76rem; }
 .scroll-library-kicker { color: #62c2aa; font: 0.65rem monospace; letter-spacing: 2px; }
 .scroll-tabs { display: flex; gap: 5px; padding: 5px 20px 4px; border: 1px solid var(--border-gold); border-top-color: rgba(197, 160, 89, 0.3); background: #17120f; }
-.scroll-tab { flex: 1; padding: 9px 22px; color: #c6aa72; background: linear-gradient(180deg, #4b3825 0%, #2a2119 100%); border: 1px solid #765a35; border-bottom: 2px solid #51402c; border-radius: 3px; box-shadow: inset 0 1px 0 rgba(255, 244, 194, 0.1), inset 0 -7px 12px rgba(0, 0, 0, 0.18); font: 0.78rem Georgia, "Times New Roman", serif; cursor: pointer; }
+.scroll-tab { display: flex; align-items: center; justify-content: center; flex: 1; min-width: 0; padding: 9px 22px; color: #c6aa72; background: linear-gradient(180deg, #4b3825 0%, #2a2119 100%); border: 1px solid #765a35; border-bottom: 2px solid #51402c; border-radius: 3px; box-shadow: inset 0 1px 0 rgba(255, 244, 194, 0.1), inset 0 -7px 12px rgba(0, 0, 0, 0.18); font: 0.9rem Georgia, "Times New Roman", serif; line-height: 1.2; text-align: center; white-space: nowrap; cursor: pointer; }
 .scroll-tab:hover, .scroll-tab.active { color: #fff1b1; background: linear-gradient(180deg, #5a4328 0%, #30251b 100%); border-color: #c69a52; border-bottom-color: #62c2aa; box-shadow: inset 0 1px 0 rgba(255, 244, 194, 0.16), 0 0 8px rgba(98, 194, 170, 0.14); }
 .scroll-library-layout { display: grid; grid-template-columns: minmax(220px, 0.32fr) minmax(0, 1fr); min-height: 600px; border: 1px solid var(--border-gold); border-top: 0; background: #17120f; }
 .scroll-list-panel { padding: 16px 12px; border-right: 1px solid rgba(98, 194, 170, 0.28); background: rgba(98, 194, 170, 0.045); }
@@ -526,8 +526,8 @@ canvas {
 .embedded-library .scroll-material-label,
 .embedded-library .scroll-meta,
 .embedded-library .scroll-status { display: none; }
-.embedded-library .scroll-tabs { display: flex; height: 36px; box-sizing: border-box; padding: 0 8px; border: 0; }
-.embedded-library .scroll-tab { flex: 1; padding: 7px 8px; font-size: 0.7rem; }
+.embedded-library .scroll-tabs { display: flex; height: 42px; box-sizing: border-box; padding: 0 8px; border: 0; gap: 8px; }
+.embedded-library .scroll-tab { display: flex; align-items: center; justify-content: center; flex: 1; min-width: 0; padding: 9px 8px; font-size: 0.82rem; line-height: 1.15; text-align: center; white-space: nowrap; }
 .embedded-library .scroll-library-layout { display: grid; grid-template-columns: 168px minmax(0, 1fr); min-height: calc(100vh - 36px); border: 0; background: #120e0c; }
 .embedded-library .scroll-list-panel { display: block; overflow-y: auto; padding: 8px 2px 8px 6px; border-right: 1px solid rgba(98, 194, 170, 0.28); border-bottom: 0; }
 .embedded-library .scroll-list-heading { margin: 0 3px 6px; font-size: 0.62rem; }
@@ -567,8 +567,8 @@ canvas {
 .embedded-library .scroll-detail-footer { bottom: 12px; }
 
 @media (max-width: 700px) {
-    .embedded-library .scroll-tabs { height: 28px; padding: 0 3px; }
-    .embedded-library .scroll-tab { padding: 4px 2px; font-size: 0.58rem; }
+    .embedded-library .scroll-tabs { height: 42px; padding: 0 6px; }
+    .embedded-library .scroll-tab { padding: 8px 6px; font-size: 0.82rem; }
     .embedded-library .scroll-list-panel { display: none; }
     .embedded-library .scroll-detail-panel { width: 100%; height: calc(100vh - 28px); padding: 4px; }
     .embedded-library .scroll-preview-frame { height: calc(100vh - 36px); }

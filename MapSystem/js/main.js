@@ -1192,9 +1192,14 @@ function syncMainPageViewportHeight() {
     const activePage = mainPageTrack.children[currentMainPage];
     if (!activePage) return;
     const nextHeight = activePage.scrollHeight || activePage.offsetHeight || 0;
-    const viewportHeight = isWideMainLayout() ? 'auto' : `${nextHeight}px`;
-    mainPageViewport.style.height = viewportHeight;
-    mainPageViewport.style.minHeight = viewportHeight === 'auto' ? '' : viewportHeight;
+    if (isWideMainLayout()) {
+        const wideHeight = Math.min(660, Math.max(260, window.innerHeight - 160));
+        mainPageViewport.style.height = `${wideHeight}px`;
+        mainPageViewport.style.minHeight = `${wideHeight}px`;
+        return;
+    }
+    mainPageViewport.style.height = `${nextHeight}px`;
+    mainPageViewport.style.minHeight = `${nextHeight}px`;
 }
 
 function setMainPage(page) {
