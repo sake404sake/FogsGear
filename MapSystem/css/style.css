@@ -326,6 +326,8 @@ h1 {
 .inventory-modal-meta { min-height: 1.2em; margin-top: 10px; color: var(--text-muted); font-size: 0.7rem; }
 .inventory-modal-actions { display: flex; justify-content: center; gap: 8px; margin-top: 18px; }
 .inventory-modal-secondary { padding: 5px 12px; color: var(--text-main); background: #1c1511; border: 1px solid var(--border-sub); border-radius: 4px; cursor: pointer; }
+.gear-editor-overlay { position: fixed; inset: 0; z-index: 2000; background: var(--bg-deep); }
+.gear-editor-overlay iframe { display: block; width: 100%; height: 100%; border: 0; }
 .cell-legend { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px 10px; }
 .cell-legend-item { display: flex; align-items: center; gap: 6px; color: var(--text-muted); font-size: 0.7rem; }
 .cell-legend-color { width: 12px; height: 12px; flex: 0 0 12px; border: 1px solid rgba(255, 255, 255, 0.25); border-radius: 2px; }
@@ -735,7 +737,7 @@ canvas.engine-runtime-canvas { display: none; }
     body:has(#gameCanvas) .landscape-main-frame {
         grid-area: main;
         display: grid !important;
-        grid-template-rows: auto minmax(250px, 1fr);
+        grid-template-rows: auto minmax(180px, 1fr);
         width: 100%;
         min-width: 0;
         height: 100%;
@@ -750,7 +752,7 @@ canvas.engine-runtime-canvas { display: none; }
         min-width: 0 !important;
         margin: 0 !important;
         justify-self: stretch;
-        overflow: hidden;
+        overflow-y: auto;
         box-sizing: border-box;
         align-self: stretch;
         flex: 0 0 auto;
@@ -761,7 +763,7 @@ canvas.engine-runtime-canvas { display: none; }
         justify-content: stretch;
         width: 100%;
         height: 100%;
-        min-height: 250px;
+        min-height: 180px;
         max-width: none;
         min-width: 0;
         margin: 0;

@@ -681,12 +681,37 @@ canvas {
         max-width: none;
         min-width: 0;
         margin: 0;
-        padding: 10px 14px;
+        padding: 6px 8px;
     }
     body:not(.scroll-library-page):not(.embedded-library):has(#gearCanvas) > .panel:last-of-type .control-group {
         margin-bottom: 0;
     }
     body:not(.scroll-library-page):not(.embedded-library):has(#gearCanvas) > .panel:last-of-type .rule-text {
         display: none;
+    }
+}
+
+@media (orientation: landscape) and (max-height: 600px) and (min-width: 600px) {
+    body:not(.scroll-library-page):not(.embedded-library):has(#gearCanvas) > .panel:last-of-type .control-group {
+        gap: 2px;
+        margin-bottom: 2px;
+    }
+    body:not(.scroll-library-page):not(.embedded-library):has(#gearCanvas) > .panel:last-of-type .group-label {
+        font-size: 0.56rem;
+        line-height: 1;
+    }
+    body:not(.scroll-library-page):not(.embedded-library):has(#gearCanvas) > .panel:last-of-type .button-row {
+        gap: 4px;
+    }
+    body:not(.scroll-library-page):not(.embedded-library):has(#gearCanvas) > .panel:last-of-type .btn {
+        min-height: 28px;
+        min-width: 0;
+        padding: 4px 6px;
+        font-size: 0.62rem;
+        line-height: 1.1;
+    }
+    body:not(.scroll-library-page):not(.embedded-library):has(#gearCanvas) > .panel:last-of-type .btn-visibility,
+    body:not(.scroll-library-page):not(.embedded-library):has(#gearCanvas) > .panel:last-of-type .btn-loop-visualize {
+        min-width: 0;
     }
 }

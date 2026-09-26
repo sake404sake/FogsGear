@@ -995,6 +995,24 @@ function updateFullscreenButton() {
     button.setAttribute('aria-pressed', String(isFullscreen));
 }
 
+let gearEditorFrame = null;
+
+function openGearEditor(material) {
+    if (gearEditorFrame) gearEditorFrame.parentElement.remove();
+    const overlay = document.createElement('div');
+    overlay.className = 'gear-editor-overlay';
+    const frame = document.createElement('iframe');
+    frame.title = 'ギア編集画面';
+    const editorUrl = new URL('../GearSystem/index.html', window.location.href);
+    editorUrl.searchParams.set('newScroll', material || 'paper');
+    editorUrl.searchParams.set('hosted', '1');
+    frame.src = editorUrl.href;
+    overlay.appendChild(frame);
+    document.body.appendChild(overlay);
+    gearEditorFrame = frame;
+    closeInventoryItem();
+}
+
 async function toggleFullscreen() {
     if (!document.fullscreenEnabled) return;
     if (document.fullscreenElement) {
@@ -1033,9 +1051,7 @@ document.addEventListener('click', (event) => {
         return;
     }
     if (button.dataset.action === 'open-gear-editor') {
-        const editorUrl = new URL('../GearSystem/index.html', window.location.href);
-        editorUrl.searchParams.set('newScroll', button.dataset.material || 'paper');
-        window.location.href = editorUrl.href;
+        openGearEditor(button.dataset.material || 'paper');
         return;
     }
     if (button.dataset.action === 'select-scroll') {
@@ -1052,6 +1068,15 @@ document.addEventListener('click', (event) => {
     if (button.dataset.action === 'toggle-fullscreen') {
         toggleFullscreen().catch(() => {});
     }
+});
+
+window.addEventListener('message', event => {
+    if (event.origin !== window.location.origin
+        || !gearEditorFrame
+        || event.source !== gearEditorFrame.contentWindow
+        || event.data?.type !== 'fogsgear:close-editor') return;
+    gearEditorFrame.parentElement.remove();
+    gearEditorFrame = null;
 });
 
 document.getElementById('inventory-item-modal')?.addEventListener('click', (event) => {

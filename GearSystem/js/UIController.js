@@ -29,7 +29,13 @@ export class UIController {
         document.addEventListener('click', event => {
             const button = event.target.closest('button');
             if (!button) return;
-            if (button.dataset.size) {
+            if (button.dataset.action === 'return-map') {
+                if (new URLSearchParams(window.location.search).get('hosted') === '1' && window.parent !== window) {
+                    window.parent.postMessage({ type: 'fogsgear:close-editor' }, window.location.origin);
+                } else {
+                    window.location.href = '../MapSystem/index.html';
+                }
+            } else if (button.dataset.size) {
                 this.state.setSelectedSize(this.state.selectedSize === button.dataset.size ? null : button.dataset.size);
                 this.state.ghostGear = null;
                 this.closeGearPopover();

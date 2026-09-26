@@ -69,6 +69,11 @@ export class GameState {
         this.listeners = [];
     }
 
+    isEditorRuntimeContext() {
+        // ギア編集画面はマップ本体の外部保存状態で停止させない。
+        return /(?:^|\/)GearSystem(?:\/|$)/.test(window.location.pathname || '');
+    }
+
     subscribe(listener) {
         // UIなどを購読者として登録し、状態変更時に再描画を依頼する。
         this.listeners.push(listener);
@@ -239,8 +244,9 @@ export class GameState {
         this.liquidMetal = data.liquidMetal ?? 0;
         this.solidMetal = data.solidMetal ?? 0;
         this.brass = data.brass;
-        this.mainGearRunning = data.mainGearRunning ?? true;
-        this.autoStoppedBySteam = data.autoStoppedBySteam ?? (data.mainGearRunning === false && this.steamPower > 0);
+        const editorRuntime = this.isEditorRuntimeContext();
+        this.mainGearRunning = editorRuntime ? true : (data.mainGearRunning ?? true);
+        this.autoStoppedBySteam = editorRuntime ? false : (data.autoStoppedBySteam ?? (data.mainGearRunning === false && this.steamPower > 0));
         this.lastExternalSaveAt = Number(data.updatedAt) || 0;
         this.creativeMode = data.creativeMode ?? false;
         this.creativeSnapshot = data.creativeSnapshot ?? null;
@@ -414,6 +420,8 @@ export class GameState {
             if (params.has('newScroll')) {
                 this.placedGears = [createGear({ q: 0, r: 0, size: 'LL', layer: 0, isCore: true })];
                 this.belts = [];
+                this.runtimeGears = this.placedGears;
+                this.runtimeBelts = this.belts;
                 this.updatePowerGrid();
                 this.notify();
             }
@@ -422,6 +430,8 @@ export class GameState {
         const gears = Array.isArray(blueprint.gears) ? blueprint.gears : [];
         this.placedGears = gears.map(gear => createGear(gear));
         this.belts = Array.isArray(blueprint.belts) ? blueprint.belts : [];
+        this.runtimeGears = this.placedGears;
+        this.runtimeBelts = this.belts;
         this.updatePowerGrid();
         if (this.network) this.network.rebuild(this.placedGears, this.belts).updateRotation();
         this.notify();
@@ -493,8 +503,9 @@ export class GameState {
                 this.liquidMetal = data.liquidMetal ?? 0;
                 this.solidMetal = data.solidMetal ?? 0;
                 this.brass = data.brass ?? 300;
-                this.mainGearRunning = data.mainGearRunning ?? true;
-                this.autoStoppedBySteam = data.autoStoppedBySteam ?? (data.mainGearRunning === false && this.steamPower > 0);
+                const editorRuntime = this.isEditorRuntimeContext();
+                this.mainGearRunning = editorRuntime ? true : (data.mainGearRunning ?? true);
+                this.autoStoppedBySteam = editorRuntime ? false : (data.autoStoppedBySteam ?? (data.mainGearRunning === false && this.steamPower > 0));
                 this.lastExternalSaveAt = Number(data.updatedAt) || 0;
                 this.creativeMode = data.creativeMode ?? false;
                 this.creativeSnapshot = data.creativeSnapshot ?? null;
@@ -737,6 +748,8 @@ export class GameState {
     }
 
     syncExternalEngineControl() {
+        // ギア編集画面はマップ本体の外部停止状態に巻き込まれないようにする。
+        if (this.isEditorRuntimeContext()) return;
         try {
             const saved = JSON.parse(localStorage.getItem('fog_thermo_save') || '{}');
             const updatedAt = Number(saved.updatedAt) || 0;

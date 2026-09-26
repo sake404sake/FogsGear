@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
     <title>Fogs Gear</title>
-    <link rel="stylesheet" href="css/style.css?v=gear-layout-2">
+    <link rel="stylesheet" href="css/style.css?v=gear-layout-3">
 </head>
 <body>
     <div id="loadingOverlay" class="loading-overlay" role="status" aria-live="polite">
@@ -12,7 +12,7 @@
     </div>
     <div class="panel">
         <div class="button-row" style="justify-content:flex-end; margin-bottom: 10px;">
-            <button class="btn btn-action" type="button" onclick="window.location.href='../MapSystem/index.html'">マップへ戻る</button>
+            <button class="btn btn-action" type="button" data-action="return-map">マップへ戻る</button>
         </div>
         <h1>Fogs Gear</h1>
         <button class="dashboard-toggle" data-action="toggle-dashboard" aria-expanded="false">動力ダッシュボード <span>+</span></button>
@@ -162,7 +162,7 @@
             }
         })();
     </script>
-    <script type="module" src="js/main.js?v=scroll-edit-7"></script>
+    <script type="module" src="js/main.js?v=scroll-edit-10"></script>
     <script>
         document.addEventListener('click', (event) => {
             const target = event.target.closest('a, button[onclick]');
