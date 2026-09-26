@@ -1,7 +1,7 @@
 /**
  * main.js - エントリーポイント（システムの初期化とモジュール結合）
  */
-import { GameState } from './GameState.js?v=runtime-7';
+import { GameState } from './GameState.js?v=runtime-8';
 import { GearManager } from './GearManager.js?v=runtime-2';
 import { CanvasRenderer } from './CanvasRenderer.js';
 import { UIController } from './UIController.js?v=scroll-edit-4';

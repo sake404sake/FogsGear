@@ -646,8 +646,9 @@ export class GameState {
             .filter(group => group.network && group.gears.length > 0);
         const activeGears = activeGearGroups.flatMap(group => group.gears);
         const activeCount = activeGears.length;
-        this.water += elapsed;
-        this.waterRecoveryRate = elapsed > 0 ? 1 : 0;
+        const hasActiveProcess = activeGears.some(gear => !gear.isCore && gear.processMode !== 'NONE');
+        this.waterRecoveryRate = hasActiveProcess && elapsed > 0 ? 1 : 0;
+        this.water += elapsed * this.waterRecoveryRate;
         this.productionRate = 0;
         const gearRate = gear => gear.teeth * Math.abs(gear.angularVelocity || 0) * 0.012 / Math.max(elapsed, 1 / 240) / (Math.PI * 2);
         this.fogRecoveryRate = activeGears.filter(gear => gear.processMode === 'FOG_COLLECTION').reduce((sum, gear) => sum + gearRate(gear) * 10, 0);
@@ -669,13 +670,13 @@ export class GameState {
         this.liquidMetalConsumptionRate = this.solidMetalRate;
         this.solidMetalConsumptionRate = this.solidMetalToBrassRate;
         this.brassGenerationRate = this.solidMetalToBrassRate;
-        this.steamGenerationRate = this.generatedSteamRate + this.waterRecoveryRate;
+        this.steamGenerationRate = this.generatedSteamRate + (this.creativeMode && elapsed > 0 ? 1 : this.waterRecoveryRate);
         this.steamConsumptionRate = steamConsumption;
         if (this.creativeMode) {
             // クリエイティブ中も自然回復は実値へ反映し、上限だけを設けない。
             this.steamPower += elapsed;
         } else {
-            this.steamPower = Math.max(0, this.steamPower + elapsed - steamConsumption * elapsed);
+            this.steamPower = Math.max(0, this.steamPower + this.waterRecoveryRate * elapsed - steamConsumption * elapsed);
         }
         if (this.steamPower <= 0) {
             const stoppedNow = this.mainGearRunning;
