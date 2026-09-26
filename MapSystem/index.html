@@ -9,47 +9,56 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="icon" href="../MainSystem/icons/app-icon.jpg" type="image/jpeg">
-    <link rel="stylesheet" href="css/style.css?v=506">
+    <link rel="stylesheet" href="css/style.css?v=511">
 </head>
 <body>
     <div id="loadingOverlay" class="loading-overlay" role="status" aria-live="polite">
         <div class="loading-panel"><div class="loading-spinner"></div><div id="loadingMessage">マップを読み込んでいます...</div><div class="loading-progress" aria-label="マップ読み込み中"></div></div>
     </div>
-    <!-- 上部パネル：プレイヤー情報 -->
-    <div class="panel">
-        <div class="title-bar">
-            <span class="title-side title-side-left" id="currentTerritory">-</span>
-            <h1>STEAMPUNK EXPLORER</h1>
-            <span class="title-side title-side-right" id="currentCellType">-</span>
-        </div>
-        <div class="dashboard-shortcuts">
-            <button class="dashboard-toggle" data-action="toggle-status" aria-expanded="false">ステータス</button>
-            <button class="dashboard-toggle" data-action="toggle-inventory" aria-expanded="false">インベントリ</button>
-        </div>
-        <section class="dashboard dashboard-popup" id="status-panel" hidden>
-            <div class="dashboard-popup-head"><div class="dashboard-title">STATUS</div><button class="dashboard-popup-close" type="button" data-action="toggle-status" aria-label="ステータスを閉じる">×</button></div>
-            <div class="status-container">
-                <div class="status-water">HP: <span id="playerHP" class="status-value">100</span> / 100</div>
-                <div class="status-steam">STEAM: <span id="playerSteam" class="status-value">50</span> / 50</div>
-                <div class="status-brass">COORD: <span id="playerCoord" class="status-value">(0, 0)</span></div>
+    <div class="landscape-main-frame">
+        <!-- 上部パネル：プレイヤー情報 -->
+        <div class="panel">
+            <div class="title-bar">
+                <span class="title-side title-side-left" id="currentTerritory">-</span>
+                <h1>STEAMPUNK EXPLORER</h1>
+                <span class="title-side title-side-right" id="currentCellType">-</span>
             </div>
-        </section>
-        
-        <section class="dashboard dashboard-popup" id="inventory-panel" hidden>
-            <div class="dashboard-popup-head"><div class="dashboard-title">COLLECTED RESOURCES</div><button class="dashboard-popup-close" type="button" data-action="toggle-inventory" aria-label="インベントリを閉じる">×</button></div>
-            <div class="dashboard-resource-table">
-                <button class="dashboard-resource-row inventory-item-card" type="button" data-action="inspect-inventory-item" data-item-key="brass_gear"><span>真鍮の歯車</span><strong id="invBrass">5</strong></button>
-                <button class="dashboard-resource-row inventory-item-card" type="button" data-action="inspect-inventory-item" data-item-key="old_screw"><span>古びたネジ</span><strong id="invScrew">12</strong></button>
-                <button class="dashboard-resource-row inventory-item-card" type="button" data-action="inspect-inventory-item" data-item-key="pressure_gauge"><span>圧力計</span><strong id="invGauge">1</strong></button>
-                <button class="dashboard-resource-row inventory-item-card" type="button" data-action="inspect-inventory-item" data-item-key="paper_scroll"><span>スクロール（紙）</span><strong id="invPaperScroll">10</strong></button>
-                <button class="dashboard-resource-row inventory-item-card" type="button" data-action="inspect-inventory-item" data-item-key="cloth_scroll"><span>スクロール（布）</span><strong id="invClothScroll">10</strong></button>
-                <button class="dashboard-resource-row inventory-item-card" type="button" data-action="inspect-inventory-item" data-item-key="scroll_book"><span>スクロールブック</span><strong>1</strong></button>
+            <div class="dashboard-shortcuts">
+                <button class="dashboard-toggle" data-action="toggle-status" aria-expanded="false">ステータス</button>
+                <button class="dashboard-toggle" data-action="toggle-inventory" aria-expanded="false">インベントリ</button>
             </div>
-        </section>
-        <button class="dashboard-toggle" data-action="toggle-cell-legend" aria-expanded="false">地形情報 <span>+</span></button>
-        <section class="dashboard" id="cell-legend-panel" hidden>
-            <div id="cell-legend" class="cell-legend" aria-label="セルの凡例"></div>
-        </section>
+            <section class="dashboard dashboard-popup" id="status-panel" hidden>
+                <div class="dashboard-popup-head"><div class="dashboard-title">STATUS</div><button class="dashboard-popup-close" type="button" data-action="toggle-status" aria-label="ステータスを閉じる">×</button></div>
+                <div class="status-container">
+                    <div class="status-water">HP: <span id="playerHP" class="status-value">100</span> / 100</div>
+                    <div class="status-steam">STEAM: <span id="playerSteam" class="status-value">50</span> / 50</div>
+                    <div class="status-brass">COORD: <span id="playerCoord" class="status-value">(0, 0)</span></div>
+                </div>
+            </section>
+            
+            <section class="dashboard dashboard-popup" id="inventory-panel" hidden>
+                <div class="dashboard-popup-head"><div class="dashboard-title">COLLECTED RESOURCES</div><button class="dashboard-popup-close" type="button" data-action="toggle-inventory" aria-label="インベントリを閉じる">×</button></div>
+                <div class="dashboard-resource-table">
+                    <button class="dashboard-resource-row inventory-item-card" type="button" data-action="inspect-inventory-item" data-item-key="brass_gear"><span>真鍮の歯車</span><strong id="invBrass">5</strong></button>
+                    <button class="dashboard-resource-row inventory-item-card" type="button" data-action="inspect-inventory-item" data-item-key="old_screw"><span>古びたネジ</span><strong id="invScrew">12</strong></button>
+                    <button class="dashboard-resource-row inventory-item-card" type="button" data-action="inspect-inventory-item" data-item-key="pressure_gauge"><span>圧力計</span><strong id="invGauge">1</strong></button>
+                    <button class="dashboard-resource-row inventory-item-card" type="button" data-action="inspect-inventory-item" data-item-key="paper_scroll"><span>スクロール（紙）</span><strong id="invPaperScroll">10</strong></button>
+                    <button class="dashboard-resource-row inventory-item-card" type="button" data-action="inspect-inventory-item" data-item-key="cloth_scroll"><span>スクロール（布）</span><strong id="invClothScroll">10</strong></button>
+                    <button class="dashboard-resource-row inventory-item-card" type="button" data-action="inspect-inventory-item" data-item-key="scroll_book"><span>スクロールブック</span><strong>1</strong></button>
+                </div>
+            </section>
+            <button class="dashboard-toggle" data-action="toggle-cell-legend" aria-expanded="false">地形情報 <span>+</span></button>
+            <section class="dashboard" id="cell-legend-panel" hidden>
+                <div id="cell-legend" class="cell-legend" aria-label="セルの凡例"></div>
+            </section>
+        </div>
+
+        <!-- ゲーム画面エリア -->
+        <div id="canvas-container">
+            <div id="interaction-prompt" class="btn-item-confirm" style="display: none;">調べる [E]</div>
+            <canvas id="gameCanvas" width="640" height="480"></canvas>
+            <canvas id="gearCanvas" class="engine-runtime-canvas" width="800" height="600" aria-hidden="true"></canvas>
+        </div>
     </div>
 
     <div id="inventory-item-modal" class="inventory-modal" hidden role="dialog" aria-modal="true" aria-labelledby="inventory-modal-title">
@@ -66,13 +75,6 @@
                 <button class="inventory-modal-secondary" type="button" data-action="close-inventory-modal">閉じる</button>
             </div>
         </div>
-    </div>
-
-    <!-- ゲーム画面エリア -->
-    <div id="canvas-container">
-        <div id="interaction-prompt" class="btn-item-confirm" style="display: none;">調べる [E]</div>
-        <canvas id="gameCanvas" width="640" height="480"></canvas>
-        <canvas id="gearCanvas" class="engine-runtime-canvas" width="800" height="600" aria-hidden="true"></canvas>
     </div>
 
     <!-- 下部パネル：操作・メニュー -->
@@ -144,6 +146,6 @@
         </div>
     </div>
 
-    <script type="module" src="js/main.js?v=506"></script>
+    <script type="module" src="js/main.js?v=511"></script>
 </body>
 </html>

@@ -482,15 +482,29 @@ function savePlayerPos() {
 
 function syncLandscapePanelHeights() {
     const isWideLandscape = window.matchMedia('(min-aspect-ratio: 1/1)').matches;
+    const mainFrame = document.querySelector('.landscape-main-frame');
+    const controlsPanel = document.querySelector('body > .panel:last-of-type');
+
     if (!isWideLandscape) {
         document.documentElement.style.setProperty('--landscape-map-height', '');
         document.documentElement.style.setProperty('--landscape-controls-height', '');
+        if (controlsPanel) {
+            controlsPanel.style.height = '';
+            controlsPanel.style.minHeight = '';
+            controlsPanel.style.maxHeight = '';
+        }
         return;
     }
 
-    const targetHeight = Math.min(660, Math.max(220, window.innerHeight - 160));
+    const targetHeight = mainFrame ? mainFrame.getBoundingClientRect().height : Math.min(660, Math.max(220, window.innerHeight - 160));
     document.documentElement.style.setProperty('--landscape-map-height', `${targetHeight}px`);
     document.documentElement.style.setProperty('--landscape-controls-height', `${targetHeight}px`);
+
+    if (controlsPanel) {
+        controlsPanel.style.height = `${targetHeight}px`;
+        controlsPanel.style.minHeight = `${targetHeight}px`;
+        controlsPanel.style.maxHeight = `${targetHeight}px`;
+    }
 }
 
 function resize() {
@@ -500,6 +514,28 @@ function resize() {
     const isWideLandscape = window.matchMedia('(min-aspect-ratio: 1/1)').matches;
     let height = 480;
 
+    if (isWideLandscape) {
+        const mainFrame = document.querySelector('.landscape-main-frame');
+        const leftPanel = mainFrame?.querySelector(':scope > .panel');
+        if (mainFrame && leftPanel && container) {
+            const frameWidth = mainFrame.clientWidth || container.clientWidth || width;
+            const frameGap = parseFloat(getComputedStyle(mainFrame).gap || '12');
+            const availableMapHeight = Math.max(220, mainFrame.clientHeight - leftPanel.offsetHeight - frameGap);
+            leftPanel.style.width = `${frameWidth}px`;
+            leftPanel.style.maxWidth = 'none';
+            leftPanel.style.minWidth = '0';
+            leftPanel.style.margin = '0';
+            container.style.width = `${frameWidth}px`;
+            container.style.maxWidth = 'none';
+            container.style.minWidth = '0';
+            container.style.height = `${availableMapHeight}px`;
+            container.style.minHeight = `${availableMapHeight}px`;
+            container.style.maxHeight = `${availableMapHeight}px`;
+            applyMapFrameRadius();
+            height = availableMapHeight;
+        }
+    }
+
     if (isCompactViewport) {
         const panels = document.querySelectorAll('.panel');
         const topPanelHeight = panels[0]?.getBoundingClientRect().height || 0;
@@ -507,8 +543,6 @@ function resize() {
         const viewportHeight = window.visualViewport?.height || window.innerHeight;
         const availableHeight = viewportHeight - topPanelHeight - movementHeight - 88;
         height = Math.max(150, Math.min(290, Math.floor(availableHeight * 0.52)));
-    } else if (isWideLandscape) {
-        height = Math.max(180, Math.min(container.clientHeight || 480, 480));
     }
 
     syncLandscapePanelHeights();
@@ -1195,8 +1229,18 @@ const mainPageTrack = document.getElementById('main-page-track');
 const mainPageDots = [...document.querySelectorAll('.main-page-dot')];
 const mainPageArrows = [...document.querySelectorAll('.main-page-arrow')];
 const gearPreviewIframe = document.querySelector('.gear-preview-page iframe');
+const canvasContainer = document.getElementById('canvas-container');
 let currentMainPage = 0;
 let mainPagePointerStart = null;
+
+function applyMapFrameRadius() {
+    if (!canvasContainer) return;
+    canvasContainer.style.borderRadius = '8px';
+    canvasContainer.style.borderTopLeftRadius = '8px';
+    canvasContainer.style.borderTopRightRadius = '8px';
+    canvasContainer.style.borderBottomLeftRadius = '8px';
+    canvasContainer.style.borderBottomRightRadius = '8px';
+}
 
 function isWideMainLayout() {
     return window.matchMedia('(min-aspect-ratio: 1/1)').matches;
@@ -1204,15 +1248,26 @@ function isWideMainLayout() {
 
 function syncMainPageViewportHeight() {
     if (!mainPageViewport || !mainPageTrack) return;
-    const preferredHeight = isWideMainLayout()
-        ? Math.min(660, Math.max(220, window.innerHeight - 170))
-        : Math.min(Math.max(window.innerHeight * 0.26, 180), 240);
+    if (isWideMainLayout()) {
+        mainPageViewport.style.height = 'auto';
+        mainPageViewport.style.minHeight = '0';
+        mainPageTrack.style.height = 'auto';
+        mainPageTrack.style.minHeight = '0';
+        mainPageTrack.querySelectorAll('.main-page').forEach((page) => {
+            page.style.height = 'auto';
+            page.style.minHeight = '0';
+        });
+        return;
+    }
 
+    const preferredHeight = Math.min(Math.max(window.innerHeight * 0.26, 180), 240);
     mainPageViewport.style.height = `${preferredHeight}px`;
     mainPageViewport.style.minHeight = `${preferredHeight}px`;
     mainPageTrack.style.height = `${preferredHeight}px`;
+    mainPageTrack.style.minHeight = `${preferredHeight}px`;
     mainPageTrack.querySelectorAll('.main-page').forEach((page) => {
         page.style.height = `${preferredHeight}px`;
+        page.style.minHeight = `${preferredHeight}px`;
     });
 }
 
@@ -1316,7 +1371,9 @@ if (minZoomSelect) {
 
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js', { scope: './' }).catch(() => {});
+        navigator.serviceWorker.getRegistrations().then((registrations) => {
+            return Promise.all(registrations.map((registration) => registration.unregister()));
+        }).catch(() => {});
     });
 }
 

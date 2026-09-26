@@ -526,7 +526,11 @@ h1 {
     display: inline-block;
     border: 2px solid var(--border-sub);
     background: #000;
-    border-radius: 6px;
+    border-radius: 8px !important;
+    border-top-left-radius: 8px !important;
+    border-top-right-radius: 8px !important;
+    border-bottom-left-radius: 8px !important;
+    border-bottom-right-radius: 8px !important;
     position: relative;
     margin-bottom: 8px;
     line-height: 0;
@@ -712,13 +716,13 @@ canvas.engine-runtime-canvas { display: none; }
     }
 }
 
-/* 横長画面では、地図を主領域、操作を右側のコントロールデッキにする。 */
+/* 横長画面では、ステータス + マップを左側のフレームにまとめ、操作を右側のコントロールにする。 */
 @media (min-aspect-ratio: 1/1) {
     body:has(#gameCanvas) {
         display: grid;
-        grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
-        grid-template-rows: auto minmax(0, 1fr);
-        grid-template-areas: "status controls" "map controls";
+        grid-template-columns: minmax(0, 1fr) minmax(260px, 360px);
+        grid-template-rows: minmax(0, 1fr);
+        grid-template-areas: "main controls";
         align-items: stretch;
         gap: 12px;
         height: 100dvh;
@@ -728,25 +732,57 @@ canvas.engine-runtime-canvas { display: none; }
         overflow-x: hidden;
         overflow-y: hidden;
     }
-    body:has(#gameCanvas) > .panel:nth-of-type(2) {
-        grid-area: status;
-        width: auto;
-        max-width: none;
-        margin: 0;
-        justify-self: stretch;
+    body:has(#gameCanvas) .landscape-main-frame {
+        grid-area: main;
+        display: grid !important;
+        grid-template-rows: auto minmax(250px, 1fr);
+        width: 100%;
+        min-width: 0;
+        height: 100%;
+        min-height: 0;
+        gap: 12px;
+        box-sizing: border-box;
+        align-self: stretch;
     }
-    body:has(#gameCanvas) #canvas-container {
-        grid-area: map;
+    body:has(#gameCanvas) .landscape-main-frame > .panel {
+        width: 100% !important;
+        max-width: none !important;
+        min-width: 0 !important;
+        margin: 0 !important;
+        justify-self: stretch;
+        overflow: hidden;
+        box-sizing: border-box;
+        align-self: stretch;
+        flex: 0 0 auto;
+    }
+    body:has(#gameCanvas) .landscape-main-frame #canvas-container {
         display: flex;
         align-items: stretch;
         justify-content: stretch;
         width: 100%;
-        height: var(--landscape-map-height, min(660px, calc(100dvh - 160px)));
+        height: 100%;
+        min-height: 250px;
         max-width: none;
         min-width: 0;
-        min-height: 0;
         margin: 0;
         padding: 0;
+        box-sizing: border-box;
+        align-self: stretch;
+        border: 1px solid var(--border-gold);
+        border-radius: 8px !important;
+        border-top-left-radius: 8px !important;
+        border-top-right-radius: 8px !important;
+        border-bottom-left-radius: 8px !important;
+        border-bottom-right-radius: 8px !important;
+        overflow: hidden;
+        clip-path: inset(0 round 8px);
+    }
+    body:has(#gameCanvas) #canvas-container {
+        border-radius: 8px !important;
+        border-top-left-radius: 8px !important;
+        border-top-right-radius: 8px !important;
+        border-bottom-left-radius: 8px !important;
+        border-bottom-right-radius: 8px !important;
     }
     body:has(#gameCanvas) #gameCanvas {
         width: 100%;
@@ -754,21 +790,23 @@ canvas.engine-runtime-canvas { display: none; }
         max-width: none;
         max-height: none;
         object-fit: cover;
+        flex: 1 1 auto;
     }
     body:has(#gameCanvas) > .panel:last-of-type {
         grid-area: controls;
         display: flex;
         flex-direction: column;
-        width: min(100%, 400px);
+        width: 100%;
         max-width: none;
         min-width: 0;
-        height: var(--landscape-controls-height, min(660px, calc(100dvh - 160px))) !important;
-        min-height: var(--landscape-controls-height, min(660px, calc(100dvh - 160px))) !important;
-        max-height: var(--landscape-controls-height, min(660px, calc(100dvh - 160px))) !important;
+        height: 100%;
+        min-height: 100%;
+        max-height: 100%;
         margin: 0;
-        overflow: hidden;
+        overflow: visible;
         justify-self: stretch;
         box-sizing: border-box;
+        align-self: stretch;
     }
     body:has(#gameCanvas) > .panel:last-of-type .main-page:first-child {
         display: flex;
@@ -790,42 +828,50 @@ canvas.engine-runtime-canvas { display: none; }
         order: 4;
     }
     body:has(#gameCanvas) > .panel:last-of-type .main-control-pager {
+        display: flex;
         flex: 1 1 auto;
+        flex-direction: column;
         min-height: 0;
-        height: calc(var(--landscape-controls-height, min(660px, calc(100dvh - 160px))) - 16px) !important;
-        max-height: calc(var(--landscape-controls-height, min(660px, calc(100dvh - 160px))) - 16px) !important;
+        height: 100%;
+        max-height: 100%;
         align-items: stretch;
+        gap: 6px;
     }
     body:has(#gameCanvas) > .panel:last-of-type .main-page-viewport {
         flex: 1 1 auto;
-        height: 100% !important;
+        height: 100%;
         min-height: 0;
-        overflow: auto;
+        overflow: visible;
         overflow-x: hidden;
     }
     body:has(#gameCanvas) > .panel:last-of-type .main-page-dots {
         flex: 0 0 auto;
-        margin-top: 4px;
+        margin-top: 6px;
+        margin-bottom: 2px;
     }
     body:has(#gameCanvas) > .panel:last-of-type .main-page-track,
     body:has(#gameCanvas) > .panel:last-of-type .main-page {
-        height: 100%;
+        height: auto;
         min-height: 0;
-        overflow: hidden;
+        overflow: visible;
     }
     body:has(#gameCanvas) > .panel:last-of-type .main-page {
         padding: 0 2px;
         display: flex;
         flex-direction: column;
-        overflow-y: auto;
+        overflow: visible;
         overflow-x: hidden;
+        height: auto !important;
     }
     body:has(#gameCanvas) > .panel:last-of-type .main-page-arrow {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        flex: 0 0 20px;
-        height: 100%;
+        display: none !important;
+        visibility: hidden;
+        pointer-events: none;
+        width: 0;
+        min-width: 0;
+        padding: 0;
+        margin: 0;
+        border: 0;
     }
     body:has(#gameCanvas) > .panel:last-of-type .gear-preview-page iframe {
         height: 100%;
@@ -860,6 +906,24 @@ canvas.engine-runtime-canvas { display: none; }
     }
     body:has(#gameCanvas) > .panel:last-of-type .main-page-dots {
         margin-top: 10px;
+    }
+    body:has(#gameCanvas) .title-bar {
+        gap: 10px;
+        width: 100%;
+    }
+    body:has(#gameCanvas) .title-side {
+        min-width: 88px;
+        max-width: 220px;
+        padding: 7px 12px;
+        font-size: 0.82rem;
+    }
+    body:has(#gameCanvas) .title-bar h1 {
+        letter-spacing: 2px;
+        font-size: 1.18rem;
+    }
+    body:has(#gameCanvas) > .panel:last-of-type {
+        position: relative;
+        z-index: 1;
     }
 }
 
