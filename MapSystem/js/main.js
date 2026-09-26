@@ -3,8 +3,8 @@ import { MapGenerator, BIOME_COLORS, loadMapSnapshot, saveMapSnapshot } from './
 import { SkinRenderer } from './skinRenderer.js?v=2';
 import { CELL_DEFINITIONS, canEnterCell, getCellEntryRule, getMosaicColor } from './cellRules.js';
 import { buildTerritoryBorderSegments } from './territoryBorders.js?v=35';
-import { GameState as EngineGameState } from '../../GearSystem/js/GameState.js?v=runtime-3';
-import { GearManager as EngineGearManager } from '../../GearSystem/js/GearManager.js?v=runtime-1';
+import { GameState as EngineGameState } from '../../GearSystem/js/GameState.js?v=runtime-7';
+import { GearManager as EngineGearManager } from '../../GearSystem/js/GearManager.js?v=runtime-2';
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
@@ -509,7 +509,7 @@ function syncLandscapePanelHeights() {
 
 function resize() {
     const container = canvas.parentElement;
-    const width = container.clientWidth || 640;
+    let width = container.clientWidth || 640;
     const isCompactViewport = window.matchMedia('(max-width: 620px)').matches;
     const isWideLandscape = window.matchMedia('(min-aspect-ratio: 1/1)').matches;
     let height = 480;
@@ -520,7 +520,7 @@ function resize() {
         if (mainFrame && leftPanel && container) {
             const frameWidth = mainFrame.clientWidth || container.clientWidth || width;
             const frameGap = parseFloat(getComputedStyle(mainFrame).gap || '12');
-            const availableMapHeight = Math.max(220, mainFrame.clientHeight - leftPanel.offsetHeight - frameGap);
+            const availableMapHeight = Math.max(180, mainFrame.clientHeight - leftPanel.offsetHeight - frameGap);
             leftPanel.style.width = `${frameWidth}px`;
             leftPanel.style.maxWidth = 'none';
             leftPanel.style.minWidth = '0';
@@ -534,6 +534,23 @@ function resize() {
             applyMapFrameRadius();
             height = availableMapHeight;
         }
+    } else {
+        const mainFrame = document.querySelector('.landscape-main-frame');
+        const leftPanel = mainFrame?.querySelector(':scope > .panel');
+        if (leftPanel) {
+            leftPanel.style.width = '';
+            leftPanel.style.maxWidth = '';
+            leftPanel.style.minWidth = '';
+            leftPanel.style.margin = '';
+        }
+        if (container) {
+            container.style.width = '';
+            container.style.maxWidth = '';
+            container.style.minWidth = '';
+            container.style.height = '';
+            container.style.minHeight = '';
+            container.style.maxHeight = '';
+        }
     }
 
     if (isCompactViewport) {
@@ -545,7 +562,9 @@ function resize() {
         height = Math.max(150, Math.min(290, Math.floor(availableHeight * 0.52)));
     }
 
+    if (!isWideLandscape) height = container.clientHeight || height;
     syncLandscapePanelHeights();
+    width = container.clientWidth || 640;
     canvas.width = width;
     canvas.height = height;
 }
@@ -1095,10 +1114,11 @@ document.addEventListener('pointerup', (event) => {
         const panel = document.getElementById(panelId);
         if (!panel || panel.hidden || panel.contains(target) || target.closest(`[data-action="${toggleAction}"]`)) continue;
         panel.hidden = true;
-        const toggle = document.querySelector(`[data-action="${toggleAction}"]`);
-        toggle?.setAttribute('aria-expanded', 'false');
-        const span = toggle?.querySelector('span');
-        if (span) span.textContent = '+';
+        document.querySelectorAll(`[data-action="${toggleAction}"]`).forEach(toggle => {
+            toggle.setAttribute('aria-expanded', 'false');
+            const span = toggle.querySelector('span');
+            if (span) span.textContent = '+';
+        });
     }
 });
 
@@ -1274,25 +1294,24 @@ function isWideMainLayout() {
 function syncMainPageViewportHeight() {
     if (!mainPageViewport || !mainPageTrack) return;
     if (isWideMainLayout()) {
-        mainPageViewport.style.height = 'auto';
+        mainPageViewport.style.height = '100%';
         mainPageViewport.style.minHeight = '0';
-        mainPageTrack.style.height = 'auto';
+        mainPageTrack.style.height = '100%';
         mainPageTrack.style.minHeight = '0';
         mainPageTrack.querySelectorAll('.main-page').forEach((page) => {
-            page.style.height = 'auto';
+            page.style.height = '100%';
             page.style.minHeight = '0';
         });
         return;
     }
 
-    const preferredHeight = Math.min(Math.max(window.innerHeight * 0.26, 180), 240);
-    mainPageViewport.style.height = `${preferredHeight}px`;
-    mainPageViewport.style.minHeight = `${preferredHeight}px`;
-    mainPageTrack.style.height = `${preferredHeight}px`;
-    mainPageTrack.style.minHeight = `${preferredHeight}px`;
+    mainPageViewport.style.height = '100%';
+    mainPageViewport.style.minHeight = '0';
+    mainPageTrack.style.height = '100%';
+    mainPageTrack.style.minHeight = '0';
     mainPageTrack.querySelectorAll('.main-page').forEach((page) => {
-        page.style.height = `${preferredHeight}px`;
-        page.style.minHeight = `${preferredHeight}px`;
+        page.style.height = '100%';
+        page.style.minHeight = '0';
     });
 }
 
@@ -1359,30 +1378,23 @@ const navigationPanel = document.getElementById('navigation-panel');
 
 function setupDashboardToggle(toggleButton, panel) {
     if (!toggleButton || !panel) return;
-    toggleButton.addEventListener('click', () => {
-        const isHidden = panel.hidden;
-        panel.hidden = !isHidden;
-        toggleButton.setAttribute('aria-expanded', String(isHidden));
-        const span = toggleButton.querySelector('span');
-        if (span) span.textContent = isHidden ? '-' : '+';
-    });
+    const toggleButtons = [...document.querySelectorAll(`[data-action="${toggleButton.dataset.action}"]`)];
+    toggleButtons.forEach(button => button.addEventListener('click', () => {
+        const isOpen = panel.hidden;
+        panel.hidden = !isOpen;
+        toggleButtons.forEach(toggle => {
+            toggle.setAttribute('aria-expanded', String(isOpen));
+            const span = toggle.querySelector('span');
+            if (span) span.textContent = isOpen ? '-' : '+';
+        });
+    }));
 }
 
 setupDashboardToggle(statusToggleBtn, statusPanel);
 setupDashboardToggle(cellLegendToggleBtn, cellLegendPanel);
 setupDashboardToggle(navigationToggleBtn, navigationPanel);
 
-if (inventoryToggleBtn && inventoryPanel) {
-    inventoryToggleBtn.addEventListener('click', () => {
-        const isHidden = inventoryPanel.hidden;
-        inventoryPanel.hidden = !isHidden;
-        inventoryToggleBtn.setAttribute('aria-expanded', String(isHidden));
-        const span = inventoryToggleBtn.querySelector('span');
-        if (span) {
-            span.textContent = isHidden ? '-' : '+';
-        }
-    });
-}
+setupDashboardToggle(inventoryToggleBtn, inventoryPanel);
 
 const minZoomSelect = document.getElementById('minZoomSelect');
 if (minZoomSelect) {

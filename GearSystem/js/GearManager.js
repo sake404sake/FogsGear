@@ -1,5 +1,5 @@
 /** GearManager - ギア仕様定義・配置・補正計算ロジック */
-import { Gear, GearNetwork } from './GearSystem.js';
+import { Gear, GearNetwork } from './GearSystem.js?v=network-2';
 export const GEAR_CONFIG = {
     'XXS': { teeth: 4, radius: 12, cost: 4, pattern: 'ring' }, 'SS': { teeth: 6, radius: 18, cost: 6, pattern: 'sunburst' }, 'S': { teeth: 10, radius: 30, cost: 10, pattern: 'holes' }, 'M': { teeth: 14, radius: 42, cost: 14, pattern: 'triangular' }, 'L': { teeth: 18, radius: 54, cost: 18, pattern: 'wave' }, 'LL': { teeth: 24, radius: 72, cost: 24, pattern: 'crown' }, '3L': { teeth: 32, radius: 96, cost: 32, pattern: 'lattice' }, '4L': { teeth: 40, radius: 120, cost: 40, pattern: 'radial' }, 'MAX': { teeth: 48, radius: 144, cost: 48, pattern: 'industrial' }
 };

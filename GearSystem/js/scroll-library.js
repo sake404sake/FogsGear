@@ -194,7 +194,7 @@ function fitPreview() {
     }), { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity });
     const width = Math.max(1, bounds.maxX - bounds.minX);
     const height = Math.max(1, bounds.maxY - bounds.minY);
-    previewState.zoomScale = Math.min(1.25, Math.max(0.22, Math.min((canvas.width - 54) / width, (canvas.height - 54) / height)));
+    previewState.zoomScale = Math.min(4.5, Math.max(0.22, Math.min((canvas.width - 54) / width, (canvas.height - 54) / height)));
     previewState.offsetX = -((bounds.minX + bounds.maxX) / 2);
     previewState.offsetY = -((bounds.minY + bounds.maxY) / 2);
 }
@@ -282,6 +282,22 @@ function selectScroll(scrollId) {
     renderedScrollId = null;
     renderList();
     renderDetail();
+    resizePreview();
+    setListVisibility(false);
+}
+
+function resizePreview() {
+    if (!isEmbedded || !previewFrame.clientWidth || !previewFrame.clientHeight) return;
+    const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+    const width = Math.max(1, Math.round(previewFrame.clientWidth * pixelRatio));
+    const height = Math.max(1, Math.round(previewFrame.clientHeight * pixelRatio));
+    if (canvas.width === width && canvas.height === height) return;
+    canvas.width = width;
+    canvas.height = height;
+    renderedScrollId = null;
+    const scroll = getSelectedScroll();
+    if (scroll) renderPreview(scroll);
+    else renderer.render();
 }
 
 tabs.forEach(tab => tab.addEventListener('click', () => {
@@ -296,6 +312,7 @@ tabs.forEach(tab => tab.addEventListener('click', () => {
     if (!visible.some(scroll => scroll.id === selectedScrollId)) selectedScrollId = visible[0]?.id || null;
     renderList();
     renderDetail();
+    resizePreview();
 }));
 
 listElement.addEventListener('click', event => {
@@ -342,8 +359,14 @@ window.addEventListener('storage', event => {
         if (event.key === LIBRARY_KEY) renderedScrollId = null;
         renderList();
         renderDetail();
+        resizePreview();
     }
 });
+
+if (isEmbedded && 'ResizeObserver' in window) {
+    new ResizeObserver(resizePreview).observe(previewFrame);
+}
+window.addEventListener('resize', resizePreview);
 
 setInterval(() => {
     if (selectedScrollId) renderDetail();
@@ -353,3 +376,4 @@ library = readLibrary();
 selectedScrollId = library[0]?.id || null;
 renderList();
 renderDetail();
+resizePreview();

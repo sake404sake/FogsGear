@@ -114,11 +114,16 @@ export class GearNetwork {
     // 配置済みギアのサイズから、設置済み真鍮コストを合計する。
     calculateBrassCost() { return [...this.gears.values()].filter(gear => !gear.isCore).reduce((sum, gear) => sum + gear.brassCost, 0); }
     // 基本駆動負荷と軸摩擦を合算する。ループ内の軸摩擦は0として扱う。
-    calculateSteamConsumption() {
-        const baseLoad = [...this.gears.values()].filter(gear => !gear.isCore).reduce((sum, gear) => sum + gear.steamLoad, 0);
+    calculateSteamConsumption(activeGears = null) {
+        const activeGearIds = activeGears ? new Set(activeGears.map(gear => gear.id)) : null;
+        const isActive = gear => !activeGearIds || activeGearIds.has(gear.id);
+        const baseLoad = [...this.gears.values()].filter(gear => !gear.isCore && isActive(gear)).reduce((sum, gear) => sum + gear.steamLoad, 0);
         const friction = [...this.axes.values()].reduce((sum, axis) => {
-            const axisInLoop = [...axis.gears.values()].some(gear => this.loopGearIds.has(gear.id));
-            return sum + (axisInLoop ? 0 : axis.friction());
+            const axisGears = [...axis.gears.values()].filter(gear => !gear.isCore && isActive(gear));
+            const axisInLoop = [...axis.gears.values()].some(gear => isActive(gear) && this.loopGearIds.has(gear.id));
+            const synchronized = axisGears.filter(gear => gear.isLocked).length;
+            const axisFriction = axisInLoop ? 0 : axisGears.filter(gear => !gear.isLocked).length * 8 + (synchronized ? 8 / synchronized : 0);
+            return sum + axisFriction;
         }, 0);
         return baseLoad + friction;
     }

@@ -1,3 +1,5 @@
+import { GearNetwork } from './GearSystem.js?v=network-2';
+
 /**
  * GameState - リソース、ギア、保存データ、Undo/Redo履歴の管理モジュール
  */
@@ -65,6 +67,9 @@ export class GameState {
         this.runtimeGears = null;
         this.runtimeBelts = null;
         this.runtimeNetwork = null;
+        this.activeScrollRuntimes = [];
+        this.activeScrollSignature = '';
+        this.lastActiveScrollSyncAt = 0;
         
         this.listeners = [];
     }
@@ -97,6 +102,62 @@ export class GameState {
 
     getRuntimeBelts() {
         return this.isScrollEditing ? (this.runtimeBelts || []) : this.belts;
+    }
+
+    getActiveScrollRuntimes(now) {
+        if (this.isEditorRuntimeContext() || !this.createGear || !this.network) return [];
+        if (now - this.lastActiveScrollSyncAt < 250) return this.activeScrollRuntimes;
+        this.lastActiveScrollSyncAt = now;
+
+        let activeScrollValue = '[]';
+        let libraryValue = '[]';
+        let legacyRunning = false;
+        try {
+            activeScrollValue = localStorage.getItem('fogsgear_active_scroll_id') || '[]';
+            libraryValue = localStorage.getItem('fogsgear_scroll_library') || '[]';
+            legacyRunning = localStorage.getItem('fogsgear_active_scroll_running') === 'true';
+        } catch (error) {
+            return [];
+        }
+        const signature = `${activeScrollValue}\n${libraryValue}\n${legacyRunning}`;
+        if (signature === this.activeScrollSignature) return this.activeScrollRuntimes;
+        this.activeScrollSignature = signature;
+
+        let activeIds = [];
+        let library = [];
+        try {
+            const parsedIds = JSON.parse(activeScrollValue);
+            activeIds = Array.isArray(parsedIds) ? parsedIds.filter(Boolean) : legacyRunning ? [activeScrollValue] : [];
+            const parsedLibrary = JSON.parse(libraryValue);
+            library = Array.isArray(parsedLibrary) ? parsedLibrary : [];
+        } catch (error) {
+            activeIds = legacyRunning ? [activeScrollValue] : [];
+        }
+
+        const activeIdSet = new Set(activeIds);
+        this.activeScrollRuntimes = [];
+        library.forEach(scroll => {
+            if (!activeIdSet.has(scroll.id)) return;
+            const blueprintGears = Array.isArray(scroll.blueprint?.gears) ? scroll.blueprint.gears : [];
+            if (!blueprintGears.some(gear => gear.isCore)) return;
+
+            const gearIdMap = new Map();
+            const gears = blueprintGears.map((data, index) => {
+                const sourceId = String(data.id || `preview-${index}`);
+                const gearId = `active-scroll:${scroll.id}:${sourceId}`;
+                const gear = this.createGear({ ...data, id: gearId });
+                gearIdMap.set(sourceId, gearId);
+                return gear;
+            });
+            const belts = (Array.isArray(scroll.blueprint?.belts) ? scroll.blueprint.belts : [])
+                .map(belt => ({ ...belt, gearIds: (belt.gearIds || []).map(id => gearIdMap.get(String(id))).filter(Boolean) }))
+                .filter(belt => belt.gearIds.length >= 2);
+            const network = new GearNetwork(gears, belts);
+            network.updateRotation();
+            if (gears.some(gear => gear.isDeadlocked || gear.angleError)) return;
+            this.activeScrollRuntimes.push({ gears, belts, network });
+        });
+        return this.activeScrollRuntimes;
     }
 
     setCreativeMode(active) {
@@ -542,13 +603,15 @@ export class GameState {
             NONE: { name: '処理なし', input: '-', output: '-', rate: 0 },
             FOG_COLLECTION: { name: '霧の回収', input: '-', output: '霧', rate: rotationRate * 10 },
             TRANSFORM: { name: '水→スチーム', input: '水', output: 'スチーム', rate: rotationRate * 10 },
-            FOG_TO_WATER: { name: '霧→水', input: '霧', output: '水', rate: rotationRate * 0.5 },
+            FOG_TO_WATER: { name: '霧→水', input: '霧', output: '水', rate: rotationRate * 2.5 },
             FOG_TO_LIQUID_METAL: { name: '霧→液体金属', input: '霧', output: '液体金属', rate: rotationRate * 0.1 },
             LIQUID_TO_SOLID_METAL: { name: '液体金属→固体金属', input: '液体金属', output: '固体金属', rate: rotationRate },
             SOLID_TO_BRASS: { name: '固体金属→真鍮資材', input: '固体金属', output: '真鍮資材', rate: rotationRate }
         };
         const info = processInfo[gear?.processMode] || processInfo.NONE;
-        const inputMultiplier = ['FOG_TO_WATER', 'FOG_TO_LIQUID_METAL'].includes(gear?.processMode) ? 10 : 1;
+        const inputMultiplier = gear?.processMode === 'FOG_TO_WATER'
+            ? 2
+            : gear?.processMode === 'FOG_TO_LIQUID_METAL' ? 10 : 1;
         return { ...info, inputRate: info.rate * inputMultiplier, outputRate: info.rate };
     }
 
@@ -562,39 +625,47 @@ export class GameState {
         const runtimeGears = this.getRuntimeGears();
         const runtimeBelts = this.getRuntimeBelts();
         const runtimeNetwork = this.runtimeNetwork || this.network;
-        if (runtimeNetwork && this.mainGearRunning && (this.creativeMode || this.steamPower > 0)) {
-            runtimeNetwork.rebuild(runtimeGears, runtimeBelts).updateRotation();
-        } else {
-            runtimeGears.forEach(gear => {
-                gear.powered = false;
-                gear.rotationDir = 0;
-                gear.angularVelocity = 0;
-            });
-        }
+        const runtimeGroups = [
+            { gears: runtimeGears, belts: runtimeBelts, network: runtimeNetwork },
+            ...this.getActiveScrollRuntimes(now)
+        ];
+        runtimeGroups.forEach(group => {
+            if (group.network && this.mainGearRunning && (this.creativeMode || this.steamPower > 0)) {
+                group.network.rebuild(group.gears, group.belts).updateRotation();
+            } else {
+                group.gears.forEach(gear => {
+                    gear.powered = false;
+                    gear.rotationDir = 0;
+                    gear.angularVelocity = 0;
+                });
+            }
+        });
         // 連結していても、処理設定は各ギア自身の値だけを参照する。
-        const activeCount = runtimeGears.filter(gear => gear.powered && !gear.isDeadlocked).length;
-        const activeGears = runtimeGears.filter(gear => gear.powered && !gear.isDeadlocked);
+        const activeGearGroups = runtimeGroups
+            .map(group => ({ network: group.network, gears: group.gears.filter(gear => gear.powered && !gear.isDeadlocked) }))
+            .filter(group => group.network && group.gears.length > 0);
+        const activeGears = activeGearGroups.flatMap(group => group.gears);
+        const activeCount = activeGears.length;
         this.water += elapsed;
         this.waterRecoveryRate = elapsed > 0 ? 1 : 0;
         this.productionRate = 0;
         const gearRate = gear => gear.teeth * Math.abs(gear.angularVelocity || 0) * 0.012 / Math.max(elapsed, 1 / 240) / (Math.PI * 2);
         this.fogRecoveryRate = activeGears.filter(gear => gear.processMode === 'FOG_COLLECTION').reduce((sum, gear) => sum + gearRate(gear) * 10, 0);
         this.liquidMetalRate = activeGears.filter(gear => gear.designType === 'ALCHEMICAL' && gear.processMode === 'FOG_TO_LIQUID_METAL').reduce((sum, gear) => sum + gearRate(gear) * 0.1, 0);
-        this.fogToWaterRate = activeGears.filter(gear => gear.designType === 'ALCHEMICAL' && gear.processMode === 'FOG_TO_WATER').reduce((sum, gear) => sum + gearRate(gear) * 0.5, 0);
+        this.fogToWaterRate = activeGears.filter(gear => gear.designType === 'ALCHEMICAL' && gear.processMode === 'FOG_TO_WATER').reduce((sum, gear) => sum + gearRate(gear) * 2.5, 0);
         this.solidMetalRate = activeGears.filter(gear => gear.designType === 'ALCHEMICAL' && gear.processMode === 'LIQUID_TO_SOLID_METAL').reduce((sum, gear) => sum + gearRate(gear), 0);
         this.solidMetalToBrassRate = activeGears.filter(gear => gear.designType === 'ALCHEMICAL' && gear.processMode === 'SOLID_TO_BRASS').reduce((sum, gear) => sum + gearRate(gear), 0);
         this.steamTransformRate = activeGears.filter(gear => gear.designType === 'ALCHEMICAL' && gear.processMode === 'TRANSFORM').reduce((sum, gear) => sum + gearRate(gear), 0);
-        const steamConsumption = runtimeNetwork && this.mainGearRunning && !this.creativeMode && activeCount > 0
-            ? runtimeNetwork.calculateSteamConsumption()
+        const steamConsumption = this.mainGearRunning && !this.creativeMode && activeCount > 0
+            ? activeGearGroups.reduce((sum, group) => sum + group.network.calculateSteamConsumption(group.gears), 0)
             : 0;
         // ダッシュボードの3列目・4列目用のレートを、変換の入力と出力に分けて集計する。
         this.waterGenerationRate = this.waterRecoveryRate + this.fogToWaterRate;
         this.waterConsumptionRate = this.steamTransformRate;
         // 水1に対してスチーム10を生成するため、水→スチームの出力は水消費量から直接算出する。
         this.generatedSteamRate = this.waterConsumptionRate * 10;
-        // 霧→水・霧→液体金属は、出力1に対して霧10を消費する。
-        // 各出力レートはすでに0.1倍後なので、入力レートへ戻すには10倍する。
-        this.fogConsumptionRate = (this.fogToWaterRate + this.liquidMetalRate) * 10;
+        // 霧→水は水5に霧10、霧→液体金属は生成1に霧10を要する。
+        this.fogConsumptionRate = this.fogToWaterRate * 2 + this.liquidMetalRate * 10;
         this.liquidMetalConsumptionRate = this.solidMetalRate;
         this.solidMetalConsumptionRate = this.solidMetalToBrassRate;
         this.brassGenerationRate = this.solidMetalToBrassRate;
@@ -625,14 +696,14 @@ export class GameState {
             if (stoppedNow) this.saveGameData();
         }
         if (!this.mainGearRunning) {
-            runtimeGears.forEach(gear => {
+            runtimeGroups.forEach(group => group.gears.forEach(gear => {
                 gear.powered = false;
                 gear.rotationDir = 0;
                 gear.angularVelocity = 0;
-            });
+            }));
         }
         // 回転中の各ギアを個別に処理する。同じ軸でも資源処理は共有しない。
-        runtimeGears.forEach(gear => {
+        activeGears.forEach(gear => {
             if (gear.powered && !gear.isDeadlocked && this.steamPower > 0 && this.mainGearRunning) {
                 const rotationDelta = 0.012 * 60 * (gear.angularVelocity || 1) * elapsed * gear.rotationDir;
                 gear.angle += rotationDelta;
@@ -660,7 +731,7 @@ export class GameState {
                         if (gear.processMode === 'FOG_TO_WATER') {
                             const transformed = Math.min(this.fog, amount * 10);
                             this.fog -= transformed;
-                            this.water += transformed * 0.5;
+                            this.water += transformed * 2.5;
                         } else if (gear.processMode === 'FOG_TO_LIQUID_METAL') {
                             const transformed = Math.min(this.fog, amount * 10);
                             this.fog -= transformed;
@@ -678,7 +749,7 @@ export class GameState {
                 }
             }
         });
-        if (runtimeNetwork) runtimeNetwork.synchronizeLockedAxes();
+        runtimeGroups.forEach(group => group.network?.synchronizeLockedAxes());
         const currentTime = performance.now();
         if (currentTime - (this.lastStorageSaveAt || 0) > 500) {
             this.lastStorageSaveAt = currentTime;

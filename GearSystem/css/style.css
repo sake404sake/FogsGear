@@ -507,12 +507,20 @@ canvas {
 .scroll-choice-panel p { margin: 0; color: var(--text-muted); font-size: 0.76rem; }
 .scroll-choice-actions { display: flex; justify-content: center; gap: 8px; margin-top: 18px; }
 @media (max-width: 760px) {
-    .scroll-library-page { padding: 8px; }
-    .scroll-library-header { flex-direction: column; padding: 14px; }
-    .scroll-tabs { padding: 0 10px; }
-    .scroll-tab { flex: 1; padding: 9px 8px; }
-    .scroll-library-layout { grid-template-columns: 1fr; }
-    .scroll-list-panel { border-right: 0; border-bottom: 1px solid rgba(98, 194, 170, 0.28); }
+    .scroll-library-page { display: flex; width: 100%; height: 100dvh; min-height: 100dvh; box-sizing: border-box; padding: 6px; overflow: hidden; }
+    .scroll-library-shell { display: flex; flex-direction: column; width: 100%; height: 100%; min-height: 0; }
+    .scroll-library-header { flex: 0 0 auto; gap: 6px; padding: 8px 10px; }
+    .scroll-library-header h1 { margin: 2px 0 3px; font-size: 1.05rem; letter-spacing: 1px; }
+    .scroll-library-header p { font-size: 0.68rem; line-height: 1.35; }
+    .scroll-library-header .btn { width: auto; min-height: 34px; padding: 6px 10px; }
+    .scroll-tabs { flex: 0 0 auto; padding: 3px 8px; }
+    .scroll-tab { min-height: 36px; padding: 6px 8px; }
+    .scroll-library-layout { flex: 1 1 auto; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(90px, 28%) minmax(0, 1fr); min-height: 0; overflow: hidden; }
+    .scroll-list-panel { min-height: 0; overflow-y: auto; padding: 8px; border-right: 0; border-bottom: 1px solid rgba(98, 194, 170, 0.28); }
+    .scroll-detail-panel { min-height: 0; overflow-y: auto; padding: 8px; }
+    .scroll-empty { min-height: 0; height: 100%; box-sizing: border-box; font-size: 0.76rem; }
+    .scroll-list-item { min-height: 38px; }
+    .scroll-list-select { padding-top: 5px; padding-bottom: 5px; }
     .scroll-list { grid-template-columns: minmax(0, 1fr); }
     .scroll-detail-panel { padding: 14px 10px; }
     .scroll-detail-footer { align-items: stretch; flex-direction: column; }
@@ -550,6 +558,7 @@ canvas {
     background: rgba(18, 14, 12, 0.38);
     border-radius: 6px;
 }
+.embedded-library .scroll-empty[hidden] { display: none; }
 .embedded-library .scroll-detail-heading { position: absolute; z-index: 2; top: 8px; left: 14px; right: 14px; pointer-events: none; }
 .embedded-library .scroll-detail-heading h2 { margin: 0; font-size: 1.1rem; text-shadow: 0 0 8px rgba(243, 198, 83, 0.45), 0 2px 5px #000; }
 .embedded-library .scroll-detail-heading #scroll-toggle { pointer-events: auto; }
@@ -569,7 +578,8 @@ canvas {
 @media (max-width: 700px) {
     .embedded-library .scroll-tabs { height: 42px; padding: 0 6px; }
     .embedded-library .scroll-tab { padding: 8px 6px; font-size: 0.82rem; }
-    .embedded-library .scroll-list-panel { display: none; }
+    .embedded-library .scroll-list-panel { display: block; top: 42px; right: 4px; bottom: auto; left: 4px; width: auto; max-height: min(45%, 170px); padding: 6px; border-right: 1px solid rgba(98, 194, 170, 0.28); border-bottom: 1px solid rgba(98, 194, 170, 0.28); }
+    .embedded-library.scroll-list-hidden .scroll-list-panel { transform: translateY(-110%); }
     .embedded-library .scroll-detail-panel { width: 100%; height: calc(100vh - 28px); padding: 4px; }
     .embedded-library .scroll-preview-frame { height: calc(100vh - 36px); }
     .embedded-library .scroll-detail-heading { top: 4px; left: 6px; right: 6px; }

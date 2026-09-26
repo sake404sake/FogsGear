@@ -154,6 +154,8 @@ h1 {
 }
 
 .title-bar h1 {
+    font-size: 0.82rem;
+    letter-spacing: 1px;
     white-space: nowrap;
 }
 
@@ -182,17 +184,21 @@ h1 {
 
 @media (max-width: 620px) {
     .title-bar {
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+        gap: 4px;
     }
 
     .title-bar h1 {
-        grid-column: 1 / -1;
-        grid-row: 1;
+        grid-column: auto;
+        grid-row: auto;
+        margin: 0;
         text-align: center;
     }
 
     .title-side {
-        grid-row: 2;
+        grid-row: auto;
+        padding: 4px 5px;
+        font-size: 0.68rem;
     }
 }
 
@@ -664,8 +670,10 @@ canvas.engine-runtime-canvas { display: none; }
         gap: 0;
     }
     .panel {
-        width: auto;
+        width: 100%;
         max-width: none;
+        min-width: 0;
+        box-sizing: border-box;
         padding: 12px 10px;
     }
     .button-row { gap: 7px; }
@@ -673,9 +681,8 @@ canvas.engine-runtime-canvas { display: none; }
     .btn-action, .btn-reset { min-height: 44px; padding: 9px 7px; }
     .dashboard-shortcuts { gap: 7px; }
     .dashboard-shortcuts .dashboard-toggle { min-height: 44px; }
-    .main-control-pager { gap: 0; height: clamp(180px, 23vh, 240px); }
-    .main-page-arrow { display: inline-flex; align-items: center; justify-content: center; }
-    .main-page-viewport { touch-action: pan-y pinch-zoom; height: clamp(190px, 23vh, 240px); min-height: 0; overflow-y: auto; }
+    .main-control-pager { flex: 1 1 auto; gap: 0; height: auto; min-height: 0; }
+    .main-page-viewport { flex: 1 1 auto; touch-action: pan-y pinch-zoom; height: 100%; min-height: 0; overflow-y: auto; }
     .main-page-track, .main-page { height: 100%; }
     .main-page-dots { gap: 12px; margin-top: 8px; }
     .main-page-dot { width: 12px; height: 12px; }
@@ -701,14 +708,17 @@ canvas.engine-runtime-canvas { display: none; }
         max-height: none;
     }
     body > .panel:last-of-type {
-        flex: 0 0 auto;
+        display: flex;
+        flex: 1 1 auto;
+        flex-direction: column;
         min-height: 0;
-        max-height: clamp(180px, 26vh, 230px);
+        max-height: none;
         overflow: hidden;
     }
     .main-page {
-        width: 100%;
-        min-width: 100%;
+        width: 33.3333%;
+        min-width: 33.3333%;
+        flex: 0 0 33.3333%;
     }
     .main-page-track {
         width: 300%;
@@ -791,7 +801,7 @@ canvas.engine-runtime-canvas { display: none; }
         height: 100%;
         max-width: none;
         max-height: none;
-        object-fit: cover;
+        object-fit: fill;
         flex: 1 1 auto;
     }
     body:has(#gameCanvas) > .panel:last-of-type {
@@ -920,8 +930,8 @@ canvas.engine-runtime-canvas { display: none; }
         font-size: 0.82rem;
     }
     body:has(#gameCanvas) .title-bar h1 {
-        letter-spacing: 2px;
-        font-size: 1.18rem;
+        letter-spacing: 1px;
+        font-size: 0.95rem;
     }
     body:has(#gameCanvas) > .panel:last-of-type {
         position: relative;
@@ -999,6 +1009,13 @@ canvas.engine-runtime-canvas { display: none; }
         grid-column: 2;
         grid-row: 2;
         text-align: right;
+    }
+    body:has(#gameCanvas) > .panel:last-of-type .main-page-track {
+        height: 100%;
+    }
+    body:has(#gameCanvas) > .panel:last-of-type .main-page {
+        height: 100% !important;
+        min-height: 0;
     }
 }
 
