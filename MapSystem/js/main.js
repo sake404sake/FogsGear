@@ -1194,6 +1194,7 @@ const mainPageViewport = document.getElementById('main-page-viewport');
 const mainPageTrack = document.getElementById('main-page-track');
 const mainPageDots = [...document.querySelectorAll('.main-page-dot')];
 const mainPageArrows = [...document.querySelectorAll('.main-page-arrow')];
+const gearPreviewIframe = document.querySelector('.gear-preview-page iframe');
 let currentMainPage = 0;
 let mainPagePointerStart = null;
 
@@ -1203,18 +1204,16 @@ function isWideMainLayout() {
 
 function syncMainPageViewportHeight() {
     if (!mainPageViewport || !mainPageTrack) return;
-    const activePage = mainPageTrack.children[currentMainPage];
-    if (!activePage) return;
-    const nextHeight = activePage.scrollHeight || activePage.offsetHeight || 0;
-    if (isWideMainLayout()) {
-        const wideHeight = Math.min(660, Math.max(220, window.innerHeight - 160));
-        mainPageViewport.style.height = `${wideHeight}px`;
-        mainPageViewport.style.minHeight = `${wideHeight}px`;
-        return;
-    }
-    const portraitHeight = Math.min(Math.max(nextHeight, 150), Math.min(window.innerHeight * 0.20, 180));
-    mainPageViewport.style.height = `${portraitHeight}px`;
-    mainPageViewport.style.minHeight = `${portraitHeight}px`;
+    const preferredHeight = isWideMainLayout()
+        ? Math.min(660, Math.max(220, window.innerHeight - 170))
+        : Math.min(Math.max(window.innerHeight * 0.26, 180), 240);
+
+    mainPageViewport.style.height = `${preferredHeight}px`;
+    mainPageViewport.style.minHeight = `${preferredHeight}px`;
+    mainPageTrack.style.height = `${preferredHeight}px`;
+    mainPageTrack.querySelectorAll('.main-page').forEach((page) => {
+        page.style.height = `${preferredHeight}px`;
+    });
 }
 
 function setMainPage(page) {
@@ -1233,19 +1232,38 @@ mainPageDots.forEach(dot => dot.addEventListener('click', () => setMainPage(Numb
 mainPageArrows.forEach(arrow => arrow.addEventListener('click', () => {
     setMainPage(currentMainPage + (arrow.dataset.mainPage === 'next' ? 1 : -1));
 }));
-mainPageViewport?.addEventListener('pointerdown', event => {
-    if (event.target.closest('button, input, select, .movement-joystick')) return;
+const captureMainPageSwipe = (event) => {
+    if (event.target && event.target.closest('button, input, select, .movement-joystick')) return;
     mainPagePointerStart = { x: event.clientX, y: event.clientY };
-});
-mainPageViewport?.addEventListener('pointerup', event => {
+};
+const releaseMainPageSwipe = (event) => {
     if (!mainPagePointerStart) return;
     const deltaX = event.clientX - mainPagePointerStart.x;
     const deltaY = event.clientY - mainPagePointerStart.y;
     mainPagePointerStart = null;
     if (Math.abs(deltaX) < 42 || Math.abs(deltaX) < Math.abs(deltaY) * 1.25) return;
     setMainPage(currentMainPage + (deltaX < 0 ? 1 : -1));
-});
+};
+
+mainPageViewport?.addEventListener('pointerdown', captureMainPageSwipe);
+mainPageViewport?.addEventListener('pointerup', releaseMainPageSwipe);
 mainPageViewport?.addEventListener('pointercancel', () => { mainPagePointerStart = null; });
+
+const bindGearPreviewSwipe = () => {
+    if (!gearPreviewIframe || !gearPreviewIframe.contentWindow || !gearPreviewIframe.contentWindow.document) return;
+    const frameDocument = gearPreviewIframe.contentWindow.document;
+    frameDocument.addEventListener('pointerdown', captureMainPageSwipe, { passive: true });
+    frameDocument.addEventListener('pointerup', releaseMainPageSwipe, { passive: true });
+    frameDocument.addEventListener('pointercancel', () => { mainPagePointerStart = null; }, { passive: true });
+};
+
+gearPreviewIframe?.addEventListener('load', bindGearPreviewSwipe);
+bindGearPreviewSwipe();
+mainPageViewport?.addEventListener('wheel', event => {
+    if (Math.abs(event.deltaX) > Math.abs(event.deltaY) && Math.abs(event.deltaX) > 20) {
+        setMainPage(currentMainPage + (event.deltaX < 0 ? 1 : -1));
+    }
+}, { passive: true });
 window.addEventListener('resize', syncMainPageViewportHeight);
 setMainPage(isWideMainLayout() ? 1 : 0);
 

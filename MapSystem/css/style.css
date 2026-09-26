@@ -363,9 +363,9 @@ h1 {
 }
 
 .main-control-pager { display: flex; align-items: stretch; gap: 4px; width: 100%; min-width: 0; }
-.main-page-viewport { min-width: 0; flex: 1; overflow: hidden; touch-action: pan-y; }
+.main-page-viewport { min-width: 0; flex: 1; overflow: auto; touch-action: pan-y; scrollbar-gutter: stable; overscroll-behavior: contain; }
 .main-page-track { display: flex; width: 300%; transition: transform 220ms ease; will-change: transform; }
-.main-page { width: 33.3333%; min-width: 33.3333%; box-sizing: border-box; padding: 0 4px; }
+.main-page { width: 33.3333%; min-width: 33.3333%; box-sizing: border-box; padding: 0 4px; overflow-y: auto; overflow-x: hidden; }
 .main-page-arrow { flex: 0 0 28px; align-self: center; height: 74px; padding: 0; color: #a7f0d9; background: rgba(98, 194, 170, 0.08); border: 1px solid rgba(98, 194, 170, 0.3); border-radius: 4px; font-size: 2rem; line-height: 1; cursor: pointer; }
 .main-page-arrow:hover { color: #f7d77d; background: rgba(98, 194, 170, 0.18); border-color: #c69a52; }
 .main-page-dots { display: flex; justify-content: center; gap: 8px; margin: 8px 0 4px; }
@@ -441,10 +441,17 @@ h1 {
 }
 
 @media (max-width: 620px) {
-    .main-page-arrow { flex-basis: 24px; height: 64px; }
-    .main-page-viewport { height: clamp(220px, 32vh, 360px); }
+    .main-page-arrow { display: none; }
+    .main-control-pager { gap: 0; height: auto; }
+    .main-page-viewport { height: clamp(190px, 26vh, 260px); min-height: 0; overflow: hidden; }
     .main-page-track, .main-page { height: 100%; }
-    .gear-preview-page iframe { height: 620px; min-height: 560px; }
+    .gear-preview-page iframe { height: 100%; min-height: 0; }
+    .main-page-dots { gap: 10px; margin: 6px 0 0; }
+    body > .panel:last-of-type {
+        flex: 0 0 auto;
+        max-height: none;
+        overflow: visible;
+    }
     .movement-pad {
         grid-template-columns: repeat(3, 60px);
         grid-template-rows: repeat(3, 50px);
@@ -661,8 +668,8 @@ canvas.engine-runtime-canvas { display: none; }
     .dashboard-shortcuts { gap: 7px; }
     .dashboard-shortcuts .dashboard-toggle { min-height: 44px; }
     .main-control-pager { gap: 0; height: clamp(180px, 23vh, 240px); }
-    .main-page-arrow { display: none; }
-    .main-page-viewport { touch-action: pan-y pinch-zoom; height: 100%; min-height: 0; }
+    .main-page-arrow { display: inline-flex; align-items: center; justify-content: center; }
+    .main-page-viewport { touch-action: pan-y pinch-zoom; height: clamp(190px, 23vh, 240px); min-height: 0; overflow-y: auto; }
     .main-page-track, .main-page { height: 100%; }
     .main-page-dots { gap: 12px; margin-top: 8px; }
     .main-page-dot { width: 12px; height: 12px; }
@@ -678,7 +685,7 @@ canvas.engine-runtime-canvas { display: none; }
         width: 100%;
         max-width: none;
         min-height: 180px;
-        height: clamp(180px, 24vh, 220px);
+        height: clamp(200px, 30vh, 280px);
         flex: 0 0 auto;
         min-height: 0;
     }
@@ -793,7 +800,8 @@ canvas.engine-runtime-canvas { display: none; }
         flex: 1 1 auto;
         height: 100% !important;
         min-height: 0;
-        overflow: hidden;
+        overflow: auto;
+        overflow-x: hidden;
     }
     body:has(#gameCanvas) > .panel:last-of-type .main-page-dots {
         flex: 0 0 auto;
@@ -809,9 +817,15 @@ canvas.engine-runtime-canvas { display: none; }
         padding: 0 2px;
         display: flex;
         flex-direction: column;
+        overflow-y: auto;
+        overflow-x: hidden;
     }
     body:has(#gameCanvas) > .panel:last-of-type .main-page-arrow {
-        display: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex: 0 0 20px;
+        height: 100%;
     }
     body:has(#gameCanvas) > .panel:last-of-type .gear-preview-page iframe {
         height: 100%;
