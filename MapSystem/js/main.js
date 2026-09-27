@@ -2,12 +2,14 @@
 import { MapGenerator, BIOME_COLORS, loadMapSnapshot, saveMapSnapshot } from './mapGenerator.js?v=88';
 import { SkinRenderer } from './skinRenderer.js?v=2';
 import { CELL_DEFINITIONS, canEnterCell, getCellEntryRule, getMosaicColor } from './cellRules.js';
+import { drawCellIcon, loadCellIconAtlas } from './cellIconRenderer.js?v=2';
 import { buildTerritoryBorderSegments } from './territoryBorders.js?v=35';
 import { GameState as EngineGameState } from '../../GearSystem/js/GameState.js?v=runtime-8';
 import { GearManager as EngineGearManager } from '../../GearSystem/js/GearManager.js?v=runtime-2';
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
+let cellIconAtlas = null;
 
 const state = {
     player: {
@@ -312,6 +314,11 @@ async function init() {
     state.cellEntryRules = loadCellEntryRules();
     state.zoom = Math.max(state.minZoom, Number(settings.zoom));
     state.worldSeed = String(settings.seed || 'SteampunkIsland_01');
+    try {
+        cellIconAtlas = await loadCellIconAtlas();
+    } catch (error) {
+        console.warn('Cell icon atlas failed to load; rendering the map without terrain icons.');
+    }
     const mainlandUnlocked = isMainlandUnlocked();
     const mapSize = mainlandUnlocked ? FULL_MAP_SIZE : COASTAL_MAP_SIZE;
     state.cols = mapSize.width;
@@ -646,6 +653,20 @@ function draw() {
         }
     }
 
+    if (cellIconAtlas && state.tileSize * state.zoom >= 14) {
+        const iconSize = state.tileSize * 0.58;
+        const iconOffset = (state.tileSize - iconSize) / 2;
+        ctx.save();
+        ctx.globalAlpha = 0.28;
+        ctx.imageSmoothingEnabled = true;
+        for (let y = startRow; y < endRow; y++) {
+            for (let x = startCol; x < endCol; x++) {
+                drawCellIcon(ctx, cellIconAtlas, state.map[y][x], x * state.tileSize + iconOffset, y * state.tileSize + iconOffset, iconSize);
+            }
+        }
+        ctx.restore();
+    }
+
     drawGridOverlay(startCol, endCol, startRow, endRow);
     drawTerritoryOverlay(startCol, endCol, startRow, endRow);
 
@@ -955,15 +976,7 @@ function updateUI() {
 }
 
 function updateEngineDashboard() {
-    let save = {};
-    try { save = JSON.parse(localStorage.getItem('fog_thermo_save') || '{}'); } catch (error) {}
-    const elapsed = Number.isFinite(Number(save.updatedAt))
-        ? Math.max(0, Math.min(5, (Date.now() - Number(save.updatedAt)) / 1000))
-        : 0;
-    const liveValue = (value, generation, consumption = 0) => {
-        const base = Number(value) || 0;
-        return Math.max(0, base + ((Number(generation) || 0) - (Number(consumption) || 0)) * elapsed);
-    };
+    const save = engineRuntimeState;
     const formatCompact = value => {
         const number = Number(value) || 0;
         const absolute = Math.abs(number);
@@ -975,8 +988,8 @@ function updateEngineDashboard() {
     };
     const integerValues = new Set(['main-engine-brass', 'main-engine-steam']);
     const values = {
-        'main-engine-steam': liveValue(save.steamPower, save.steamGenerationRate, save.steamConsumptionRate),
-        'main-engine-water': liveValue(save.water, save.waterGenerationRate, save.waterConsumptionRate),
+        'main-engine-steam': save.steamPower,
+        'main-engine-water': save.water,
         'main-engine-fog': save.fog,
         'main-engine-liquid-metal': save.liquidMetal,
         'main-engine-solid-metal': save.solidMetal,
@@ -1360,8 +1373,8 @@ mainPageDots.forEach(dot => dot.addEventListener('click', () => setMainPage(Numb
 mainPageArrows.forEach(arrow => arrow.addEventListener('click', () => {
     setMainPage(currentMainPage + (arrow.dataset.mainPage === 'next' ? 1 : -1));
 }));
-const captureMainPageSwipe = (event) => {
-    if (event.target && event.target.closest('button, input, select, .movement-joystick')) return;
+const captureMainPageSwipe = (event, allowInteractiveTarget = false) => {
+    if (!allowInteractiveTarget && event.target && event.target.closest('button, input, select, .movement-joystick')) return;
     mainPagePointerStart = { x: event.clientX, y: event.clientY };
 };
 const releaseMainPageSwipe = (event) => {
@@ -1380,7 +1393,8 @@ mainPageViewport?.addEventListener('pointercancel', () => { mainPagePointerStart
 const bindGearPreviewSwipe = () => {
     if (!gearPreviewIframe || !gearPreviewIframe.contentWindow || !gearPreviewIframe.contentWindow.document) return;
     const frameDocument = gearPreviewIframe.contentWindow.document;
-    frameDocument.addEventListener('pointerdown', captureMainPageSwipe, { passive: true });
+    const capturePreviewSwipe = event => captureMainPageSwipe(event, true);
+    frameDocument.addEventListener('pointerdown', capturePreviewSwipe, { passive: true });
     frameDocument.addEventListener('pointerup', releaseMainPageSwipe, { passive: true });
     frameDocument.addEventListener('pointercancel', () => { mainPagePointerStart = null; }, { passive: true });
 };

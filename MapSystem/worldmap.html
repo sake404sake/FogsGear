@@ -117,6 +117,9 @@
         import { MapGenerator, loadMapSnapshot, saveMapSnapshot } from './js/mapGenerator.js?v=88';
         import { CELL_DEFINITIONS, getMosaicColor } from './js/cellRules.js?v=4';
         import { buildTerritoryBorderSegments } from './js/territoryBorders.js?v=35';
+        import { drawCellIcon, loadCellIconAtlas } from './js/cellIconRenderer.js?v=2';
+
+        const cellIconAtlas = await loadCellIconAtlas().catch(() => null);
 
         const legendEl = document.getElementById('worldLegend');
         const legendItems = [
@@ -507,6 +510,19 @@
 
             ctx.imageSmoothingEnabled = false;
             ctx.drawImage(overviewCanvas, 0, 0, cols, rows, 0, 0, cols * tileSize, rows * tileSize);
+            if (cellIconAtlas && tileSize * zoom >= 14) {
+                const iconSize = tileSize * 0.58;
+                const iconOffset = (tileSize - iconSize) / 2;
+                ctx.save();
+                ctx.globalAlpha = 0.28;
+                ctx.imageSmoothingEnabled = true;
+                for (let y = startRow; y < endRow; y++) {
+                    for (let x = startCol; x < endCol; x++) {
+                        drawCellIcon(ctx, cellIconAtlas, mapData[y][x], x * tileSize + iconOffset, y * tileSize + iconOffset, iconSize);
+                    }
+                }
+                ctx.restore();
+            }
             drawTerritoryBorders(startCol, endCol, startRow, endRow);
             ctx.restore();
 

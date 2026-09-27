@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>セル模様・アイコン案 | Fogs Gear</title>
+    <style>
+        :root {
+            color-scheme: dark;
+            --bg: #111411;
+            --panel: #1b201d;
+            --panel-raised: #232a25;
+            --line: #46534a;
+            --muted: #a7b0a8;
+            --text: #ece8dc;
+            --gold: #e1b65a;
+            --mint: #7fd0b5;
+            --tile-size: 20px;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            color: var(--text);
+            background: var(--bg);
+            font-family: "Yu Gothic UI", "Meiryo", sans-serif;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        .page { width: min(1240px, 100%); margin: 0 auto; padding: 28px 24px 48px; }
+        .masthead { display: flex; justify-content: space-between; align-items: end; gap: 24px; padding-bottom: 18px; border-bottom: 1px solid var(--line); }
+        .eyebrow { margin: 0 0 6px; color: var(--mint); font: 11px monospace; letter-spacing: 1.4px; }
+        h1 { margin: 0; color: var(--gold); font: 600 28px Georgia, "Yu Mincho", serif; }
+        .lede { max-width: 420px; margin: 0; color: var(--muted); font-size: 13px; }
+        .keyline { display: flex; flex-wrap: wrap; gap: 8px 18px; padding: 14px 0 18px; color: var(--muted); font-size: 12px; }
+        .keyline span { display: inline-flex; align-items: center; gap: 7px; }
+        .keyline i { display: inline-block; width: 18px; height: 12px; border: 1px solid rgba(255,255,255,.22); border-radius: 2px; }
+        .key-mosaic { background: linear-gradient(90deg, rgba(255,255,255,.11) 50%, transparent 50%), linear-gradient(rgba(0,0,0,.14) 50%, transparent 50%), #53735d; background-size: 9px 9px; }
+        .key-texture { background: repeating-linear-gradient(135deg, #82c7a8 0 2px, #315543 2px 6px); }
+        .toolbar { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 20px; }
+        .tabs { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px; border: 1px solid var(--line); background: #171b18; border-radius: 5px; }
+        .tab { min-height: 34px; padding: 6px 12px; color: #b8c2b9; background: transparent; border: 1px solid transparent; border-radius: 3px; font: inherit; font-size: 12px; cursor: pointer; }
+        .tab[aria-pressed="true"] { color: #171914; background: var(--gold); border-color: #f0cf7e; font-weight: 700; }
+        .count { color: var(--muted); font: 12px monospace; white-space: nowrap; }
+        .group { margin-top: 26px; }
+        .group[hidden] { display: none; }
+        .group-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+        .group-head h2 { margin: 0; color: var(--mint); font-size: 17px; font-weight: 600; }
+        .group-head p { margin: 0; color: var(--muted); font-size: 12px; }
+        .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+        .cell-card { min-width: 0; padding: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 5px; }
+        .card-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+        .card-top h3 { overflow: hidden; margin: 0; font-size: 15px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+        .origin { padding: 2px 7px; color: #c8d3ca; border: 1px solid #536158; border-radius: 10px; font-size: 10px; white-space: nowrap; }
+        .samples { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 7px; }
+        .sample { min-width: 0; }
+        .sample-label { display: flex; justify-content: space-between; gap: 5px; margin-bottom: 4px; color: var(--muted); font-size: 10px; }
+        .sample-label b { color: #d5ded5; font-weight: 500; }
+        .swatch {
+            position: relative;
+            height: 68px;
+            display: grid;
+            grid-template-columns: repeat(6, minmax(0, 1fr));
+            grid-template-rows: repeat(3, minmax(0, 1fr));
+            gap: 1px;
+            overflow: hidden;
+            border: 1px solid rgba(235,240,222,.18);
+            border-radius: 3px;
+        }
+        .terrain-cell { position: relative; display: grid; min-width: 0; min-height: 0; place-items: center; overflow: hidden; background-color: var(--ground); }
+        .terrain-cell::before { position: absolute; inset: 0; content: ""; opacity: .72; background-image: var(--pattern); background-size: var(--pattern-size, 32px 32px); }
+        .terrain-cell::after { position: absolute; z-index: 1; inset: 0; content: ""; background: rgba(255,255,255,.045); pointer-events: none; }
+        .terrain-cell:nth-child(3n)::after { background: rgba(0,0,0,.12); }
+        .terrain-cell:nth-child(4n)::after { background: rgba(255,255,255,.1); }
+        .terrain-icon { position: relative; z-index: 2; display: block; width: 10px; height: 10px; overflow: visible; }
+        .terrain-icon use { filter: none; stroke: #17231f; stroke-width: .65; stroke-linejoin: round; paint-order: stroke fill; }
+        .faded-icons .terrain-icon { opacity: .28; }
+        .mosaic-only .terrain-cell::before { display: none; }
+        .pattern-sea { --pattern: repeating-linear-gradient(176deg, transparent 0 8px, rgba(145,213,222,.75) 9px 10px, transparent 11px 18px); --pattern-size: 40px 25px; }
+        .pattern-lake { --pattern: radial-gradient(ellipse at center, transparent 0 7px, rgba(173,217,244,.8) 8px 9px, transparent 10px 16px); --pattern-size: 36px 28px; }
+        .pattern-plains { --pattern: radial-gradient(circle, rgba(240,223,139,.9) 0 1.3px, transparent 1.8px); --pattern-size: 17px 15px; }
+        .pattern-forest { --pattern: radial-gradient(ellipse at 50% 30%, rgba(188,205,128,.9) 0 2px, transparent 2.7px), linear-gradient(70deg, transparent 47%, rgba(31,69,45,.95) 49% 53%, transparent 55%); --pattern-size: 25px 23px; }
+        .pattern-mountain { --pattern: repeating-linear-gradient(145deg, transparent 0 10px, rgba(221,213,193,.8) 11px 12px, transparent 13px 23px); --pattern-size: 38px 32px; }
+        .pattern-sand { --pattern: radial-gradient(ellipse at 40% 65%, transparent 0 8px, rgba(245,224,167,.9) 9px 10px, transparent 11px 18px), radial-gradient(circle, rgba(102,80,48,.55) 0 1px, transparent 1.7px); --pattern-size: 36px 25px, 13px 13px; }
+        .pattern-ruin { --pattern: repeating-linear-gradient(0deg, transparent 0 13px, rgba(239,180,101,.8) 14px 15px, transparent 16px 28px), repeating-linear-gradient(90deg, transparent 0 18px, rgba(239,180,101,.7) 19px 20px, transparent 21px 38px); --pattern-size: 38px 29px; }
+        .pattern-iron { --pattern: radial-gradient(circle at 25% 35%, #c0bcb0 0 2px, transparent 2.8px), radial-gradient(circle at 72% 68%, #42464a 0 3px, transparent 3.8px), repeating-linear-gradient(135deg, transparent 0 17px, rgba(185,186,177,.45) 18px 19px, transparent 20px 31px); --pattern-size: 34px 31px; }
+        .pattern-copper { --pattern: repeating-linear-gradient(132deg, transparent 0 12px, rgba(226,151,93,.95) 13px 15px, transparent 16px 28px); --pattern-size: 32px 32px; }
+        .pattern-coal { --pattern: radial-gradient(ellipse at 30% 65%, #24282a 0 5px, transparent 6px), radial-gradient(ellipse at 75% 25%, #44484a 0 4px, transparent 5px); --pattern-size: 28px 24px; }
+        .pattern-sulfur { --pattern: repeating-conic-gradient(from 45deg at 50% 50%, transparent 0 22%, rgba(244,214,91,.9) 23% 27%, transparent 28% 50%); --pattern-size: 24px 24px; }
+        .pattern-clay { --pattern: repeating-linear-gradient(0deg, transparent 0 7px, rgba(216,142,111,.78) 8px 9px, transparent 10px 16px); --pattern-size: 32px 24px; }
+        .pattern-limestone { --pattern: repeating-linear-gradient(0deg, transparent 0 10px, rgba(240,228,185,.86) 11px 12px, transparent 13px 22px), radial-gradient(ellipse, rgba(246,235,201,.7) 0 1px, transparent 2px); --pattern-size: 36px 28px, 21px 18px; }
+        .pattern-peat { --pattern: radial-gradient(circle, rgba(202,160,94,.85) 0 1.5px, transparent 2px), repeating-linear-gradient(0deg, transparent 0 13px, rgba(71,55,38,.9) 14px 16px, transparent 17px 25px); --pattern-size: 16px 16px, 34px 28px; }
+        .pattern-salt { --pattern: repeating-conic-gradient(from 45deg, transparent 0 23%, rgba(235,244,230,.85) 24% 26%, transparent 27% 50%); --pattern-size: 22px 22px; }
+        .pattern-oil { --pattern: radial-gradient(ellipse at 30% 40%, rgba(34,46,43,.95) 0 4px, rgba(196,155,73,.8) 5px 6px, transparent 7px), radial-gradient(ellipse at 75% 70%, rgba(25,32,29,.95) 0 5px, rgba(202,164,83,.7) 6px 7px, transparent 8px); --pattern-size: 36px 29px; }
+        .pattern-tin { --pattern: radial-gradient(circle, rgba(216,225,214,.9) 0 2px, transparent 2.8px), repeating-linear-gradient(45deg, transparent 0 18px, rgba(186,204,198,.45) 19px 20px, transparent 21px 32px); --pattern-size: 24px 22px; }
+        .pattern-zinc { --pattern: repeating-linear-gradient(135deg, transparent 0 8px, rgba(206,214,193,.86) 9px 10px, transparent 11px 18px); --pattern-size: 29px 29px; }
+        .pattern-crystal { --pattern: repeating-conic-gradient(from 45deg at 50% 50%, transparent 0 20%, rgba(171,227,238,.92) 21% 24%, transparent 25% 50%); --pattern-size: 24px 24px; }
+        .pattern-mycelium { --pattern: radial-gradient(circle at 30% 70%, rgba(231,208,173,.95) 0 2px, transparent 2.7px), radial-gradient(circle at 58% 38%, rgba(231,208,173,.85) 0 1.5px, transparent 2.2px), linear-gradient(30deg, transparent 46%, rgba(221,201,168,.72) 48% 50%, transparent 52%); --pattern-size: 27px 24px; }
+        .pattern-herb { --pattern: radial-gradient(ellipse at 35% 50%, rgba(181,207,107,.92) 0 3px, transparent 4px), radial-gradient(ellipse at 70% 35%, rgba(219,202,107,.9) 0 2px, transparent 3px); --pattern-size: 29px 24px; }
+        .pattern-resin { --pattern: radial-gradient(circle, transparent 0 5px, rgba(225,171,75,.9) 6px 7px, transparent 8px 14px); --pattern-size: 30px 26px; }
+        .pattern-machinery { --pattern: repeating-linear-gradient(0deg, transparent 0 13px, rgba(201,171,111,.8) 14px 16px, transparent 17px 25px), repeating-linear-gradient(90deg, transparent 0 12px, rgba(116,151,145,.8) 13px 15px, transparent 16px 27px); --pattern-size: 29px 27px; }
+        .pattern-airship { --pattern: radial-gradient(ellipse at 30% 35%, rgba(209,182,124,.95) 0 3px, transparent 4px), repeating-linear-gradient(125deg, transparent 0 15px, rgba(143,164,148,.85) 16px 18px, transparent 19px 29px); --pattern-size: 34px 28px; }
+        .resources { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; }
+        .item { display: inline-flex; align-items: center; gap: 5px; min-height: 26px; padding: 3px 7px 3px 4px; color: #d6ded5; background: #171b18; border: 1px solid #38423b; border-radius: 3px; font-size: 10px; }
+        .item svg { width: 18px; height: 18px; flex: 0 0 18px; image-rendering: pixelated; }
+        .recipe { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; margin-top: 7px; padding-top: 7px; border-top: 1px solid rgba(130,150,135,.18); }
+        .recipe-label { width: 100%; color: #a7b0a8; font-size: 10px; }
+        .recipe .item { min-height: 23px; padding: 2px 5px 2px 3px; border-color: rgba(225,182,90,.3); }
+        .arrow { color: var(--gold); font-size: 12px; }
+        .item-catalog { margin-top: 38px; }
+        .item-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+        .item-entry { display: flex; align-items: center; gap: 10px; min-width: 0; min-height: 60px; padding: 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 4px; }
+        .item-entry > svg { width: 34px; height: 34px; flex: 0 0 34px; }
+        .item-entry h3 { margin: 0; color: var(--text); font-size: 12px; font-weight: 600; }
+        .item-source { margin: 2px 0 0; color: var(--muted); font-size: 10px; line-height: 1.35; }
+        .icon-catalog { margin-top: 38px; }
+        .icon-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+        .icon-entry { display: flex; align-items: center; gap: 10px; min-width: 0; min-height: 66px; padding: 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 4px; }
+        .icon-entry > svg { width: 36px; height: 36px; flex: 0 0 36px; padding: 3px; }
+        .icon-entry h3 { margin: 0; color: var(--text); font-size: 12px; font-weight: 600; }
+        .icon-uses { margin: 2px 0 0; color: var(--muted); font-size: 10px; line-height: 1.35; overflow-wrap: anywhere; }
+        .note { margin: 28px 0 0; padding: 12px 14px; color: #bdc7bd; background: #1b211d; border-left: 3px solid var(--mint); font-size: 12px; }
+        @media (max-width: 700px) {
+            .page { padding: 18px 12px 32px; }
+            .masthead { align-items: start; flex-direction: column; gap: 8px; }
+            h1 { font-size: 24px; }
+            .toolbar { align-items: start; flex-direction: column; }
+            .tabs { width: 100%; }
+            .tab { flex: 1; padding-right: 8px; padding-left: 8px; }
+            .grid { grid-template-columns: minmax(0,1fr); }
+            .icon-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+            .item-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+            .icon-entry { gap: 6px; padding: 6px; }
+            .icon-entry > svg { width: 30px; height: 30px; flex-basis: 30px; }
+            .item-entry { gap: 6px; padding: 6px; }
+            .item-entry > svg { width: 30px; height: 30px; flex-basis: 30px; }
+        }
+    </style>
+</head>
+<body>
+    <svg aria-hidden="true" width="0" height="0" style="position:absolute;overflow:hidden">
+        <symbol id="i-water" viewBox="0 0 24 24"><path fill="#7ec6dc" d="M12 2C9 7 5 11 5 15a7 7 0 0 0 14 0c0-4-4-8-7-13Z"/><path fill="#c4edf0" d="M8 15c0-1.4.8-3 2-4.6-.3 2.2.2 3.1 1.1 4.1.7.8.4 2.6-1.2 2.8-1.1.1-1.9-.8-1.9-2.3Z"/></symbol>
+        <symbol id="i-grain" viewBox="0 0 24 24"><path fill="none" stroke="#d6c66f" stroke-width="2" d="M12 22V4m0 5 4-4m-4 8 4-4m-4 8 4-4m-4-4L8 6m4 9-4-4"/><path fill="#f0dc8a" d="M15 3h4v4h-4zM15 7h4v4h-4zM15 11h4v4h-4zM5 5h4v4H5zm0 5h4v4H5z"/></symbol>
+        <symbol id="i-wood" viewBox="0 0 24 24"><path fill="#9e7045" d="M3 7h15a3 3 0 0 1 0 6H3z"/><ellipse cx="18" cy="10" rx="3" ry="3" fill="#d2a366"/><ellipse cx="18" cy="10" rx="1.5" ry="1.5" fill="none" stroke="#795330"/><path fill="#714d33" d="M4 14h14a3 3 0 0 1 0 6H4z"/><ellipse cx="18" cy="17" rx="3" ry="3" fill="#ba8954"/></symbol>
+        <symbol id="i-stone" viewBox="0 0 24 24"><path fill="#898e87" d="m2 16 3-8 6-4 8 3 4 7-4 7H6z"/><path fill="#c7c8b8" d="m5 9 6-5 4 5-5 4z"/><path fill="#686f6c" d="m10 13 5-4 8 5-4 7-7-1z"/><path fill="none" stroke="#e0ddc8" stroke-width="1.2" d="m8 14 3-2 2 2-2 3"/></symbol>
+        <symbol id="i-relic" viewBox="0 0 24 24"><path fill="#b38b4d" d="M8 3h4v4H8zM2 8h4v4H2zm2 10 3-3 3 3-3 3zM10 19h4v4h-4zm8-2h4v4h-4zm2-7h3v4h-3z"/><path fill="#806b43" stroke="#dfbd72" stroke-width="1.4" d="M12 3a9 9 0 1 1 9 9h-5a4 4 0 1 0-4-4z"/><circle cx="12" cy="12" r="3.2" fill="#352d22" stroke="#d2a95b" stroke-width="1.3"/><circle cx="12" cy="12" r="1" fill="#f0cf7a"/><path fill="none" stroke="#efce79" stroke-width="1" d="m16 7 2-2m-3 5 3-2"/></symbol>
+        <symbol id="i-iron" viewBox="0 0 24 24"><path fill="#454f53" d="m2 14 4-8 6-3 9 5 1 8-7 6-9-2z"/><path fill="#8f9a98" d="m6 7 6-4 3 7-5 4z"/><path fill="#b67552" d="m5 15 4-2 2 3-5 3z"/><path fill="#252e32" d="m13 13 7-4 1 7-6 5z"/></symbol>
+        <symbol id="i-copper" viewBox="0 0 24 24"><path fill="#a76543" d="m3 15 5-11h7l6 8-3 8-9 1z"/><path fill="none" stroke="#e6a274" stroke-width="2" d="m7 17 4-6 6-3"/><path fill="#d38a5f" d="m8 5 5-1 2 4-6 3z"/></symbol>
+        <symbol id="i-coal" viewBox="0 0 24 24"><path fill="#303638" d="m2 14 4-8 7-3 8 6 1 8-7 5-9-2z"/><path fill="#596064" d="m6 7 7-4 4 7-7 4z"/><path fill="#202729" d="m10 14 7-4 5 7-7 5z"/></symbol>
+        <symbol id="i-sulfur" viewBox="0 0 24 24"><path fill="#aa9638" d="M4 8 8 4l5 2 5-1 3 6-2 8-7 2-8-4z"/><path fill="#ead45d" d="m6 9 3-3 3 2-2 4-4 1zm8-1 4-1 2 4-4 2zM9 15l4-2 3 3-2 4-5-1z"/><path fill="none" stroke="#574c27" stroke-width="1.5" d="m8 5 2 3-2 3m8-4-1 4 3 1m-7 3 2 3"/></symbol>
+        <symbol id="i-clay" viewBox="0 0 24 24"><path fill="#bd8068" d="M4 16c0-4 4-8 8-8s8 4 8 8c0 3-4 5-8 5s-8-2-8-5Z"/><path fill="#d99b7b" d="M7 10c2-3 8-4 11 0l-2 3-8 1z"/><path fill="#8e5b4d" d="M9 16h7v2H9z"/></symbol>
+        <symbol id="i-limestone" viewBox="0 0 24 24"><path fill="#8f8975" d="M3 5h18v5H3zm-1 7h20v5H2zm3 7h15v3H5z"/><path fill="#d8d0b2" d="M3 5h18v2H3zm-1 7h20v2H2zm3 7h15v1H5z"/><circle cx="8" cy="9" r="1.5" fill="#f0e4c1"/><circle cx="16" cy="16" r="2" fill="none" stroke="#d8d0b2" stroke-width="1.2"/><circle cx="16" cy="16" r=".7" fill="#d8d0b2"/></symbol>
+        <symbol id="i-peat" viewBox="0 0 24 24"><path fill="#5b4430" d="M3 8h18v5H3zm2 6h16v5H5z"/><path fill="#967148" d="M5 6h14v3H5zm2 10h4v2H7z"/><path fill="#322d25" d="M14 14h5v3h-5z"/></symbol>
+        <symbol id="i-salt" viewBox="0 0 24 24"><path fill="#b7c7bd" d="M3 8h8v8H3zM12 4h8v8h-8zM9 14h9v7H9z"/><path fill="#f0f4e8" d="M3 8h8v3H3zm9-4h8v3h-8zm-3 10h9v3H9z"/><path fill="#758c82" d="M8 11h3v5H8zm9-4h3v5h-3zm-5 6h6v2h-6z"/></symbol>
+        <symbol id="i-sand" viewBox="0 0 24 24"><path fill="#83b9b0" d="M7 2h10l-1 3 2 2v13l-2 2H8l-2-2V7l2-2z"/><path fill="#d8bb70" d="M7 14h10v6l-2 2H8l-2-2z"/><path fill="#f0d88b" d="M8 16h8v2H8zm2 3h5v1h-5z"/><path fill="#d6e5d7" d="M8 7h8v6H8z"/><path fill="#607d77" d="M15 8h1v4h-1z"/></symbol>
+        <symbol id="i-oil" viewBox="0 0 24 24"><path fill="#263b36" d="M2 14c2-1 3-5 6-4 3 1 4 0 6-2 3-2 5 2 8 2l1 5c-4 0-4 4-9 4-4 0-6 3-10 0z"/><path fill="none" stroke="#d1a94e" stroke-width="1.5" stroke-linecap="round" d="M5 15c3-2 5-1 7 0m4-3c2-1 3 0 4 1"/><ellipse cx="9" cy="17" rx="2" ry="1" fill="#e1bf64"/></symbol>
+        <symbol id="i-tin" viewBox="0 0 24 24"><path fill="#788985" d="M3 7h18l-2 14H5z"/><path fill="#d6ded3" d="m3 7 4-4h10l4 4z"/><path fill="#aebdb5" d="M6 9h12l-1 9H7z"/><path fill="none" stroke="#eff2e5" stroke-width="1.4" d="M8 11h8m-9 3h8"/></symbol>
+        <symbol id="i-zinc" viewBox="0 0 24 24"><path fill="#537a70" d="m12 2 8 4 2 9-7 7-10-2-3-9z"/><path fill="#a4c9b6" d="m12 2 1 9-8 9-3-9z"/><path fill="#719b8a" d="m12 2 8 4 2 9-9-4z"/><circle cx="17" cy="17" r="2" fill="#bad06d"/><circle cx="7" cy="7" r="1.5" fill="#bad06d"/></symbol>
+        <symbol id="i-crystal" viewBox="0 0 24 24"><path fill="#397f98" d="m4 10 5-7 4 3 4-4 4 9-5 11-5-3-5 2z"/><path fill="#a9e4e8" d="m9 3 4 3-2 13-4 3-3-12z"/><path fill="#61b4c7" d="m13 6 4-4 4 9-5 11-3-3z"/><path fill="none" stroke="#daf5ed" stroke-width="1.2" d="m9 3 2 16m6-17-1 20"/></symbol>
+        <symbol id="i-spore" viewBox="0 0 24 24"><path fill="#d2b995" d="M6 12a6 6 0 0 1 12 0H6zm5 0h2v8h-2zm-3 8h8v2H8z"/><circle cx="8" cy="7" r="1" fill="#f0dfc2"/><circle cx="15" cy="6" r="1" fill="#f0dfc2"/><circle cx="12" cy="4" r="1" fill="#f0dfc2"/></symbol>
+        <symbol id="i-seed" viewBox="0 0 24 24"><path fill="#8d7440" d="M6 14c0-4 3-8 7-8 4 0 6 3 6 6 0 4-4 7-8 7-3 0-5-2-5-5Z"/><path fill="#d7bd70" d="M8 13c1-2 3-3 6-3 2 0 3 1 4 2-2 0-4 1-6 3-2 1-3 1-4-2Z"/><path fill="none" stroke="#f0dfa1" stroke-width="1.4" d="M8 15c2-2 5-4 9-4"/></symbol>
+        <symbol id="i-herb" viewBox="0 0 24 24"><path fill="none" stroke="#74974c" stroke-width="2" d="M12 22V9m0 7-5-4m5 1 5-5"/><path fill="#8ebd65" d="M7 14c-4 0-5-3-4-6 4 0 7 2 8 6zm6-2c0-5 3-8 7-8 1 4-2 7-7 9z"/><circle cx="12" cy="6" r="2" fill="#e4c85d"/><path fill="#f0d77b" d="m12 2 1 2h2l-2 1 1 2-2-1-2 1 1-2-2-1h2z"/></symbol>
+        <symbol id="i-resin" viewBox="0 0 24 24"><path fill="#795237" d="M11 2h3v8h-3z"/><path fill="#c58d43" d="M11 9c-4 1-5 5-4 8 1 4 9 5 11 1 2-4-1-9-7-9Z"/><path fill="#f0cf72" d="M12 11c-2 1-3 3-2 5 1 2 4 2 5 0 1-2-1-4-3-5Z"/></symbol>
+        <symbol id="i-salvage" viewBox="0 0 24 24"><path fill="#75817c" d="m3 6 3-2 5 5-3 3zm9 0h8v3h-8zm-7 9 7-4 2 3-7 5z"/><path fill="#c59a56" d="m4 5 2-2 5 5-2 2zm11 10 5-2 1 3-5 2z"/><circle cx="17" cy="7.5" r="1" fill="#e0c578"/><path fill="none" stroke="#303a37" stroke-width="1.2" d="m5 17 5-3m5 2 4-1"/></symbol>
+        <symbol id="i-device" viewBox="0 0 24 24"><path fill="#927a4b" d="M5 4h14v17H5zM3 7h2v10H3zm16 0h2v10h-2z"/><circle cx="12" cy="11" r="5" fill="#263f3b" stroke="#cfb56d" stroke-width="1.5"/><path fill="#8bd1bd" d="m12 7 1 4-3 2 2-4z"/><circle cx="12" cy="11" r="1" fill="#f1d579"/><path fill="#d8bd77" d="M8 17h2v2H8zm6 0h3v2h-3z"/></symbol>
+        <symbol id="i-seedcase" viewBox="0 0 24 24"><path fill="#8d7046" d="M4 5h16v15H4z"/><path fill="#d1b77b" d="M6 7h12v2H6z"/><path fill="#77904d" d="M8 15c0-3 2-5 4-6 2 2 3 5 1 7-2 2-5 1-5-1Z"/><path fill="#c9d184" d="M11 16c1-3 3-4 5-4 0 3-1 5-4 5z"/></symbol>
+        <symbol id="i-mining-sample" viewBox="0 0 24 24"><path fill="#8c7044" d="M6 2h12v3l2 2v13l-2 2H6l-2-2V7l2-2z"/><path fill="#9bc2b2" d="M7 7h10v10H7z"/><path fill="#4b5853" d="m8 14 2-5 3-1 3 3-1 5H9z"/><path fill="#bf754a" d="m9 13 3-3 2 2-3 3z"/><path fill="#e5c36e" d="M9 19h6v1H9z"/></symbol>
+        <symbol id="i-coke" viewBox="0 0 24 24"><path fill="#252d2d" d="m3 14 3-8 5-3 5 3 5 1 1 9-6 5-8-1z"/><path fill="#59615b" d="m6 8 5-5 2 6-4 4z"/><path fill="#343d3a" d="m10 14 4-5 7 3 1 4-6 5z"/><circle cx="8" cy="16" r="1" fill="#dda45b"/><circle cx="16" cy="8" r="1" fill="#dda45b"/></symbol>
+        <symbol id="i-vein-mold" viewBox="0 0 24 24"><path fill="#bd9650" d="M10 1h4v3h-4zM10 20h4v3h-4zM1 10h3v4H1zm19 0h3v4h-3z"/><circle cx="12" cy="12" r="8" fill="#58635b" stroke="#d1ad60" stroke-width="1.5"/><circle cx="12" cy="12" r="5" fill="#26342f" stroke="#a7854c"/><path fill="none" stroke="#c47e50" stroke-width="1.8" d="m9 15 2-4 2 1 2-4"/><circle cx="12" cy="12" r="1" fill="#e5c36e"/></symbol>
+        <symbol id="i-spore-vial" viewBox="0 0 24 24"><path fill="#a17e49" d="M9 2h6v3l2 2v12l-2 3H9l-2-3V7l2-2z"/><path fill="#8dbbac" d="M8 10h8v8l-2 2h-4l-2-2z"/><path fill="#e4c16a" d="M10 14c-1-2 1-3 2-5 2 2 3 4 2 6-1 2-4 1-4-1Z"/><path fill="#d9c58c" d="M8 5h8v2H8z"/><circle cx="10" cy="12" r=".7" fill="#f1dda1"/></symbol>
+        <symbol id="i-compost" viewBox="0 0 24 24"><path fill="#9d7448" d="M5 8h14l-1 12-3 2H9l-3-2z"/><path fill="#62452f" d="M6 10h12l-.5 8h-11z"/><path fill="#8eaa60" d="M9 13c2-3 4-3 6 0l-2 4h-4z"/><path fill="#d0aa5d" d="M4 7h16v2H4zm4-3h8v3H8z"/><circle cx="10" cy="15" r=".8" fill="#e8cf83"/><circle cx="15" cy="12" r=".8" fill="#e8cf83"/></symbol>
+        <symbol id="i-forest-seed" viewBox="0 0 24 24"><path fill="#745537" d="M12 2c5 4 7 8 5 13-1 3-3 6-5 7-2-1-4-4-5-7C5 10 7 6 12 2Z"/><path fill="#a8b66b" d="M12 5c3 3 4 6 3 10-1 3-2 4-3 5-1-1-2-2-3-5-1-4 0-7 3-10Z"/><path fill="none" stroke="#e3ce8e" stroke-width="1.2" d="M12 7v11m0-6-3-3m3 6 3-3"/></symbol>
+        <symbol id="cell-sea" viewBox="0 0 24 24"><path fill="none" stroke="#9de2e8" stroke-width="2" stroke-linecap="round" d="M2 7c3-3 5 3 8 0s5 3 8 0 4 0 4 0M2 13c3-3 5 3 8 0s5 3 8 0 4 0 4 0M2 19c3-3 5 3 8 0s5 3 8 0 4 0 4 0"/></symbol>
+        <symbol id="cell-lake" viewBox="0 0 24 24"><path fill="#327d9b" stroke="#b0e7ed" stroke-width="1.4" d="M12 3c5 0 9 3 9 7s-4 8-9 11C7 18 3 14 3 10s4-7 9-7Z"/><path fill="none" stroke="#d5f4eb" stroke-width="1.2" d="M7 10c2-2 8-2 10 0m-8 4c2-1 4-1 6 0"/><circle cx="12" cy="8" r="1.3" fill="#f1e4a5"/></symbol>
+        <symbol id="cell-plains" viewBox="0 0 24 24"><path d="M12 22C10 17 7 13 4 11M12 22C12 16 12 9 12 4M12 22c2-5 5-9 8-11" fill="none" stroke="#263e35" stroke-width="4" stroke-linecap="round"/><path d="M12 22C10 17 7 13 4 11M12 22C12 16 12 9 12 4M12 22c2-5 5-9 8-11" fill="none" stroke="#a9c877" stroke-width="2.2" stroke-linecap="round"/><path d="M12 22C10 17 7 13 4 11M12 22C12 16 12 9 12 4M12 22c2-5 5-9 8-11" fill="none" stroke="#d6df99" stroke-width=".65" stroke-linecap="round"/></symbol>
+        <symbol id="cell-forest" viewBox="0 0 24 24"><path fill="#b6cb83" d="M12 2 4 13h5l-4 6h14l-4-6h5z"/><path fill="#755b3c" d="M10 17h4v5h-4z"/><path fill="#d1df9b" d="m12 4-5 7h4l-2 3h7l-2-3h3z"/></symbol>
+        <symbol id="cell-mountain" viewBox="0 0 24 24"><path fill="#c6c8bf" d="m1 20 7-13 4 6 3-9 8 16z"/><path fill="#f0eee0" d="m6 11 2-4 3 5-2-1-1 2zm7 1 2-8 4 10-3-2-2 2z"/><path fill="#7f8782" d="M1 20h22v2H1z"/></symbol>
+        <symbol id="cell-sand" viewBox="0 0 24 24"><circle cx="17" cy="6" r="3" fill="#f0d27b"/><path fill="none" stroke="#f0d9a0" stroke-width="2" stroke-linecap="round" d="M2 13c4-5 7-5 11 0s7 5 9 1M2 19c4-4 7-4 11 0s7 4 9 1"/></symbol>
+        <symbol id="cell-ruin" viewBox="0 0 24 24"><path fill="#d0a963" d="M3 20h18v2H3zm2-2V7l3-3 3 3v11H9v-7H7v7zm8 0V5l3-3 3 3v13h-2V9h-2v9z"/><path fill="#594638" d="M7 9h2v2H7zm7-2h2v2h-2z"/><path fill="#e7c881" d="m2 5 2-2 2 2-2 2zm15 14h3v2h-3z"/></symbol>
+        <symbol id="cell-mycelium" viewBox="0 0 24 24"><path fill="none" stroke="#e7d4ad" stroke-width="1.5" stroke-linecap="round" d="M12 22V13m0 4-5-4m5 2 5-5m-10 9-3-2m13-5 3-2"/><circle cx="4" cy="11" r="2" fill="#d5b78c"/><circle cx="19" cy="8" r="2.5" fill="#ead9b5"/><circle cx="7" cy="12" r="1" fill="#f4e7cb"/><circle cx="17" cy="10" r="1" fill="#f4e7cb"/><circle cx="12" cy="6" r="1.5" fill="#c5ae86"/></symbol>
+        <symbol id="cell-machinery" viewBox="0 0 24 24"><path fill="#68756f" d="m2 4 8-1 1 3-3 2-1 5-4 1-2-3zm12 0h7v3h-7zm-2 7 3-2 3 3 4-1v10h-9z"/><path fill="#293632" d="M3 5h5l-1 4-4 1zm12 7h6v6h-6z"/><circle cx="6" cy="17" r="4" fill="#3b4641" stroke="#c29b51" stroke-width="1.3"/><circle cx="6" cy="17" r="1.2" fill="#d9bd72"/><path fill="none" stroke="#d0a958" stroke-width="1.4" d="m3 3 1-2m5 5 3-2m2 12 3 2M3 22l-2 1"/><path fill="#b06e49" d="m17 2 2 2-2 2-2-2z"/></symbol>
+        <symbol id="cell-airship" viewBox="0 0 24 24"><path fill="#dbc58f" d="M3 8c2-5 16-6 19 0-2 5-16 6-19 0Z"/><path fill="#7eb9ad" d="M7 8c3-2 8-2 11 0-3 2-8 2-11 0Z"/><path fill="#b8894f" d="m9 13 6 0 2 3H7zm3 3v4m-4-1h8"/><path fill="#e9dfbe" d="M11 7h2v2h-2z"/></symbol>
+    </svg>
+    <main class="page">
+        <header class="masthead">
+            <div><p class="eyebrow">FOGS GEAR / TERRAIN STUDY</p><h1>セル模様と採取アイテム案</h1></div>
+            <p class="lede">地形色のモザイクを残しながら、縮小表示でもセルの種類を読み分けられる模様を検討するための静的プレビューです。</p>
+        </header>
+        <div class="keyline"><span><i class="key-mosaic"></i>地形色の濃淡モザイク</span><span><i class="key-texture"></i>各セルに模様を重ねる案</span><span>6×3セルそれぞれにSVGを配置</span><span>セルSVGはスプライトから再利用します。</span></div>
+        <div class="toolbar">
+            <div class="tabs" role="group" aria-label="表示するセル分類">
+                <button class="tab" type="button" data-filter="all" aria-pressed="true">すべて</button>
+                <button class="tab" type="button" data-filter="initial" aria-pressed="false">初期生成</button>
+                <button class="tab" type="button" data-filter="direct" aria-pressed="false">二次生成・素材不要</button>
+                <button class="tab" type="button" data-filter="item" aria-pressed="false">二次生成・素材必要</button>
+                <button class="tab" type="button" data-filter="event" aria-pressed="false">イベント生成</button>
+            </div>
+            <span class="count" id="cell-count" aria-live="polite"></span>
+        </div>
+        <div id="cell-groups"></div>
+        <section class="item-catalog" aria-labelledby="item-catalog-title">
+            <header class="group-head"><h2 id="item-catalog-title">アイテム一覧 / 重複なし</h2><p id="item-count"></p></header>
+            <div class="item-grid" id="item-grid"></div>
+        </section>
+        <section class="icon-catalog" aria-labelledby="icon-catalog-title">
+            <header class="group-head"><h2 id="icon-catalog-title">SVGアイコン一覧</h2><p id="icon-count"></p></header>
+            <div class="icon-grid" id="icon-grid"></div>
+        </section>
+        <p class="note">模様の識別性は、セルを実ゲームと同じ大きさまで縮小して確認してください。色だけに依存しない識別を目指し、線・点・結晶・層など模様の方向性を分けています。アイコンは採取物や変形素材のラフ案です。</p>
+    </main>
+    <script>
+        const items = {
+            water: ['水', 'water'], grain: ['穀物', 'grain'], wood: ['木材', 'wood'], stone: ['石材', 'stone'], sand: ['砂', 'sand'], relic: ['遺物', 'relic'],
+            iron: ['鉄鉱石', 'iron'], copper: ['銅鉱石', 'copper'], coal: ['石炭', 'coal'], sulfur: ['硫黄', 'sulfur'], clay: ['粘土', 'clay'], limestone: ['石灰石', 'limestone'], peat: ['泥炭', 'peat'], salt: ['塩', 'salt'], oil: ['タール', 'oil'],
+            tin: ['錫鉱石', 'tin'], zinc: ['亜鉛鉱石', 'zinc'], crystal: ['水晶片', 'crystal'], spore: ['胞子', 'spore'], seed: ['古種', 'seed'], herb: ['薬草', 'herb'], resin: ['樹脂', 'resin'], salvage: ['部品くず', 'salvage'], device: ['航法結晶片', 'device'], seedcase: ['種子箱', 'seedcase'],
+            miningSample: ['採掘標本', 'mining-sample'], coke: ['コークス', 'coke'], veinMold: ['鉱脈型', 'vein-mold'], preservedSpores: ['保存胞子', 'spore-vial'], compost: ['菌糸堆肥', 'compost'], forestSeed: ['森林の種', 'forest-seed']
+        };
+        const itemSources = {
+            water: '海・湖沼', grain: '草原', wood: '森林', stone: '山岳', sand: '砂地', relic: '古代遺跡',
+            iron: '鉄鉱脈', copper: '銅鉱脈', coal: '石炭層', sulfur: '硫黄鉱床', clay: '粘土層', limestone: '石灰岩層', peat: '泥炭地', salt: '塩沼', oil: '油浸地',
+            tin: '錫鉱脈', zinc: '亜鉛鉱脈', crystal: '水晶脈', spore: '菌糸群落', seed: '飛行船の墜落跡（③）', herb: '薬草地', resin: '樹脂林', salvage: '機械の残骸（③）', device: '飛行船の墜落跡（③）', seedcase: '飛行船の墜落跡（③）',
+            miningSample: '機械の残骸（③）', coke: '石炭層の石炭を加工', veinMold: '機械の残骸（③）', preservedSpores: '飛行船の墜落跡（③）', compost: '菌糸群落（②）', forestSeed: '森林'
+        };
+        const cells = [
+            { group: 'initial', name: '海', pattern: 'sea', glyph: 'cell-sea', color: '#1e4d6b', out: ['water'] },
+            { group: 'initial', name: '湖沼', pattern: 'lake', glyph: 'cell-lake', color: '#3b82f6', out: ['water'] },
+            { group: 'initial', name: '草原', pattern: 'plains', glyph: 'cell-plains', color: '#8db87c', out: ['grain'] },
+            { group: 'initial', name: '森林', pattern: 'forest', glyph: 'cell-forest', color: '#3e6b48', out: ['wood'] },
+            { group: 'initial', name: '山岳', pattern: 'mountain', glyph: 'cell-mountain', color: '#746b60', out: ['stone'] },
+            { group: 'initial', name: '砂地', pattern: 'sand', glyph: 'cell-sand', color: '#d5bd8a', out: ['sand'] },
+            { group: 'initial', name: '古代遺跡', pattern: 'ruin', glyph: 'cell-ruin', color: '#6f2c2c', out: ['relic'] },
+            { group: 'direct', name: '鉄鉱脈', pattern: 'iron', glyph: 'i-iron', color: '#5d6663', out: ['iron'] },
+            { group: 'direct', name: '銅鉱脈', pattern: 'copper', glyph: 'i-copper', color: '#754c3b', out: ['copper'] },
+            { group: 'direct', name: '石炭層', pattern: 'coal', glyph: 'i-coal', color: '#424846', out: ['coal'] },
+            { group: 'direct', name: '硫黄鉱床', pattern: 'sulfur', glyph: 'i-sulfur', color: '#756a31', out: ['sulfur'] },
+            { group: 'direct', name: '粘土層', pattern: 'clay', glyph: 'i-clay', color: '#795548', out: ['clay'] },
+            { group: 'direct', name: '石灰岩層', pattern: 'limestone', glyph: 'i-limestone', color: '#77735f', out: ['limestone'] },
+            { group: 'direct', name: '泥炭地', pattern: 'peat', glyph: 'i-peat', color: '#554b36', out: ['peat'] },
+            { group: 'direct', name: '塩沼', pattern: 'salt', glyph: 'i-salt', color: '#60736b', out: ['salt'] },
+            { group: 'direct', name: '油浸地', pattern: 'oil', glyph: 'i-oil', color: '#45493d', out: ['oil'] },
+            { group: 'item', name: '錫鉱脈', pattern: 'tin', glyph: 'i-tin', color: '#69736b', out: ['tin'], recipe: [['miningSample'], ['coke']] },
+            { group: 'item', name: '亜鉛鉱脈', pattern: 'zinc', glyph: 'i-zinc', color: '#52655d', out: ['zinc'], recipe: [['tin'], ['sulfur'], ['veinMold']] },
+            { group: 'item', name: '水晶脈', pattern: 'crystal', glyph: 'i-crystal', color: '#356e77', out: ['crystal'], recipe: [['device', '航法結晶片'], ['salt', '塩'], ['limestone', '石灰石']] },
+            { group: 'item', name: '菌糸群落', pattern: 'mycelium', glyph: 'cell-mycelium', color: '#756c5c', out: ['spore'], recipe: [['preservedSpores'], ['peat']] },
+            { group: 'item', name: '薬草地', pattern: 'herb', glyph: 'i-herb', color: '#58794b', out: ['herb'], recipe: [['seed'], ['compost']] },
+            { group: 'item', name: '樹脂林', pattern: 'resin', glyph: 'i-resin', color: '#3e674a', out: ['resin'], recipe: [['forestSeed'], ['compost']] },
+            { group: 'event', name: '機械の残骸', pattern: 'machinery', glyph: 'cell-machinery', color: '#545d59', out: ['salvage', 'miningSample', 'veinMold'] },
+            { group: 'event', name: '飛行船の墜落跡', pattern: 'airship', glyph: 'cell-airship', color: '#625949', out: ['device', 'seedcase', 'preservedSpores', 'seed'] }
+        ];
+        const groups = [
+            { id: 'initial', title: '初期生成セル', description: 'マップ生成時に配置される基本地形。' },
+            { id: 'direct', title: '二次生成セル / アイテム不要', description: '地形変形のみで生成する候補。' },
+            { id: 'item', title: '二次生成セル / アイテム必要', description: '別セルの採取物やイベント素材を組み合わせる候補。' },
+            { id: 'event', title: 'イベント生成セル', description: '地形変形ではなく、探索やイベントで出現させる候補。' }
+        ];
+        const itemChip = ([key, label]) => {
+            const [defaultName, icon] = items[key];
+            return `<span class="item"><svg aria-hidden="true"><use href="#i-${icon}"></use></svg>${label || defaultName}</span>`;
+        };
+        const renderCellGrid = (cell, withIcons) => Array.from({ length: 18 }, () =>
+            `<span class="terrain-cell">${withIcons ? `<svg class="terrain-icon" aria-hidden="true"><use href="#${cell.glyph}"></use></svg>` : ''}</span>`
+        ).join('');
+        const renderCard = (cell) => {
+            const outputItems = cell.out.map((key) => [key, items[key][0]]).map(itemChip).join('');
+            const recipe = cell.recipe ? `<div class="recipe"><span class="recipe-label">変形に使う素材案</span>${cell.recipe.map(itemChip).join('<span class="arrow" aria-hidden="true">+</span>')}</div>` : '';
+            return `<article class="cell-card" style="--ground:${cell.color}">
+                <div class="card-top"><h3>${cell.name}</h3><span class="origin">${cell.group === 'initial' ? '初期セル' : cell.group === 'event' ? '③ イベント' : '② 二次生成'}</span></div>
+                <div class="samples">
+                    <div class="sample"><div class="sample-label"><b>濃淡のみ</b><span>現行</span></div><div class="swatch mosaic-only">${renderCellGrid(cell, false)}</div></div>
+                    <div class="sample"><div class="sample-label"><b>SVG通常</b><span>6×3</span></div><div class="swatch pattern-${cell.pattern}">${renderCellGrid(cell, true)}</div></div>
+                    <div class="sample"><div class="sample-label"><b>SVG薄め</b><span>28%</span></div><div class="swatch pattern-${cell.pattern} faded-icons">${renderCellGrid(cell, true)}</div></div>
+                </div>
+                <div class="resources">${outputItems}</div>${recipe}
+            </article>`;
+        };
+        const groupsRoot = document.getElementById('cell-groups');
+        groupsRoot.innerHTML = groups.map((group) => {
+            const groupCells = cells.filter((cell) => cell.group === group.id);
+            return `<section class="group" data-group="${group.id}"><header class="group-head"><h2>${group.title}</h2><p>${group.description}</p></header><div class="grid">${groupCells.map(renderCard).join('')}</div></section>`;
+        }).join('');
+        const itemEntries = Object.entries(items);
+        document.getElementById('item-count').textContent = `${itemEntries.length}種類`;
+        document.getElementById('item-grid').innerHTML = itemEntries.map(([key, [name, icon]]) =>
+            `<article class="item-entry"><svg aria-hidden="true"><use href="#i-${icon}"></use></svg><div><h3>${name}</h3><p class="item-source">入手元: ${itemSources[key] || '未設定'}</p></div></article>`
+        ).join('');
+        const iconUses = new Map();
+        const addIconUse = (icon, type, name) => {
+            if (!iconUses.has(icon)) iconUses.set(icon, []);
+            iconUses.get(icon).push(`${type}: ${name}`);
+        };
+        cells.forEach((cell) => addIconUse(cell.glyph, 'セル', cell.name));
+        Object.values(items).forEach(([name, icon]) => addIconUse(`i-${icon}`, 'アイテム', name));
+        document.getElementById('icon-count').textContent = `${iconUses.size}種類`;
+        document.getElementById('icon-grid').innerHTML = [...iconUses.entries()].map(([icon, uses]) =>
+            `<article class="icon-entry"><svg aria-hidden="true"><use href="#${icon}"></use></svg><div><h3>${uses[0].split(': ')[1]}</h3><p class="icon-uses">${uses.join(' / ')}</p></div></article>`
+        ).join('');
+        const count = document.getElementById('cell-count');
+        const tabs = [...document.querySelectorAll('.tab')];
+        const showGroup = (filter) => {
+            document.querySelectorAll('.group').forEach((group) => { group.hidden = filter !== 'all' && group.dataset.group !== filter; });
+            tabs.forEach((tab) => tab.setAttribute('aria-pressed', String(tab.dataset.filter === filter)));
+            const visibleCount = filter === 'all' ? cells.length : cells.filter((cell) => cell.group === filter).length;
+            count.textContent = `${visibleCount} CELLS`;
+        };
+        tabs.forEach((tab) => tab.addEventListener('click', () => showGroup(tab.dataset.filter)));
+        showGroup('all');
+    </script>
+</body>
+</html>
