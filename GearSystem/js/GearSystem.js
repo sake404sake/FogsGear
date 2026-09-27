@@ -5,13 +5,13 @@ export const Layer = Object.freeze({ GOLD: 0, SILVER: 1, BRONZE: 2 });
 // ギアの外観分類。処理モードとは独立した設定値として保持する。
 export const GearDesignType = Object.freeze({ INDUSTRIAL: 'INDUSTRIAL', ALCHEMICAL: 'ALCHEMICAL', LOGISTICS: 'LOGISTICS', CLOCKWORK: 'CLOCKWORK', PRODUCTION: 'PRODUCTION' });
 // 資源変換や霧回収の種類。実際の資源処理はGameStateが担当する。
-export const ProcessMode = Object.freeze({ NONE: 'NONE', FOG_COLLECTION: 'FOG_COLLECTION', TRANSFORM: 'TRANSFORM', FOG_TO_WATER: 'FOG_TO_WATER', FOG_TO_LIQUID_METAL: 'FOG_TO_LIQUID_METAL', LIQUID_TO_SOLID_METAL: 'LIQUID_TO_SOLID_METAL', SOLID_TO_BRASS: 'SOLID_TO_BRASS' });
+export const ProcessMode = Object.freeze({ NONE: 'NONE', FOG_COLLECTION: 'FOG_COLLECTION', RESOURCE_COLLECTION: 'RESOURCE_COLLECTION', TRANSFORM: 'TRANSFORM', FOG_TO_WATER: 'FOG_TO_WATER', FOG_TO_LIQUID_METAL: 'FOG_TO_LIQUID_METAL', LIQUID_TO_SOLID_METAL: 'LIQUID_TO_SOLID_METAL', SOLID_TO_BRASS: 'SOLID_TO_BRASS', TERRAIN_TRANSFORM: 'TERRAIN_TRANSFORM', ERA_SHIFT: 'ERA_SHIFT', TARGET_SHIFT_UP: 'TARGET_SHIFT_UP', TARGET_SHIFT_DOWN: 'TARGET_SHIFT_DOWN', TARGET_SHIFT_LEFT: 'TARGET_SHIFT_LEFT', TARGET_SHIFT_RIGHT: 'TARGET_SHIFT_RIGHT' });
 
 const layerDesigns = [GearDesignType.INDUSTRIAL, GearDesignType.ALCHEMICAL, GearDesignType.CLOCKWORK];
 
 export class Gear {
     // ギア1個の永続設定と、ネットワークが毎 tick 更新する回転状態を保持する。
-    constructor({ id, size, layer = Layer.GOLD, isLocked, designType, processMode = ProcessMode.NONE, position = { q: 0, r: 0 }, isCore = false, angle = 0 }) {
+    constructor({ id, size, layer = Layer.GOLD, isLocked, designType, processMode = ProcessMode.NONE, terrainTargetType = 'IRON_VEIN', position = { q: 0, r: 0 }, isCore = false, angle = 0 }) {
         this.id = id || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
         this.size = size;
         this.sizeKey = Object.keys(GearSize).find(key => GearSize[key] === size) || 'M';
@@ -20,6 +20,7 @@ export class Gear {
         this.isLocked = isLocked ?? isCore;
         this.designType = designType || layerDesigns[layer];
         this.processMode = processMode === 'POWER' ? ProcessMode.NONE : processMode;
+        this.terrainTargetType = terrainTargetType;
         this.q = position.q;
         this.r = position.r;
         this.isCore = isCore;
@@ -198,20 +199,16 @@ export class GearNetwork {
             if (known) {
                 const speedMismatch = Math.abs(known.speed - current.speed) > 0.001;
                 const directionMismatch = known.direction !== current.direction;
-                // 同じギアへ別経路が戻ってきても、すでに確定した状態は維持する。
-                // 速度・方向が異なる場合だけ、物理的に矛盾する閉路として停止させる。
-                if ((speedMismatch || directionMismatch) && !current.gear.isDeadlocked) {
+                if ((speedMismatch || directionMismatch) && !invalidLockedAxes.has(current.gear.id)) {
                     conflicts.add(current.gear.id);
                 }
                 continue;
             }
             rotationStates.set(current.gear.id, { speed: current.speed, direction: current.direction });
             if (invalidLockedAxes.has(current.gear.id)) continue;
-            current.gear.powered = true;
-            current.gear.rotationDir = current.direction;
-            current.gear.angularVelocity = current.speed;
             for (const id of this.connections.get(current.gear.id) || []) {
                 const other = this.gears.get(id);
+                if (!other || other.id === current.gear.id) continue;
                 const axis = current.gear.q === other.q && current.gear.r === other.r && current.gear.layer !== other.layer
                     && current.gear.isLocked && other.isLocked;
                 const belt = this.beltEdges.has([current.gear.id, other.id].sort().join(':'));
@@ -221,31 +218,40 @@ export class GearNetwork {
                     : belt
                         ? current.speed * other.size / driver.size
                         : current.speed * driver.size / other.size;
-                queue.push({ gear: other, speed, direction: axis || belt ? current.direction : -current.direction });
+                const direction = axis || belt ? current.direction : -current.direction;
+                const next = { gear: other, speed, direction };
+                const existing = rotationStates.get(other.id);
+                if (existing && (Math.abs(existing.speed - next.speed) > 0.001 || existing.direction !== next.direction)) {
+                    conflicts.add(other.id);
+                    continue;
+                }
+                if (!existing) queue.push(next);
             }
         }
-        conflicts.forEach(id => {
-            const gear = this.gears.get(id);
-            if (gear) { gear.isDeadlocked = true; gear.angleError = true; }
-        });
         const deadlocked = new Set([...invalidLockedAxes, ...conflicts]);
-        const blockedQueue = [...deadlocked];
-        while (blockedQueue.length) {
-            const id = blockedQueue.shift();
-            for (const connectedId of this.connections.get(id) || []) {
-                if (deadlocked.has(connectedId)) continue;
-                deadlocked.add(connectedId);
-                blockedQueue.push(connectedId);
+        this.gears.forEach(gear => {
+            const known = rotationStates.get(gear.id);
+            if (deadlocked.has(gear.id)) {
+                gear.powered = false;
+                gear.rotationDir = 0;
+                gear.angularVelocity = 0;
+                gear.isDeadlocked = true;
+                gear.angleError = true;
+                return;
             }
-        }
-        deadlocked.forEach(id => {
-            const gear = this.gears.get(id);
-            if (!gear) return;
+            if (known) {
+                gear.powered = true;
+                gear.rotationDir = known.direction;
+                gear.angularVelocity = known.speed;
+                gear.isDeadlocked = false;
+                gear.angleError = false;
+                return;
+            }
             gear.powered = false;
             gear.rotationDir = 0;
             gear.angularVelocity = 0;
-            gear.isDeadlocked = true;
-            gear.angleError = true;
+            gear.isDeadlocked = false;
+            gear.angleError = false;
         });
     }
 

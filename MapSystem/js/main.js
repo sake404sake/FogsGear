@@ -2,7 +2,8 @@
 import { MapGenerator, BIOME_COLORS, loadMapSnapshot, saveMapSnapshot } from './mapGenerator.js?v=88';
 import { SkinRenderer } from './skinRenderer.js?v=2';
 import { CELL_DEFINITIONS, canEnterCell, getCellEntryRule, getMosaicColor } from './cellRules.js';
-import { drawCellIcon, loadCellIconAtlas } from './cellIconRenderer.js?v=2';
+import { drawCellIcon, loadCellIconAtlas } from './cellIconRenderer.js?v=3';
+import { ACTIVE_SCROLL_TARGETS_KEY, CELL_MATERIALS, TERRAIN_TRANSFORM_RECIPES, WORLD_CELL_TYPES, applyCellChanges, chooseEraCellType, getCellDrops, readCellChanges, saveCellChange } from './worldCells.js?v=2';
 import { buildTerritoryBorderSegments } from './territoryBorders.js?v=35';
 import { GameState as EngineGameState } from '../../GearSystem/js/GameState.js?v=runtime-8';
 import { GearManager as EngineGearManager } from '../../GearSystem/js/GearManager.js?v=runtime-2';
@@ -37,6 +38,8 @@ const state = {
     generator: null,
     skin: new SkinRenderer(),
     inventoryItems: new Set(),
+    cellChanges: {},
+    activeScrollTargets: {},
     cellEntryRules: { types: {}, cells: {} }
 };
 
@@ -178,7 +181,7 @@ function renderCellLegend() {
     const legend = document.getElementById('cell-legend');
     if (!legend) return;
     legend.innerHTML = '';
-    Object.entries(CELL_DEFINITIONS).forEach(([typeKey, definition]) => {
+    Object.entries(WORLD_CELL_TYPES).forEach(([typeKey, definition]) => {
         const item = document.createElement('div');
         item.className = 'cell-legend-item';
         item.title = getCellEntryRule({ type: typeKey }, state.cellEntryRules).requiredItems.length
@@ -333,6 +336,14 @@ async function init() {
         saveMapSnapshot(generated, state.worldSeed, mapSize.width, mapSize.height).catch(() => {});
     }
     state.map = generated.grid;
+    state.map.forEach(row => row.forEach(tile => { tile.initialType = tile.type; }));
+    state.cellChanges = applyCellChanges(state.map, state.worldSeed);
+    try {
+        const targets = JSON.parse(localStorage.getItem(ACTIVE_SCROLL_TARGETS_KEY) || '{}');
+        state.activeScrollTargets = targets && typeof targets === 'object' ? targets : {};
+    } catch (error) {
+        state.activeScrollTargets = {};
+    }
     state.territories = generated.territories || [];
     state.rivers = generated.rivers || [];
     state.ruins = generated.ruins || [];
@@ -487,6 +498,148 @@ function savePlayerPos() {
     } catch(e) {}
 }
 
+function setWorldCellType(tile, type) {
+    const definition = WORLD_CELL_TYPES[type];
+    if (!tile || !definition) return false;
+    tile.type = type;
+    tile.color = definition.color;
+    tile.isSea = type === 'SEA';
+    tile.isOcean = tile.isSea;
+    tile.isLake = type === 'LAKE';
+    tile.isLand = !tile.isSea && !tile.isLake;
+    tile.isRuin = type === 'RUIN';
+    return true;
+}
+
+function handleWorldCellOperation(operation) {
+    const { x, y } = operation.target || {};
+    if (!Number.isInteger(x) || !Number.isInteger(y)) return { success: false };
+    const directions = {
+        TARGET_SHIFT_UP: [0, -1],
+        TARGET_SHIFT_DOWN: [0, 1],
+        TARGET_SHIFT_LEFT: [-1, 0],
+        TARGET_SHIFT_RIGHT: [1, 0]
+    };
+    const direction = directions[operation.mode];
+    if (direction) {
+        const target = { x: x + direction[0], y: y + direction[1] };
+        return target.x >= 0 && target.x < state.cols && target.y >= 0 && target.y < state.rows
+            ? { success: true, target }
+            : { success: false };
+    }
+
+    const tile = state.map[y]?.[x];
+    if (!tile) return { success: false };
+    const initialType = tile.initialType || tile.type;
+    const currentType = tile.type;
+    const collectionCount = Number(tile.collectionCount) || 0;
+    const transformCount = Number(state.cellChanges[`${x},${y}`]?.transformCount) || 0;
+    const persistChange = (nextType, nextTransformCount = transformCount, nextCollectionCount = collectionCount) => {
+        const typeChanged = tile.type !== nextType;
+        tile.initialType = initialType;
+        tile.collectionCount = nextCollectionCount;
+        tile.transformCount = nextTransformCount;
+        if (typeChanged) setWorldCellType(tile, nextType);
+        state.cellChanges = saveCellChange(state.worldSeed, x, y, {
+            type: nextType,
+            initialType,
+            transformCount: nextTransformCount,
+            collectionCount: nextCollectionCount
+        });
+        if (typeChanged) state.territoryBorderSegments = buildTerritoryBorderSegments(state.map);
+        updateUI();
+        scheduleDraw();
+    };
+
+    if (operation.mode === 'TERRAIN_TRANSFORM') {
+        const nextType = operation.terrainTargetType;
+        const definition = WORLD_CELL_TYPES[nextType];
+        if (!definition || !['direct', 'item'].includes(definition.category) || tile.isSea || tile.isLake) return { success: false };
+        const recipe = TERRAIN_TRANSFORM_RECIPES[nextType] || {};
+        const hasMaterials = Object.entries(recipe).every(([item, count]) => (Number(operation.materials?.[item]) || 0) >= count);
+        if (!hasMaterials || nextType === currentType) return { success: false };
+        persistChange(nextType, transformCount + 1);
+        return { success: true, consumedItems: recipe };
+    }
+
+    if (operation.mode === 'ERA_SHIFT') {
+        const nextType = chooseEraCellType(state.worldSeed, x, y, transformCount + 1, initialType, currentType);
+        if (!nextType || nextType === currentType) return { success: false };
+        persistChange(nextType, transformCount + 1);
+        return { success: true };
+    }
+
+    if (operation.mode === 'RESOURCE_COLLECTION') {
+        const drops = getCellDrops(currentType, collectionCount);
+        if (!drops.length) return { success: false };
+        persistChange(currentType, transformCount, collectionCount + 1);
+        return { success: true, producedItems: Object.fromEntries(drops.map(item => [item, 1])) };
+    }
+
+    return { success: false };
+}
+
+function refreshActiveScrollTargets(targets = null) {
+    if (targets) {
+        state.activeScrollTargets = targets;
+    } else {
+        try {
+            const stored = JSON.parse(localStorage.getItem(ACTIVE_SCROLL_TARGETS_KEY) || '{}');
+            state.activeScrollTargets = stored && typeof stored === 'object' ? stored : {};
+        } catch (error) {
+            state.activeScrollTargets = {};
+        }
+    }
+    updateCellInspection();
+    scheduleDraw();
+}
+
+function updateCellInspection() {
+    const details = document.getElementById('cell-inspection');
+    if (!details || !state.map.length) return;
+    const cellName = type => WORLD_CELL_TYPES[type]?.label || '不明な地形';
+    const current = state.map[state.player.y]?.[state.player.x];
+    const lines = current
+        ? [`現在地 (${state.player.x}, ${state.player.y}): ${cellName(current.type)}`, `初期地形: ${cellName(current.initialType || current.type)}`]
+        : [];
+    Object.entries(state.activeScrollTargets).forEach(([scrollId, target]) => {
+        const tile = state.map[target?.y]?.[target?.x];
+        if (tile) lines.push(`${scrollId}: (${target.x}, ${target.y}) ${cellName(tile.type)} / 初期 ${cellName(tile.initialType || tile.type)}`);
+    });
+    details.replaceChildren(...lines.map(text => {
+        const line = document.createElement('div');
+        line.textContent = text;
+        return line;
+    }));
+}
+
+function renderCellMaterials() {
+    const list = document.getElementById('cell-material-list');
+    if (!list || !engineRuntimeState) return;
+    list.replaceChildren();
+    const entries = Object.entries(engineRuntimeState.materialInventory || {}).filter(([, count]) => Number(count) > 0);
+    if (!entries.length) {
+        const empty = document.createElement('span');
+        empty.className = 'saved-scroll-empty';
+        empty.textContent = '地形素材はありません';
+        list.appendChild(empty);
+        return;
+    }
+    entries.forEach(([item, count]) => {
+        const material = CELL_MATERIALS[item];
+        if (!material) return;
+        const entry = document.createElement('div');
+        entry.className = 'saved-scroll-item';
+        const name = document.createElement('span');
+        name.className = 'saved-scroll-name';
+        name.textContent = `${material.icon} ${material.label}`;
+        const amount = document.createElement('strong');
+        amount.textContent = String(count);
+        entry.append(name, amount);
+        list.appendChild(entry);
+    });
+}
+
 function syncLandscapePanelHeights() {
     const isWideLandscape = window.matchMedia('(min-aspect-ratio: 1/1)').matches;
     const mainFrame = document.querySelector('.landscape-main-frame');
@@ -623,6 +776,29 @@ function drawGridOverlay(startCol, endCol, startRow, endRow) {
     ctx.restore();
 }
 
+function drawTargetCellHighlights(left, top, viewW, viewH) {
+    Object.entries(state.activeScrollTargets).forEach(([scrollId, target]) => {
+        if (!Number.isInteger(target?.x) || !Number.isInteger(target?.y)) return;
+
+        const x = target.x * state.tileSize;
+        const y = target.y * state.tileSize;
+        const right = x + state.tileSize;
+        const bottom = y + state.tileSize;
+        const isVisible = right >= left && x <= left + viewW && bottom >= top && y <= top + viewH;
+        if (!isVisible) return;
+
+        ctx.save();
+        ctx.fillStyle = 'rgba(255, 90, 90, 0.14)';
+        ctx.strokeStyle = '#ff5a5a';
+        ctx.lineWidth = Math.max(2, 2.2 / state.zoom);
+        ctx.shadowColor = 'rgba(255, 90, 90, 0.75)';
+        ctx.shadowBlur = 12 / state.zoom;
+        ctx.fillRect(x, y, state.tileSize, state.tileSize);
+        ctx.strokeRect(x + 1, y + 1, state.tileSize - 2, state.tileSize - 2);
+        ctx.restore();
+    });
+}
+
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = '#071317';
@@ -669,6 +845,7 @@ function draw() {
 
     drawGridOverlay(startCol, endCol, startRow, endRow);
     drawTerritoryOverlay(startCol, endCol, startRow, endRow);
+    drawTargetCellHighlights(left, top, viewW, viewH);
 
     state.skin.draw(
         ctx,
@@ -676,6 +853,21 @@ function draw() {
         state.player.y * state.tileSize + (state.tileSize - state.player.size) / 2,
         state.player.size
     );
+
+    Object.entries(state.activeScrollTargets).forEach(([scrollId, target], index) => {
+        if (!Number.isInteger(target?.x) || !Number.isInteger(target?.y)) return;
+        const centerX = (target.x + 0.5) * state.tileSize;
+        const centerY = (target.y + 0.5) * state.tileSize;
+        ctx.save();
+        ctx.globalAlpha = 0.8;
+        ctx.strokeStyle = ['#f3c653', '#72d1ba', '#d88f67', '#a7b7df'][index % 4];
+        ctx.lineWidth = 2 / state.zoom;
+        ctx.setLineDash([4 / state.zoom, 2 / state.zoom]);
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, state.tileSize * 0.4, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+    });
 
     ctx.restore();
 }
@@ -961,18 +1153,10 @@ function updateUI() {
         : tile.isMainland && tile.territoryId >= 0
             ? (tile.regionName || state.territories.find((item) => item.territoryId === tile.territoryId || item.id === tile.territoryId)?.name || '不明な領域')
             : '孤島';
-    const cellTypes = {
-        SEA: '海',
-        LAKE: '湖沼',
-        PLAINS: '草原',
-        FOREST: '森林',
-        MOUNTAIN: '山岳',
-        SAND: '砂地',
-        RUIN: '古代遺跡'
-    };
-    const cellType = cellTypes[tile.type] || (tile.type === 1 ? '山岳' : tile.type === 2 ? '森林' : tile.type === 0 ? '草原' : '地形');
+    const cellType = WORLD_CELL_TYPES[tile.type]?.label || (tile.type === 1 ? '山岳' : tile.type === 2 ? '森林' : tile.type === 0 ? '草原' : '地形');
     territoryElement.textContent = territory;
     cellTypeElement.textContent = cellType;
+    updateCellInspection();
 }
 
 function updateEngineDashboard() {
@@ -1001,6 +1185,11 @@ function updateEngineDashboard() {
     });
     const creativeIndicator = document.getElementById('main-creative-mode-indicator');
     if (creativeIndicator) creativeIndicator.hidden = !save.creativeMode;
+    const formatSignedRate = (value) => {
+        const number = Number(value) || 0;
+        const formatted = formatCompact(Math.abs(number));
+        return `${number >= 0 ? '+' : '-'}${formatted} /秒`;
+    };
     const rates = {
         'main-water-generation': save.waterGenerationRate,
         'main-water-consumption': save.waterConsumptionRate,
@@ -1016,8 +1205,14 @@ function updateEngineDashboard() {
     };
     Object.entries(rates).forEach(([id, value]) => {
         const element = document.getElementById(id);
-        if (element) element.textContent = `${formatCompact(value)} /秒`;
+        if (!element) return;
+        const isSteamGeneration = id === 'main-steam-generation';
+        element.textContent = isSteamGeneration ? formatSignedRate(value) : `${formatCompact(value)} /秒`;
+        if (save.autoStoppedBySteam && isSteamGeneration) {
+            element.textContent = '+1.00 /秒';
+        }
     });
+    renderCellMaterials();
 }
 
 function updateFullscreenButton() {
@@ -1068,11 +1263,51 @@ async function toggleFullscreen() {
     }
 }
 
+function closeGuideModal() {
+    document.querySelectorAll('.guide-modal').forEach((modal) => modal.remove());
+}
+
+function openGuideModal() {
+    closeGuideModal();
+    const modal = document.createElement('div');
+    modal.className = 'inventory-modal guide-modal';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-label', 'セルガイド');
+
+    const panel = document.createElement('div');
+    panel.className = 'inventory-modal-panel guide-modal-panel';
+
+    const closeButton = document.createElement('button');
+    closeButton.type = 'button';
+    closeButton.className = 'inventory-modal-close';
+    closeButton.setAttribute('aria-label', 'セルガイドを閉じる');
+    closeButton.textContent = '×';
+    closeButton.addEventListener('click', closeGuideModal);
+
+    const frame = document.createElement('iframe');
+    frame.title = 'セルガイド';
+    frame.src = 'cell-atlas.html?modal=1';
+    frame.loading = 'lazy';
+    frame.setAttribute('allowfullscreen', 'false');
+
+    panel.append(closeButton, frame);
+    modal.appendChild(panel);
+    document.body.appendChild(modal);
+    modal.addEventListener('click', (event) => {
+        if (event.target === modal) closeGuideModal();
+    });
+}
+
 document.addEventListener('click', (event) => {
     const button = event.target.closest('button');
     if (!button) return;
     if (button.dataset.action === 'open-world-map') {
         openAppPage('worldmap.html', '全体マップ');
+        return;
+    }
+    if (button.dataset.action === 'open-guide') {
+        openGuideModal();
         return;
     }
     if (button.dataset.action === 'open-settings') {
@@ -1174,15 +1409,19 @@ document.addEventListener('fullscreenchange', () => {
     scheduleDraw();
 });
 
-window.addEventListener('storage', () => {
+window.addEventListener('storage', (event) => {
     renderSavedScrolls();
     updateEngineDashboard();
+    if (event.key === ACTIVE_SCROLL_TARGETS_KEY) refreshActiveScrollTargets();
 });
+
+window.addEventListener('fogsgear:scroll-targets-changed', event => refreshActiveScrollTargets(event.detail));
 
 window.setInterval(updateEngineDashboard, 250);
 
 const engineRuntimeState = new EngineGameState();
 new EngineGearManager(engineRuntimeState);
+engineRuntimeState.worldCellHandler = handleWorldCellOperation;
 window.setInterval(() => engineRuntimeState.tick(), 16);
 
 window.addEventListener('keydown', (e) => {

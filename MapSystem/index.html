@@ -9,7 +9,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="icon" href="../MainSystem/icons/app-icon.jpg" type="image/jpeg">
-    <link rel="stylesheet" href="css/style.css?v=537">
+    <link rel="stylesheet" href="css/style.css?v=538">
 </head>
 <body>
     <div id="loadingOverlay" class="loading-overlay" role="status" aria-live="polite">
@@ -46,10 +46,15 @@
                     <button class="dashboard-resource-row inventory-item-card" type="button" data-action="inspect-inventory-item" data-item-key="cloth_scroll"><span>スクロール（布）</span><strong id="invClothScroll">10</strong></button>
                     <button class="dashboard-resource-row inventory-item-card" type="button" data-action="inspect-inventory-item" data-item-key="scroll_book"><span>スクロールブック</span><strong>1</strong></button>
                 </div>
+                <div class="saved-scroll-section">
+                    <div class="saved-scroll-head">地形採取素材</div>
+                    <div id="cell-material-list" class="saved-scroll-list" aria-live="polite"></div>
+                </div>
             </section>
             <button class="dashboard-toggle" data-action="toggle-cell-legend" aria-expanded="false">地形情報 <span>+</span></button>
             <section class="dashboard" id="cell-legend-panel" hidden>
                 <div id="cell-legend" class="cell-legend" aria-label="セルの凡例"></div>
+                <div id="cell-inspection" class="cell-inspection" aria-live="polite"></div>
             </section>
         </div>
 
@@ -102,6 +107,7 @@
             <section class="navigation-panel" id="navigation-panel" hidden>
                 <div class="button-row">
                     <button class="btn btn-action" data-action="open-world-map">全体マップ</button>
+                    <button class="btn btn-action" data-action="open-guide">セルガイド</button>
                     <button class="btn btn-action" data-action="open-settings">設定</button>
                     <button class="btn btn-action" data-action="toggle-fullscreen" aria-pressed="false">全画面表示</button>
                 </div>
@@ -146,6 +152,6 @@
         </div>
     </div>
 
-    <script type="module" src="js/main.js?v=527"></script>
+    <script type="module" src="js/main.js?v=528"></script>
 </body>
 </html>

@@ -23,8 +23,25 @@ export class CanvasRenderer {
         this.sortedGearSource = null;
         this.gearImages = {};
         this.tintedImages = {};
+        this.resizeObserver = null;
         this.loadGearImages();
+        this.resizeCanvas();
+        if ('ResizeObserver' in window) {
+            this.resizeObserver = new ResizeObserver(() => this.resizeCanvas());
+            this.resizeObserver.observe(this.canvas);
+        }
         if (autoAnimate) requestAnimationFrame(() => this.loop());
+    }
+
+    resizeCanvas() {
+        const rect = this.canvas.getBoundingClientRect();
+        const dpr = window.devicePixelRatio || 1;
+        const nextWidth = Math.max(1, Math.round(rect.width * dpr));
+        const nextHeight = Math.max(1, Math.round(rect.height * dpr));
+        if (this.canvas.width !== nextWidth || this.canvas.height !== nextHeight) {
+            this.canvas.width = nextWidth;
+            this.canvas.height = nextHeight;
+        }
     }
 
     loadGearImages() {
@@ -67,6 +84,7 @@ export class CanvasRenderer {
     }
 
     render() {
+        this.resizeCanvas();
         // 背景、グリッド、配置ギア、ループ表示、ゴーストをこの順番で描画する。
         const { width, height } = this.canvas;
         this.ctx.clearRect(0, 0, width, height);

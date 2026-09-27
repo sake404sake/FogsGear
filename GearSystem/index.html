@@ -46,7 +46,7 @@
             <span class="group-label">— Item Selector —</span>
             <div class="button-row item-selector-row">
                 <button class="btn btn-item" data-item="BELT">ベルト</button>
-                <button class="btn btn-action" type="button" data-action="toggle-gear-size-popup" aria-expanded="false" aria-controls="gear-size-popup">ギア</button>
+                <button class="btn btn-item btn-item-gear" type="button" data-action="toggle-gear-size-popup" data-item="GEAR" aria-expanded="false" aria-controls="gear-size-popup">ギア</button>
             </div>
         </div>
         <div class="control-group">
@@ -112,6 +112,7 @@
             <label id="main-gear-size-row" class="main-gear-hidden">ギアサイズ <select id="main-gear-size-select"><option value="XXS">XXS (4歯)</option><option value="SS">SS (6歯)</option><option value="S">S (10歯)</option><option value="M">M (14歯)</option><option value="L">L (18歯)</option><option value="LL">LL (24歯)</option><option value="3L">3L (32歯)</option><option value="4L">4L (40歯)</option><option value="MAX">MAX (48歯)</option></select></label>
             <label id="gear-design-row">ギア種類 <select id="gear-design-select"><option value="INDUSTRIAL">工業・動力</option><option value="ALCHEMICAL">加工・錬金</option><option value="LOGISTICS">物流・搬送</option><option value="CLOCKWORK">精密・制御</option><option value="PRODUCTION">産業・生産</option></select></label>
             <label id="gear-process-row">処理内容 <select id="gear-process-select"><option value="NONE">処理なし</option></select></label>
+            <label id="gear-terrain-target-row" hidden>変成先セル <select id="gear-terrain-target-select"><option value="IRON_VEIN">鉄鉱脈</option><option value="COPPER_VEIN">銅鉱脈</option><option value="COAL_SEAM">石炭層</option><option value="SULFUR_DEPOSIT">硫黄鉱床</option><option value="CLAY_BED">粘土層</option><option value="LIMESTONE">石灰岩層</option><option value="PEAT_BOG">泥炭地</option><option value="SALT_MARSH">塩沼</option><option value="OIL_SEEP">油浸地</option><option value="TIN_VEIN">錫鉱脈</option><option value="ZINC_VEIN">亜鉛鉱脈</option><option value="CRYSTAL_VEIN">水晶脈</option><option value="MYCELIUM">菌糸群落</option><option value="HERB_FIELD">薬草地</option><option value="RESIN_FOREST">樹脂林</option></select></label>
             <details id="gear-process-section" class="popover-section" hidden>
                 <summary>処理能力</summary>
                 <div id="gear-process-info" class="process-info-panel">
@@ -168,7 +169,7 @@
             }
         })();
     </script>
-    <script type="module" src="js/main.js?v=scroll-edit-15"></script>
+    <script type="module" src="js/main.js?v=scroll-edit-16"></script>
     <script>
         document.addEventListener('click', (event) => {
             const target = event.target.closest('a, button[onclick]');

@@ -1,4 +1,5 @@
 import { GearNetwork } from './GearSystem.js?v=network-2';
+import { ACTIVE_SCROLL_TARGETS_KEY, CELL_MATERIALS, TERRAIN_TRANSFORM_RECIPES, WORLD_CELL_TYPES } from '../../MapSystem/js/worldCells.js?v=2';
 
 /**
  * GameState - リソース、ギア、保存データ、Undo/Redo履歴の管理モジュール
@@ -14,6 +15,7 @@ export class GameState {
         this.brass = 300;
         this.creativeMode = false;
         this.creativeSnapshot = null;
+        this.materialInventory = {};
         this.productionRate = 0;
         this.rotationProgress = new Map();
         this.waterRecoveryRate = 0;
@@ -34,6 +36,7 @@ export class GameState {
         this.brassGenerationRate = 0;
         this.mainGearRunning = true;
         this.autoStoppedBySteam = false;
+        this.userStoppedMainGear = false;
         this.lastTickAt = performance.now();
         this.lastTickElapsed = 1 / 60;
         this.lastStorageSaveAt = 0;
@@ -69,6 +72,7 @@ export class GameState {
         this.runtimeNetwork = null;
         this.activeScrollRuntimes = [];
         this.activeScrollSignature = '';
+        this.worldCellHandler = null;
         this.lastActiveScrollSyncAt = 0;
         
         this.listeners = [];
@@ -111,31 +115,37 @@ export class GameState {
 
         let activeScrollValue = '[]';
         let libraryValue = '[]';
+        let targetValue = '{}';
         let legacyRunning = false;
         try {
             activeScrollValue = localStorage.getItem('fogsgear_active_scroll_id') || '[]';
             libraryValue = localStorage.getItem('fogsgear_scroll_library') || '[]';
+            targetValue = localStorage.getItem(ACTIVE_SCROLL_TARGETS_KEY) || '{}';
             legacyRunning = localStorage.getItem('fogsgear_active_scroll_running') === 'true';
         } catch (error) {
             return [];
         }
-        const signature = `${activeScrollValue}\n${libraryValue}\n${legacyRunning}`;
+        const signature = `${activeScrollValue}\n${libraryValue}\n${targetValue}\n${legacyRunning}`;
         if (signature === this.activeScrollSignature) return this.activeScrollRuntimes;
         this.activeScrollSignature = signature;
 
         let activeIds = [];
         let library = [];
+        let targets = {};
         try {
             const parsedIds = JSON.parse(activeScrollValue);
             activeIds = Array.isArray(parsedIds) ? parsedIds.filter(Boolean) : legacyRunning ? [activeScrollValue] : [];
             const parsedLibrary = JSON.parse(libraryValue);
             library = Array.isArray(parsedLibrary) ? parsedLibrary : [];
+            const parsedTargets = JSON.parse(targetValue);
+            targets = parsedTargets && typeof parsedTargets === 'object' ? parsedTargets : {};
         } catch (error) {
             activeIds = legacyRunning ? [activeScrollValue] : [];
         }
 
         const activeIdSet = new Set(activeIds);
         this.activeScrollRuntimes = [];
+        let targetsChanged = false;
         library.forEach(scroll => {
             if (!activeIdSet.has(scroll.id)) return;
             const blueprintGears = Array.isArray(scroll.blueprint?.gears) ? scroll.blueprint.gears : [];
@@ -155,8 +165,21 @@ export class GameState {
             const network = new GearNetwork(gears, belts);
             network.updateRotation();
             if (gears.some(gear => gear.isDeadlocked || gear.angleError)) return;
-            this.activeScrollRuntimes.push({ gears, belts, network });
+            if (!targets[scroll.id] || !Number.isInteger(targets[scroll.id].x) || !Number.isInteger(targets[scroll.id].y)) {
+                let playerPosition = { x: 0, y: 0 };
+                try {
+                    const savedPlayer = JSON.parse(localStorage.getItem('steampunk_explorer_player_pos') || 'null');
+                    if (Number.isInteger(savedPlayer?.x) && Number.isInteger(savedPlayer?.y)) playerPosition = { x: savedPlayer.x, y: savedPlayer.y };
+                } catch (error) {}
+                targets[scroll.id] = playerPosition;
+                targetsChanged = true;
+            }
+            this.activeScrollRuntimes.push({ scrollId: scroll.id, target: { ...targets[scroll.id] }, gears, belts, network });
         });
+        if (targetsChanged) {
+            localStorage.setItem(ACTIVE_SCROLL_TARGETS_KEY, JSON.stringify(targets));
+            window.dispatchEvent(new CustomEvent('fogsgear:scroll-targets-changed', { detail: targets }));
+        }
         return this.activeScrollRuntimes;
     }
 
@@ -243,9 +266,15 @@ export class GameState {
     }
 
     toggleMainGear() {
-        // メインギアの稼働状態を反転し、接続グラフへ再計算を依頼する。
-        this.mainGearRunning = !this.mainGearRunning;
-        this.autoStoppedBySteam = false;
+        // 手動停止は steam > 0 時の自動再起動で上書きしないよう、停止状態を保持する。
+        if (this.mainGearRunning) {
+            this.mainGearRunning = false;
+            this.userStoppedMainGear = true;
+        } else {
+            this.mainGearRunning = true;
+            this.userStoppedMainGear = false;
+            this.autoStoppedBySteam = false;
+        }
         this.updatePowerGrid();
         this.saveGameData();
         this.notify();
@@ -269,9 +298,11 @@ export class GameState {
             solidMetal: this.solidMetal,
             brass: this.brass,
             mainGearRunning: this.mainGearRunning,
+            userStoppedMainGear: this.userStoppedMainGear,
             autoStoppedBySteam: this.autoStoppedBySteam,
             creativeMode: this.creativeMode,
             creativeSnapshot: this.creativeSnapshot,
+            materialInventory: this.materialInventory,
             waterGenerationRate: this.waterGenerationRate,
             waterConsumptionRate: this.waterConsumptionRate,
             fogRecoveryRate: this.fogRecoveryRate,
@@ -291,7 +322,7 @@ export class GameState {
                 size: gear.sizeKey,
                 layer: gear.layer,
                 isCore: gear.isCore,
-                angle: gear.angle, isLocked: gear.isLocked, designType: gear.designType, processMode: gear.processMode
+                angle: gear.angle, isLocked: gear.isLocked, designType: gear.designType, processMode: gear.processMode, terrainTargetType: gear.terrainTargetType
             }))
         });
     }
@@ -305,9 +336,15 @@ export class GameState {
         this.liquidMetal = data.liquidMetal ?? 0;
         this.solidMetal = data.solidMetal ?? 0;
         this.brass = data.brass;
+        this.materialInventory = data.materialInventory && typeof data.materialInventory === 'object' ? { ...data.materialInventory } : {};
         const editorRuntime = this.isEditorRuntimeContext();
-        this.mainGearRunning = editorRuntime ? true : (data.mainGearRunning ?? true);
-        this.autoStoppedBySteam = editorRuntime ? false : (data.autoStoppedBySteam ?? (data.mainGearRunning === false && this.steamPower > 0));
+        const savedManualStop = data.userStoppedMainGear === true;
+        const savedMainGearRunning = data.mainGearRunning ?? true;
+        this.userStoppedMainGear = savedManualStop;
+        this.mainGearRunning = savedManualStop ? false : savedMainGearRunning;
+        this.autoStoppedBySteam = editorRuntime
+            ? (savedManualStop ? false : (data.autoStoppedBySteam === true || (savedMainGearRunning === false && this.steamPower > 0)))
+            : (savedManualStop ? false : (data.autoStoppedBySteam === true || (savedMainGearRunning === false && this.steamPower > 0)));
         this.lastExternalSaveAt = Number(data.updatedAt) || 0;
         this.creativeMode = data.creativeMode ?? false;
         this.creativeSnapshot = data.creativeSnapshot ?? null;
@@ -381,7 +418,9 @@ export class GameState {
         this.liquidMetal = 0;
         this.solidMetal = 0;
         this.brass = 300;
+        this.materialInventory = {};
         this.mainGearRunning = true;
+        this.userStoppedMainGear = false;
         this.autoStoppedBySteam = false;
         this.undoStack = [];
         this.redoStack = [];
@@ -403,9 +442,11 @@ export class GameState {
             solidMetal: this.solidMetal,
             brass: this.brass,
             mainGearRunning: this.mainGearRunning,
+            userStoppedMainGear: this.userStoppedMainGear,
             autoStoppedBySteam: this.autoStoppedBySteam,
             creativeMode: this.creativeMode,
             creativeSnapshot: this.creativeSnapshot,
+            materialInventory: this.materialInventory,
             waterGenerationRate: this.waterGenerationRate,
             waterConsumptionRate: this.waterConsumptionRate,
             fogRecoveryRate: this.fogRecoveryRate,
@@ -421,7 +462,7 @@ export class GameState {
             gears: this.getRuntimeGears().map(gear => ({
                 id: gear.id,
                 q: gear.q, r: gear.r, size: gear.sizeKey, layer: gear.layer,
-                isCore: Boolean(gear.isCore), angle: gear.angle, isLocked: gear.isLocked, designType: gear.designType, processMode: gear.processMode
+                isCore: Boolean(gear.isCore), angle: gear.angle, isLocked: gear.isLocked, designType: gear.designType, processMode: gear.processMode, terrainTargetType: gear.terrainTargetType
             })),
             undoStack: this.undoStack,
             redoStack: this.redoStack
@@ -442,7 +483,8 @@ export class GameState {
                 angle: gear.angle,
                 isLocked: gear.isLocked,
                 designType: gear.designType,
-                processMode: gear.processMode
+                processMode: gear.processMode,
+                terrainTargetType: gear.terrainTargetType
             })),
             belts: this.belts
         };
@@ -564,9 +606,15 @@ export class GameState {
                 this.liquidMetal = data.liquidMetal ?? 0;
                 this.solidMetal = data.solidMetal ?? 0;
                 this.brass = data.brass ?? 300;
+                this.materialInventory = data.materialInventory && typeof data.materialInventory === 'object' ? { ...data.materialInventory } : {};
                 const editorRuntime = this.isEditorRuntimeContext();
-                this.mainGearRunning = editorRuntime ? true : (data.mainGearRunning ?? true);
-                this.autoStoppedBySteam = editorRuntime ? false : (data.autoStoppedBySteam ?? (data.mainGearRunning === false && this.steamPower > 0));
+                const savedManualStop = data.userStoppedMainGear === true;
+                const savedMainGearRunning = data.mainGearRunning ?? true;
+                this.userStoppedMainGear = savedManualStop;
+                this.mainGearRunning = savedManualStop ? false : savedMainGearRunning;
+                this.autoStoppedBySteam = editorRuntime
+                    ? (savedManualStop ? false : (data.autoStoppedBySteam === true || (savedMainGearRunning === false && this.steamPower > 0)))
+                    : (savedManualStop ? false : (data.autoStoppedBySteam === true || (savedMainGearRunning === false && this.steamPower > 0)));
                 this.lastExternalSaveAt = Number(data.updatedAt) || 0;
                 this.creativeMode = data.creativeMode ?? false;
                 this.creativeSnapshot = data.creativeSnapshot ?? null;
@@ -599,20 +647,66 @@ export class GameState {
         // ギア単体の処理名、入力、出力、毎秒レートをUI用の共通形式で返す。
         // 処理ごとの表示情報をここに集約し、吹き出し側が個別の計算式を持たないようにする。
         const rotationRate = gear ? gear.teeth * Math.abs(gear.angularVelocity || 0) * 0.012 * 60 / (Math.PI * 2) : 0;
+        const terrainTargetType = gear?.terrainTargetType || 'IRON_VEIN';
+        const terrainRecipe = TERRAIN_TRANSFORM_RECIPES[terrainTargetType] || {};
+        const terrainInput = Object.entries(terrainRecipe)
+            .map(([item, count]) => `${CELL_MATERIALS[item]?.label || item} ×${count}`)
+            .join(' + ') || '-';
         const processInfo = {
             NONE: { name: '処理なし', input: '-', output: '-', rate: 0 },
             FOG_COLLECTION: { name: '霧の回収', input: '-', output: '霧', rate: rotationRate * 10 },
+            RESOURCE_COLLECTION: { name: '資材収集', input: '対象セル', output: 'セル資材', rate: rotationRate },
             TRANSFORM: { name: '水→スチーム', input: '水', output: 'スチーム', rate: rotationRate * 10 },
             FOG_TO_WATER: { name: '霧→水', input: '霧', output: '水', rate: rotationRate * 2.5 },
             FOG_TO_LIQUID_METAL: { name: '霧→液体金属', input: '霧', output: '液体金属', rate: rotationRate * 0.1 },
             LIQUID_TO_SOLID_METAL: { name: '液体金属→固体金属', input: '液体金属', output: '固体金属', rate: rotationRate },
-            SOLID_TO_BRASS: { name: '固体金属→真鍮資材', input: '固体金属', output: '真鍮資材', rate: rotationRate }
+            SOLID_TO_BRASS: { name: '固体金属→真鍮資材', input: '固体金属', output: '真鍮資材', rate: rotationRate },
+            TERRAIN_TRANSFORM: { name: '地形変成', input: terrainInput, output: WORLD_CELL_TYPES[terrainTargetType]?.label || '地形セル', rate: rotationRate },
+            ERA_SHIFT: { name: '時代変質', input: '対象セル', output: 'ランダムな時代セル', rate: rotationRate },
+            TARGET_SHIFT_UP: { name: '対象セルを上へシフト', input: '-', output: '対象座標', rate: rotationRate },
+            TARGET_SHIFT_DOWN: { name: '対象セルを下へシフト', input: '-', output: '対象座標', rate: rotationRate },
+            TARGET_SHIFT_LEFT: { name: '対象セルを左へシフト', input: '-', output: '対象座標', rate: rotationRate },
+            TARGET_SHIFT_RIGHT: { name: '対象セルを右へシフト', input: '-', output: '対象座標', rate: rotationRate }
         };
         const info = processInfo[gear?.processMode] || processInfo.NONE;
         const inputMultiplier = gear?.processMode === 'FOG_TO_WATER'
             ? 2
             : gear?.processMode === 'FOG_TO_LIQUID_METAL' ? 10 : 1;
         return { ...info, inputRate: info.rate * inputMultiplier, outputRate: info.rate };
+    }
+
+    processScrollCellGear(gear, scrollRuntime, rotationDelta) {
+        const cellModes = new Set(['RESOURCE_COLLECTION', 'TERRAIN_TRANSFORM', 'ERA_SHIFT', 'TARGET_SHIFT_UP', 'TARGET_SHIFT_DOWN', 'TARGET_SHIFT_LEFT', 'TARGET_SHIFT_RIGHT']);
+        if (!scrollRuntime || !cellModes.has(gear.processMode) || !this.worldCellHandler) return;
+        const progressKey = `cell:${scrollRuntime.scrollId}:${gear.id}:${gear.processMode}`;
+        const progress = (this.rotationProgress.get(progressKey) || 0) + Math.abs(rotationDelta);
+        const completedRotations = Math.floor(progress / (Math.PI * 2));
+        this.rotationProgress.set(progressKey, progress % (Math.PI * 2));
+        for (let rotation = 0; rotation < completedRotations; rotation++) {
+            const detail = {
+                scrollId: scrollRuntime.scrollId,
+                target: { ...scrollRuntime.target },
+                mode: gear.processMode,
+                terrainTargetType: gear.terrainTargetType,
+                materials: this.materialInventory
+            };
+            const result = this.worldCellHandler(detail);
+            if (!result?.success) continue;
+            Object.entries(result.consumedItems || {}).forEach(([item, amount]) => {
+                this.materialInventory[item] = Math.max(0, (Number(this.materialInventory[item]) || 0) - amount);
+            });
+            Object.entries(result.producedItems || {}).forEach(([item, amount]) => {
+                this.materialInventory[item] = (Number(this.materialInventory[item]) || 0) + amount;
+            });
+            if (result.target) {
+                Object.assign(scrollRuntime.target, result.target);
+                let targets = {};
+                try { targets = JSON.parse(localStorage.getItem(ACTIVE_SCROLL_TARGETS_KEY) || '{}'); } catch (error) {}
+                targets[scrollRuntime.scrollId] = { ...scrollRuntime.target };
+                localStorage.setItem(ACTIVE_SCROLL_TARGETS_KEY, JSON.stringify(targets));
+                window.dispatchEvent(new CustomEvent('fogsgear:scroll-targets-changed', { detail: targets }));
+            }
+        }
     }
 
     tick() {
@@ -645,9 +739,14 @@ export class GameState {
             .map(group => ({ network: group.network, gears: group.gears.filter(gear => gear.powered && !gear.isDeadlocked) }))
             .filter(group => group.network && group.gears.length > 0);
         const activeGears = activeGearGroups.flatMap(group => group.gears);
+        const scrollRuntimeByGearId = new Map();
+        runtimeGroups.forEach(group => {
+            if (group.scrollId) group.gears.forEach(gear => scrollRuntimeByGearId.set(gear.id, group));
+        });
         const activeCount = activeGears.length;
         const hasActiveProcess = activeGears.some(gear => !gear.isCore && gear.processMode !== 'NONE');
-        this.waterRecoveryRate = hasActiveProcess && elapsed > 0 ? 1 : 0;
+        const ambientWaterRecovery = !this.creativeMode && (!this.mainGearRunning || this.autoStoppedBySteam || this.steamPower <= 0);
+        this.waterRecoveryRate = (hasActiveProcess || ambientWaterRecovery) && elapsed > 0 ? 1 : 0;
         this.water += elapsed * this.waterRecoveryRate;
         this.productionRate = 0;
         const gearRate = gear => gear.teeth * Math.abs(gear.angularVelocity || 0) * 0.012 / Math.max(elapsed, 1 / 240) / (Math.PI * 2);
@@ -660,6 +759,7 @@ export class GameState {
         const steamConsumption = this.mainGearRunning && !this.creativeMode && activeCount > 0
             ? activeGearGroups.reduce((sum, group) => sum + group.network.calculateSteamConsumption(group.gears), 0)
             : 0;
+        const steamAutoRecoveryRate = !this.creativeMode && (!this.mainGearRunning || this.autoStoppedBySteam || this.steamPower <= 0) && this.steamPower < 100 ? 1 : 0;
         // ダッシュボードの3列目・4列目用のレートを、変換の入力と出力に分けて集計する。
         this.waterGenerationRate = this.waterRecoveryRate + this.fogToWaterRate;
         this.waterConsumptionRate = this.steamTransformRate;
@@ -670,18 +770,20 @@ export class GameState {
         this.liquidMetalConsumptionRate = this.solidMetalRate;
         this.solidMetalConsumptionRate = this.solidMetalToBrassRate;
         this.brassGenerationRate = this.solidMetalToBrassRate;
-        this.steamGenerationRate = this.generatedSteamRate + (this.creativeMode && elapsed > 0 ? 1 : this.waterRecoveryRate);
+        this.steamGenerationRate = this.generatedSteamRate + (this.creativeMode && elapsed > 0 ? 1 : this.waterRecoveryRate) + steamAutoRecoveryRate;
         this.steamConsumptionRate = steamConsumption;
         if (this.creativeMode) {
             // クリエイティブ中も自然回復は実値へ反映し、上限だけを設けない。
             this.steamPower += elapsed;
         } else {
-            this.steamPower = Math.max(0, this.steamPower + this.waterRecoveryRate * elapsed - steamConsumption * elapsed);
+            const autoRecovery = steamAutoRecoveryRate;
+            const recoveryRate = this.mainGearRunning ? this.waterRecoveryRate : 0;
+            this.steamPower = Math.max(0, Math.min(100, this.steamPower + (recoveryRate + autoRecovery) * elapsed - steamConsumption * elapsed));
         }
-        if (this.steamPower <= 0) {
-            const stoppedNow = this.mainGearRunning;
-            this.mainGearRunning = false;
+        if (!this.creativeMode && this.steamPower <= 0) {
             this.autoStoppedBySteam = true;
+            this.userStoppedMainGear = true;
+            this.mainGearRunning = false;
             this.fogRecoveryRate = 0;
             this.fogToWaterRate = 0;
             this.liquidMetalRate = 0;
@@ -694,7 +796,16 @@ export class GameState {
             this.solidMetalConsumptionRate = 0;
             this.brassGenerationRate = 0;
             this.steamConsumptionRate = 0;
-            if (stoppedNow) this.saveGameData();
+        } else if (!this.creativeMode && this.steamPower > 0.25) {
+            this.autoStoppedBySteam = false;
+            // 蒸気切れで停止した場合は、手動停止と同じく自動再起動しない。
+            if (!this.mainGearRunning && !this.userStoppedMainGear && this.steamPower > 0.25) {
+                this.mainGearRunning = true;
+            }
+        }
+        if (this.userStoppedMainGear) {
+            this.mainGearRunning = false;
+            this.autoStoppedBySteam = false;
         }
         if (!this.mainGearRunning) {
             runtimeGroups.forEach(group => group.gears.forEach(gear => {
@@ -748,6 +859,7 @@ export class GameState {
                         }
                     }
                 }
+                this.processScrollCellGear(gear, scrollRuntimeByGearId.get(gear.id), rotationDelta);
             }
         });
         runtimeGroups.forEach(group => group.network?.synchronizeLockedAxes());
@@ -826,8 +938,15 @@ export class GameState {
             const saved = JSON.parse(localStorage.getItem('fog_thermo_save') || '{}');
             const updatedAt = Number(saved.updatedAt) || 0;
             if (updatedAt <= this.lastExternalSaveAt || saved.mainGearRunning === undefined) return;
-            this.mainGearRunning = saved.mainGearRunning !== false;
-            this.autoStoppedBySteam = saved.autoStoppedBySteam === true;
+            if (saved.userStoppedMainGear === true) {
+                this.userStoppedMainGear = true;
+                this.mainGearRunning = false;
+                this.autoStoppedBySteam = false;
+            } else {
+                this.userStoppedMainGear = false;
+                this.mainGearRunning = saved.mainGearRunning !== false;
+                this.autoStoppedBySteam = saved.autoStoppedBySteam === true && this.mainGearRunning === false;
+            }
             this.lastExternalSaveAt = updatedAt;
         } catch (error) {}
     }

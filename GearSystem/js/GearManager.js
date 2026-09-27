@@ -39,6 +39,7 @@ export class GearManager {
             gear.isLocked = data.isLocked ?? Boolean(data.isCore);
             gear.designType = data.designType || gear.designType;
             gear.processMode = data.processMode === 'GAS_TO_LIQUID_METAL' ? 'FOG_TO_LIQUID_METAL' : data.processMode || gear.processMode;
+            gear.terrainTargetType = data.terrainTargetType || gear.terrainTargetType;
             return gear;
         });
         this.state.loadScrollEditorSession(data => {
@@ -49,6 +50,7 @@ export class GearManager {
             gear.isLocked = data.isLocked ?? Boolean(data.isCore);
             gear.designType = data.designType || gear.designType;
             gear.processMode = data.processMode || gear.processMode;
+            gear.terrainTargetType = data.terrainTargetType || gear.terrainTargetType;
             return gear;
         });
         if (this.state.isScrollEditing) {
@@ -135,6 +137,7 @@ export class GearManager {
         if (!gear || !this.state.placedGears.includes(gear)) return false;
         if (Object.hasOwn(settings, 'designType')) gear.designType = settings.designType;
         if (Object.hasOwn(settings, 'processMode')) gear.processMode = settings.processMode;
+        if (Object.hasOwn(settings, 'terrainTargetType')) gear.terrainTargetType = settings.terrainTargetType;
         this.state.saveGameData();
         this.state.notify();
         return true;

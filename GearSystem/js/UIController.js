@@ -37,6 +37,10 @@ export class UIController {
                 }
             } else if (button.dataset.action === 'toggle-gear-size-popup') {
                 const popup = document.getElementById('gear-size-popup');
+                const isGearSelected = this.state.selectedItem === 'GEAR' && this.state.selectedSize === null;
+                if (this.state.selectedSize === null) {
+                    this.state.setSelectedItem(isGearSelected ? 'NONE' : 'GEAR');
+                }
                 if (popup) {
                     popup.hidden = !popup.hidden;
                     button.setAttribute('aria-expanded', String(!popup.hidden));
@@ -127,8 +131,14 @@ export class UIController {
             // 種類を変えると、その種類で利用できる処理の先頭を選択する。
             const processMode = this.updateProcessOptions(event.target.value);
             this.updateSelectedGear({ designType: event.target.value, processMode });
+            this.updateTerrainTargetRow({ processMode, terrainTargetType: document.getElementById('gear-terrain-target-select')?.value });
         });
-        document.getElementById('gear-process-select').addEventListener('change', event => this.updateSelectedGear({ processMode: event.target.value }));
+        document.getElementById('gear-process-select').addEventListener('change', event => {
+            const gear = this.gearManager.findGearById(this.state.selectedGearId);
+            this.updateSelectedGear({ processMode: event.target.value });
+            this.updateTerrainTargetRow({ ...gear, processMode: event.target.value });
+        });
+        document.getElementById('gear-terrain-target-select')?.addEventListener('change', event => this.updateSelectedGear({ terrainTargetType: event.target.value }));
         document.getElementById('gear-layer-select').addEventListener('change', event => {
             const gear = this.gearManager.findGearById(this.state.selectedGearId);
             if (!gear) return;
@@ -309,7 +319,7 @@ export class UIController {
         this.activeTouches.delete(event.pointerId);
         if (this.activeTouches.size < 2) this.initialPinchDist = null;
         if (this.activeTouches.size !== 0) return;
-        const point = this.renderer.worldPoint(event.clientX, event.clientY);
+        const point = this.adjustedWorldPoint(event);
         const existingGear = this.state.selectedSize ? null : this.gearManager.findGearAt(point.x, point.y);
         if (existingGear) {
             this.openGearPopover(existingGear);
@@ -349,8 +359,9 @@ export class UIController {
 
     getProcessOptions(designType) {
         // ギア種類ごとに選べる処理モードを返す。新しい処理はここへ追加する。
-        if (designType === 'PRODUCTION') return [['NONE', '処理なし'], ['FOG_COLLECTION', '霧の回収']];
-        if (designType === 'ALCHEMICAL') return [['NONE', '処理なし'], ['TRANSFORM', '水→スチーム'], ['FOG_TO_WATER', '霧→水'], ['FOG_TO_LIQUID_METAL', '霧→液体金属'], ['LIQUID_TO_SOLID_METAL', '液体金属→固体金属'], ['SOLID_TO_BRASS', '固体金属→真鍮資材']];
+        if (designType === 'PRODUCTION') return [['NONE', '処理なし'], ['FOG_COLLECTION', '霧の回収'], ['RESOURCE_COLLECTION', '資材収集']];
+        if (designType === 'ALCHEMICAL') return [['NONE', '処理なし'], ['TRANSFORM', '水→スチーム'], ['FOG_TO_WATER', '霧→水'], ['FOG_TO_LIQUID_METAL', '霧→液体金属'], ['LIQUID_TO_SOLID_METAL', '液体金属→固体金属'], ['SOLID_TO_BRASS', '固体金属→真鍮資材'], ['TERRAIN_TRANSFORM', '地形変成'], ['ERA_SHIFT', '時代変質']];
+        if (designType === 'CLOCKWORK') return [['NONE', '処理なし'], ['TARGET_SHIFT_UP', '対象セルを上へシフト'], ['TARGET_SHIFT_DOWN', '対象セルを下へシフト'], ['TARGET_SHIFT_LEFT', '対象セルを左へシフト'], ['TARGET_SHIFT_RIGHT', '対象セルを右へシフト']];
         return [['NONE', '処理なし']];
     }
     updateProcessOptions(designType, selectedMode = null) {
@@ -362,6 +373,19 @@ export class UIController {
         select.value = mode;
         return mode;
     }
+    updateTerrainTargetRow(gear) {
+        const row = document.getElementById('gear-terrain-target-row');
+        const select = document.getElementById('gear-terrain-target-select');
+        if (!row || !select) return;
+        const visible = Boolean(gear && gear.processMode === 'TERRAIN_TRANSFORM');
+        row.hidden = !visible;
+        row.style.display = visible ? '' : 'none';
+        if (visible) {
+            select.value = [...select.options].some(option => option.value === gear.terrainTargetType)
+                ? gear.terrainTargetType
+                : 'IRON_VEIN';
+        }
+    }
     // 選択ギアの設定、コスト、同期状態を吹き出しへまとめて表示する。
     openGearPopover(gear) { this.state.selectedGearId = gear.id; this.updateProcessInfo(gear); document.getElementById('gear-modal').hidden = false; document.getElementById('gear-popover-title').textContent = gear.isCore ? 'メインギア' : `${gear.sizeKey} ギア設定`; document.getElementById('gear-popover-meta').textContent = gear.isCore ? `L${gear.layer + 1} / ${gear.teeth}歯` : `L${gear.layer + 1} / ${gear.teeth}歯 / ${gear.designType} / ${gear.processMode}`; const friction = Math.round(this.state.network?.calculateGearFriction(gear) || 0); const driveCost = Math.round(gear.steamLoad); const steamCost = driveCost + friction; const rotation = Math.round(Math.abs(gear.angularVelocity || 0)); const loopBonus = this.state.network?.loopGearIds?.has(gear.id) ? '環機構ボーナス' : ''; document.getElementById('gear-popover-cost').innerHTML = gear.isCore ? '<div class="cost-note">メインギア<br>現在コストの集計対象外</div>' : `<div class="resource-block brass-block"><div class="resource-heading">真鍮資材 <strong>${Math.round(gear.brassCost)}</strong></div></div><div class="resource-divider"></div><div class="resource-block steam-block"><div class="cost-row"><span>駆動コスト</span><strong>${driveCost}</strong></div><div class="cost-row"><span>摩擦コスト</span><strong>${friction}</strong></div>${loopBonus ? `<div class="bonus-row">(${loopBonus})</div>` : ''}</div><div class="resource-divider strong"></div><div class="cost-row steam-total"><span>消費スチーム / 回転</span><strong>${steamCost} / ${rotation}</strong></div>`; document.getElementById('gear-lock-toggle').checked = gear.isLocked; document.getElementById('main-gear-size-select').value = gear.sizeKey; document.getElementById('gear-design-select').value = gear.designType; this.updateProcessOptions(gear.designType, gear.processMode); document.getElementById('main-gear-size-row').classList.toggle('main-gear-hidden', !gear.isCore); document.getElementById('gear-design-row').classList.toggle('main-gear-hidden', gear.isCore); document.getElementById('gear-process-row').classList.toggle('main-gear-hidden', gear.isCore); document.getElementById('gear-delete-button').disabled = gear.isCore; }
     updateProcessInfo(gear) {
@@ -369,8 +393,10 @@ export class UIController {
         const section = document.getElementById('gear-process-section');
         if (!section || !gear || gear.isCore) {
             if (section) section.hidden = true;
+            this.updateTerrainTargetRow(null);
             return;
         }
+        this.updateTerrainTargetRow(gear);
         const info = this.state.getGearProcessInfo(gear);
         section.hidden = gear.processMode === 'NONE';
         document.getElementById('gear-process-info-name').textContent = info.name;
@@ -416,8 +442,20 @@ export class UIController {
     }
 
     pointerOffset(event) {
-        // タッチ操作だけ、指でUIが隠れないよう入力位置を上方向へ補正する。
+        // タッチ操作だけ、指でギアの中心が隠れないよう上方向へ少し補正する。
         return event.pointerType === 'mouse' ? 0 : 110;
+    }
+
+    adjustedWorldPoint(event) {
+        const point = this.renderer.worldPoint(event.clientX, event.clientY);
+        if (!this.isTouchPointer(event)) return point;
+        const offset = this.pointerOffset(event);
+        const canvasPoint = this.renderer.canvasPoint(event.clientX, event.clientY);
+        const adjustedCanvasY = canvasPoint.y - offset;
+        return {
+            x: (canvasPoint.x - this.canvas.width / 2) / this.state.zoomScale - this.state.offsetX,
+            y: (adjustedCanvasY - this.canvas.height / 2) / this.state.zoomScale - this.state.offsetY
+        };
     }
 
     isTouchPointer(event) { return event.pointerType === 'touch' || event.pointerType === 'pen'; }
@@ -506,7 +544,13 @@ export class UIController {
         }
         const beltAddButton = document.getElementById('belt-add-button');
         if (beltAddButton) beltAddButton.hidden = this.state.selectedItem !== 'BELT';
-        document.querySelectorAll('.btn-item').forEach(button => button.classList.toggle('active', button.dataset.item === this.state.selectedItem));
+        document.querySelectorAll('.btn-item').forEach(button => {
+            const item = button.dataset.item;
+            const isBeltsActive = item === 'BELT' && this.state.selectedItem === 'BELT';
+            const isGearActive = item === 'GEAR' && (this.state.selectedItem === 'GEAR' || this.state.selectedSize !== null);
+            button.classList.toggle('active', isBeltsActive || isGearActive);
+            button.setAttribute('aria-pressed', String(isBeltsActive || isGearActive));
+        });
         const beltConfirm = document.getElementById('belt-confirm-button');
         if (beltConfirm) beltConfirm.hidden = this.state.selectedItem !== 'BELT' || this.state.beltSelection.length < 2;
         const creativeIndicator = document.getElementById('creative-mode-indicator');

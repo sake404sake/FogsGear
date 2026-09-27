@@ -5,6 +5,7 @@ import { GearNetwork } from './GearSystem.js';
 const LIBRARY_KEY = 'fogsgear_scroll_library';
 const ACTIVE_SCROLL_KEY = 'fogsgear_active_scroll_id';
 const ACTIVE_SCROLL_RUNNING_KEY = 'fogsgear_active_scroll_running';
+const ACTIVE_SCROLL_TARGETS_KEY = 'fogsgear_active_scroll_targets';
 const GAME_SAVE_KEY = 'fog_thermo_save';
 const canvas = document.getElementById('previewCanvas');
 const ctx = canvas.getContext('2d');
@@ -119,16 +120,38 @@ function getActiveScrollIds() {
     return legacyId && localStorage.getItem(ACTIVE_SCROLL_RUNNING_KEY) === 'true' ? [legacyId] : [];
 }
 
+function getActiveScrollTargets() {
+    try {
+        const targets = JSON.parse(localStorage.getItem(ACTIVE_SCROLL_TARGETS_KEY) || '{}');
+        return targets && typeof targets === 'object' ? targets : {};
+    } catch (error) {
+        return {};
+    }
+}
+
 function setScrollRunning(scrollId, running) {
     const ids = new Set(getActiveScrollIds());
+    const targets = getActiveScrollTargets();
+    if (running) {
+        let playerPosition = { x: 0, y: 0 };
+        try {
+            const savedPlayer = JSON.parse(localStorage.getItem('steampunk_explorer_player_pos') || 'null');
+            if (Number.isInteger(savedPlayer?.x) && Number.isInteger(savedPlayer?.y)) playerPosition = { x: savedPlayer.x, y: savedPlayer.y };
+        } catch (error) {}
+        targets[scrollId] = playerPosition;
+    } else {
+        delete targets[scrollId];
+    }
     if (running) ids.add(scrollId);
     else ids.delete(scrollId);
     localStorage.setItem(ACTIVE_SCROLL_KEY, JSON.stringify([...ids]));
+    localStorage.setItem(ACTIVE_SCROLL_TARGETS_KEY, JSON.stringify(targets));
     localStorage.removeItem(ACTIVE_SCROLL_RUNNING_KEY);
 }
 
 function stopAllScrolls() {
     localStorage.setItem(ACTIVE_SCROLL_KEY, '[]');
+    localStorage.setItem(ACTIVE_SCROLL_TARGETS_KEY, '{}');
     localStorage.removeItem(ACTIVE_SCROLL_RUNNING_KEY);
 }
 
@@ -253,6 +276,7 @@ function renderDetail() {
     if (!scroll) return;
     const gearCount = Array.isArray(scroll.blueprint?.gears) ? scroll.blueprint.gears.length : 0;
     const requestedRunning = getActiveScrollIds().includes(scroll.id);
+    const target = getActiveScrollTargets()[scroll.id];
     const enginePowered = hasEnginePower();
     const isRunning = requestedRunning && enginePowered;
     previewState.running = isRunning;
@@ -269,6 +293,9 @@ function renderDetail() {
         ? 'ギア接続に矛盾があるため起動できません。'
         : !enginePowered ? '動力が停止しているため起動できません。'
         : effectiveRunning ? 'このスクロールは起動中です。' : 'このスクロールは停止中です。';
+    if (effectiveRunning && Number.isInteger(target?.x) && Number.isInteger(target?.y)) {
+        statusElement.textContent += ` / 対象セル (${target.x}, ${target.y})`;
+    }
     toggleButton.textContent = effectiveRunning ? 'スクロールを停止' : 'スクロールを起動';
     toggleButton.classList.toggle('btn-reset', effectiveRunning);
     toggleButton.classList.toggle('btn-visibility', !effectiveRunning);
@@ -362,7 +389,7 @@ choiceModal?.addEventListener('click', event => {
 previewFrame?.addEventListener('pointerup', () => setListVisibility(false));
 
 window.addEventListener('storage', event => {
-    if (event.key === LIBRARY_KEY || event.key === ACTIVE_SCROLL_KEY || event.key === ACTIVE_SCROLL_RUNNING_KEY || event.key === GAME_SAVE_KEY) {
+    if (event.key === LIBRARY_KEY || event.key === ACTIVE_SCROLL_KEY || event.key === ACTIVE_SCROLL_RUNNING_KEY || event.key === ACTIVE_SCROLL_TARGETS_KEY || event.key === GAME_SAVE_KEY) {
         library = readLibrary();
         if (!library.some(scroll => scroll.id === selectedScrollId)) selectedScrollId = library[0]?.id || null;
         if (event.key === LIBRARY_KEY) renderedScrollId = null;

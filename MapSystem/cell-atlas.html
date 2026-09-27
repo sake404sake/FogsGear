@@ -3,77 +3,90 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>セル模様・アイコン案 | Fogs Gear</title>
+    <title>セルガイド | Fogs Gear</title>
     <style>
         :root {
             color-scheme: dark;
-            --bg: #111411;
-            --panel: #1b201d;
-            --panel-raised: #232a25;
-            --line: #46534a;
-            --muted: #a7b0a8;
-            --text: #ece8dc;
-            --gold: #e1b65a;
-            --mint: #7fd0b5;
-            --tile-size: 20px;
+            --bg: #120e0c;
+            --panel: #1d1714;
+            --panel-strong: #241d18;
+            --line: rgba(197, 160, 89, 0.28);
+            --muted: #9c8e80;
+            --text: #e2d9cd;
+            --gold: #f3c653;
+            --amber: #f9d892;
+            --mint: #62c2aa;
+            --tile-size: 32px;
+            --shadow: 0 18px 46px rgba(0, 0, 0, 0.35);
         }
         * { box-sizing: border-box; }
         body {
             margin: 0;
             color: var(--text);
-            background: var(--bg);
+            background:
+                radial-gradient(circle at top, rgba(98, 194, 170, 0.10), transparent 24%),
+                linear-gradient(180deg, #120e0c, #17120f 52%, #100d0b);
             font-family: "Yu Gothic UI", "Meiryo", sans-serif;
             font-size: 14px;
             line-height: 1.5;
         }
         .page { width: min(1240px, 100%); margin: 0 auto; padding: 28px 24px 48px; }
         .masthead { display: flex; justify-content: space-between; align-items: end; gap: 24px; padding-bottom: 18px; border-bottom: 1px solid var(--line); }
-        .eyebrow { margin: 0 0 6px; color: var(--mint); font: 11px monospace; letter-spacing: 1.4px; }
-        h1 { margin: 0; color: var(--gold); font: 600 28px Georgia, "Yu Mincho", serif; }
+        .eyebrow { margin: 0 0 6px; color: var(--mint); font: 11px monospace; letter-spacing: 1.6px; }
+        h1 { margin: 0; color: var(--gold); font: 600 29px Georgia, "Yu Mincho", serif; text-shadow: 0 0 24px rgba(240, 199, 119, 0.25); }
         .lede { max-width: 420px; margin: 0; color: var(--muted); font-size: 13px; }
-        .keyline { display: flex; flex-wrap: wrap; gap: 8px 18px; padding: 14px 0 18px; color: var(--muted); font-size: 12px; }
-        .keyline span { display: inline-flex; align-items: center; gap: 7px; }
-        .keyline i { display: inline-block; width: 18px; height: 12px; border: 1px solid rgba(255,255,255,.22); border-radius: 2px; }
-        .key-mosaic { background: linear-gradient(90deg, rgba(255,255,255,.11) 50%, transparent 50%), linear-gradient(rgba(0,0,0,.14) 50%, transparent 50%), #53735d; background-size: 9px 9px; }
-        .key-texture { background: repeating-linear-gradient(135deg, #82c7a8 0 2px, #315543 2px 6px); }
-        .toolbar { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 20px; }
-        .tabs { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px; border: 1px solid var(--line); background: #171b18; border-radius: 5px; }
-        .tab { min-height: 34px; padding: 6px 12px; color: #b8c2b9; background: transparent; border: 1px solid transparent; border-radius: 3px; font: inherit; font-size: 12px; cursor: pointer; }
-        .tab[aria-pressed="true"] { color: #171914; background: var(--gold); border-color: #f0cf7e; font-weight: 700; }
+        .toolbar { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin: 20px 0 18px; }
+        .tabs { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px; border: 1px solid var(--line); background: rgba(17, 21, 18, 0.9); border-radius: 8px; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04); }
+        .tab { min-height: 34px; padding: 6px 12px; color: #d5e2d5; background: transparent; border: 1px solid transparent; border-radius: 6px; font: inherit; font-size: 12px; cursor: pointer; transition: 0.2s ease; }
+        .tab[aria-pressed="true"] { color: #1a130b; background: linear-gradient(180deg, #f4ce79, #d49c3e); border-color: rgba(249, 216, 146, 0.7); font-weight: 700; box-shadow: 0 0 20px rgba(240, 199, 119, 0.28); }
         .count { color: var(--muted); font: 12px monospace; white-space: nowrap; }
-        .group { margin-top: 26px; }
+        .group { margin-top: 28px; }
         .group[hidden] { display: none; }
         .group-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
         .group-head h2 { margin: 0; color: var(--mint); font-size: 17px; font-weight: 600; }
         .group-head p { margin: 0; color: var(--muted); font-size: 12px; }
-        .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-        .cell-card { min-width: 0; padding: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 5px; }
-        .card-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
-        .card-top h3 { overflow: hidden; margin: 0; font-size: 15px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
-        .origin { padding: 2px 7px; color: #c8d3ca; border: 1px solid #536158; border-radius: 10px; font-size: 10px; white-space: nowrap; }
-        .samples { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 7px; }
-        .sample { min-width: 0; }
-        .sample-label { display: flex; justify-content: space-between; gap: 5px; margin-bottom: 4px; color: var(--muted); font-size: 10px; }
-        .sample-label b { color: #d5ded5; font-weight: 500; }
+        .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+        .cell-card {
+            min-width: 0; padding: 14px;
+            background: linear-gradient(180deg, rgba(26, 35, 31, 0.94), rgba(18, 25, 21, 0.96));
+            border: 1px solid rgba(166, 189, 174, 0.22);
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+        }
+        .card-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
+        .card-top h3 { overflow: hidden; margin: 0; font-size: 15px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+        .origin { padding: 2px 7px; color: #dfeee2; border: 1px solid rgba(169, 211, 187, 0.3); border-radius: 999px; background: rgba(118, 166, 137, 0.08); font-size: 10px; white-space: nowrap; }
         .swatch {
             position: relative;
-            height: 68px;
+            width: 190px;
+            height: 190px;
             display: grid;
-            grid-template-columns: repeat(6, minmax(0, 1fr));
-            grid-template-rows: repeat(3, minmax(0, 1fr));
-            gap: 1px;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            grid-template-rows: repeat(4, minmax(0, 1fr));
+            gap: 0;
             overflow: hidden;
-            border: 1px solid rgba(235,240,222,.18);
-            border-radius: 3px;
+            border: 0;
+            border-radius: 0;
+            background: var(--ground, #120e0c);
+            box-shadow: none;
+            image-rendering: pixelated;
         }
-        .terrain-cell { position: relative; display: grid; min-width: 0; min-height: 0; place-items: center; overflow: hidden; background-color: var(--ground); }
-        .terrain-cell::before { position: absolute; inset: 0; content: ""; opacity: .72; background-image: var(--pattern); background-size: var(--pattern-size, 32px 32px); }
-        .terrain-cell::after { position: absolute; z-index: 1; inset: 0; content: ""; background: rgba(255,255,255,.045); pointer-events: none; }
-        .terrain-cell:nth-child(3n)::after { background: rgba(0,0,0,.12); }
-        .terrain-cell:nth-child(4n)::after { background: rgba(255,255,255,.1); }
-        .terrain-icon { position: relative; z-index: 2; display: block; width: 10px; height: 10px; overflow: visible; }
-        .terrain-icon use { filter: none; stroke: #17231f; stroke-width: .65; stroke-linejoin: round; paint-order: stroke fill; }
-        .faded-icons .terrain-icon { opacity: .28; }
+        .terrain-cell {
+            position: relative; display: grid; min-width: 0; min-height: 0; place-items: center; overflow: hidden;
+            width: 100%;
+            height: 100%;
+            background: var(--ground, #120e0c);
+            border: 0;
+            box-shadow: none;
+        }
+        .terrain-cell::before { display: none; }
+        .terrain-cell::after { display: none; }
+        .terrain-icon {
+            position: relative; z-index: 2; display: block; width: 18px; height: 18px; padding: 2px;
+            overflow: visible; background: transparent; border-radius: 0; box-shadow: none;
+            opacity: 0.28;
+        }
+        .terrain-icon use { filter: drop-shadow(0 0 1px rgba(14,18,17,.7)); stroke: #17231f; stroke-width: .7; stroke-linejoin: round; paint-order: stroke fill; }
         .mosaic-only .terrain-cell::before { display: none; }
         .pattern-sea { --pattern: repeating-linear-gradient(176deg, transparent 0 8px, rgba(145,213,222,.75) 9px 10px, transparent 11px 18px); --pattern-size: 40px 25px; }
         .pattern-lake { --pattern: radial-gradient(ellipse at center, transparent 0 7px, rgba(173,217,244,.8) 8px 9px, transparent 10px 16px); --pattern-size: 36px 28px; }
@@ -182,125 +195,263 @@
     </svg>
     <main class="page">
         <header class="masthead">
-            <div><p class="eyebrow">FOGS GEAR / TERRAIN STUDY</p><h1>セル模様と採取アイテム案</h1></div>
-            <p class="lede">地形色のモザイクを残しながら、縮小表示でもセルの種類を読み分けられる模様を検討するための静的プレビューです。</p>
+            <div>
+                <p class="eyebrow">FOGS GEAR / WORLD GUIDE</p>
+                <h1>セルの見た目と採取の目印</h1>
+            </div>
+            <p class="lede">各セルの見た目、採取物、変形候補をひと目で確認できるガイドです。探索中の判断材料として、色と模様を両方で読み取れるよう整理しました。</p>
         </header>
-        <div class="keyline"><span><i class="key-mosaic"></i>地形色の濃淡モザイク</span><span><i class="key-texture"></i>各セルに模様を重ねる案</span><span>6×3セルそれぞれにSVGを配置</span><span>セルSVGはスプライトから再利用します。</span></div>
+
         <div class="toolbar">
-            <div class="tabs" role="group" aria-label="表示するセル分類">
-                <button class="tab" type="button" data-filter="all" aria-pressed="true">すべて</button>
-                <button class="tab" type="button" data-filter="initial" aria-pressed="false">初期生成</button>
-                <button class="tab" type="button" data-filter="direct" aria-pressed="false">二次生成・素材不要</button>
-                <button class="tab" type="button" data-filter="item" aria-pressed="false">二次生成・素材必要</button>
-                <button class="tab" type="button" data-filter="event" aria-pressed="false">イベント生成</button>
+            <div class="tabs" role="group" aria-label="地形のカテゴリ">
+                <button class="tab" type="button" data-filter="all" aria-pressed="true">全体</button>
+                <button class="tab" type="button" data-filter="initial" aria-pressed="false">初期地形</button>
+                <button class="tab" type="button" data-filter="direct" aria-pressed="false">変質地形</button>
+                <button class="tab" type="button" data-filter="item" aria-pressed="false">採取素材</button>
+                <button class="tab" type="button" data-filter="event" aria-pressed="false">発見地形</button>
             </div>
             <span class="count" id="cell-count" aria-live="polite"></span>
         </div>
+
         <div id="cell-groups"></div>
+
         <section class="item-catalog" aria-labelledby="item-catalog-title">
-            <header class="group-head"><h2 id="item-catalog-title">アイテム一覧 / 重複なし</h2><p id="item-count"></p></header>
+            <header class="group-head">
+                <h2 id="item-catalog-title">採取アイテム</h2>
+                <p id="item-count"></p>
+            </header>
             <div class="item-grid" id="item-grid"></div>
         </section>
+
         <section class="icon-catalog" aria-labelledby="icon-catalog-title">
-            <header class="group-head"><h2 id="icon-catalog-title">SVGアイコン一覧</h2><p id="icon-count"></p></header>
+            <header class="group-head">
+                <h2 id="icon-catalog-title">アイコン一覧</h2>
+                <p id="icon-count"></p>
+            </header>
             <div class="icon-grid" id="icon-grid"></div>
         </section>
-        <p class="note">模様の識別性は、セルを実ゲームと同じ大きさまで縮小して確認してください。色だけに依存しない識別を目指し、線・点・結晶・層など模様の方向性を分けています。アイコンは採取物や変形素材のラフ案です。</p>
     </main>
-    <script>
-        const items = {
-            water: ['水', 'water'], grain: ['穀物', 'grain'], wood: ['木材', 'wood'], stone: ['石材', 'stone'], sand: ['砂', 'sand'], relic: ['遺物', 'relic'],
-            iron: ['鉄鉱石', 'iron'], copper: ['銅鉱石', 'copper'], coal: ['石炭', 'coal'], sulfur: ['硫黄', 'sulfur'], clay: ['粘土', 'clay'], limestone: ['石灰石', 'limestone'], peat: ['泥炭', 'peat'], salt: ['塩', 'salt'], oil: ['タール', 'oil'],
-            tin: ['錫鉱石', 'tin'], zinc: ['亜鉛鉱石', 'zinc'], crystal: ['水晶片', 'crystal'], spore: ['胞子', 'spore'], seed: ['古種', 'seed'], herb: ['薬草', 'herb'], resin: ['樹脂', 'resin'], salvage: ['部品くず', 'salvage'], device: ['航法結晶片', 'device'], seedcase: ['種子箱', 'seedcase'],
-            miningSample: ['採掘標本', 'mining-sample'], coke: ['コークス', 'coke'], veinMold: ['鉱脈型', 'vein-mold'], preservedSpores: ['保存胞子', 'spore-vial'], compost: ['菌糸堆肥', 'compost'], forestSeed: ['森林の種', 'forest-seed']
+
+    <script type="module">
+        import {
+            WORLD_CELL_TYPES,
+            CELL_MATERIALS,
+            TERRAIN_TRANSFORM_RECIPES,
+            getCellDrops
+        } from './js/worldCells.js?v=4';
+        import { getMosaicColor } from './js/cellRules.js?v=4';
+
+        const categoryConfig = {
+            initial: { title: '初期地形', description: 'マップ生成時に広がりやすい基本地形です。' },
+            direct: { title: '変質地形', description: '通常の地形変化で増える資源セルです。' },
+            item: { title: '採取素材', description: '再利用しやすい素材の収集先です。' },
+            event: { title: '発見地形', description: '通常の探索では出現しにくく、特別な発見や変化が発生します。' }
         };
-        const itemSources = {
-            water: '海・湖沼', grain: '草原', wood: '森林', stone: '山岳', sand: '砂地', relic: '古代遺跡',
-            iron: '鉄鉱脈', copper: '銅鉱脈', coal: '石炭層', sulfur: '硫黄鉱床', clay: '粘土層', limestone: '石灰岩層', peat: '泥炭地', salt: '塩沼', oil: '油浸地',
-            tin: '錫鉱脈', zinc: '亜鉛鉱脈', crystal: '水晶脈', spore: '菌糸群落', seed: '飛行船の墜落跡（③）', herb: '薬草地', resin: '樹脂林', salvage: '機械の残骸（③）', device: '飛行船の墜落跡（③）', seedcase: '飛行船の墜落跡（③）',
-            miningSample: '機械の残骸（③）', coke: '石炭層の石炭を加工', veinMold: '機械の残骸（③）', preservedSpores: '飛行船の墜落跡（③）', compost: '菌糸群落（②）', forestSeed: '森林'
+
+        const patternMap = {
+            SEA: 'sea',
+            LAKE: 'lake',
+            PLAINS: 'plains',
+            FOREST: 'forest',
+            MOUNTAIN: 'mountain',
+            SAND: 'sand',
+            RUIN: 'ruin',
+            IRON_VEIN: 'iron',
+            COPPER_VEIN: 'copper',
+            COAL_SEAM: 'coal',
+            SULFUR_DEPOSIT: 'sulfur',
+            CLAY_BED: 'clay',
+            LIMESTONE: 'limestone',
+            PEAT_BOG: 'peat',
+            SALT_MARSH: 'salt',
+            OIL_SEEP: 'oil',
+            TIN_VEIN: 'tin',
+            ZINC_VEIN: 'zinc',
+            CRYSTAL_VEIN: 'crystal',
+            MYCELIUM: 'mycelium',
+            HERB_FIELD: 'herb',
+            RESIN_FOREST: 'resin',
+            MACHINE_WRECK: 'machinery',
+            AIRSHIP_WRECK: 'airship'
         };
-        const cells = [
-            { group: 'initial', name: '海', pattern: 'sea', glyph: 'cell-sea', color: '#1e4d6b', out: ['water'] },
-            { group: 'initial', name: '湖沼', pattern: 'lake', glyph: 'cell-lake', color: '#3b82f6', out: ['water'] },
-            { group: 'initial', name: '草原', pattern: 'plains', glyph: 'cell-plains', color: '#8db87c', out: ['grain'] },
-            { group: 'initial', name: '森林', pattern: 'forest', glyph: 'cell-forest', color: '#3e6b48', out: ['wood'] },
-            { group: 'initial', name: '山岳', pattern: 'mountain', glyph: 'cell-mountain', color: '#746b60', out: ['stone'] },
-            { group: 'initial', name: '砂地', pattern: 'sand', glyph: 'cell-sand', color: '#d5bd8a', out: ['sand'] },
-            { group: 'initial', name: '古代遺跡', pattern: 'ruin', glyph: 'cell-ruin', color: '#6f2c2c', out: ['relic'] },
-            { group: 'direct', name: '鉄鉱脈', pattern: 'iron', glyph: 'i-iron', color: '#5d6663', out: ['iron'] },
-            { group: 'direct', name: '銅鉱脈', pattern: 'copper', glyph: 'i-copper', color: '#754c3b', out: ['copper'] },
-            { group: 'direct', name: '石炭層', pattern: 'coal', glyph: 'i-coal', color: '#424846', out: ['coal'] },
-            { group: 'direct', name: '硫黄鉱床', pattern: 'sulfur', glyph: 'i-sulfur', color: '#756a31', out: ['sulfur'] },
-            { group: 'direct', name: '粘土層', pattern: 'clay', glyph: 'i-clay', color: '#795548', out: ['clay'] },
-            { group: 'direct', name: '石灰岩層', pattern: 'limestone', glyph: 'i-limestone', color: '#77735f', out: ['limestone'] },
-            { group: 'direct', name: '泥炭地', pattern: 'peat', glyph: 'i-peat', color: '#554b36', out: ['peat'] },
-            { group: 'direct', name: '塩沼', pattern: 'salt', glyph: 'i-salt', color: '#60736b', out: ['salt'] },
-            { group: 'direct', name: '油浸地', pattern: 'oil', glyph: 'i-oil', color: '#45493d', out: ['oil'] },
-            { group: 'item', name: '錫鉱脈', pattern: 'tin', glyph: 'i-tin', color: '#69736b', out: ['tin'], recipe: [['miningSample'], ['coke']] },
-            { group: 'item', name: '亜鉛鉱脈', pattern: 'zinc', glyph: 'i-zinc', color: '#52655d', out: ['zinc'], recipe: [['tin'], ['sulfur'], ['veinMold']] },
-            { group: 'item', name: '水晶脈', pattern: 'crystal', glyph: 'i-crystal', color: '#356e77', out: ['crystal'], recipe: [['device', '航法結晶片'], ['salt', '塩'], ['limestone', '石灰石']] },
-            { group: 'item', name: '菌糸群落', pattern: 'mycelium', glyph: 'cell-mycelium', color: '#756c5c', out: ['spore'], recipe: [['preservedSpores'], ['peat']] },
-            { group: 'item', name: '薬草地', pattern: 'herb', glyph: 'i-herb', color: '#58794b', out: ['herb'], recipe: [['seed'], ['compost']] },
-            { group: 'item', name: '樹脂林', pattern: 'resin', glyph: 'i-resin', color: '#3e674a', out: ['resin'], recipe: [['forestSeed'], ['compost']] },
-            { group: 'event', name: '機械の残骸', pattern: 'machinery', glyph: 'cell-machinery', color: '#545d59', out: ['salvage', 'miningSample', 'veinMold'] },
-            { group: 'event', name: '飛行船の墜落跡', pattern: 'airship', glyph: 'cell-airship', color: '#625949', out: ['device', 'seedcase', 'preservedSpores', 'seed'] }
-        ];
-        const groups = [
-            { id: 'initial', title: '初期生成セル', description: 'マップ生成時に配置される基本地形。' },
-            { id: 'direct', title: '二次生成セル / アイテム不要', description: '地形変形のみで生成する候補。' },
-            { id: 'item', title: '二次生成セル / アイテム必要', description: '別セルの採取物やイベント素材を組み合わせる候補。' },
-            { id: 'event', title: 'イベント生成セル', description: '地形変形ではなく、探索やイベントで出現させる候補。' }
-        ];
-        const itemChip = ([key, label]) => {
-            const [defaultName, icon] = items[key];
-            return `<span class="item"><svg aria-hidden="true"><use href="#i-${icon}"></use></svg>${label || defaultName}</span>`;
+
+        const glyphMap = {
+            SEA: 'cell-sea',
+            LAKE: 'cell-lake',
+            PLAINS: 'cell-plains',
+            FOREST: 'cell-forest',
+            MOUNTAIN: 'cell-mountain',
+            SAND: 'cell-sand',
+            RUIN: 'cell-ruin',
+            IRON_VEIN: 'i-iron',
+            COPPER_VEIN: 'i-copper',
+            COAL_SEAM: 'i-coal',
+            SULFUR_DEPOSIT: 'i-sulfur',
+            CLAY_BED: 'i-clay',
+            LIMESTONE: 'i-limestone',
+            PEAT_BOG: 'i-peat',
+            SALT_MARSH: 'i-salt',
+            OIL_SEEP: 'i-oil',
+            TIN_VEIN: 'i-tin',
+            ZINC_VEIN: 'i-zinc',
+            CRYSTAL_VEIN: 'i-crystal',
+            MYCELIUM: 'cell-mycelium',
+            HERB_FIELD: 'i-herb',
+            RESIN_FOREST: 'i-resin',
+            MACHINE_WRECK: 'cell-machinery',
+            AIRSHIP_WRECK: 'cell-airship'
         };
-        const renderCellGrid = (cell, withIcons) => Array.from({ length: 18 }, () =>
-            `<span class="terrain-cell">${withIcons ? `<svg class="terrain-icon" aria-hidden="true"><use href="#${cell.glyph}"></use></svg>` : ''}</span>`
-        ).join('');
+
+        const materialIconMap = {
+            water: 'i-water',
+            grain: 'i-grain',
+            wood: 'i-wood',
+            stone: 'i-stone',
+            sand: 'i-sand',
+            relic_fragment: 'i-relic',
+            iron_ore: 'i-iron',
+            copper_ore: 'i-copper',
+            coal: 'i-coal',
+            sulfur: 'i-sulfur',
+            clay: 'i-clay',
+            limestone: 'i-limestone',
+            peat: 'i-peat',
+            salt: 'i-salt',
+            tar: 'i-oil',
+            tin_ore: 'i-tin',
+            zinc_ore: 'i-zinc',
+            crystal_shard: 'i-crystal',
+            spores: 'i-spore',
+            herbs: 'i-herb',
+            resin: 'i-resin',
+            salvage: 'i-salvage',
+            mining_sample: 'i-mining-sample',
+            coke: 'i-coke',
+            vein_mold: 'i-vein-mold',
+            navigation_crystal: 'i-device',
+            preserved_spores: 'i-spore-vial',
+            mycelium_compost: 'i-compost',
+            forest_seed: 'i-forest-seed',
+            ancient_seed: 'i-seedcase'
+        };
+
+        const allCellEntries = Object.entries(WORLD_CELL_TYPES).map(([typeKey, definition]) => ({
+            key: typeKey,
+            group: definition.category,
+            name: definition.label,
+            color: definition.color,
+            glyph: glyphMap[typeKey] || 'cell-plains',
+            pattern: patternMap[typeKey] || 'plains',
+            output: getCellDrops(typeKey)
+        }));
+
+        const allMaterials = Object.keys(CELL_MATERIALS)
+            .filter((materialId) => CELL_MATERIALS[materialId])
+            .map((materialId) => {
+                const material = CELL_MATERIALS[materialId];
+                const sourceByCollect = Object.entries(WORLD_CELL_TYPES).find(([, definition]) => definition.collect === materialId);
+                const sourceByRecipe = Object.entries(TERRAIN_TRANSFORM_RECIPES).find(([, recipe]) => Object.prototype.hasOwnProperty.call(recipe, materialId));
+                return {
+                    id: materialId,
+                    name: material.label,
+                    icon: materialIconMap[materialId] || 'i-water',
+                    source: sourceByCollect ? sourceByCollect[1].label : sourceByRecipe ? WORLD_CELL_TYPES[sourceByRecipe[0]].label : ''
+                };
+            })
+            .filter((material) => material.source);
+
+        const groups = Object.entries(categoryConfig).map(([id, config]) => ({
+            id,
+            ...config,
+            cells: allCellEntries.filter((cell) => cell.group === id)
+        }));
+
+        const itemChip = (materialId) => {
+            const material = CELL_MATERIALS[materialId];
+            if (!material) return '';
+            const iconId = materialIconMap[materialId] || 'i-water';
+            return `<span class="item"><svg aria-hidden="true"><use href="#${iconId}"></use></svg>${material.label}</span>`;
+        };
+
+        const renderCellGrid = (cell, withIcons) => {
+            const cells = [];
+            for (let row = 0; row < 4; row++) {
+                for (let col = 0; col < 5; col++) {
+                    const bg = getMosaicColor(cell.color || '#526f4e', col, 0);
+                    cells.push(`<span class="terrain-cell" style="background:${bg};">${withIcons ? `<svg class="terrain-icon" aria-hidden="true"><use href="#${cell.glyph}"></use></svg>` : ''}</span>`);
+                }
+            }
+            return cells.join('');
+        };
+
+        const renderRecipe = (key) => {
+            const recipe = TERRAIN_TRANSFORM_RECIPES[key];
+            if (!recipe) return '';
+            const entries = Object.entries(recipe)
+                .filter(([materialId]) => Boolean(CELL_MATERIALS[materialId]));
+            if (!entries.length) return '';
+            return `<div class="recipe"><span class="recipe-label">変化資材</span>${entries.map(([materialId]) => itemChip(materialId)).join('<span class="arrow" aria-hidden="true">＋</span>')}</div>`;
+        };
+
         const renderCard = (cell) => {
-            const outputItems = cell.out.map((key) => [key, items[key][0]]).map(itemChip).join('');
-            const recipe = cell.recipe ? `<div class="recipe"><span class="recipe-label">変形に使う素材案</span>${cell.recipe.map(itemChip).join('<span class="arrow" aria-hidden="true">+</span>')}</div>` : '';
+            const outputs = (cell.output || []).filter((materialId) => Boolean(CELL_MATERIALS[materialId])).map((materialId) => itemChip(materialId)).join('');
             return `<article class="cell-card" style="--ground:${cell.color}">
-                <div class="card-top"><h3>${cell.name}</h3><span class="origin">${cell.group === 'initial' ? '初期セル' : cell.group === 'event' ? '③ イベント' : '② 二次生成'}</span></div>
-                <div class="samples">
-                    <div class="sample"><div class="sample-label"><b>濃淡のみ</b><span>現行</span></div><div class="swatch mosaic-only">${renderCellGrid(cell, false)}</div></div>
-                    <div class="sample"><div class="sample-label"><b>SVG通常</b><span>6×3</span></div><div class="swatch pattern-${cell.pattern}">${renderCellGrid(cell, true)}</div></div>
-                    <div class="sample"><div class="sample-label"><b>SVG薄め</b><span>28%</span></div><div class="swatch pattern-${cell.pattern} faded-icons">${renderCellGrid(cell, true)}</div></div>
-                </div>
-                <div class="resources">${outputItems}</div>${recipe}
+                <div class="card-top"><h3>${cell.name}</h3><span class="origin">${cell.group === 'initial' ? '初期' : cell.group === 'event' ? '発見' : '変質'}</span></div>
+                <div class="swatch pattern-${cell.pattern}">${renderCellGrid(cell, true)}</div>
+                <div class="resources">${outputs}</div>
+                ${renderRecipe(cell.key)}
             </article>`;
         };
+
         const groupsRoot = document.getElementById('cell-groups');
-        groupsRoot.innerHTML = groups.map((group) => {
-            const groupCells = cells.filter((cell) => cell.group === group.id);
-            return `<section class="group" data-group="${group.id}"><header class="group-head"><h2>${group.title}</h2><p>${group.description}</p></header><div class="grid">${groupCells.map(renderCard).join('')}</div></section>`;
-        }).join('');
-        const itemEntries = Object.entries(items);
-        document.getElementById('item-count').textContent = `${itemEntries.length}種類`;
-        document.getElementById('item-grid').innerHTML = itemEntries.map(([key, [name, icon]]) =>
-            `<article class="item-entry"><svg aria-hidden="true"><use href="#i-${icon}"></use></svg><div><h3>${name}</h3><p class="item-source">入手元: ${itemSources[key] || '未設定'}</p></div></article>`
-        ).join('');
+        groupsRoot.innerHTML = groups.map((group) => `
+            <section class="group" data-group="${group.id}">
+                <header class="group-head"><h2>${group.title}</h2><p>${group.description}</p></header>
+                <div class="grid">${group.cells.map(renderCard).join('')}</div>
+            </section>
+        `).join('');
+
+        document.getElementById('item-count').textContent = `${allMaterials.length} 種類`;
+        document.getElementById('item-grid').innerHTML = allMaterials.map((material) => `
+            <article class="item-entry">
+                <svg aria-hidden="true"><use href="#${material.icon}"></use></svg>
+                <div>
+                    <h3>${material.name}</h3>
+                    <p class="item-source">主な入手先: ${material.source}</p>
+                </div>
+            </article>
+        `).join('');
+
         const iconUses = new Map();
         const addIconUse = (icon, type, name) => {
             if (!iconUses.has(icon)) iconUses.set(icon, []);
             iconUses.get(icon).push(`${type}: ${name}`);
         };
-        cells.forEach((cell) => addIconUse(cell.glyph, 'セル', cell.name));
-        Object.values(items).forEach(([name, icon]) => addIconUse(`i-${icon}`, 'アイテム', name));
-        document.getElementById('icon-count').textContent = `${iconUses.size}種類`;
-        document.getElementById('icon-grid').innerHTML = [...iconUses.entries()].map(([icon, uses]) =>
-            `<article class="icon-entry"><svg aria-hidden="true"><use href="#${icon}"></use></svg><div><h3>${uses[0].split(': ')[1]}</h3><p class="icon-uses">${uses.join(' / ')}</p></div></article>`
-        ).join('');
+        allCellEntries.forEach((cell) => addIconUse(cell.glyph, 'セル', cell.name));
+        allMaterials.forEach((material) => addIconUse(material.icon, 'アイテム', material.name));
+
+        document.getElementById('icon-count').textContent = `${iconUses.size} 種類`;
+        document.getElementById('icon-grid').innerHTML = [...iconUses.entries()].map(([icon, uses]) => `
+            <article class="icon-entry">
+                <svg aria-hidden="true"><use href="#${icon}"></use></svg>
+                <div>
+                    <h3>${uses[0].split(': ')[1]}</h3>
+                    <p class="icon-uses">${uses.join(' / ')}</p>
+                </div>
+            </article>
+        `).join('');
+
         const count = document.getElementById('cell-count');
         const tabs = [...document.querySelectorAll('.tab')];
         const showGroup = (filter) => {
-            document.querySelectorAll('.group').forEach((group) => { group.hidden = filter !== 'all' && group.dataset.group !== filter; });
+            document.querySelectorAll('.group').forEach((group) => {
+                group.hidden = filter !== 'all' && group.dataset.group !== filter;
+            });
             tabs.forEach((tab) => tab.setAttribute('aria-pressed', String(tab.dataset.filter === filter)));
-            const visibleCount = filter === 'all' ? cells.length : cells.filter((cell) => cell.group === filter).length;
+            const visibleCount = filter === 'all' ? allCellEntries.length : allCellEntries.filter((cell) => cell.group === filter).length;
             count.textContent = `${visibleCount} CELLS`;
         };
+
         tabs.forEach((tab) => tab.addEventListener('click', () => showGroup(tab.dataset.filter)));
         showGroup('all');
     </script>
