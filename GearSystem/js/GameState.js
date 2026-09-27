@@ -74,6 +74,13 @@ export class GameState {
         this.activeScrollSignature = '';
         this.worldCellHandler = null;
         this.lastActiveScrollSyncAt = 0;
+        window.addEventListener('storage', event => {
+            if (event.key === ACTIVE_SCROLL_TARGETS_KEY) {
+                this.syncActiveScrollTargets(event.newValue);
+            } else if (event.key === null || ['fogsgear_active_scroll_id', 'fogsgear_scroll_library'].includes(event.key)) {
+                this.activeScrollSignature = '';
+            }
+        });
         
         this.listeners = [];
     }
@@ -108,9 +115,26 @@ export class GameState {
         return this.isScrollEditing ? (this.runtimeBelts || []) : this.belts;
     }
 
+    syncActiveScrollTargets(value = null) {
+        let targets;
+        try {
+            const stored = value === null ? localStorage.getItem(ACTIVE_SCROLL_TARGETS_KEY) : value;
+            const parsed = JSON.parse(stored || '{}');
+            targets = parsed && typeof parsed === 'object' ? parsed : {};
+        } catch (error) {
+            return;
+        }
+        this.activeScrollRuntimes.forEach(runtime => {
+            const target = targets[runtime.scrollId];
+            if (!Number.isInteger(target?.x) || !Number.isInteger(target?.y)) return;
+            runtime.target.x = target.x;
+            runtime.target.y = target.y;
+        });
+    }
+
     getActiveScrollRuntimes(now) {
         if (this.isEditorRuntimeContext() || !this.createGear || !this.network) return [];
-        if (now - this.lastActiveScrollSyncAt < 250) return this.activeScrollRuntimes;
+        if (this.activeScrollSignature && now - this.lastActiveScrollSyncAt < 250) return this.activeScrollRuntimes;
         this.lastActiveScrollSyncAt = now;
 
         let activeScrollValue = '[]';
@@ -125,7 +149,7 @@ export class GameState {
         } catch (error) {
             return [];
         }
-        const signature = `${activeScrollValue}\n${libraryValue}\n${targetValue}\n${legacyRunning}`;
+        const signature = `${activeScrollValue}\n${libraryValue}\n${legacyRunning}`;
         if (signature === this.activeScrollSignature) return this.activeScrollRuntimes;
         this.activeScrollSignature = signature;
 

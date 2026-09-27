@@ -5,7 +5,7 @@ import { CELL_DEFINITIONS, canEnterCell, getCellEntryRule, getMosaicColor } from
 import { drawCellIcon, loadCellIconAtlas } from './cellIconRenderer.js?v=3';
 import { ACTIVE_SCROLL_TARGETS_KEY, CELL_MATERIALS, TERRAIN_TRANSFORM_RECIPES, WORLD_CELL_TYPES, applyCellChanges, chooseEraCellType, getCellDrops, readCellChanges, saveCellChange } from './worldCells.js?v=2';
 import { buildTerritoryBorderSegments } from './territoryBorders.js?v=35';
-import { GameState as EngineGameState } from '../../GearSystem/js/GameState.js?v=runtime-8';
+import { GameState as EngineGameState } from '../../GearSystem/js/GameState.js?v=runtime-10';
 import { GearManager as EngineGearManager } from '../../GearSystem/js/GearManager.js?v=runtime-2';
 
 const canvas = document.getElementById('gameCanvas');
@@ -1238,14 +1238,15 @@ function openAppPage(path, title) {
     appPageFrame = frame;
 }
 
-function openGearEditor(material) {
+function openGearEditor(material, scrollId = null) {
     if (gearEditorFrame) gearEditorFrame.parentElement.remove();
     const overlay = document.createElement('div');
     overlay.className = 'gear-editor-overlay';
     const frame = document.createElement('iframe');
     frame.title = 'ギア編集画面';
     const editorUrl = new URL('../GearSystem/index.html', window.location.href);
-    editorUrl.searchParams.set('newScroll', material || 'paper');
+    if (scrollId) editorUrl.searchParams.set('editScroll', scrollId);
+    else editorUrl.searchParams.set('newScroll', material || 'paper');
     editorUrl.searchParams.set('hosted', '1');
     frame.src = editorUrl.href;
     overlay.appendChild(frame);
@@ -1361,11 +1362,25 @@ document.addEventListener('click', (event) => {
 
 window.addEventListener('message', event => {
     if (event.origin !== window.location.origin && event.origin !== 'null') return;
-    if (appPageFrame
-        && event.source === appPageFrame.contentWindow
-        && event.data?.type === 'fogsgear:close-page') {
-        appPageFrame.parentElement.remove();
-        appPageFrame = null;
+    const scrollLibraryFrame = [
+        appPageFrame,
+        document.querySelector('iframe[title="保存スクロールのギアプレビュー"]')
+    ].find(frame => frame && event.source === frame.contentWindow);
+    if (appPageFrame && event.source === appPageFrame.contentWindow) {
+        if (event.data?.type === 'fogsgear:close-page') {
+            appPageFrame.parentElement.remove();
+            appPageFrame = null;
+            return;
+        }
+    }
+    if (scrollLibraryFrame && event.data?.type === 'fogsgear:edit-scroll') {
+        const scrollId = String(event.data.scrollId || '');
+        if (!getStoredSavedScrolls().some(scroll => scroll.id === scrollId)) return;
+        if (scrollLibraryFrame === appPageFrame) {
+            appPageFrame.parentElement.remove();
+            appPageFrame = null;
+        }
+        openGearEditor(null, scrollId);
         return;
     }
     if (!gearEditorFrame

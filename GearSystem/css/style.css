@@ -573,8 +573,8 @@ canvas {
 .embedded-library .scroll-list { grid-template-columns: minmax(0, 1fr); gap: 5px; }
 .embedded-library .scroll-list-item { grid-template-columns: 23px minmax(0, 1fr); gap: 5px; min-height: 34px; padding: 4px 5px; font-size: 0.68rem; }
 .embedded-library .scroll-list-type { width: 20px; height: 20px; font-size: 0.6rem; }
-.embedded-library .scroll-list-item { grid-template-columns: minmax(0, 1fr); padding-right: 0; }
-.embedded-library .scroll-list-edit { display: none; }
+.embedded-library .scroll-list-item { grid-template-columns: minmax(0, 1fr) 28px; padding-right: 4px; }
+.embedded-library .scroll-list-edit { display: grid; }
 .embedded-library .scroll-detail-panel { min-width: 0; height: calc(100vh - 36px); box-sizing: border-box; padding: 8px; }
 .embedded-library .scroll-empty {
     display: flex;

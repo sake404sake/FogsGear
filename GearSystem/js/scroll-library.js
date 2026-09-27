@@ -61,7 +61,7 @@ const previewState = {
     running: false,
     invalid: false,
     network: new GearNetwork(),
-    tick() {
+    tick(elapsed) {
         if (!this.running || this.invalid) {
             this.placedGears.forEach(gear => {
                 gear.powered = false;
@@ -73,16 +73,21 @@ const previewState = {
         this.network.updateRotation();
         this.placedGears.forEach(gear => {
             if (!gear.powered || gear.isDeadlocked) return;
-            gear.angle += 0.012 * (gear.angularVelocity || 1) * (gear.rotationDir || 1);
+            gear.angle += 0.012 * 60 * elapsed * (gear.angularVelocity || 1) * (gear.rotationDir || 1);
         });
         this.network.synchronizeLockedAxes();
     }
 };
 const renderer = new CanvasRenderer('previewCanvas', previewState, false);
-setInterval(() => {
-    previewState.tick();
+let lastPreviewFrame = 0;
+function animatePreview(now) {
+    const elapsed = lastPreviewFrame ? Math.min(0.1, Math.max(0, (now - lastPreviewFrame) / 1000)) : 1 / 60;
+    lastPreviewFrame = now;
+    previewState.tick(elapsed);
     renderer.render();
-}, 16);
+    requestAnimationFrame(animatePreview);
+}
+requestAnimationFrame(animatePreview);
 let currentMaterial = 'all';
 let selectedScrollId = null;
 let library = [];
@@ -139,13 +144,15 @@ function setScrollRunning(scrollId, running) {
             if (Number.isInteger(savedPlayer?.x) && Number.isInteger(savedPlayer?.y)) playerPosition = { x: savedPlayer.x, y: savedPlayer.y };
         } catch (error) {}
         targets[scrollId] = playerPosition;
+        ids.add(scrollId);
+        localStorage.setItem(ACTIVE_SCROLL_TARGETS_KEY, JSON.stringify(targets));
+        localStorage.setItem(ACTIVE_SCROLL_KEY, JSON.stringify([...ids]));
     } else {
+        ids.delete(scrollId);
+        localStorage.setItem(ACTIVE_SCROLL_KEY, JSON.stringify([...ids]));
         delete targets[scrollId];
+        localStorage.setItem(ACTIVE_SCROLL_TARGETS_KEY, JSON.stringify(targets));
     }
-    if (running) ids.add(scrollId);
-    else ids.delete(scrollId);
-    localStorage.setItem(ACTIVE_SCROLL_KEY, JSON.stringify([...ids]));
-    localStorage.setItem(ACTIVE_SCROLL_TARGETS_KEY, JSON.stringify(targets));
     localStorage.removeItem(ACTIVE_SCROLL_RUNNING_KEY);
 }
 
@@ -353,9 +360,13 @@ tabs.forEach(tab => tab.addEventListener('click', () => {
 
 listElement.addEventListener('click', event => {
     const editButton = event.target.closest('.scroll-list-edit');
-    if (editButton && !isEmbedded) {
+    if (editButton) {
         selectScroll(editButton.dataset.scrollId);
-        openChoiceModal(getSelectedScroll());
+        if (isEmbedded) {
+            window.parent.postMessage({ type: 'fogsgear:edit-scroll', scrollId: editButton.dataset.scrollId }, window.location.origin);
+        } else {
+            openChoiceModal(getSelectedScroll());
+        }
         return;
     }
     const selectButton = event.target.closest('.scroll-list-select');
