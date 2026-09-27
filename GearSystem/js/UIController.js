@@ -35,10 +35,19 @@ export class UIController {
                 } else {
                     window.location.href = '../MapSystem/index.html';
                 }
+            } else if (button.dataset.action === 'toggle-gear-size-popup') {
+                const popup = document.getElementById('gear-size-popup');
+                if (popup) {
+                    popup.hidden = !popup.hidden;
+                    button.setAttribute('aria-expanded', String(!popup.hidden));
+                }
+            } else if (button.dataset.action === 'close-gear-size-popup') {
+                this.closeGearSizePopup();
             } else if (button.dataset.size) {
                 this.state.setSelectedSize(this.state.selectedSize === button.dataset.size ? null : button.dataset.size);
                 this.state.ghostGear = null;
                 this.closeGearPopover();
+                this.closeGearSizePopup();
             } else if (button.dataset.visibilityLayer !== undefined) {
                 const layer = Number(button.dataset.visibilityLayer);
                 this.state.toggleLayerVisibility(layer);
@@ -100,6 +109,13 @@ export class UIController {
                 const gear = this.gearManager.findGearById(this.state.selectedGearId);
                 if (gear && this.gearManager.removeGear(gear)) this.closeGearPopover();
             }
+        });
+
+        document.getElementById('gear-size-popup')?.addEventListener('click', event => {
+            if (event.target.id === 'gear-size-popup') this.closeGearSizePopup();
+        });
+        document.addEventListener('keydown', event => {
+            if (event.key === 'Escape') this.closeGearSizePopup();
         });
 
         document.getElementById('gear-lock-toggle').addEventListener('change', event => { const gear = this.gearManager.findGearById(this.state.selectedGearId); if (gear) this.gearManager.setGearLock(gear, event.target.checked); });
@@ -385,6 +401,12 @@ export class UIController {
         title.textContent = `${baseTitle}${beltLinked ? '  🔗' : ''}`;
     }
     updateSelectedGear(settings) { const gear = this.gearManager.findGearById(this.state.selectedGearId); if (gear) this.gearManager.updateGearSettings(gear, settings); }
+    closeGearSizePopup() {
+        const popup = document.getElementById('gear-size-popup');
+        const toggle = document.querySelector('[data-action="toggle-gear-size-popup"]');
+        if (popup) popup.hidden = true;
+        toggle?.setAttribute('aria-expanded', 'false');
+    }
     closeGearPopover() {
         // 選択ギアとモーダル表示を解除する。
         this.state.selectedGearId = null;

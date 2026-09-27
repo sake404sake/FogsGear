@@ -520,7 +520,8 @@ function resize() {
         if (mainFrame && leftPanel && container) {
             const frameWidth = mainFrame.clientWidth || container.clientWidth || width;
             const frameGap = parseFloat(getComputedStyle(mainFrame).gap || '12');
-            const availableMapHeight = Math.max(180, mainFrame.clientHeight - leftPanel.offsetHeight - frameGap);
+            const minMapHeight = window.matchMedia('(max-height: 320px)').matches ? 140 : 180;
+            const availableMapHeight = Math.max(minMapHeight, mainFrame.clientHeight - leftPanel.offsetHeight - frameGap);
             leftPanel.style.width = `${frameWidth}px`;
             leftPanel.style.maxWidth = 'none';
             leftPanel.style.minWidth = '0';
@@ -1014,7 +1015,20 @@ function updateFullscreenButton() {
     button.setAttribute('aria-pressed', String(isFullscreen));
 }
 
+let appPageFrame = null;
 let gearEditorFrame = null;
+
+function openAppPage(path, title) {
+    appPageFrame?.parentElement.remove();
+    const overlay = document.createElement('div');
+    overlay.className = 'app-page-overlay';
+    const frame = document.createElement('iframe');
+    frame.title = title;
+    frame.src = new URL(path, window.location.href).href;
+    overlay.appendChild(frame);
+    document.body.appendChild(overlay);
+    appPageFrame = frame;
+}
 
 function openGearEditor(material) {
     if (gearEditorFrame) gearEditorFrame.parentElement.remove();
@@ -1044,9 +1058,17 @@ async function toggleFullscreen() {
 document.addEventListener('click', (event) => {
     const button = event.target.closest('button');
     if (!button) return;
+    if (button.dataset.action === 'open-world-map') {
+        openAppPage('worldmap.html', '全体マップ');
+        return;
+    }
+    if (button.dataset.action === 'open-settings') {
+        openAppPage('settings.html', '設定');
+        return;
+    }
     if (button.dataset.action === 'inspect-inventory-item') {
         if (button.dataset.itemKey === 'scroll_book') {
-            window.location.href = '../GearSystem/scroll-library.html';
+            openAppPage('../GearSystem/scroll-library.html?embed=1&v=6', 'スクロール書庫');
             return;
         }
         openInventoryItem(button.dataset.itemKey);
@@ -1090,8 +1112,15 @@ document.addEventListener('click', (event) => {
 });
 
 window.addEventListener('message', event => {
-    if (event.origin !== window.location.origin
-        || !gearEditorFrame
+    if (event.origin !== window.location.origin && event.origin !== 'null') return;
+    if (appPageFrame
+        && event.source === appPageFrame.contentWindow
+        && event.data?.type === 'fogsgear:close-page') {
+        appPageFrame.parentElement.remove();
+        appPageFrame = null;
+        return;
+    }
+    if (!gearEditorFrame
         || event.source !== gearEditorFrame.contentWindow
         || event.data?.type !== 'fogsgear:close-editor') return;
     gearEditorFrame.parentElement.remove();

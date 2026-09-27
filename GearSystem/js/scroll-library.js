@@ -24,7 +24,16 @@ const choiceTitle = document.getElementById('scroll-choice-title');
 const choiceDescription = document.getElementById('scroll-choice-description');
 const choiceEditButton = document.getElementById('scroll-choice-edit');
 const isEmbedded = new URLSearchParams(window.location.search).get('embed') === '1';
+const hideMapBack = new URLSearchParams(window.location.search).get('hideMapBack') === '1';
 if (isEmbedded) document.body.classList.add('embedded-library');
+if (isEmbedded && hideMapBack) document.body.classList.add('hide-embedded-map-back');
+document.querySelectorAll('.back-to-map').forEach(link => {
+    link.addEventListener('click', event => {
+        if (!isEmbedded) return;
+        event.preventDefault();
+        window.parent.postMessage({ type: 'fogsgear:close-page' }, window.location.origin);
+    });
+});
 function setListVisibility(visible) {
     if (!isEmbedded) return;
     document.body.classList.toggle('scroll-list-hidden', !visible);

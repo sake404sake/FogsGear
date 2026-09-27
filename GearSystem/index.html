@@ -4,14 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
     <title>Fogs Gear</title>
-    <link rel="stylesheet" href="css/style.css?v=gear-layout-3">
+    <link rel="stylesheet" href="css/style.css?v=gear-layout-7">
 </head>
 <body>
     <div id="loadingOverlay" class="loading-overlay" role="status" aria-live="polite">
         <div class="loading-panel"><div class="loading-spinner"></div><div>ギア編集画面を読み込んでいます...</div></div>
     </div>
     <div class="panel">
-        <div class="button-row" style="justify-content:flex-end; margin-bottom: 10px;">
+        <div class="button-row" style="justify-content:flex-end; margin-bottom: 4px;">
             <button class="btn btn-action" type="button" data-action="return-map">マップへ戻る</button>
         </div>
         <h1>Fogs Gear</h1>
@@ -43,23 +43,10 @@
             </table>
         </section>
         <div class="control-group">
-            <span class="group-label">— Gear Type Selector —</span>
-            <div class="button-row">
-                <button class="btn btn-size" data-size="XXS">XXS(4)</button>
-                <button class="btn btn-size" data-size="SS">SS(6)</button>
-                <button class="btn btn-size" data-size="S">S(10)</button>
-                <button class="btn btn-size active" data-size="M">M(14)</button>
-                <button class="btn btn-size" data-size="L">L(18)</button>
-                <button class="btn btn-size" data-size="LL">LL(24)</button>
-                <button class="btn btn-size" data-size="3L">3L(32)</button>
-                <button class="btn btn-size" data-size="4L">4L(40)</button>
-                <button class="btn btn-size" data-size="MAX">MAX(48)</button>
-            </div>
-        </div>
-        <div class="control-group">
             <span class="group-label">— Item Selector —</span>
             <div class="button-row item-selector-row">
                 <button class="btn btn-item" data-item="BELT">ベルト</button>
+                <button class="btn btn-action" type="button" data-action="toggle-gear-size-popup" aria-expanded="false" aria-controls="gear-size-popup">ギア</button>
             </div>
         </div>
         <div class="control-group">
@@ -83,6 +70,25 @@
                 <button class="btn btn-layer" id="btn-layer-2" data-layer="2">3段目 (銅)</button>
             </div>
         </div>
+    </div>
+    <div id="gear-size-popup" class="gear-size-popup" hidden>
+        <section class="gear-size-dialog" role="dialog" aria-modal="true" aria-labelledby="gear-size-title">
+            <div class="gear-size-heading">
+                <h2 id="gear-size-title">ギアサイズを選択</h2>
+                <button class="gear-size-close" type="button" data-action="close-gear-size-popup" aria-label="閉じる">×</button>
+            </div>
+            <div class="gear-size-options">
+                <button class="btn btn-size" data-size="XXS">XXS(4)</button>
+                <button class="btn btn-size" data-size="SS">SS(6)</button>
+                <button class="btn btn-size" data-size="S">S(10)</button>
+                <button class="btn btn-size active" data-size="M">M(14)</button>
+                <button class="btn btn-size" data-size="L">L(18)</button>
+                <button class="btn btn-size" data-size="LL">LL(24)</button>
+                <button class="btn btn-size" data-size="3L">3L(32)</button>
+                <button class="btn btn-size" data-size="4L">4L(40)</button>
+                <button class="btn btn-size" data-size="MAX">MAX(48)</button>
+            </div>
+        </section>
     </div>
     <!-- マップ描画エリア -->
     <div id="canvas-container">
@@ -162,7 +168,7 @@
             }
         })();
     </script>
-    <script type="module" src="js/main.js?v=scroll-edit-14"></script>
+    <script type="module" src="js/main.js?v=scroll-edit-15"></script>
     <script>
         document.addEventListener('click', (event) => {
             const target = event.target.closest('a, button[onclick]');
