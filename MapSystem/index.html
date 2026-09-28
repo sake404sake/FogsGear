@@ -9,7 +9,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="icon" href="../MainSystem/icons/app-icon.jpg" type="image/jpeg">
-    <link rel="stylesheet" href="css/style.css?v=540">
+    <link rel="stylesheet" href="css/style.css?v=541">
 </head>
 <body>
     <div id="loadingOverlay" class="loading-overlay" role="status" aria-live="polite">
@@ -82,6 +82,21 @@
             </div>
         </div>
     </div>
+    <input id="save-import-file" type="file" accept=".json,application/json" hidden>
+    <div id="save-transfer-modal" class="inventory-modal" hidden role="dialog" aria-modal="true" aria-labelledby="save-transfer-title">
+        <div class="inventory-modal-panel save-transfer-panel">
+            <button class="inventory-modal-close" type="button" data-action="cancel-save-import" aria-label="閉じる">×</button>
+            <div class="inventory-modal-icon" aria-hidden="true">📦</div>
+            <div class="inventory-modal-kicker">SAVE TRANSFER</div>
+            <h2 id="save-transfer-title">セーブデータを読み込みますか？</h2>
+            <p id="save-transfer-description">現在のゲーム進行、保存ギア、設定をファイルの内容に置き換えます。</p>
+            <div id="save-transfer-meta" class="inventory-modal-meta"></div>
+            <div class="inventory-modal-actions">
+                <button class="saved-scroll-use" type="button" data-action="confirm-save-import">読み込む</button>
+                <button class="inventory-modal-secondary" type="button" data-action="cancel-save-import">キャンセル</button>
+            </div>
+        </div>
+    </div>
 
     <!-- 下部パネル：操作・メニュー -->
     <div class="panel">
@@ -117,8 +132,8 @@
 
         <div class="control-group">
             <div class="button-row" style="width: 100%;">
-                <button class="btn btn-visibility active" data-action="save">記録 (Save)</button>
-                <button class="btn btn-reset" data-action="rest">休息 (Rest)</button>
+                <button class="btn btn-visibility active" data-action="export-save" title="セーブデータをJSONファイルへ書き出す">Save</button>
+                <button class="btn btn-action" data-action="choose-save-import" title="JSONバックアップからセーブデータを読み込む">Load</button>
             </div>
         </div>
         <div class="rule-text">
@@ -153,6 +168,6 @@
         </div>
     </div>
 
-    <script type="module" src="js/main.js?v=543"></script>
+    <script type="module" src="js/main.js?v=548"></script>
 </body>
 </html>

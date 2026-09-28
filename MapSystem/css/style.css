@@ -360,6 +360,10 @@ h1 {
 .inventory-modal-meta { min-height: 1.2em; margin-top: 10px; color: var(--text-muted); font-size: 0.7rem; }
 .inventory-modal-actions { display: flex; justify-content: center; gap: 8px; margin-top: 18px; }
 .inventory-modal-secondary { padding: 5px 12px; color: var(--text-main); background: #1c1511; border: 1px solid var(--border-sub); border-radius: 4px; cursor: pointer; }
+.save-transfer-panel { text-align: left; }
+.save-transfer-panel .inventory-modal-icon { width: 54px; height: 54px; margin-left: 0; font-size: 1.8rem; }
+.save-transfer-panel h2 { padding-right: 20px; }
+.save-transfer-panel .inventory-modal-meta { overflow-wrap: anywhere; line-height: 1.5; }
 .gear-editor-overlay { position: fixed; inset: 0; z-index: 2000; background: var(--bg-deep); }
 .gear-editor-overlay iframe { display: block; width: 100%; height: 100%; border: 0; }
 .app-page-overlay { position: fixed; inset: 0; z-index: 1200; background: var(--bg-deep); }
@@ -1056,8 +1060,8 @@ canvas.engine-runtime-canvas { display: none; }
         width: 20px;
         height: 20px;
     }
-    body:has(#gameCanvas) > .panel:last-of-type [data-action="save"],
-    body:has(#gameCanvas) > .panel:last-of-type [data-action="rest"] {
+    body:has(#gameCanvas) > .panel:last-of-type [data-action="export-save"],
+    body:has(#gameCanvas) > .panel:last-of-type [data-action="choose-save-import"] {
         min-height: 34px;
         padding: 6px 4px;
         font-size: 0.62rem;
@@ -1164,8 +1168,8 @@ canvas.engine-runtime-canvas { display: none; }
         body:has(#gameCanvas) > .panel:last-of-type .movement-button { width: 36px; height: 34px; }
         body:has(#gameCanvas) > .panel:last-of-type .movement-joystick { width: 34px; height: 34px; }
         body:has(#gameCanvas) > .panel:last-of-type .movement-joystick-knob { width: 16px; height: 16px; }
-        body:has(#gameCanvas) > .panel:last-of-type .btn[data-action="save"],
-        body:has(#gameCanvas) > .panel:last-of-type .btn[data-action="rest"] {
+        body:has(#gameCanvas) > .panel:last-of-type .btn[data-action="export-save"],
+        body:has(#gameCanvas) > .panel:last-of-type .btn[data-action="choose-save-import"] {
             min-height: 30px;
             padding: 3px 4px;
             font-size: 0.68rem;

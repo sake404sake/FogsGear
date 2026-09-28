@@ -47,6 +47,29 @@ const activePointers = new Map();
 const MAP_UNLOCK_KEY = 'fogsgear_world_unlocks';
 const COASTAL_MAP_SIZE = { width: 640, height: 360 };
 const FULL_MAP_SIZE = { width: 2000, height: 1000 };
+const SAVE_BACKUP_FORMAT = 'fogsgear-save';
+const SAVE_BACKUP_VERSION = 1;
+const CELL_CHANGES_PREFIX = 'fogsgear_world_cell_changes:';
+const SAVE_BACKUP_KEYS = [
+    'fog_thermo_save',
+    'steampunk_explorer_settings',
+    'steampunk_explorer_player_pos',
+    'fogsgear_scroll_library',
+    'fogsgear_scroll_draft_paper',
+    'fogsgear_scroll_draft_cloth',
+    'fogsgear_world_unlocks',
+    'fogsgear_cell_entry_rules',
+    'fogsgear_scroll_effect_log',
+    'steampunk_explorer_skin_url',
+    'steampunk_explorer_skin_source',
+    'steampunk_explorer_skin_name'
+];
+const TRANSIENT_SAVE_KEYS = [
+    'fogsgear_active_scroll_id',
+    'fogsgear_active_scroll_running',
+    'fogsgear_active_scroll_targets'
+];
+let pendingSaveBackup = null;
 
 function isMainlandUnlocked() {
     try {
@@ -124,6 +147,130 @@ function showAppNotice(message) {
     notice.hidden = false;
     clearTimeout(appNoticeTimer);
     appNoticeTimer = setTimeout(() => { notice.hidden = true; }, 3200);
+}
+
+function collectSaveBackup() {
+    const data = Object.fromEntries(SAVE_BACKUP_KEYS.map(key => [key, localStorage.getItem(key)]));
+    const cellChanges = {};
+    for (let index = 0; index < localStorage.length; index++) {
+        const key = localStorage.key(index);
+        if (key?.startsWith(CELL_CHANGES_PREFIX)) cellChanges[key] = localStorage.getItem(key);
+    }
+    return {
+        format: SAVE_BACKUP_FORMAT,
+        version: SAVE_BACKUP_VERSION,
+        exportedAt: new Date().toISOString(),
+        data,
+        cellChanges
+    };
+}
+
+function exportSaveBackup() {
+    const backup = collectSaveBackup();
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `fogsgear-save-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    showAppNotice('セーブデータをJSONへ書き出しました。');
+}
+
+function isRecord(value) {
+    return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function validateSaveBackupValue(key, value) {
+    if (value === null) return;
+    if (typeof value !== 'string' || value.length > 8_000_000) throw new Error('保存データの形式が正しくありません。');
+    if (key.startsWith('steampunk_explorer_skin_')) return;
+    let parsed;
+    try { parsed = JSON.parse(value); }
+    catch (error) { throw new Error('JSON内の保存データを解析できません。'); }
+    if (key === 'fog_thermo_save') {
+        if (!isRecord(parsed) || (parsed.gears !== undefined && !Array.isArray(parsed.gears)) || (parsed.placedGears !== undefined && !Array.isArray(parsed.placedGears))) throw new Error('ギアのセーブデータが不正です。');
+    } else if (key === 'steampunk_explorer_settings') {
+        if (!isRecord(parsed) || (parsed.seed !== undefined && typeof parsed.seed !== 'string')) throw new Error('ワールド設定が不正です。');
+    } else if (key === 'steampunk_explorer_player_pos') {
+        if (!isRecord(parsed) || !Number.isInteger(parsed.x) || !Number.isInteger(parsed.y)) throw new Error('プレイヤー位置が不正です。');
+    } else if (key === 'fogsgear_scroll_library') {
+        if (!Array.isArray(parsed) || parsed.some(scroll => !isRecord(scroll) || (scroll.id !== undefined && typeof scroll.id !== 'string'))) throw new Error('保存ギア一覧が不正です。');
+    } else if (key.startsWith('fogsgear_scroll_draft_')) {
+        if (!isRecord(parsed) || !Array.isArray(parsed.gears)) throw new Error('編集中ギアのデータが不正です。');
+    } else if (key === 'fogsgear_scroll_effect_log') {
+        if (!Array.isArray(parsed)) throw new Error('スクロール履歴が不正です。');
+    } else if (!isRecord(parsed)) {
+        throw new Error('設定データの形式が正しくありません。');
+    }
+}
+
+function validateSaveBackup(backup) {
+    if (!isRecord(backup) || backup.format !== SAVE_BACKUP_FORMAT || backup.version !== SAVE_BACKUP_VERSION) {
+        throw new Error('FogsGearの対応セーブJSONではありません。');
+    }
+    if (!isRecord(backup.data) || !isRecord(backup.cellChanges)) throw new Error('セーブJSONの構造が不正です。');
+    for (const key of SAVE_BACKUP_KEYS) {
+        if (!Object.hasOwn(backup.data, key)) throw new Error('セーブJSONに必要な項目がありません。');
+        validateSaveBackupValue(key, backup.data[key]);
+    }
+    if (Object.keys(backup.data).some(key => !SAVE_BACKUP_KEYS.includes(key))) throw new Error('未対応の保存項目が含まれています。');
+    Object.entries(backup.cellChanges).forEach(([key, value]) => {
+        if (!key.startsWith(CELL_CHANGES_PREFIX) || key.length <= CELL_CHANGES_PREFIX.length || typeof value !== 'string') throw new Error('地形変更データが不正です。');
+        let changes;
+        try { changes = JSON.parse(value); }
+        catch (error) { throw new Error('地形変更データを解析できません。'); }
+        if (!isRecord(changes)) throw new Error('地形変更データの形式が正しくありません。');
+    });
+    return backup;
+}
+
+function openSaveImportConfirmation(backup) {
+    pendingSaveBackup = backup;
+    const changedCells = Object.values(backup.cellChanges).reduce((sum, value) => sum + Object.keys(JSON.parse(value)).length, 0);
+    document.getElementById('save-transfer-meta').textContent = `${backup.exportedAt ? `書き出し日時: ${backup.exportedAt} / ` : ''}保存ギア ${JSON.parse(backup.data.fogsgear_scroll_library || '[]').length}件 / 地形変更 ${changedCells}件`;
+    document.getElementById('save-transfer-modal').hidden = false;
+}
+
+function applySaveBackup(backup) {
+    const affectedKeys = new Set([...SAVE_BACKUP_KEYS, ...TRANSIENT_SAVE_KEYS]);
+    for (let index = 0; index < localStorage.length; index++) {
+        const key = localStorage.key(index);
+        if (key?.startsWith(CELL_CHANGES_PREFIX)) affectedKeys.add(key);
+    }
+    Object.keys(backup.cellChanges).forEach(key => affectedKeys.add(key));
+    const previousValues = new Map([...affectedKeys].map(key => [key, localStorage.getItem(key)]));
+    try {
+        SAVE_BACKUP_KEYS.forEach(key => {
+            const value = backup.data[key];
+            if (value === null) localStorage.removeItem(key);
+            else localStorage.setItem(key, value);
+        });
+        [...affectedKeys].filter(key => key.startsWith(CELL_CHANGES_PREFIX)).forEach(key => localStorage.removeItem(key));
+        Object.entries(backup.cellChanges).forEach(([key, value]) => localStorage.setItem(key, value));
+        TRANSIENT_SAVE_KEYS.forEach(key => localStorage.removeItem(key));
+    } catch (error) {
+        affectedKeys.forEach(key => {
+            try { localStorage.removeItem(key); }
+            catch (rollbackError) {}
+        });
+        previousValues.forEach((value, key) => {
+            try {
+                if (value === null) localStorage.removeItem(key);
+                else localStorage.setItem(key, value);
+            } catch (rollbackError) {}
+        });
+        throw new Error('保存領域が不足しているため、読み込みを取り消しました。');
+    }
+    document.getElementById('save-transfer-modal').hidden = true;
+    pendingSaveBackup = null;
+    const loadingMessage = document.getElementById('loadingMessage');
+    if (loadingMessage) loadingMessage.textContent = 'セーブデータを反映しています...';
+    document.getElementById('loadingOverlay')?.removeAttribute('hidden');
+    if (typeof engineRuntimeState !== 'undefined') engineRuntimeState.lastStorageSaveAt = performance.now();
+    setTimeout(() => window.location.reload(), 120);
 }
 
 function applySavedScrollEffect(scroll) {
@@ -1311,6 +1458,26 @@ function openGuideModal() {
 document.addEventListener('click', (event) => {
     const button = event.target.closest('button');
     if (!button) return;
+    if (button.dataset.action === 'export-save') {
+        try { exportSaveBackup(); }
+        catch (error) { showAppNotice('セーブデータを書き出せませんでした。'); }
+        return;
+    }
+    if (button.dataset.action === 'choose-save-import') {
+        document.getElementById('save-import-file')?.click();
+        return;
+    }
+    if (button.dataset.action === 'cancel-save-import') {
+        pendingSaveBackup = null;
+        document.getElementById('save-transfer-modal').hidden = true;
+        return;
+    }
+    if (button.dataset.action === 'confirm-save-import') {
+        if (!pendingSaveBackup) return;
+        try { applySaveBackup(pendingSaveBackup); }
+        catch (error) { showAppNotice(error.message || 'セーブデータを読み込めませんでした。'); }
+        return;
+    }
     if (button.dataset.action === 'open-world-map') {
         openAppPage('worldmap.html?ui=legend-1', '全体マップ');
         return;
@@ -1368,6 +1535,32 @@ document.addEventListener('click', (event) => {
     }
 });
 
+document.getElementById('save-import-file')?.addEventListener('change', async event => {
+    const input = event.currentTarget;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) return;
+    if (file.size > 15_000_000) {
+        showAppNotice('ファイルが大きすぎます。');
+        return;
+    }
+    try {
+        const backup = validateSaveBackup(JSON.parse(await file.text()));
+        openSaveImportConfirmation(backup);
+    } catch (error) {
+        const message = error instanceof SyntaxError
+            ? 'JSONファイルの形式が正しくありません。'
+            : error.message || 'FogsGearのセーブJSONを読み込めませんでした。';
+        showAppNotice(message);
+    }
+});
+
+document.getElementById('save-transfer-modal')?.addEventListener('click', event => {
+    if (event.target.id !== 'save-transfer-modal') return;
+    pendingSaveBackup = null;
+    event.currentTarget.hidden = true;
+});
+
 window.addEventListener('message', event => {
     if (event.origin !== window.location.origin && event.origin !== 'null') return;
     const scrollLibraryFrame = [
@@ -1423,7 +1616,11 @@ document.addEventListener('pointerup', (event) => {
 });
 
 window.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape') closeInventoryItem();
+    if (event.key !== 'Escape') return;
+    closeInventoryItem();
+    pendingSaveBackup = null;
+    const transferModal = document.getElementById('save-transfer-modal');
+    if (transferModal) transferModal.hidden = true;
 });
 
 document.addEventListener('fullscreenchange', () => {
