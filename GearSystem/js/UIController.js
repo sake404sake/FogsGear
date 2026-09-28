@@ -455,22 +455,25 @@ export class UIController {
         conditionSelect.value = gear.controlCondition || 'ROTATIONS';
         document.getElementById('gear-control-rotation-count').value = String(Math.max(1, Number(gear.controlRotationCount) || 1));
         document.getElementById('gear-control-item-count').value = String(Math.max(1, Number(gear.controlItemCount) || 1));
-        const controlItems = [
-            ...Object.entries(CELL_MATERIALS),
-            ['fog', { label: '霧' }],
-            ['liquid_metal', { label: '液体金属' }],
-            ['solid_metal', { label: '固体金属' }],
-            ['brass', { label: '真鍮資材' }],
-            ['steam_power', { label: 'スチーム' }]
-        ];
-        itemSelect.replaceChildren(...controlItems.map(([id, item]) => new Option(item.label, id)));
-        itemSelect.value = [...itemSelect.options].some(option => option.value === gear.controlItemType)
+        if (!itemSelect.options.length) {
+            const controlItems = [
+                ...Object.entries(CELL_MATERIALS),
+                ['fog', { label: '霧' }],
+                ['liquid_metal', { label: '液体金属' }],
+                ['solid_metal', { label: '固体金属' }],
+                ['brass', { label: '真鍮資材' }],
+                ['steam_power', { label: 'スチーム' }]
+            ];
+            itemSelect.replaceChildren(...controlItems.map(([id, item]) => new Option(item.label, id)));
+        }
+        const selectedItemType = [...itemSelect.options].some(option => option.value === gear.controlItemType)
             ? gear.controlItemType
             : 'wood';
+        if (itemSelect.value !== selectedItemType) itemSelect.value = selectedItemType;
         const targetGearIds = new Set(Array.isArray(gear.controlTargetGearIds) ? gear.controlTargetGearIds : []);
-        const actionNeedsTargets = gear.controlAction === 'SYNC_AXIS' || gear.controlAction === 'UNSYNC_AXIS';
+        const actionNeedsTargets = ['SYNC_AXIS', 'UNSYNC_AXIS', 'TOGGLE_SYNC_AXIS'].includes(gear.controlAction);
         document.getElementById('gear-control-target-fieldset').hidden = !actionNeedsTargets;
-        const targets = this.state.placedGears.filter(target => !target.isCore && target.id !== gear.id);
+        const targets = this.state.placedGears.filter(target => !target.isCore && target.id !== gear.id && target.q === gear.q && target.r === gear.r);
         targetList.replaceChildren();
         if (!targets.length) {
             const empty = document.createElement('span');
@@ -490,7 +493,7 @@ export class UIController {
             label.append(checkbox, name);
             targetList.appendChild(label);
         });
-        const usesItemCount = conditionSelect.value === 'ITEM_COUNT';
+        const usesItemCount = conditionSelect.value === 'ITEM_COUNT' || conditionSelect.value === 'ITEM_COUNT_BELOW';
         document.getElementById('gear-control-rotation-row').hidden = usesItemCount;
         document.getElementById('gear-control-item-fields').hidden = !usesItemCount;
     }

@@ -702,7 +702,8 @@ export class GameState {
             STOP_MAIN_GEAR: 'メインギアを停止',
             START_MAIN_GEAR: 'メインギアを起動',
             SYNC_AXIS: '同軸同期',
-            UNSYNC_AXIS: '同軸同期解除'
+            UNSYNC_AXIS: '同軸同期解除',
+            TOGGLE_SYNC_AXIS: '同軸同期状態の切り替え'
         };
         const controlItemLabels = {
             fog: '霧',
@@ -711,8 +712,8 @@ export class GameState {
             brass: '真鍮資材',
             steam_power: 'スチーム'
         };
-        const controlCondition = gear?.controlCondition === 'ITEM_COUNT'
-            ? `${CELL_MATERIALS[gear.controlItemType]?.label || controlItemLabels[gear.controlItemType] || gear.controlItemType} ${gear.controlItemCount}個以上`
+        const controlCondition = gear?.controlCondition === 'ITEM_COUNT' || gear?.controlCondition === 'ITEM_COUNT_BELOW'
+            ? `${CELL_MATERIALS[gear.controlItemType]?.label || controlItemLabels[gear.controlItemType] || gear.controlItemType} ${gear.controlItemCount}個${gear.controlCondition === 'ITEM_COUNT_BELOW' ? '未満' : '以上'}`
             : `${Math.max(1, Number(gear?.controlRotationCount) || 1)}回転ごと`;
         const processInfo = {
             NONE: { name: '処理なし', input: '-', output: '-', rate: 0 },
@@ -786,11 +787,19 @@ export class GameState {
         const targets = new Set(Array.isArray(gear.controlTargetGearIds) ? gear.controlTargetGearIds : []);
         if (!targets.size || !group?.gears) return false;
         let networkChanged = false;
-        for (const target of group.gears) {
-            if (!targets.has(target.id) || target.isCore) continue;
-            if (gear.controlAction !== 'SYNC_AXIS' && gear.controlAction !== 'UNSYNC_AXIS') continue;
-            const locked = gear.controlAction === 'SYNC_AXIS';
-            group.gears.filter(other => other.q === target.q && other.r === target.r).forEach(other => {
+        if (!['SYNC_AXIS', 'UNSYNC_AXIS', 'TOGGLE_SYNC_AXIS'].includes(gear.controlAction)) return false;
+        const selectedTargets = group.gears.filter(target => targets.has(target.id) && !target.isCore
+            && target.q === gear.q && target.r === gear.r);
+        const processedAxes = new Set();
+        for (const target of selectedTargets) {
+            const axisKey = `${target.q},${target.r}`;
+            if (processedAxes.has(axisKey)) continue;
+            processedAxes.add(axisKey);
+            const axisGears = group.gears.filter(other => other.q === target.q && other.r === target.r);
+            const nonCoreGears = axisGears.filter(other => !other.isCore);
+            const locked = gear.controlAction === 'SYNC_AXIS'
+                || (gear.controlAction === 'TOGGLE_SYNC_AXIS' && !nonCoreGears.every(other => other.isLocked));
+            axisGears.forEach(other => {
                 const nextLock = locked || other.isCore;
                 if (other.isLocked === nextLock) return;
                 other.isLocked = nextLock;
@@ -815,7 +824,7 @@ export class GameState {
             controlState = { signature, rotationProgress: 0, itemTriggered: false };
             this.controlStates.set(gear.id, controlState);
         }
-        if (gear.controlCondition === 'ITEM_COUNT') {
+        if (gear.controlCondition === 'ITEM_COUNT' || gear.controlCondition === 'ITEM_COUNT_BELOW') {
             const resourceProperties = {
                 water: 'water',
                 fog: 'fog',
@@ -826,7 +835,10 @@ export class GameState {
             };
             const property = resourceProperties[gear.controlItemType];
             const count = Number(property ? this[property] : this.materialInventory[gear.controlItemType]) || 0;
-            if (count < gear.controlItemCount) {
+            const conditionMet = gear.controlCondition === 'ITEM_COUNT_BELOW'
+                ? count < gear.controlItemCount
+                : count >= gear.controlItemCount;
+            if (!conditionMet) {
                 controlState.itemTriggered = false;
                 return false;
             }
@@ -1001,12 +1013,12 @@ export class GameState {
         let controlNetworkChanged = false;
         activeGears.forEach(gear => {
             const group = runtimeGroupByGearId.get(gear.id);
-            if (!group || gear.controlCondition === 'ITEM_COUNT') return;
+            if (!group || gear.controlCondition === 'ITEM_COUNT' || gear.controlCondition === 'ITEM_COUNT_BELOW') return;
             controlNetworkChanged = this.processControlGear(gear, group, rotationDeltas.get(gear.id) || 0) || controlNetworkChanged;
         });
         runtimeGroups.forEach(group => {
             group.gears.forEach(gear => {
-                if (gear.processMode !== 'CONDITIONAL_CONTROL' || gear.controlCondition !== 'ITEM_COUNT') return;
+                if (gear.processMode !== 'CONDITIONAL_CONTROL' || !['ITEM_COUNT', 'ITEM_COUNT_BELOW'].includes(gear.controlCondition)) return;
                 controlNetworkChanged = this.processControlGear(gear, group, 0) || controlNetworkChanged;
             });
         });
