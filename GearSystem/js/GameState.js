@@ -71,7 +71,6 @@ export class GameState {
         this.runtimeBelts = null;
         this.runtimeNetwork = null;
         this.activeScrollRuntimes = [];
-        this._cachedScrollRuntimes = null;
         this.activeScrollSignature = '';
         this.worldCellHandler = null;
         this.lastActiveScrollSyncAt = 0;
@@ -80,7 +79,6 @@ export class GameState {
                 this.syncActiveScrollTargets(event.newValue);
             } else if (event.key === null || ['fogsgear_active_scroll_id', 'fogsgear_scroll_library'].includes(event.key)) {
                 this.activeScrollSignature = '';
-                this._cachedScrollRuntimes = null;
             }
         });
         
@@ -136,7 +134,7 @@ export class GameState {
 
     getActiveScrollRuntimes(now) {
         if (this.isEditorRuntimeContext() || !this.createGear || !this.network) return [];
-        if (this.activeScrollSignature && now - this.lastActiveScrollSyncAt < 250 && this._cachedScrollRuntimes) return this._cachedScrollRuntimes;
+        if (this.activeScrollSignature && now - this.lastActiveScrollSyncAt < 250) return this.activeScrollRuntimes;
         this.lastActiveScrollSyncAt = now;
 
         let activeScrollValue = '[]';
@@ -152,11 +150,7 @@ export class GameState {
             return [];
         }
         const signature = `${activeScrollValue}\n${libraryValue}\n${legacyRunning}`;
-        
-        // 構成が変わっていない場合は既存のランタイムをそのまま返し、毎フレームの再生成・位置リセットを防ぐ
-        if (signature === this.activeScrollSignature && this._cachedScrollRuntimes) {
-            return this._cachedScrollRuntimes;
-        }
+        if (signature === this.activeScrollSignature) return this.activeScrollRuntimes;
         this.activeScrollSignature = signature;
 
         let activeIds = [];
@@ -174,46 +168,27 @@ export class GameState {
         }
 
         const activeIdSet = new Set(activeIds);
-        const newScrollRuntimes = [];
+        this.activeScrollRuntimes = [];
         let targetsChanged = false;
-
-        // 既存のランタイムをマップで保持しておく（角度などの状態を引き継ぐため）
-        const previousRuntimes = new Map(
-            (this._cachedScrollRuntimes || []).map(rt => [rt.scrollId, rt])
-        );
-
         library.forEach(scroll => {
             if (!activeIdSet.has(scroll.id)) return;
             const blueprintGears = Array.isArray(scroll.blueprint?.gears) ? scroll.blueprint.gears : [];
             if (!blueprintGears.some(gear => gear.isCore)) return;
 
-            const prevRuntime = previousRuntimes.get(scroll.id);
-            let gears, belts, network;
-
-            if (prevRuntime && prevRuntime.blueprintSignature === JSON.stringify(scroll.blueprint)) {
-                // ブループリントに変更がない場合は既存インスタンスを流用して角度が戻るのを防ぐ
-                gears = prevRuntime.gears;
-                belts = prevRuntime.belts;
-                network = prevRuntime.network;
-            } else {
-                // 新規または変更がある場合のみギアを生成
-                const gearIdMap = new Map();
-                gears = blueprintGears.map((data, index) => {
-                    const sourceId = String(data.id || `preview-${index}`);
-                    const gearId = `active-scroll:${scroll.id}:${sourceId}`;
-                    const gear = this.createGear({ ...data, id: gearId });
-                    gearIdMap.set(sourceId, gearId);
-                    return gear;
-                });
-                belts = (Array.isArray(scroll.blueprint?.belts) ? scroll.blueprint.belts : [])
-                    .map(belt => ({ ...belt, gearIds: (belt.gearIds || []).map(id => gearIdMap.get(String(id))).filter(Boolean) }))
-                    .filter(belt => belt.gearIds.length >= 2);
-                network = new GearNetwork(gears, belts);
-                network.updateRotation();
-            }
-
+            const gearIdMap = new Map();
+            const gears = blueprintGears.map((data, index) => {
+                const sourceId = String(data.id || `preview-${index}`);
+                const gearId = `active-scroll:${scroll.id}:${sourceId}`;
+                const gear = this.createGear({ ...data, id: gearId });
+                gearIdMap.set(sourceId, gearId);
+                return gear;
+            });
+            const belts = (Array.isArray(scroll.blueprint?.belts) ? scroll.blueprint.belts : [])
+                .map(belt => ({ ...belt, gearIds: (belt.gearIds || []).map(id => gearIdMap.get(String(id))).filter(Boolean) }))
+                .filter(belt => belt.gearIds.length >= 2);
+            const network = new GearNetwork(gears, belts);
+            network.updateRotation();
             if (gears.some(gear => gear.isDeadlocked || gear.angleError)) return;
-
             if (!targets[scroll.id] || !Number.isInteger(targets[scroll.id].x) || !Number.isInteger(targets[scroll.id].y)) {
                 let playerPosition = { x: 0, y: 0 };
                 try {
@@ -223,25 +198,13 @@ export class GameState {
                 targets[scroll.id] = playerPosition;
                 targetsChanged = true;
             }
-
-            newScrollRuntimes.push({
-                scrollId: scroll.id,
-                target: prevRuntime ? prevRuntime.target : { ...targets[scroll.id] },
-                gears,
-                belts,
-                network,
-                blueprintSignature: JSON.stringify(scroll.blueprint)
-            });
+            this.activeScrollRuntimes.push({ scrollId: scroll.id, target: { ...targets[scroll.id] }, gears, belts, network });
         });
-
         if (targetsChanged) {
             localStorage.setItem(ACTIVE_SCROLL_TARGETS_KEY, JSON.stringify(targets));
             window.dispatchEvent(new CustomEvent('fogsgear:scroll-targets-changed', { detail: targets }));
         }
-
-        this._cachedScrollRuntimes = newScrollRuntimes;
-        this.activeScrollRuntimes = newScrollRuntimes;
-        return this._cachedScrollRuntimes;
+        return this.activeScrollRuntimes;
     }
 
     setCreativeMode(active) {
@@ -487,7 +450,6 @@ export class GameState {
         this.redoStack = [];
         this.belts = [];
         this.beltSelection = [];
-        this._cachedScrollRuntimes = null;
         this.updatePowerGrid();
         this.saveGameData();
         this.notify();
@@ -652,7 +614,6 @@ export class GameState {
         localStorage.setItem('fogsgear_scroll_library', JSON.stringify(library));
         this.currentScrollId = library[index >= 0 ? index : 0]?.id || entry.id;
         localStorage.removeItem(this.getScrollDraftKey(this.currentScrollMaterial));
-        this._cachedScrollRuntimes = null;
         return entry;
     }
 
@@ -786,11 +747,9 @@ export class GameState {
             { gears: runtimeGears, belts: runtimeBelts, network: runtimeNetwork },
             ...this.getActiveScrollRuntimes(now)
         ];
-        
         runtimeGroups.forEach(group => {
             if (group.network && this.mainGearRunning && (this.creativeMode || this.steamPower > 0)) {
-                // 毎フレームの rebuild を外し、updateRotationのみに限定
-                group.network.updateRotation();
+                group.network.rebuild(group.gears, group.belts).updateRotation();
             } else {
                 group.gears.forEach(gear => {
                     gear.powered = false;
@@ -799,7 +758,6 @@ export class GameState {
                 });
             }
         });
-        
         // 連結していても、処理設定は各ギア自身の値だけを参照する。
         const activeGearGroups = runtimeGroups
             .map(group => ({ network: group.network, gears: group.gears.filter(gear => gear.powered && !gear.isDeadlocked) }))
@@ -825,7 +783,7 @@ export class GameState {
         const steamConsumption = this.mainGearRunning && !this.creativeMode && activeCount > 0
             ? activeGearGroups.reduce((sum, group) => sum + group.network.calculateSteamConsumption(group.gears), 0)
             : 0;
-        const steamAutoRecoveryRate = !this.creativeMode && (!this.mainGearRunning || this.autoStoppedBySteam || this.steamPower <= 0) && this.steamPower < 100 ? 1 : 0;
+        const steamAutoRecoveryRate = !this.creativeMode && (!this.mainGearRunning || this.autoStoppedBySteam || this.steamPower <= 0) ? 1 : 0;
         // ダッシュボードの3列目・4列目用のレートを、変換の入力と出力に分けて集計する。
         this.waterGenerationRate = this.waterRecoveryRate + this.fogToWaterRate;
         this.waterConsumptionRate = this.steamTransformRate;
@@ -844,7 +802,7 @@ export class GameState {
         } else {
             const autoRecovery = steamAutoRecoveryRate;
             const recoveryRate = this.mainGearRunning ? this.waterRecoveryRate : 0;
-            this.steamPower = Math.max(0, Math.min(100, this.steamPower + (recoveryRate + autoRecovery) * elapsed - steamConsumption * elapsed));
+            this.steamPower = Math.max(0, this.steamPower + (recoveryRate + autoRecovery) * elapsed - steamConsumption * elapsed);
         }
         if (!this.creativeMode && this.steamPower <= 0) {
             this.autoStoppedBySteam = true;
@@ -890,14 +848,9 @@ export class GameState {
                     this.fog += gear.teeth * 10 * Math.abs(rotationDelta) / (Math.PI * 2);
                 }
                 if (gear.designType === 'ALCHEMICAL' && gear.processMode === 'TRANSFORM') {
-                    const progress = (this.rotationProgress.get(gear.id) || 0) + Math.abs(rotationDelta);
-                    const completedRotations = Math.floor(progress / (Math.PI * 2));
-                    this.rotationProgress.set(gear.id, progress % (Math.PI * 2));
-                    if (completedRotations > 0) {
-                        const transformed = Math.min(this.water, completedRotations * gear.teeth);
-                        this.water -= transformed;
-                        this.steamPower += transformed * 10;
-                    }
+                    const transformed = Math.min(this.water, gear.teeth * Math.abs(rotationDelta) / (Math.PI * 2));
+                    this.water -= transformed;
+                    this.steamPower += transformed * 10;
                 }
                 if (gear.designType === 'ALCHEMICAL' && (gear.processMode === 'FOG_TO_WATER' || gear.processMode === 'FOG_TO_LIQUID_METAL' || gear.processMode === 'LIQUID_TO_SOLID_METAL' || gear.processMode === 'SOLID_TO_BRASS')) {
                     const progressKey = `${gear.id}:${gear.processMode}`;

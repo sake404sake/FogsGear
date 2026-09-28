@@ -1,11 +1,11 @@
 // js/main.js - Steampunk Explorer Game Logic
-import { MapGenerator, BIOME_COLORS, loadMapSnapshot, saveMapSnapshot } from './mapGenerator.js?v=88';
+import { MapGenerator, BIOME_COLORS, loadMapSnapshot, saveMapSnapshot } from './mapGenerator.js?v=89';
 import { SkinRenderer } from './skinRenderer.js?v=2';
 import { CELL_DEFINITIONS, canEnterCell, getCellEntryRule, getMosaicColor } from './cellRules.js';
 import { drawCellIcon, loadCellIconAtlas } from './cellIconRenderer.js?v=3';
 import { ACTIVE_SCROLL_TARGETS_KEY, CELL_MATERIALS, TERRAIN_TRANSFORM_RECIPES, WORLD_CELL_TYPES, applyCellChanges, chooseEraCellType, getCellDrops, readCellChanges, saveCellChange } from './worldCells.js?v=2';
 import { buildTerritoryBorderSegments } from './territoryBorders.js?v=35';
-import { GameState as EngineGameState } from '../../GearSystem/js/GameState.js?v=runtime-10';
+import { GameState as EngineGameState } from '../../GearSystem/js/GameState.js?v=runtime-13';
 import { GearManager as EngineGearManager } from '../../GearSystem/js/GearManager.js?v=runtime-2';
 
 const canvas = document.getElementById('gameCanvas');
@@ -115,6 +115,17 @@ function getStoredSavedScrolls() {
     }
 }
 
+let appNoticeTimer = null;
+
+function showAppNotice(message) {
+    const notice = document.getElementById('app-notice');
+    if (!notice) return;
+    notice.textContent = message;
+    notice.hidden = false;
+    clearTimeout(appNoticeTimer);
+    appNoticeTimer = setTimeout(() => { notice.hidden = true; }, 3200);
+}
+
 function applySavedScrollEffect(scroll) {
     const effect = scroll?.effect || { type: 'custom', label: '未設定', config: {} };
     const history = (() => {
@@ -137,7 +148,7 @@ function applySavedScrollEffect(scroll) {
     } else if (effect.type === 'gear_sync') {
         message = 'ギア同期効果を発動しました。';
     }
-    window.alert(`${scroll?.name || 'スクロール'} を使用しました。\n${message}`);
+    showAppNotice(`${scroll?.name || 'スクロール'} を使用しました。 ${message}`);
 }
 
 function renderSavedScrolls() {
@@ -281,7 +292,7 @@ async function applySelectedSkinSource(source, sourceType = 'url', name = '') {
 
 function generateMapInWorker(seed) {
     return new Promise((resolve, reject) => {
-        const worker = new Worker('./js/mapWorker.js?v=88', { type: 'module' });
+        const worker = new Worker('./js/mapWorker.js?v=89', { type: 'module' });
         worker.onmessage = (event) => {
             if (event.data?.type === 'complete') {
                 worker.terminate();
@@ -418,26 +429,6 @@ function findSafeSpawn() {
     );
     const largestIslandSet = new Set(largestIsland.map(({ x, y }) => `${x},${y}`));
 
-    const hasSavedPosition = savedPlayer && savedPlayer.spawnVersion === 3 && savedPlayer.seed === state.worldSeed && typeof savedPlayer.x === 'number' && typeof savedPlayer.y === 'number';
-    if (hasSavedPosition) {
-        const tx = savedPlayer.x;
-        const ty = savedPlayer.y;
-        if (tx >= 0 && tx < state.cols && ty >= 0 && ty < state.rows) {
-            const tile = state.map[ty][tx];
-            if (tile && largestIslandSet.has(`${tx},${ty}`)) {
-                state.player.x = tx;
-                state.player.y = ty;
-                savePlayerPos();
-                return;
-            }
-        }
-    }
-
-    const islandCenterX = Math.floor(state.cols * 0.86);
-    const islandCenterY = Math.floor(state.rows * 0.56);
-    let best = null;
-    let bestScore = -Infinity;
-
     const isWestCoastLand = (x, y) => {
         const tile = state.map[y]?.[x];
         if (!tile || !largestIslandSet.has(`${x},${y}`) || tile.type === 'MOUNTAIN') return false;
@@ -446,6 +437,23 @@ function findSafeSpawn() {
             return neighbor?.isSea || neighbor?.isOcean;
         });
     };
+
+    const hasSavedPosition = savedPlayer && savedPlayer.spawnVersion === 4 && savedPlayer.seed === state.worldSeed && Number.isInteger(savedPlayer.x) && Number.isInteger(savedPlayer.y);
+    if (hasSavedPosition) {
+        const tx = savedPlayer.x;
+        const ty = savedPlayer.y;
+        if (tx >= 0 && tx < state.cols && ty >= 0 && ty < state.rows && largestIslandSet.has(`${tx},${ty}`)) {
+            state.player.x = tx;
+            state.player.y = ty;
+            savePlayerPos();
+            return;
+        }
+    }
+
+    const islandCenterX = Math.floor(state.cols * (state.generator.coastalOnly ? 0.5 : 0.86));
+    const islandCenterY = Math.floor(state.rows * (state.generator.coastalOnly ? 0.5 : 0.56));
+    let best = null;
+    let bestScore = -Infinity;
 
     for (let y = 1; y < state.rows - 1; y++) {
         for (let x = 1; x < state.cols - 1; x++) {
@@ -493,7 +501,7 @@ function savePlayerPos() {
             seed: state.worldSeed,
             x: state.player.x,
             y: state.player.y,
-            spawnVersion: 3
+            spawnVersion: 4
         }));
     } catch(e) {}
 }
@@ -1185,11 +1193,6 @@ function updateEngineDashboard() {
     });
     const creativeIndicator = document.getElementById('main-creative-mode-indicator');
     if (creativeIndicator) creativeIndicator.hidden = !save.creativeMode;
-    const formatSignedRate = (value) => {
-        const number = Number(value) || 0;
-        const formatted = formatCompact(Math.abs(number));
-        return `${number >= 0 ? '+' : '-'}${formatted} /秒`;
-    };
     const rates = {
         'main-water-generation': save.waterGenerationRate,
         'main-water-consumption': save.waterConsumptionRate,
@@ -1206,11 +1209,7 @@ function updateEngineDashboard() {
     Object.entries(rates).forEach(([id, value]) => {
         const element = document.getElementById(id);
         if (!element) return;
-        const isSteamGeneration = id === 'main-steam-generation';
-        element.textContent = isSteamGeneration ? formatSignedRate(value) : `${formatCompact(value)} /秒`;
-        if (save.autoStoppedBySteam && isSteamGeneration) {
-            element.textContent = '+1.00 /秒';
-        }
+        element.textContent = `${formatCompact(value)} /秒`;
     });
     renderCellMaterials();
 }
@@ -1248,6 +1247,7 @@ function openGearEditor(material, scrollId = null) {
     if (scrollId) editorUrl.searchParams.set('editScroll', scrollId);
     else editorUrl.searchParams.set('newScroll', material || 'paper');
     editorUrl.searchParams.set('hosted', '1');
+    editorUrl.searchParams.set('ui', 'fullscreen-dialog-1');
     frame.src = editorUrl.href;
     overlay.appendChild(frame);
     document.body.appendChild(overlay);
@@ -1304,7 +1304,7 @@ document.addEventListener('click', (event) => {
     const button = event.target.closest('button');
     if (!button) return;
     if (button.dataset.action === 'open-world-map') {
-        openAppPage('worldmap.html', '全体マップ');
+        openAppPage('worldmap.html?ui=legend-1', '全体マップ');
         return;
     }
     if (button.dataset.action === 'open-guide') {
@@ -1573,6 +1573,7 @@ const gearPreviewIframe = document.querySelector('.gear-preview-page iframe');
 const canvasContainer = document.getElementById('canvas-container');
 let currentMainPage = 0;
 let mainPagePointerStart = null;
+let mainPageTouchStart = null;
 
 function applyMapFrameRadius() {
     if (!canvasContainer) return;
@@ -1628,29 +1629,45 @@ mainPageArrows.forEach(arrow => arrow.addEventListener('click', () => {
     setMainPage(currentMainPage + (arrow.dataset.mainPage === 'next' ? 1 : -1));
 }));
 const captureMainPageSwipe = (event, allowInteractiveTarget = false) => {
+    if (event.pointerType === 'touch') return;
     if (!allowInteractiveTarget && event.target && event.target.closest('button, input, select, .movement-joystick')) return;
     mainPagePointerStart = { x: event.clientX, y: event.clientY };
 };
-const releaseMainPageSwipe = (event) => {
-    if (!mainPagePointerStart) return;
-    const deltaX = event.clientX - mainPagePointerStart.x;
-    const deltaY = event.clientY - mainPagePointerStart.y;
-    mainPagePointerStart = null;
+const releaseMainPageSwipe = (point, start = mainPagePointerStart) => {
+    if (!start) return;
+    const deltaX = point.x - start.x;
+    const deltaY = point.y - start.y;
+    if (start === mainPagePointerStart) mainPagePointerStart = null;
+    if (start === mainPageTouchStart) mainPageTouchStart = null;
     if (Math.abs(deltaX) < 42 || Math.abs(deltaX) < Math.abs(deltaY) * 1.25) return;
     setMainPage(currentMainPage + (deltaX < 0 ? 1 : -1));
 };
+const captureMainPageTouch = event => {
+    const touch = event.changedTouches[0];
+    if (touch) mainPageTouchStart = { x: touch.clientX, y: touch.clientY };
+};
+const releaseMainPageTouch = event => {
+    const touch = event.changedTouches[0];
+    if (touch) releaseMainPageSwipe({ x: touch.clientX, y: touch.clientY }, mainPageTouchStart);
+};
 
 mainPageViewport?.addEventListener('pointerdown', captureMainPageSwipe);
-mainPageViewport?.addEventListener('pointerup', releaseMainPageSwipe);
+mainPageViewport?.addEventListener('pointerup', event => releaseMainPageSwipe({ x: event.clientX, y: event.clientY }));
 mainPageViewport?.addEventListener('pointercancel', () => { mainPagePointerStart = null; });
+mainPageViewport?.addEventListener('touchstart', captureMainPageTouch, { passive: true });
+mainPageViewport?.addEventListener('touchend', releaseMainPageTouch, { passive: true });
+mainPageViewport?.addEventListener('touchcancel', () => { mainPageTouchStart = null; }, { passive: true });
 
 const bindGearPreviewSwipe = () => {
     if (!gearPreviewIframe || !gearPreviewIframe.contentWindow || !gearPreviewIframe.contentWindow.document) return;
     const frameDocument = gearPreviewIframe.contentWindow.document;
     const capturePreviewSwipe = event => captureMainPageSwipe(event, true);
-    frameDocument.addEventListener('pointerdown', capturePreviewSwipe, { passive: true });
-    frameDocument.addEventListener('pointerup', releaseMainPageSwipe, { passive: true });
+    frameDocument.addEventListener('pointerdown', capturePreviewSwipe, { passive: true, capture: true });
+    frameDocument.addEventListener('pointerup', event => releaseMainPageSwipe({ x: event.clientX, y: event.clientY }), { passive: true, capture: true });
     frameDocument.addEventListener('pointercancel', () => { mainPagePointerStart = null; }, { passive: true });
+    frameDocument.addEventListener('touchstart', captureMainPageTouch, { passive: true, capture: true });
+    frameDocument.addEventListener('touchend', releaseMainPageTouch, { passive: true, capture: true });
+    frameDocument.addEventListener('touchcancel', () => { mainPageTouchStart = null; }, { passive: true, capture: true });
 };
 
 gearPreviewIframe?.addEventListener('load', bindGearPreviewSwipe);

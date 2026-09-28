@@ -154,12 +154,14 @@ function setScrollRunning(scrollId, running) {
         localStorage.setItem(ACTIVE_SCROLL_TARGETS_KEY, JSON.stringify(targets));
     }
     localStorage.removeItem(ACTIVE_SCROLL_RUNNING_KEY);
+    renderList();
 }
 
 function stopAllScrolls() {
     localStorage.setItem(ACTIVE_SCROLL_KEY, '[]');
     localStorage.setItem(ACTIVE_SCROLL_TARGETS_KEY, '{}');
     localStorage.removeItem(ACTIVE_SCROLL_RUNNING_KEY);
+    renderList();
 }
 
 function hasEnginePower() {
@@ -176,6 +178,7 @@ function requestEngineResume() {
         const save = JSON.parse(localStorage.getItem(GAME_SAVE_KEY) || '{}');
         if (Number(save.steamPower ?? 0) <= 0 || save.mainGearRunning !== false) return;
         save.mainGearRunning = true;
+        save.userStoppedMainGear = false;
         save.autoStoppedBySteam = false;
         save.updatedAt = Date.now();
         localStorage.setItem(GAME_SAVE_KEY, JSON.stringify(save));
@@ -254,6 +257,7 @@ function renderPreview(scroll) {
 
 function renderList() {
     const filtered = library.filter(scroll => currentMaterial === 'all' || getMaterial(scroll) === currentMaterial);
+    const activeScrollIds = new Set(getActiveScrollIds());
     countElement.textContent = String(filtered.length);
     listElement.replaceChildren();
     if (!filtered.length) {
@@ -264,12 +268,15 @@ function renderList() {
         return;
     }
     filtered.forEach(scroll => {
+        const isRunning = activeScrollIds.has(scroll.id);
         const item = document.createElement('div');
-        item.className = `scroll-list-item${scroll.id === selectedScrollId ? ' active' : ''}`;
+        item.className = `scroll-list-item${scroll.id === selectedScrollId ? ' active' : ''}${isRunning ? ' running' : ''}`;
         item.dataset.scrollId = scroll.id;
         item.innerHTML = `<button class="scroll-list-select" type="button"><span class="scroll-list-type">${getMaterial(scroll) === 'cloth' ? '布' : '紙'}</span><span class="scroll-list-name"></span></button><button class="scroll-list-edit" type="button" aria-label="スクロールを編集" title="スクロールを編集">⚙</button>`;
         item.querySelector('.scroll-list-name').textContent = scroll.name || '名前なしスクロール';
-        item.querySelector('.scroll-list-select').dataset.scrollId = scroll.id;
+        const selectButton = item.querySelector('.scroll-list-select');
+        selectButton.dataset.scrollId = scroll.id;
+        selectButton.setAttribute('aria-label', `${getMaterialLabel(scroll)}: ${scroll.name || '名前なしスクロール'}、${isRunning ? '起動中' : '停止中'}`);
         item.querySelector('.scroll-list-edit').dataset.scrollId = scroll.id;
         listElement.appendChild(item);
     });
@@ -331,16 +338,10 @@ function selectScroll(scrollId) {
 
 function resizePreview() {
     if (!isEmbedded || !previewFrame.clientWidth || !previewFrame.clientHeight) return;
-    const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
-    const width = Math.max(1, Math.round(previewFrame.clientWidth * pixelRatio));
-    const height = Math.max(1, Math.round(previewFrame.clientHeight * pixelRatio));
-    if (canvas.width === width && canvas.height === height) return;
-    canvas.width = width;
-    canvas.height = height;
-    renderedScrollId = null;
-    const scroll = getSelectedScroll();
-    if (scroll) renderPreview(scroll);
-    else renderer.render();
+    const previousWidth = canvas.width;
+    const previousHeight = canvas.height;
+    renderer.resizeCanvas();
+    if (canvas.width !== previousWidth || canvas.height !== previousHeight) renderer.render();
 }
 
 tabs.forEach(tab => tab.addEventListener('click', () => {
@@ -390,6 +391,7 @@ choiceEditButton?.addEventListener('click', () => {
     if (!scroll) return;
     const editorUrl = new URL('index.html', window.location.href);
     editorUrl.searchParams.set('editScroll', scroll.id);
+    editorUrl.searchParams.set('ui', 'fullscreen-dialog-1');
     window.top.location.href = editorUrl.href;
 });
 

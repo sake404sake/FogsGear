@@ -50,10 +50,10 @@ export class MapManager {
         if (!rows || !cols) return;
 
         const islandCenter = this.coastalOnly
-            ? { x: cols * 0.75, y: rows * 0.5 }
+            ? { x: cols * 0.5, y: rows * 0.5 }
             : { x: cols * 0.86, y: rows * 0.56 };
         const islandRadius = this.coastalOnly
-            ? { x: 150, y: 160 }
+            ? { x: cols * 0.22, y: rows * 0.32 }
             : { x: cols * 0.075, y: rows * 0.16 };
         const colorByType = {
             SEA: '#1e4d6b',

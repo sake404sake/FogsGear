@@ -20,8 +20,18 @@ export class UIController {
         this.pointerDownGear = null;
         this.pointerDownPoint = null;
         this.longPressTimer = null;
+        this.noticeTimer = null;
         this.initEvents();
         this.state.subscribe(() => this.updateUI());
+    }
+
+    showNotice(message) {
+        const notice = document.getElementById('gear-notice');
+        if (!notice) return;
+        notice.textContent = message;
+        notice.hidden = false;
+        clearTimeout(this.noticeTimer);
+        this.noticeTimer = setTimeout(() => { notice.hidden = true; }, 2800);
     }
 
     initEvents() {
@@ -103,11 +113,19 @@ export class UIController {
                     try {
                         window.dispatchEvent(new StorageEvent('storage', { key: 'fogsgear_scroll_library', newValue: localStorage.getItem('fogsgear_scroll_library') }));
                     } catch (error) {}
-                    alert(`「${result.name}」として保存しました。`);
+                    this.showNotice(`「${result.name}」として保存しました。`);
                 } else {
-                    alert('保存名を入力してください。');
+                    this.showNotice('保存名を入力してください。');
                 }
-            } else if (button.dataset.action === 'reset' && confirm('盤面のギアと資材を初期状態にリセットしますか？')) {
+            } else if (button.dataset.action === 'reset') {
+                const modal = document.getElementById('reset-confirm-modal');
+                if (modal) modal.hidden = false;
+            } else if (button.dataset.action === 'cancel-reset') {
+                const modal = document.getElementById('reset-confirm-modal');
+                if (modal) modal.hidden = true;
+            } else if (button.dataset.action === 'confirm-reset') {
+                const modal = document.getElementById('reset-confirm-modal');
+                if (modal) modal.hidden = true;
                 this.state.reset();
             } else if (button.dataset.action === 'delete-gear') {
                 const gear = this.gearManager.findGearById(this.state.selectedGearId);
@@ -118,8 +136,15 @@ export class UIController {
         document.getElementById('gear-size-popup')?.addEventListener('click', event => {
             if (event.target.id === 'gear-size-popup') this.closeGearSizePopup();
         });
+        document.getElementById('reset-confirm-modal')?.addEventListener('click', event => {
+            if (event.target.id === 'reset-confirm-modal') event.currentTarget.hidden = true;
+        });
         document.addEventListener('keydown', event => {
-            if (event.key === 'Escape') this.closeGearSizePopup();
+            if (event.key === 'Escape') {
+                this.closeGearSizePopup();
+                const modal = document.getElementById('reset-confirm-modal');
+                if (modal) modal.hidden = true;
+            }
         });
 
         document.getElementById('gear-lock-toggle').addEventListener('change', event => { const gear = this.gearManager.findGearById(this.state.selectedGearId); if (gear) this.gearManager.setGearLock(gear, event.target.checked); });

@@ -9,12 +9,13 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="icon" href="../MainSystem/icons/app-icon.jpg" type="image/jpeg">
-    <link rel="stylesheet" href="css/style.css?v=538">
+    <link rel="stylesheet" href="css/style.css?v=539">
 </head>
 <body>
     <div id="loadingOverlay" class="loading-overlay" role="status" aria-live="polite">
         <div class="loading-panel"><div class="loading-spinner"></div><div id="loadingMessage">マップを読み込んでいます...</div><div class="loading-progress" aria-label="マップ読み込み中"></div></div>
     </div>
+    <div id="app-notice" class="app-notice" role="status" aria-live="polite" hidden></div>
     <div class="landscape-main-frame">
         <!-- 上部パネル：プレイヤー情報 -->
         <div class="panel">
@@ -125,7 +126,7 @@
         </div>
                     </section>
                     <section class="main-page gear-preview-page" aria-label="保存ギアプレビューページ">
-                        <iframe src="../GearSystem/scroll-library.html?embed=1&hideMapBack=1&v=5" title="保存スクロールのギアプレビュー"></iframe>
+                        <iframe src="../GearSystem/scroll-library.html?embed=1&hideMapBack=1&v=10" title="保存スクロールのギアプレビュー"></iframe>
                     </section>
                     <section class="main-page engine-dashboard-page" aria-label="動力ダッシュボードページ">
                         <div class="dashboard main-engine-dashboard">
@@ -152,6 +153,6 @@
         </div>
     </div>
 
-    <script type="module" src="js/main.js?v=530"></script>
+    <script type="module" src="js/main.js?v=540"></script>
 </body>
 </html>

@@ -4,7 +4,7 @@
 import { GameState } from './GameState.js?v=runtime-9';
 import { GearManager } from './GearManager.js?v=runtime-3';
 import { CanvasRenderer } from './CanvasRenderer.js';
-import { UIController } from './UIController.js?v=scroll-edit-6';
+import { UIController } from './UIController.js?v=scroll-edit-7';
 
 // DOMの準備後に、状態・ギア操作・描画・入力操作を同じGameStateへ接続する。
 document.addEventListener('DOMContentLoaded', () => {

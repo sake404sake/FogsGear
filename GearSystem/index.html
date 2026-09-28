@@ -4,12 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
     <title>Fogs Gear</title>
-    <link rel="stylesheet" href="css/style.css?v=gear-layout-7">
+    <link rel="stylesheet" href="css/style.css?v=gear-layout-8">
 </head>
 <body>
     <div id="loadingOverlay" class="loading-overlay" role="status" aria-live="polite">
         <div class="loading-panel"><div class="loading-spinner"></div><div>ギア編集画面を読み込んでいます...</div></div>
     </div>
+    <div id="gear-notice" class="gear-notice" role="status" aria-live="polite" hidden></div>
     <div class="panel">
         <div class="button-row" style="justify-content:flex-end; margin-bottom: 4px;">
             <button class="btn btn-action" type="button" data-action="return-map">マップへ戻る</button>
@@ -169,7 +170,19 @@
             }
         })();
     </script>
-    <script type="module" src="js/main.js?v=scroll-edit-16"></script>
+    <div id="reset-confirm-modal" class="scroll-choice-modal" hidden role="dialog" aria-modal="true" aria-labelledby="reset-confirm-title">
+        <section class="scroll-choice-panel">
+            <button class="scroll-choice-close" type="button" data-action="cancel-reset" aria-label="閉じる">×</button>
+            <div class="scroll-library-kicker">RESET BOARD</div>
+            <h2 id="reset-confirm-title">盤面をリセットしますか？</h2>
+            <p>配置したギア、資材、履歴が初期状態に戻ります。</p>
+            <div class="scroll-choice-actions">
+                <button class="btn btn-action" type="button" data-action="cancel-reset">キャンセル</button>
+                <button class="btn btn-reset" type="button" data-action="confirm-reset">リセット</button>
+            </div>
+        </section>
+    </div>
+    <script type="module" src="js/main.js?v=scroll-edit-17"></script>
     <script>
         document.addEventListener('click', (event) => {
             const target = event.target.closest('a, button[onclick]');

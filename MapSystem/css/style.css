@@ -52,6 +52,8 @@ body {
 .loading-overlay[hidden] {
     display: none;
 }
+.app-notice { position: fixed; z-index: 1200; top: max(14px, env(safe-area-inset-top)); left: 50%; width: min(520px, calc(100vw - 28px)); box-sizing: border-box; padding: 12px 16px; transform: translateX(-50%); color: #e7fff7; background: rgba(23, 45, 39, 0.96); border: 1px solid #62c2aa; box-shadow: 0 6px 22px rgba(0, 0, 0, 0.55), 0 0 14px rgba(98, 194, 170, 0.28); text-align: center; }
+.app-notice[hidden] { display: none; }
 
 .loading-panel {
     min-width: 220px;

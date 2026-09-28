@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Steampunk Explorer - World Map (全体マップ)</title>
-    <link rel="stylesheet" href="css/style.css?v=4">
+    <link rel="stylesheet" href="css/style.css?v=5">
     <style>
         body {
             padding: 20px;
@@ -27,18 +27,48 @@
             cursor: grabbing;
         }
         .legend {
-            display: flex;
-            justify-content: center;
-            gap: 16px;
-            flex-wrap: wrap;
-            margin: 12px 0;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
+            gap: 4px;
+            max-height: min(260px, 32vh);
+            margin: 0;
+            padding: 8px;
+            overflow-y: auto;
             font-size: 0.75rem;
             color: var(--text-muted);
         }
+        .world-legend-disclosure {
+            margin: 8px 0 12px;
+            border: 1px solid rgba(98, 194, 170, 0.32);
+            border-radius: 4px;
+            background: rgba(18, 14, 12, 0.72);
+            text-align: left;
+        }
+        .world-legend-disclosure > summary {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            min-height: 38px;
+            padding: 0 12px;
+            color: #a7f0d9;
+            cursor: pointer;
+            font: 600 0.75rem monospace;
+            list-style: none;
+        }
+        .world-legend-disclosure > summary::-webkit-details-marker { display: none; }
+        .world-legend-disclosure > summary::after { content: '+'; color: #f3c653; font-size: 1rem; }
+        .world-legend-disclosure[open] > summary { border-bottom: 1px solid rgba(98, 194, 170, 0.24); }
+        .world-legend-disclosure[open] > summary::after { content: '\2212'; }
+        .world-legend-count { margin-left: auto; margin-right: 10px; color: var(--text-muted); font: 0.65rem monospace; }
         .legend-item {
             display: flex;
             align-items: center;
-            gap: 6px;
+            gap: 8px;
+            min-height: 30px;
+            box-sizing: border-box;
+            padding: 4px 7px;
+            border: 1px solid rgba(98, 194, 170, 0.12);
+            background: rgba(98, 194, 170, 0.04);
         }
         .legend-color {
             width: 14px;
@@ -106,7 +136,10 @@
             外洋孤島の全体マップです。ドラッグで移動、マウスホイールまたはピンチ操作で拡大縮小できます。
         </div>
 
-        <div id="worldLegend" class="legend"></div>
+        <details class="world-legend-disclosure">
+            <summary><span>セル凡例</span><span id="worldLegendCount" class="world-legend-count"></span></summary>
+            <div id="worldLegend" class="legend" aria-label="セル凡例一覧"></div>
+        </details>
         <div id="currentArea" class="current-area" aria-live="polite"></div>
         <div class="map-options">
             <div class="map-view-toggle" role="group" aria-label="表示するマップ">
@@ -126,7 +159,7 @@
     </div>
 
     <script type="module">
-        import { MapGenerator, loadMapSnapshot, saveMapSnapshot } from './js/mapGenerator.js?v=88';
+        import { MapGenerator, loadMapSnapshot, saveMapSnapshot } from './js/mapGenerator.js?v=89';
         import { CELL_DEFINITIONS, getMosaicColor } from './js/cellRules.js?v=4';
         import { buildTerritoryBorderSegments } from './js/territoryBorders.js?v=35';
         import { drawCellIcon, loadCellIconAtlas } from './js/cellIconRenderer.js?v=3';
@@ -137,6 +170,7 @@
         const legendEl = document.getElementById('worldLegend');
         const legendItems = Object.values(WORLD_CELL_TYPES).map(({ label, color }) => ({ label, color }));
         legendItems.push({ label: '現在地 (Player)', color: '#ff0000' });
+        document.getElementById('worldLegendCount').textContent = `${legendItems.length}項目`;
         legendEl.innerHTML = legendItems.map(item => `
             <div class="legend-item"><div class="legend-color" style="background-color:${item.color};"></div>${item.label}</div>
         `).join('');
@@ -159,10 +193,12 @@
             catch (error) { return {}; }
         })();
         const mainlandUnlocked = unlocks.mainland === true;
+        const labelToggle = document.getElementById('toggleLabels');
+        if (labelToggle) labelToggle.hidden = !mainlandUnlocked;
         const mapSize = mainlandUnlocked ? { width: 2000, height: 1000 } : { width: 640, height: 360 };
         const generator = new MapGenerator({ ...mapSize, seed: settings.seed, coastalOnly: !mainlandUnlocked });
         const generateMapInWorker = (seed) => new Promise((resolve, reject) => {
-            const worker = new Worker('./js/mapWorker.js?v=88', { type: 'module' });
+            const worker = new Worker('./js/mapWorker.js?v=89', { type: 'module' });
             worker.onmessage = (event) => {
                 if (event.data?.type === 'complete') {
                     worker.terminate();
@@ -346,9 +382,10 @@
         const worldSpanY = Math.max(1, (worldMaxY - worldMinY + 1) * 32);
         const fitZoom = Math.min(canvas.width / worldSpanX, canvas.height / worldSpanY);
 
-        const focusCenterX = Number.isFinite(landMinX) ? (worldMinX + worldMaxX) / 2 : Math.floor(cols * 0.76);
+        const focusCenterX = Number.isFinite(landMinX) ? (worldMinX + worldMaxX) / 2 : Math.floor(cols * (mainlandUnlocked ? 0.76 : 0.5));
         const focusCenterY = Number.isFinite(landMinY) ? (worldMinY + worldMaxY) / 2 : Math.floor(rows * 0.60);
-        let zoom = Math.max(minAllowedZoom, Math.min(4.0, fitZoom * 0.94));
+        const initialFit = mainlandUnlocked ? 0.94 : 0.78;
+        let zoom = Math.max(minAllowedZoom, Math.min(4.0, fitZoom * initialFit));
         let cameraX = (focusCenterX + 0.5) * 32;
         let cameraY = (focusCenterY + 0.5) * 32;
         let isDragging = false;
@@ -444,7 +481,7 @@
         try {
             savedPlayer = JSON.parse(localStorage.getItem('steampunk_explorer_player_pos') || 'null');
         } catch (error) {}
-        if (savedPlayer && savedPlayer.spawnVersion === 3 && savedPlayer.seed === settings.seed && Number.isInteger(savedPlayer.x) && Number.isInteger(savedPlayer.y) && savedPlayer.x >= 0 && savedPlayer.x < cols && savedPlayer.y >= 0 && savedPlayer.y < rows && mapData[savedPlayer.y][savedPlayer.x].isLand && !mapData[savedPlayer.y][savedPlayer.x].isLake) {
+        if (savedPlayer && savedPlayer.spawnVersion === 4 && savedPlayer.seed === settings.seed && Number.isInteger(savedPlayer.x) && Number.isInteger(savedPlayer.y) && savedPlayer.x >= 0 && savedPlayer.x < cols && savedPlayer.y >= 0 && savedPlayer.y < rows && mapData[savedPlayer.y][savedPlayer.x].isLand && !mapData[savedPlayer.y][savedPlayer.x].isLake) {
             playerX = savedPlayer.x;
             playerY = savedPlayer.y;
         } else if (!Number.isInteger(generated.playerPos?.x) || !Number.isInteger(generated.playerPos?.y)) {

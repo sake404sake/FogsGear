@@ -1,4 +1,4 @@
-import { MapManager } from './MapGenerator/index.js?v=79';
+import { MapManager } from './MapGenerator/index.js?v=80';
 
 self.onmessage = (event) => {
     const { seed, width = 2000, height = 1000, coastalOnly = false } = event.data || {};
