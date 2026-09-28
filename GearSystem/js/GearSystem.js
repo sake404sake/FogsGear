@@ -5,13 +5,13 @@ export const Layer = Object.freeze({ GOLD: 0, SILVER: 1, BRONZE: 2 });
 // ギアの外観分類。処理モードとは独立した設定値として保持する。
 export const GearDesignType = Object.freeze({ INDUSTRIAL: 'INDUSTRIAL', ALCHEMICAL: 'ALCHEMICAL', LOGISTICS: 'LOGISTICS', CLOCKWORK: 'CLOCKWORK', PRODUCTION: 'PRODUCTION' });
 // 資源変換や霧回収の種類。実際の資源処理はGameStateが担当する。
-export const ProcessMode = Object.freeze({ NONE: 'NONE', FOG_COLLECTION: 'FOG_COLLECTION', RESOURCE_COLLECTION: 'RESOURCE_COLLECTION', TRANSFORM: 'TRANSFORM', FOG_TO_WATER: 'FOG_TO_WATER', FOG_TO_LIQUID_METAL: 'FOG_TO_LIQUID_METAL', LIQUID_TO_SOLID_METAL: 'LIQUID_TO_SOLID_METAL', SOLID_TO_BRASS: 'SOLID_TO_BRASS', TERRAIN_TRANSFORM: 'TERRAIN_TRANSFORM', ERA_SHIFT: 'ERA_SHIFT', TARGET_SHIFT_UP: 'TARGET_SHIFT_UP', TARGET_SHIFT_DOWN: 'TARGET_SHIFT_DOWN', TARGET_SHIFT_LEFT: 'TARGET_SHIFT_LEFT', TARGET_SHIFT_RIGHT: 'TARGET_SHIFT_RIGHT' });
+export const ProcessMode = Object.freeze({ NONE: 'NONE', FOG_COLLECTION: 'FOG_COLLECTION', RESOURCE_COLLECTION: 'RESOURCE_COLLECTION', TRANSFORM: 'TRANSFORM', FOG_TO_WATER: 'FOG_TO_WATER', FOG_TO_LIQUID_METAL: 'FOG_TO_LIQUID_METAL', LIQUID_TO_SOLID_METAL: 'LIQUID_TO_SOLID_METAL', SOLID_TO_BRASS: 'SOLID_TO_BRASS', TERRAIN_TRANSFORM: 'TERRAIN_TRANSFORM', ERA_SHIFT: 'ERA_SHIFT', TARGET_SHIFT_UP: 'TARGET_SHIFT_UP', TARGET_SHIFT_DOWN: 'TARGET_SHIFT_DOWN', TARGET_SHIFT_LEFT: 'TARGET_SHIFT_LEFT', TARGET_SHIFT_RIGHT: 'TARGET_SHIFT_RIGHT', CONDITIONAL_CONTROL: 'CONDITIONAL_CONTROL' });
 
 const layerDesigns = [GearDesignType.INDUSTRIAL, GearDesignType.ALCHEMICAL, GearDesignType.CLOCKWORK];
 
 export class Gear {
     // ギア1個の永続設定と、ネットワークが毎 tick 更新する回転状態を保持する。
-    constructor({ id, size, layer = Layer.GOLD, isLocked, designType, processMode = ProcessMode.NONE, terrainTargetType = 'IRON_VEIN', position = { q: 0, r: 0 }, isCore = false, angle = 0 }) {
+    constructor({ id, size, layer = Layer.GOLD, isLocked, designType, processMode = ProcessMode.NONE, terrainTargetType = 'IRON_VEIN', controlAction = 'STOP_MAIN_GEAR', controlCondition = 'ROTATIONS', controlRotationCount = 1, controlItemType = 'wood', controlItemCount = 1, controlTargetGearIds = [], position = { q: 0, r: 0 }, isCore = false, angle = 0 }) {
         this.id = id || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
         this.size = size;
         this.sizeKey = Object.keys(GearSize).find(key => GearSize[key] === size) || 'M';
@@ -21,6 +21,14 @@ export class Gear {
         this.designType = designType || layerDesigns[layer];
         this.processMode = processMode === 'POWER' ? ProcessMode.NONE : processMode;
         this.terrainTargetType = terrainTargetType;
+        this.controlAction = controlAction === 'STOP_GEARS' ? 'STOP_MAIN_GEAR'
+            : controlAction === 'START_GEARS' ? 'START_MAIN_GEAR'
+            : controlAction;
+        this.controlCondition = controlCondition;
+        this.controlRotationCount = Math.max(1, Number(controlRotationCount) || 1);
+        this.controlItemType = controlItemType;
+        this.controlItemCount = Math.max(1, Number(controlItemCount) || 1);
+        this.controlTargetGearIds = Array.isArray(controlTargetGearIds) ? [...controlTargetGearIds] : [];
         this.q = position.q;
         this.r = position.r;
         this.isCore = isCore;

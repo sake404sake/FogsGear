@@ -1,5 +1,5 @@
 /** GearManager - ギア仕様定義・配置・補正計算ロジック */
-import { Gear, GearNetwork } from './GearSystem.js?v=network-2';
+import { Gear, GearNetwork } from './GearSystem.js?v=network-4';
 export const GEAR_CONFIG = {
     'XXS': { teeth: 4, radius: 12, cost: 4, pattern: 'ring' }, 'SS': { teeth: 6, radius: 18, cost: 6, pattern: 'sunburst' }, 'S': { teeth: 10, radius: 30, cost: 10, pattern: 'holes' }, 'M': { teeth: 14, radius: 42, cost: 14, pattern: 'triangular' }, 'L': { teeth: 18, radius: 54, cost: 18, pattern: 'wave' }, 'LL': { teeth: 24, radius: 72, cost: 24, pattern: 'crown' }, '3L': { teeth: 32, radius: 96, cost: 32, pattern: 'lattice' }, '4L': { teeth: 40, radius: 120, cost: 40, pattern: 'radial' }, 'MAX': { teeth: 48, radius: 144, cost: 48, pattern: 'industrial' }
 };
@@ -40,6 +40,14 @@ export class GearManager {
             gear.designType = data.designType || gear.designType;
             gear.processMode = data.processMode === 'GAS_TO_LIQUID_METAL' ? 'FOG_TO_LIQUID_METAL' : data.processMode || gear.processMode;
             gear.terrainTargetType = data.terrainTargetType || gear.terrainTargetType;
+            gear.controlAction = data.controlAction === 'STOP_GEARS' ? 'STOP_MAIN_GEAR'
+                : data.controlAction === 'START_GEARS' ? 'START_MAIN_GEAR'
+                : data.controlAction || gear.controlAction;
+            gear.controlCondition = data.controlCondition || gear.controlCondition;
+            gear.controlRotationCount = Math.max(1, Number(data.controlRotationCount) || gear.controlRotationCount);
+            gear.controlItemType = data.controlItemType || gear.controlItemType;
+            gear.controlItemCount = Math.max(1, Number(data.controlItemCount) || gear.controlItemCount);
+            gear.controlTargetGearIds = Array.isArray(data.controlTargetGearIds) ? [...data.controlTargetGearIds] : [];
             return gear;
         });
         this.state.loadScrollEditorSession(data => {
@@ -51,6 +59,14 @@ export class GearManager {
             gear.designType = data.designType || gear.designType;
             gear.processMode = data.processMode || gear.processMode;
             gear.terrainTargetType = data.terrainTargetType || gear.terrainTargetType;
+            gear.controlAction = data.controlAction === 'STOP_GEARS' ? 'STOP_MAIN_GEAR'
+                : data.controlAction === 'START_GEARS' ? 'START_MAIN_GEAR'
+                : data.controlAction || gear.controlAction;
+            gear.controlCondition = data.controlCondition || gear.controlCondition;
+            gear.controlRotationCount = Math.max(1, Number(data.controlRotationCount) || gear.controlRotationCount);
+            gear.controlItemType = data.controlItemType || gear.controlItemType;
+            gear.controlItemCount = Math.max(1, Number(data.controlItemCount) || gear.controlItemCount);
+            gear.controlTargetGearIds = Array.isArray(data.controlTargetGearIds) ? [...data.controlTargetGearIds] : [];
             return gear;
         });
         if (this.state.isScrollEditing) {
@@ -138,6 +154,12 @@ export class GearManager {
         if (Object.hasOwn(settings, 'designType')) gear.designType = settings.designType;
         if (Object.hasOwn(settings, 'processMode')) gear.processMode = settings.processMode;
         if (Object.hasOwn(settings, 'terrainTargetType')) gear.terrainTargetType = settings.terrainTargetType;
+        if (Object.hasOwn(settings, 'controlAction')) gear.controlAction = settings.controlAction;
+        if (Object.hasOwn(settings, 'controlCondition')) gear.controlCondition = settings.controlCondition;
+        if (Object.hasOwn(settings, 'controlRotationCount')) gear.controlRotationCount = Math.max(1, Math.floor(Number(settings.controlRotationCount) || 1));
+        if (Object.hasOwn(settings, 'controlItemType')) gear.controlItemType = settings.controlItemType;
+        if (Object.hasOwn(settings, 'controlItemCount')) gear.controlItemCount = Math.max(1, Math.floor(Number(settings.controlItemCount) || 1));
+        if (Object.hasOwn(settings, 'controlTargetGearIds')) gear.controlTargetGearIds = Array.isArray(settings.controlTargetGearIds) ? [...settings.controlTargetGearIds] : [];
         this.state.saveGameData();
         this.state.notify();
         return true;

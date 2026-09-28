@@ -1,3 +1,5 @@
+import { CELL_MATERIALS } from '../../MapSystem/js/worldCells.js?v=2';
+
 /**
  * UIController - DOM操作、ポインター入力、ギア設定吹き出しを管理する。
  * GameStateの値を読み取り、ユーザー操作だけを各管理モジュールへ渡す。
@@ -157,13 +159,41 @@ export class UIController {
             const processMode = this.updateProcessOptions(event.target.value);
             this.updateSelectedGear({ designType: event.target.value, processMode });
             this.updateTerrainTargetRow({ processMode, terrainTargetType: document.getElementById('gear-terrain-target-select')?.value });
+            this.updateControlConfig(this.gearManager.findGearById(this.state.selectedGearId));
         });
         document.getElementById('gear-process-select').addEventListener('change', event => {
             const gear = this.gearManager.findGearById(this.state.selectedGearId);
             this.updateSelectedGear({ processMode: event.target.value });
             this.updateTerrainTargetRow({ ...gear, processMode: event.target.value });
+            this.updateControlConfig(gear ? { ...gear, processMode: event.target.value } : null);
         });
         document.getElementById('gear-terrain-target-select')?.addEventListener('change', event => this.updateSelectedGear({ terrainTargetType: event.target.value }));
+        document.getElementById('gear-control-action')?.addEventListener('change', event => {
+            this.updateControlSetting('controlAction', event.target.value);
+            this.updateControlConfig(this.gearManager.findGearById(this.state.selectedGearId));
+        });
+        document.getElementById('gear-control-condition')?.addEventListener('change', event => {
+            this.updateControlSetting('controlCondition', event.target.value);
+            this.updateControlConfig(this.gearManager.findGearById(this.state.selectedGearId));
+        });
+        document.getElementById('gear-control-rotation-count')?.addEventListener('change', event => this.updateControlSetting('controlRotationCount', event.target.value));
+        document.getElementById('gear-control-item-type')?.addEventListener('change', event => this.updateControlSetting('controlItemType', event.target.value));
+        document.getElementById('gear-control-item-count')?.addEventListener('change', event => this.updateControlSetting('controlItemCount', event.target.value));
+        document.querySelectorAll('.gear-number-step').forEach(button => {
+            button.addEventListener('click', () => {
+                const input = document.getElementById(button.dataset.numberTarget);
+                if (!input) return;
+                const minimum = Number(input.min) || 1;
+                const step = Number(input.step) || 1;
+                const current = Math.max(minimum, Number(input.value) || minimum);
+                input.value = String(Math.max(minimum, current + Number(button.dataset.step) * step));
+                input.dispatchEvent(new Event('change', { bubbles: true }));
+            });
+        });
+        document.getElementById('gear-control-targets')?.addEventListener('change', () => {
+            const targetGearIds = [...document.querySelectorAll('#gear-control-targets input:checked')].map(input => input.value);
+            this.updateSelectedGear({ controlTargetGearIds: targetGearIds });
+        });
         document.getElementById('gear-layer-select').addEventListener('change', event => {
             const gear = this.gearManager.findGearById(this.state.selectedGearId);
             if (!gear) return;
@@ -386,7 +416,7 @@ export class UIController {
         // ギア種類ごとに選べる処理モードを返す。新しい処理はここへ追加する。
         if (designType === 'PRODUCTION') return [['NONE', '処理なし'], ['FOG_COLLECTION', '霧の回収'], ['RESOURCE_COLLECTION', '資材収集']];
         if (designType === 'ALCHEMICAL') return [['NONE', '処理なし'], ['TRANSFORM', '水→スチーム'], ['FOG_TO_WATER', '霧→水'], ['FOG_TO_LIQUID_METAL', '霧→液体金属'], ['LIQUID_TO_SOLID_METAL', '液体金属→固体金属'], ['SOLID_TO_BRASS', '固体金属→真鍮資材'], ['TERRAIN_TRANSFORM', '地形変成'], ['ERA_SHIFT', '時代変質']];
-        if (designType === 'CLOCKWORK') return [['NONE', '処理なし'], ['TARGET_SHIFT_UP', '対象セルを上へシフト'], ['TARGET_SHIFT_DOWN', '対象セルを下へシフト'], ['TARGET_SHIFT_LEFT', '対象セルを左へシフト'], ['TARGET_SHIFT_RIGHT', '対象セルを右へシフト']];
+        if (designType === 'CLOCKWORK') return [['NONE', '処理なし'], ['TARGET_SHIFT_UP', '対象セルを上へシフト'], ['TARGET_SHIFT_DOWN', '対象セルを下へシフト'], ['TARGET_SHIFT_LEFT', '対象セルを左へシフト'], ['TARGET_SHIFT_RIGHT', '対象セルを右へシフト'], ['CONDITIONAL_CONTROL', '条件制御']];
         return [['NONE', '処理なし']];
     }
     updateProcessOptions(designType, selectedMode = null) {
@@ -411,11 +441,65 @@ export class UIController {
                 : 'IRON_VEIN';
         }
     }
+    updateControlConfig(gear) {
+        const panel = document.getElementById('gear-control-config');
+        const targetList = document.getElementById('gear-control-targets');
+        const conditionSelect = document.getElementById('gear-control-condition');
+        const itemSelect = document.getElementById('gear-control-item-type');
+        if (!panel || !targetList || !conditionSelect || !itemSelect) return;
+        const visible = Boolean(gear && gear.processMode === 'CONDITIONAL_CONTROL');
+        panel.hidden = !visible;
+        if (!visible) return;
+
+        document.getElementById('gear-control-action').value = gear.controlAction || 'STOP_MAIN_GEAR';
+        conditionSelect.value = gear.controlCondition || 'ROTATIONS';
+        document.getElementById('gear-control-rotation-count').value = String(Math.max(1, Number(gear.controlRotationCount) || 1));
+        document.getElementById('gear-control-item-count').value = String(Math.max(1, Number(gear.controlItemCount) || 1));
+        const controlItems = [
+            ...Object.entries(CELL_MATERIALS),
+            ['fog', { label: '霧' }],
+            ['liquid_metal', { label: '液体金属' }],
+            ['solid_metal', { label: '固体金属' }],
+            ['brass', { label: '真鍮資材' }],
+            ['steam_power', { label: 'スチーム' }]
+        ];
+        itemSelect.replaceChildren(...controlItems.map(([id, item]) => new Option(item.label, id)));
+        itemSelect.value = [...itemSelect.options].some(option => option.value === gear.controlItemType)
+            ? gear.controlItemType
+            : 'wood';
+        const targetGearIds = new Set(Array.isArray(gear.controlTargetGearIds) ? gear.controlTargetGearIds : []);
+        const actionNeedsTargets = gear.controlAction === 'SYNC_AXIS' || gear.controlAction === 'UNSYNC_AXIS';
+        document.getElementById('gear-control-target-fieldset').hidden = !actionNeedsTargets;
+        const targets = this.state.placedGears.filter(target => !target.isCore && target.id !== gear.id);
+        targetList.replaceChildren();
+        if (!targets.length) {
+            const empty = document.createElement('span');
+            empty.className = 'control-target-empty';
+            empty.textContent = '同軸操作するギアを先に配置してください。';
+            targetList.appendChild(empty);
+        }
+        targets.forEach(target => {
+            const label = document.createElement('label');
+            label.className = 'control-target-option';
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.value = target.id;
+            checkbox.checked = targetGearIds.has(target.id);
+            const name = document.createElement('span');
+            name.textContent = `${target.sizeKey} / ${target.layer + 1}段目 / (${target.q}, ${target.r})`;
+            label.append(checkbox, name);
+            targetList.appendChild(label);
+        });
+        const usesItemCount = conditionSelect.value === 'ITEM_COUNT';
+        document.getElementById('gear-control-rotation-row').hidden = usesItemCount;
+        document.getElementById('gear-control-item-fields').hidden = !usesItemCount;
+    }
     // 選択ギアの設定、コスト、同期状態を吹き出しへまとめて表示する。
     openGearPopover(gear) { this.state.selectedGearId = gear.id; this.updateProcessInfo(gear); document.getElementById('gear-modal').hidden = false; document.getElementById('gear-popover-title').textContent = gear.isCore ? 'メインギア' : `${gear.sizeKey} ギア設定`; document.getElementById('gear-popover-meta').textContent = gear.isCore ? `L${gear.layer + 1} / ${gear.teeth}歯` : `L${gear.layer + 1} / ${gear.teeth}歯 / ${gear.designType} / ${gear.processMode}`; const friction = Math.round(this.state.network?.calculateGearFriction(gear) || 0); const driveCost = Math.round(gear.steamLoad); const steamCost = driveCost + friction; const rotation = Math.round(Math.abs(gear.angularVelocity || 0)); const loopBonus = this.state.network?.loopGearIds?.has(gear.id) ? '環機構ボーナス' : ''; document.getElementById('gear-popover-cost').innerHTML = gear.isCore ? '<div class="cost-note">メインギア<br>現在コストの集計対象外</div>' : `<div class="resource-block brass-block"><div class="resource-heading">真鍮資材 <strong>${Math.round(gear.brassCost)}</strong></div></div><div class="resource-divider"></div><div class="resource-block steam-block"><div class="cost-row"><span>駆動コスト</span><strong>${driveCost}</strong></div><div class="cost-row"><span>摩擦コスト</span><strong>${friction}</strong></div>${loopBonus ? `<div class="bonus-row">(${loopBonus})</div>` : ''}</div><div class="resource-divider strong"></div><div class="cost-row steam-total"><span>消費スチーム / 回転</span><strong>${steamCost} / ${rotation}</strong></div>`; document.getElementById('gear-lock-toggle').checked = gear.isLocked; document.getElementById('main-gear-size-select').value = gear.sizeKey; document.getElementById('gear-design-select').value = gear.designType; this.updateProcessOptions(gear.designType, gear.processMode); document.getElementById('main-gear-size-row').classList.toggle('main-gear-hidden', !gear.isCore); document.getElementById('gear-design-row').classList.toggle('main-gear-hidden', gear.isCore); document.getElementById('gear-process-row').classList.toggle('main-gear-hidden', gear.isCore); document.getElementById('gear-delete-button').disabled = gear.isCore; }
     updateProcessInfo(gear) {
         // 選択ギアの処理定義を毎秒レートへ変換し、処理能力枠を更新する。
         const section = document.getElementById('gear-process-section');
+        this.updateControlConfig(gear);
         if (!section || !gear || gear.isCore) {
             if (section) section.hidden = true;
             this.updateTerrainTargetRow(null);
@@ -423,12 +507,17 @@ export class UIController {
         }
         this.updateTerrainTargetRow(gear);
         const info = this.state.getGearProcessInfo(gear);
+        const isConditionalControl = gear.processMode === 'CONDITIONAL_CONTROL';
         section.hidden = gear.processMode === 'NONE';
         document.getElementById('gear-process-info-name').textContent = info.name;
-        document.getElementById('gear-process-info-input').textContent = info.input === '-'
+        document.getElementById('gear-process-info-input').textContent = isConditionalControl
+            ? info.input
+            : info.input === '-'
             ? '-'
             : `${info.input} ${info.inputRate.toFixed(2)} /秒`;
-        document.getElementById('gear-process-info-output').textContent = info.output === '-'
+        document.getElementById('gear-process-info-output').textContent = isConditionalControl
+            ? info.output
+            : info.output === '-'
             ? '-'
             : `${info.output} ${info.outputRate.toFixed(2)} /秒`;
         queueMicrotask(() => {
@@ -450,6 +539,12 @@ export class UIController {
         const baseTitle = gear.isCore ? 'メインギア' : `${gear.sizeKey} ギア設定`;
         const beltLinked = this.state.belts.some(belt => belt.gearIds?.includes(gear.id));
         title.textContent = `${baseTitle}${beltLinked ? '  🔗' : ''}`;
+    }
+    updateControlSetting(key, value) {
+        const gear = this.gearManager.findGearById(this.state.selectedGearId);
+        if (!gear) return;
+        this.updateSelectedGear({ [key]: value });
+        this.updateProcessInfo(gear);
     }
     updateSelectedGear(settings) { const gear = this.gearManager.findGearById(this.state.selectedGearId); if (gear) this.gearManager.updateGearSettings(gear, settings); }
     closeGearSizePopup() {

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Steampunk Explorer - World Map (全体マップ)</title>
-    <link rel="stylesheet" href="css/style.css?v=4">
+    <link rel="stylesheet" href="css/style.css?v=5">
     <style>
         body {
             padding: 20px;
@@ -26,23 +26,45 @@
         #fullMapCanvas:active {
             cursor: grabbing;
         }
-        .legend {
-            display: flex;
-            justify-content: center;
-            gap: 16px;
-            flex-wrap: wrap;
+        .legend-disclosure {
             margin: 12px 0;
-            font-size: 0.75rem;
+            border-top: 1px solid rgba(98, 194, 170, 0.2);
+            border-bottom: 1px solid rgba(98, 194, 170, 0.2);
+        }
+        .legend-disclosure summary {
+            padding: 8px;
+            color: #a7f0d9;
+            font: 0.7rem monospace;
+            text-align: left;
+            cursor: pointer;
+        }
+        .legend {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(min(100%, 110px), 1fr));
+            align-items: start;
+            gap: 4px 8px;
+            margin: 0 0 10px;
+            font-size: 0.68rem;
             color: var(--text-muted);
         }
         .legend-item {
-            display: flex;
+            display: grid;
+            grid-template-columns: 22px minmax(0, 1fr);
             align-items: center;
-            gap: 6px;
+            gap: 5px;
+            min-width: 0;
+            min-height: 24px;
+            line-height: 1.15;
+        }
+        .legend-item > span:last-child {
+            min-width: 0;
+            overflow-wrap: anywhere;
         }
         .legend-color {
-            width: 14px;
-            height: 14px;
+            display: block;
+            width: 22px;
+            height: 22px;
+            box-sizing: border-box;
             border-radius: 2px;
             border: 1px solid var(--border-sub);
         }
@@ -66,8 +88,20 @@
             justify-content: center;
             margin: 8px 0 12px;
         }
-        .map-options .btn {
-            min-width: 170px;
+        .map-mode-toggle {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            width: min(100%, 360px);
+            gap: 4px;
+        }
+        .map-mode-toggle .btn {
+            min-width: 0;
+        }
+        .map-mode-toggle .btn[aria-pressed="true"] {
+            color: #08242b;
+            background: #8eeaff;
+            border-color: #c1f6ff;
+            box-shadow: 0 0 10px rgba(98, 203, 228, 0.35);
         }
         @media (max-width: 620px) {
             body {
@@ -77,7 +111,6 @@
                 width: 100%;
                 box-sizing: border-box;
             }
-            .map-options .btn,
             .actions-bar .btn {
                 width: 100%;
                 min-width: 0;
@@ -98,10 +131,16 @@
             外洋孤島の全体マップです。ドラッグで移動、マウスホイールまたはピンチ操作で拡大縮小できます。
         </div>
 
-        <div id="worldLegend" class="legend"></div>
+        <details class="legend-disclosure">
+            <summary>セル凡例</summary>
+            <div id="worldLegend" class="legend" aria-label="全セル種類の凡例"></div>
+        </details>
         <div id="currentArea" class="current-area" aria-live="polite"></div>
         <div class="map-options">
-            <button class="btn btn-action" id="toggleLabels" type="button" aria-pressed="true">地域ラベルを非表示</button>
+            <div class="map-mode-toggle" role="group" aria-label="地図の種類">
+                <button class="btn" type="button" data-map-mode="initial" aria-pressed="true">初期マップ</button>
+                <button class="btn" type="button" data-map-mode="current" aria-pressed="false">現在マップ</button>
+            </div>
         </div>
 
         <div style="position: relative;">
@@ -117,25 +156,38 @@
         import { MapGenerator, loadMapSnapshot, saveMapSnapshot } from './js/mapGenerator.js?v=88';
         import { CELL_DEFINITIONS, getMosaicColor } from './js/cellRules.js?v=4';
         import { buildTerritoryBorderSegments } from './js/territoryBorders.js?v=35';
+        import { applyCellChanges, WORLD_CELL_TYPES } from './js/worldCells.js?v=2';
+        import { drawCellIcon, loadCellIconAtlas } from './js/cellIconRenderer.js?v=3';
 
         const legendEl = document.getElementById('worldLegend');
+        let cellIconAtlas = null;
+        try {
+            cellIconAtlas = await loadCellIconAtlas();
+        } catch (error) {
+            console.warn('Cell icon atlas failed to load; rendering the legend without terrain icons.');
+        }
         const legendItems = [
-            { label: CELL_DEFINITIONS.PLAINS.label, color: CELL_DEFINITIONS.PLAINS.color },
-            { label: CELL_DEFINITIONS.MOUNTAIN.label, color: CELL_DEFINITIONS.MOUNTAIN.color },
-            { label: CELL_DEFINITIONS.FOREST.label, color: CELL_DEFINITIONS.FOREST.color },
-            { label: CELL_DEFINITIONS.SAND.label, color: CELL_DEFINITIONS.SAND.color },
-            { label: CELL_DEFINITIONS.SEA.label, color: CELL_DEFINITIONS.SEA.color },
-            { label: CELL_DEFINITIONS.LAKE.label, color: CELL_DEFINITIONS.LAKE.color },
-            { label: CELL_DEFINITIONS.RUIN.label, color: CELL_DEFINITIONS.RUIN.color },
+            ...Object.entries(WORLD_CELL_TYPES).map(([type, definition]) => ({ type, ...definition })),
             { label: '現在地 (Player)', color: '#ff0000' }
         ];
-        legendEl.innerHTML = legendItems.map(item => `
-            <div class="legend-item"><div class="legend-color" style="background-color:${item.color};"></div>${item.label}</div>
-        `).join('');
-        Array.from(document.querySelectorAll('.legend-color')).forEach((node) => {
-            const label = node.parentElement?.textContent?.trim() || '';
-            const match = legendItems.find((item) => label.startsWith(item.label));
-            if (match) node.style.backgroundColor = match.color;
+        legendItems.forEach(({ type, label, color }) => {
+            const item = document.createElement('div');
+            item.className = 'legend-item';
+            const swatch = document.createElement('canvas');
+            swatch.className = 'legend-color';
+            swatch.width = 22;
+            swatch.height = 22;
+            swatch.setAttribute('aria-hidden', 'true');
+            swatch.style.backgroundColor = color;
+            const swatchContext = swatch.getContext('2d');
+            if (type && cellIconAtlas && swatchContext) {
+                swatchContext.globalAlpha = 0.72;
+                drawCellIcon(swatchContext, cellIconAtlas, { type }, 1, 1, 20);
+            }
+            const text = document.createElement('span');
+            text.textContent = label;
+            item.append(swatch, text);
+            legendEl.appendChild(item);
         });
 
         const canvas = document.getElementById('fullMapCanvas');
@@ -178,7 +230,12 @@
             generated = await generateMapInWorker(settings.seed).catch(() => generator.generate(settings.seed));
             saveMapSnapshot(generated, settings.seed, mapSize.width, mapSize.height).catch(() => {});
         }
-        const mapData = generated.worldMap || generated.grid;
+        const sourceMapData = generated.worldMap || generated.grid;
+        const initialMapData = sourceMapData.map(row => row.map(tile => ({ ...tile })));
+        const currentMapData = initialMapData.map(row => row.map(tile => ({ ...tile })));
+        applyCellChanges(currentMapData, settings.seed);
+        let mapData = initialMapData;
+        let activeMapMode = 'initial';
         const cols = mapData[0].length;
         const rows = mapData.length;
         const territories = generated.territories || [];
@@ -292,17 +349,25 @@
             ctx.restore();
         }
 
-        const overviewCanvas = document.createElement('canvas');
-        overviewCanvas.width = cols;
-        overviewCanvas.height = rows;
-        const overviewCtx = overviewCanvas.getContext('2d');
-        for (let y = 0; y < rows; y++) {
-            for (let x = 0; x < cols; x++) {
-                const tile = mapData[y][x];
-                overviewCtx.fillStyle = getMosaicColor(tile.color || '#526f4e', x, y);
-                overviewCtx.fillRect(x, y, 1, 1);
+        function createOverviewCanvas(source) {
+            const overview = document.createElement('canvas');
+            overview.width = cols;
+            overview.height = rows;
+            const overviewCtx = overview.getContext('2d');
+            for (let y = 0; y < rows; y++) {
+                for (let x = 0; x < cols; x++) {
+                    const tile = source[y][x];
+                    overviewCtx.fillStyle = getMosaicColor(tile.color || '#526f4e', x, y);
+                    overviewCtx.fillRect(x, y, 1, 1);
+                }
             }
+            return overview;
         }
+        const overviewCanvases = {
+            initial: createOverviewCanvas(initialMapData),
+            current: createOverviewCanvas(currentMapData)
+        };
+        let overviewCanvas = overviewCanvases.initial;
 
         const smoothOverviewCanvas = document.createElement('canvas');
         smoothOverviewCanvas.width = cols * 2;
@@ -369,7 +434,6 @@
         let pinchStartZoom = zoom;
         let pinchStartCenter = { x: 0, y: 0 };
         let pinchStartWorldCenter = { x: cameraX, y: cameraY };
-        let labelsVisible = true;
         let renderQueued = false;
 
         const scheduleRender = () => {
@@ -510,7 +574,7 @@
             drawTerritoryBorders(startCol, endCol, startRow, endRow);
             ctx.restore();
 
-            if (labelsVisible) drawMapLabels(left, top);
+            drawMapLabels(left, top);
 
             const playerWorldX = (playerX + 0.5) * tileSize;
             const playerWorldY = (playerY + 0.5) * tileSize;
@@ -621,11 +685,21 @@
         canvas.addEventListener('pointerup', handlePointerUp);
         canvas.addEventListener('pointercancel', handlePointerUp);
 
-        document.getElementById('toggleLabels').addEventListener('click', (event) => {
-            labelsVisible = !labelsVisible;
-            event.currentTarget.textContent = labelsVisible ? '地域ラベルを非表示' : '地域ラベルを表示';
-            event.currentTarget.setAttribute('aria-pressed', String(labelsVisible));
-            scheduleRender();
+        document.querySelectorAll('[data-map-mode]').forEach(button => {
+            button.addEventListener('click', () => {
+                const mode = button.dataset.mapMode;
+                if (mode === activeMapMode || !overviewCanvases[mode]) return;
+                activeMapMode = mode;
+                mapData = mode === 'current' ? currentMapData : initialMapData;
+                overviewCanvas = overviewCanvases[mode];
+                cachedTerritoryBorders = null;
+                document.querySelectorAll('[data-map-mode]').forEach(item => {
+                    const isActive = item.dataset.mapMode === activeMapMode;
+                    item.classList.toggle('active', isActive);
+                    item.setAttribute('aria-pressed', String(isActive));
+                });
+                scheduleRender();
+            });
         });
 
         document.getElementById('backToGame').onclick = () => {

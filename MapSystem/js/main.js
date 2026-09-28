@@ -198,9 +198,17 @@ function renderCellLegend() {
         item.title = getCellEntryRule({ type: typeKey }, state.cellEntryRules).requiredItems.length
             ? '侵入に必要なアイテムがあります'
             : '侵入条件なし';
-        const color = document.createElement('span');
+        const color = document.createElement('canvas');
         color.className = 'cell-legend-color';
+        color.width = 22;
+        color.height = 22;
+        color.setAttribute('aria-hidden', 'true');
         color.style.backgroundColor = definition.color;
+        const iconContext = color.getContext('2d');
+        if (cellIconAtlas && iconContext) {
+            iconContext.globalAlpha = 0.72;
+            drawCellIcon(iconContext, cellIconAtlas, { type: typeKey }, 1, 1, 20);
+        }
         const label = document.createElement('span');
         label.textContent = definition.label;
         item.append(color, label);

@@ -1,4 +1,4 @@
-import { GearNetwork } from './GearSystem.js?v=network-2';
+import { GearNetwork } from './GearSystem.js?v=network-4';
 import { ACTIVE_SCROLL_TARGETS_KEY, CELL_MATERIALS, TERRAIN_TRANSFORM_RECIPES, WORLD_CELL_TYPES } from '../../MapSystem/js/worldCells.js?v=2';
 
 /**
@@ -18,6 +18,7 @@ export class GameState {
         this.materialInventory = {};
         this.productionRate = 0;
         this.rotationProgress = new Map();
+        this.controlStates = new Map();
         this.waterRecoveryRate = 0;
         this.waterGenerationRate = 0;
         this.waterConsumptionRate = 0;
@@ -183,6 +184,11 @@ export class GameState {
                 gearIdMap.set(sourceId, gearId);
                 return gear;
             });
+            gears.forEach((gear, index) => {
+                gear.controlTargetGearIds = (blueprintGears[index].controlTargetGearIds || [])
+                    .map(id => gearIdMap.get(String(id)))
+                    .filter(Boolean);
+            });
             const belts = (Array.isArray(scroll.blueprint?.belts) ? scroll.blueprint.belts : [])
                 .map(belt => ({ ...belt, gearIds: (belt.gearIds || []).map(id => gearIdMap.get(String(id))).filter(Boolean) }))
                 .filter(belt => belt.gearIds.length >= 2);
@@ -289,19 +295,24 @@ export class GameState {
         this.notify();
     }
 
-    toggleMainGear() {
+    setMainGearRunning(running) {
         // 手動停止は steam > 0 時の自動再起動で上書きしないよう、停止状態を保持する。
-        if (this.mainGearRunning) {
-            this.mainGearRunning = false;
-            this.userStoppedMainGear = true;
-        } else {
+        if (running) {
             this.mainGearRunning = true;
             this.userStoppedMainGear = false;
+            this.autoStoppedBySteam = false;
+        } else {
+            this.mainGearRunning = false;
+            this.userStoppedMainGear = true;
             this.autoStoppedBySteam = false;
         }
         this.updatePowerGrid();
         this.saveGameData();
         this.notify();
+    }
+
+    toggleMainGear() {
+        this.setMainGearRunning(!this.mainGearRunning);
     }
 
     saveState() {
@@ -346,7 +357,9 @@ export class GameState {
                 size: gear.sizeKey,
                 layer: gear.layer,
                 isCore: gear.isCore,
-                angle: gear.angle, isLocked: gear.isLocked, designType: gear.designType, processMode: gear.processMode, terrainTargetType: gear.terrainTargetType
+                angle: gear.angle, isLocked: gear.isLocked, designType: gear.designType, processMode: gear.processMode, terrainTargetType: gear.terrainTargetType,
+                controlAction: gear.controlAction, controlCondition: gear.controlCondition, controlRotationCount: gear.controlRotationCount,
+                controlItemType: gear.controlItemType, controlItemCount: gear.controlItemCount, controlTargetGearIds: gear.controlTargetGearIds
             }))
         });
     }
@@ -394,6 +407,7 @@ export class GameState {
             gear.angleError = false;
         });
         this.rotationProgress = new Map();
+        this.controlStates.clear();
         this.updatePowerGrid();
         if (this.network) this.network.rebuild(this.placedGears, this.belts).updateRotation();
         this.lastTickAt = performance.now();
@@ -486,7 +500,9 @@ export class GameState {
             gears: this.getRuntimeGears().map(gear => ({
                 id: gear.id,
                 q: gear.q, r: gear.r, size: gear.sizeKey, layer: gear.layer,
-                isCore: Boolean(gear.isCore), angle: gear.angle, isLocked: gear.isLocked, designType: gear.designType, processMode: gear.processMode, terrainTargetType: gear.terrainTargetType
+                isCore: Boolean(gear.isCore), angle: gear.angle, isLocked: gear.isLocked, designType: gear.designType, processMode: gear.processMode, terrainTargetType: gear.terrainTargetType,
+                controlAction: gear.controlAction, controlCondition: gear.controlCondition, controlRotationCount: gear.controlRotationCount,
+                controlItemType: gear.controlItemType, controlItemCount: gear.controlItemCount, controlTargetGearIds: gear.controlTargetGearIds
             })),
             undoStack: this.undoStack,
             redoStack: this.redoStack
@@ -508,7 +524,13 @@ export class GameState {
                 isLocked: gear.isLocked,
                 designType: gear.designType,
                 processMode: gear.processMode,
-                terrainTargetType: gear.terrainTargetType
+                terrainTargetType: gear.terrainTargetType,
+                controlAction: gear.controlAction,
+                controlCondition: gear.controlCondition,
+                controlRotationCount: gear.controlRotationCount,
+                controlItemType: gear.controlItemType,
+                controlItemCount: gear.controlItemCount,
+                controlTargetGearIds: gear.controlTargetGearIds
             })),
             belts: this.belts
         };
@@ -676,6 +698,22 @@ export class GameState {
         const terrainInput = Object.entries(terrainRecipe)
             .map(([item, count]) => `${CELL_MATERIALS[item]?.label || item} ×${count}`)
             .join(' + ') || '-';
+        const controlActions = {
+            STOP_MAIN_GEAR: 'メインギアを停止',
+            START_MAIN_GEAR: 'メインギアを起動',
+            SYNC_AXIS: '同軸同期',
+            UNSYNC_AXIS: '同軸同期解除'
+        };
+        const controlItemLabels = {
+            fog: '霧',
+            liquid_metal: '液体金属',
+            solid_metal: '固体金属',
+            brass: '真鍮資材',
+            steam_power: 'スチーム'
+        };
+        const controlCondition = gear?.controlCondition === 'ITEM_COUNT'
+            ? `${CELL_MATERIALS[gear.controlItemType]?.label || controlItemLabels[gear.controlItemType] || gear.controlItemType} ${gear.controlItemCount}個以上`
+            : `${Math.max(1, Number(gear?.controlRotationCount) || 1)}回転ごと`;
         const processInfo = {
             NONE: { name: '処理なし', input: '-', output: '-', rate: 0 },
             FOG_COLLECTION: { name: '霧の回収', input: '-', output: '霧', rate: rotationRate * 10 },
@@ -690,7 +728,8 @@ export class GameState {
             TARGET_SHIFT_UP: { name: '対象セルを上へシフト', input: '-', output: '対象座標', rate: rotationRate },
             TARGET_SHIFT_DOWN: { name: '対象セルを下へシフト', input: '-', output: '対象座標', rate: rotationRate },
             TARGET_SHIFT_LEFT: { name: '対象セルを左へシフト', input: '-', output: '対象座標', rate: rotationRate },
-            TARGET_SHIFT_RIGHT: { name: '対象セルを右へシフト', input: '-', output: '対象座標', rate: rotationRate }
+            TARGET_SHIFT_RIGHT: { name: '対象セルを右へシフト', input: '-', output: '対象座標', rate: rotationRate },
+            CONDITIONAL_CONTROL: { name: '条件制御', input: controlCondition, output: controlActions[gear?.controlAction] || controlActions.STOP_MAIN_GEAR, rate: rotationRate }
         };
         const info = processInfo[gear?.processMode] || processInfo.NONE;
         const inputMultiplier = gear?.processMode === 'FOG_TO_WATER'
@@ -733,6 +772,80 @@ export class GameState {
         }
     }
 
+    executeControlAction(gear, group) {
+        if (gear.controlAction === 'STOP_MAIN_GEAR') {
+            if (!this.mainGearRunning && this.userStoppedMainGear && !this.autoStoppedBySteam) return false;
+            this.setMainGearRunning(false);
+            return true;
+        }
+        if (gear.controlAction === 'START_MAIN_GEAR') {
+            if (this.mainGearRunning && !this.userStoppedMainGear && !this.autoStoppedBySteam) return false;
+            this.setMainGearRunning(true);
+            return true;
+        }
+        const targets = new Set(Array.isArray(gear.controlTargetGearIds) ? gear.controlTargetGearIds : []);
+        if (!targets.size || !group?.gears) return false;
+        let networkChanged = false;
+        for (const target of group.gears) {
+            if (!targets.has(target.id) || target.isCore) continue;
+            if (gear.controlAction !== 'SYNC_AXIS' && gear.controlAction !== 'UNSYNC_AXIS') continue;
+            const locked = gear.controlAction === 'SYNC_AXIS';
+            group.gears.filter(other => other.q === target.q && other.r === target.r).forEach(other => {
+                const nextLock = locked || other.isCore;
+                if (other.isLocked === nextLock) return;
+                other.isLocked = nextLock;
+                networkChanged = true;
+            });
+        }
+        return networkChanged;
+    }
+
+    processControlGear(gear, group, rotationDelta) {
+        if (gear.processMode !== 'CONDITIONAL_CONTROL' || !group) return false;
+        const signature = JSON.stringify([
+            gear.controlAction,
+            gear.controlCondition,
+            gear.controlRotationCount,
+            gear.controlItemType,
+            gear.controlItemCount,
+            gear.controlTargetGearIds
+        ]);
+        let controlState = this.controlStates.get(gear.id);
+        if (!controlState || controlState.signature !== signature) {
+            controlState = { signature, rotationProgress: 0, itemTriggered: false };
+            this.controlStates.set(gear.id, controlState);
+        }
+        if (gear.controlCondition === 'ITEM_COUNT') {
+            const resourceProperties = {
+                water: 'water',
+                fog: 'fog',
+                liquid_metal: 'liquidMetal',
+                solid_metal: 'solidMetal',
+                brass: 'brass',
+                steam_power: 'steamPower'
+            };
+            const property = resourceProperties[gear.controlItemType];
+            const count = Number(property ? this[property] : this.materialInventory[gear.controlItemType]) || 0;
+            if (count < gear.controlItemCount) {
+                controlState.itemTriggered = false;
+                return false;
+            }
+            if (controlState.itemTriggered) return false;
+            controlState.itemTriggered = true;
+            return this.executeControlAction(gear, group);
+        }
+        const rotationsPerTrigger = Math.max(1, Math.floor(Number(gear.controlRotationCount) || 1));
+        controlState.rotationProgress += Math.abs(rotationDelta);
+        const triggerAngle = rotationsPerTrigger * Math.PI * 2;
+        const triggerCount = Math.floor(controlState.rotationProgress / triggerAngle);
+        controlState.rotationProgress %= triggerAngle;
+        let networkChanged = false;
+        for (let index = 0; index < triggerCount; index++) {
+            networkChanged = this.executeControlAction(gear, group) || networkChanged;
+        }
+        return networkChanged;
+    }
+
     tick() {
         // 1フレーム分の時間を基準に、回転・資源変換・UI表示値を更新する。
         const now = performance.now();
@@ -763,12 +876,14 @@ export class GameState {
             .map(group => ({ network: group.network, gears: group.gears.filter(gear => gear.powered && !gear.isDeadlocked) }))
             .filter(group => group.network && group.gears.length > 0);
         const activeGears = activeGearGroups.flatMap(group => group.gears);
+        const runtimeGroupByGearId = new Map();
+        runtimeGroups.forEach(group => group.gears.forEach(gear => runtimeGroupByGearId.set(gear.id, group)));
         const scrollRuntimeByGearId = new Map();
         runtimeGroups.forEach(group => {
             if (group.scrollId) group.gears.forEach(gear => scrollRuntimeByGearId.set(gear.id, group));
         });
         const activeCount = activeGears.length;
-        const hasActiveProcess = activeGears.some(gear => !gear.isCore && gear.processMode !== 'NONE');
+        const hasActiveProcess = activeGears.some(gear => !gear.isCore && gear.processMode !== 'NONE' && gear.processMode !== 'CONDITIONAL_CONTROL');
         const ambientWaterRecovery = !this.creativeMode && (!this.mainGearRunning || this.autoStoppedBySteam || this.steamPower <= 0);
         this.waterRecoveryRate = (hasActiveProcess || ambientWaterRecovery) && elapsed > 0 ? 1 : 0;
         this.water += elapsed * this.waterRecoveryRate;
@@ -839,9 +954,11 @@ export class GameState {
             }));
         }
         // 回転中の各ギアを個別に処理する。同じ軸でも資源処理は共有しない。
+        const rotationDeltas = new Map();
         activeGears.forEach(gear => {
             if (gear.powered && !gear.isDeadlocked && this.steamPower > 0 && this.mainGearRunning) {
                 const rotationDelta = 0.012 * 60 * (gear.angularVelocity || 1) * elapsed * gear.rotationDir;
+            rotationDeltas.set(gear.id, rotationDelta);
                 gear.angle += rotationDelta;
                 // 霧回収は1回転の完了を待たず、回転角に比例して連続的に加算する。
                 if (gear.processMode === 'FOG_COLLECTION') {
@@ -881,6 +998,28 @@ export class GameState {
                 this.processScrollCellGear(gear, scrollRuntimeByGearId.get(gear.id), rotationDelta);
             }
         });
+        let controlNetworkChanged = false;
+        activeGears.forEach(gear => {
+            const group = runtimeGroupByGearId.get(gear.id);
+            if (!group || gear.controlCondition === 'ITEM_COUNT') return;
+            controlNetworkChanged = this.processControlGear(gear, group, rotationDeltas.get(gear.id) || 0) || controlNetworkChanged;
+        });
+        runtimeGroups.forEach(group => {
+            group.gears.forEach(gear => {
+                if (gear.processMode !== 'CONDITIONAL_CONTROL' || gear.controlCondition !== 'ITEM_COUNT') return;
+                controlNetworkChanged = this.processControlGear(gear, group, 0) || controlNetworkChanged;
+            });
+        });
+        if (controlNetworkChanged) {
+            runtimeGroups.forEach(group => {
+                group.network?.rebuild(group.gears, group.belts).updateRotation();
+                if (!this.mainGearRunning) group.gears.forEach(gear => {
+                    gear.powered = false;
+                    gear.rotationDir = 0;
+                    gear.angularVelocity = 0;
+                });
+            });
+        }
         runtimeGroups.forEach(group => group.network?.synchronizeLockedAxes());
         const currentTime = performance.now();
         if (currentTime - (this.lastStorageSaveAt || 0) > 500) {
