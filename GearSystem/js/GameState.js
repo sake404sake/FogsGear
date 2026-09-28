@@ -760,9 +760,11 @@ export class GameState {
             { gears: runtimeGears, belts: runtimeBelts, network: runtimeNetwork },
             ...this.getActiveScrollRuntimes(now)
         ];
+        
         runtimeGroups.forEach(group => {
             if (group.network && this.mainGearRunning && (this.creativeMode || this.steamPower > 0)) {
-                group.network.rebuild(group.gears, group.belts).updateRotation();
+                // 毎フレームの rebuild を外し、updateRotationのみに限定
+                group.network.updateRotation();
             } else {
                 group.gears.forEach(gear => {
                     gear.powered = false;
@@ -771,6 +773,7 @@ export class GameState {
                 });
             }
         });
+        
         // 連結していても、処理設定は各ギア自身の値だけを参照する。
         const activeGearGroups = runtimeGroups
             .map(group => ({ network: group.network, gears: group.gears.filter(gear => gear.powered && !gear.isDeadlocked) }))
