@@ -9,7 +9,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="icon" href="../MainSystem/icons/app-icon.jpg" type="image/jpeg">
-    <link rel="stylesheet" href="css/style.css?v=541">
+    <link rel="stylesheet" href="css/style.css?v=550">
 </head>
 <body>
     <div id="loadingOverlay" class="loading-overlay" role="status" aria-live="polite">
@@ -123,18 +123,13 @@
             <section class="navigation-panel" id="navigation-panel" hidden>
                 <div class="button-row">
                     <button class="btn btn-action" data-action="open-world-map">全体マップ</button>
+                    <button class="btn btn-visibility active" data-action="export-save" title="セーブデータをJSONファイルへ書き出す">Save</button>
+                    <button class="btn btn-action" data-action="choose-save-import" title="JSONバックアップからセーブデータを読み込む">Load</button>
                     <button class="btn btn-action" data-action="open-guide">ガイド</button>
                     <button class="btn btn-action" data-action="open-settings">設定</button>
                     <button class="btn btn-action" data-action="toggle-fullscreen" aria-pressed="false">全画面表示</button>
                 </div>
             </section>
-        </div>
-
-        <div class="control-group">
-            <div class="button-row" style="width: 100%;">
-                <button class="btn btn-visibility active" data-action="export-save" title="セーブデータをJSONファイルへ書き出す">Save</button>
-                <button class="btn btn-action" data-action="choose-save-import" title="JSONバックアップからセーブデータを読み込む">Load</button>
-            </div>
         </div>
         <div class="rule-text">
             WASD / 方向ボタンで移動。マウスホイールまたはピンチ操作で拡大縮小、ドラッグでマップを移動できます。シード値と初期ズームは設定画面で変更できます。
