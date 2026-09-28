@@ -1,10 +1,10 @@
 /**
  * main.js - エントリーポイント（システムの初期化とモジュール結合）
  */
-import { GameState } from './GameState.js?v=runtime-13';
+import { GameState } from './GameState.js?v=runtime-15';
 import { GearManager } from './GearManager.js?v=runtime-5';
-import { CanvasRenderer } from './CanvasRenderer.js';
-import { UIController } from './UIController.js?v=scroll-edit-12';
+import { CanvasRenderer } from './CanvasRenderer.js?v=render-1';
+import { UIController } from './UIController.js?v=scroll-edit-14';
 
 // DOMの準備後に、状態・ギア操作・描画・入力操作を同じGameStateへ接続する。
 document.addEventListener('DOMContentLoaded', () => {

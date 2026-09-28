@@ -60,9 +60,9 @@ export class CanvasRenderer {
 
     loop() {
         // 1フレームごとにゲーム状態を進めてから、最新状態を描画する。
+        requestAnimationFrame(() => this.loop());
         this.state.tick();
         this.render();
-        requestAnimationFrame(() => this.loop());
     }
 
     worldPoint(clientX, clientY) {

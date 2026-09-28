@@ -67,6 +67,39 @@ export const CELL_MATERIALS = Object.freeze({
     ancient_seed: { label: '古種', icon: '❖' }
 });
 
+export const COLLECTION_POWER_COSTS = Object.freeze({
+    water: 1,
+    grain: 2,
+    wood: 2,
+    forest_seed: 15,
+    stone: 6,
+    sand: 1,
+    relic_fragment: 24,
+    iron_ore: 12,
+    copper_ore: 10,
+    coal: 6,
+    coke: 24,
+    sulfur: 12,
+    clay: 3,
+    limestone: 4,
+    peat: 3,
+    salt: 6,
+    tar: 24,
+    tin_ore: 32,
+    zinc_ore: 48,
+    crystal_shard: 64,
+    spores: 10,
+    mycelium_compost: 28,
+    herbs: 20,
+    resin: 24,
+    salvage: 32,
+    mining_sample: 64,
+    vein_mold: 96,
+    navigation_crystal: 80,
+    preserved_spores: 64,
+    ancient_seed: 96
+});
+
 export const ACTIVE_SCROLL_TARGETS_KEY = 'fogsgear_active_scroll_targets';
 
 export function cellChangesKey(seed) {
@@ -135,4 +168,9 @@ export function getCellDrops(type, collectionCount = 0) {
     }
     const material = WORLD_CELL_TYPES[type]?.collect;
     return material ? [material] : [];
+}
+
+export function getCellCollectionPowerCost(type, collectionCount = 0) {
+    return getCellDrops(type, collectionCount)
+        .reduce((total, materialId) => total + (COLLECTION_POWER_COSTS[materialId] ?? 0), 0);
 }

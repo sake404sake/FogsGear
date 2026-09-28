@@ -1,6 +1,6 @@
-import { CanvasRenderer } from './CanvasRenderer.js';
+import { CanvasRenderer } from './CanvasRenderer.js?v=render-1';
 import { GEAR_CONFIG, hexToPixel } from './GearManager.js';
-import { GearNetwork } from './GearSystem.js';
+import { GearNetwork } from './GearSystem.js?v=network-5';
 
 const LIBRARY_KEY = 'fogsgear_scroll_library';
 const ACTIVE_SCROLL_KEY = 'fogsgear_active_scroll_id';
@@ -81,11 +81,11 @@ const previewState = {
 const renderer = new CanvasRenderer('previewCanvas', previewState, false);
 let lastPreviewFrame = 0;
 function animatePreview(now) {
+    requestAnimationFrame(animatePreview);
     const elapsed = lastPreviewFrame ? Math.min(0.1, Math.max(0, (now - lastPreviewFrame) / 1000)) : 1 / 60;
     lastPreviewFrame = now;
     previewState.tick(elapsed);
     renderer.render();
-    requestAnimationFrame(animatePreview);
 }
 requestAnimationFrame(animatePreview);
 let currentMaterial = 'all';

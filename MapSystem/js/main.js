@@ -3,9 +3,9 @@ import { MapGenerator, BIOME_COLORS, loadMapSnapshot, saveMapSnapshot } from './
 import { SkinRenderer } from './skinRenderer.js?v=2';
 import { CELL_DEFINITIONS, canEnterCell, getCellEntryRule, getMosaicColor } from './cellRules.js';
 import { drawCellIcon, loadCellIconAtlas } from './cellIconRenderer.js?v=3';
-import { ACTIVE_SCROLL_TARGETS_KEY, CELL_MATERIALS, TERRAIN_TRANSFORM_RECIPES, WORLD_CELL_TYPES, applyCellChanges, chooseEraCellType, getCellDrops, readCellChanges, saveCellChange } from './worldCells.js?v=2';
+import { ACTIVE_SCROLL_TARGETS_KEY, CELL_MATERIALS, TERRAIN_TRANSFORM_RECIPES, WORLD_CELL_TYPES, applyCellChanges, chooseEraCellType, getCellCollectionPowerCost, getCellDrops, readCellChanges, saveCellChange } from './worldCells.js?v=3';
 import { buildTerritoryBorderSegments } from './territoryBorders.js?v=35';
-import { GameState as EngineGameState } from '../../GearSystem/js/GameState.js?v=runtime-13';
+import { GameState as EngineGameState } from '../../GearSystem/js/GameState.js?v=runtime-14';
 import { GearManager as EngineGearManager } from '../../GearSystem/js/GearManager.js?v=runtime-2';
 
 const canvas = document.getElementById('gameCanvas');
@@ -735,8 +735,10 @@ function handleWorldCellOperation(operation) {
     if (operation.mode === 'RESOURCE_COLLECTION') {
         const drops = getCellDrops(currentType, collectionCount);
         if (!drops.length) return { success: false };
+        const consumedPower = getCellCollectionPowerCost(currentType, collectionCount);
+        if ((Number(operation.power) || 0) < consumedPower) return { success: false };
         persistChange(currentType, transformCount, collectionCount + 1);
-        return { success: true, producedItems: Object.fromEntries(drops.map(item => [item, 1])) };
+        return { success: true, consumedPower, producedItems: Object.fromEntries(drops.map(item => [item, 1])) };
     }
 
     return { success: false };
@@ -1340,7 +1342,8 @@ function updateEngineDashboard() {
         'main-engine-fog': save.fog,
         'main-engine-liquid-metal': save.liquidMetal,
         'main-engine-solid-metal': save.solidMetal,
-        'main-engine-brass': save.brass
+        'main-engine-brass': save.brass,
+        'main-engine-power': save.power
     };
     Object.entries(values).forEach(([id, value]) => {
         const element = document.getElementById(id);
@@ -1358,6 +1361,8 @@ function updateEngineDashboard() {
         'main-solid-generation': save.solidMetalRate,
         'main-solid-consumption': save.solidMetalConsumptionRate,
         'main-brass-generation': save.brassGenerationRate,
+        'main-power-generation': save.powerGenerationRate,
+        'main-power-consumption': save.powerConsumptionRate,
         'main-steam-generation': save.steamGenerationRate,
         'main-steam-consumption': save.steamConsumptionRate
     };
@@ -1492,7 +1497,7 @@ document.addEventListener('click', (event) => {
     }
     if (button.dataset.action === 'inspect-inventory-item') {
         if (button.dataset.itemKey === 'scroll_book') {
-            openAppPage('../GearSystem/scroll-library.html?embed=1&v=6', 'スクロール書庫');
+            openAppPage('../GearSystem/scroll-library.html?embed=1&v=7', 'スクロール書庫');
             return;
         }
         openInventoryItem(button.dataset.itemKey);

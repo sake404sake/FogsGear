@@ -818,11 +818,11 @@ canvas.engine-runtime-canvas { display: none; }
         justify-content: flex-start;
     }
     body:has(#gameCanvas) > .panel:last-of-type .main-page:first-child > .movement-control-group {
-        flex: 1 1 auto;
+        flex: 0 0 auto;
         justify-content: center;
         align-items: center;
         width: 100%;
-        min-height: 152px;
+        min-height: max-content;
         margin: 0;
     }
     body:has(#gameCanvas) > .panel:last-of-type .movement-pad { margin: 0 auto; }

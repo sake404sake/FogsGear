@@ -1,5 +1,5 @@
-import { GearNetwork } from './GearSystem.js?v=network-4';
-import { ACTIVE_SCROLL_TARGETS_KEY, CELL_MATERIALS, TERRAIN_TRANSFORM_RECIPES, WORLD_CELL_TYPES } from '../../MapSystem/js/worldCells.js?v=2';
+import { GearNetwork } from './GearSystem.js?v=network-5';
+import { ACTIVE_SCROLL_TARGETS_KEY, CELL_MATERIALS, TERRAIN_TRANSFORM_RECIPES, WORLD_CELL_TYPES } from '../../MapSystem/js/worldCells.js?v=3';
 
 /**
  * GameState - リソース、ギア、保存データ、Undo/Redo履歴の管理モジュール
@@ -8,6 +8,7 @@ export class GameState {
     // 資源、配置ギア、保存、Undo/Redo、UI通知を一元管理するアプリケーション状態。
     constructor() {
         this.steamPower = 100;
+        this.power = 0;
         this.water = 200;
         this.fog = 0;
         this.liquidMetal = 0;
@@ -35,6 +36,9 @@ export class GameState {
         this.steamGenerationRate = 0;
         this.steamConsumptionRate = 0;
         this.brassGenerationRate = 0;
+        this.powerGenerationRate = 0;
+        this.powerConsumptionRate = 0;
+        this.powerConsumedThisTick = 0;
         this.mainGearRunning = true;
         this.autoStoppedBySteam = false;
         this.userStoppedMainGear = false;
@@ -230,6 +234,7 @@ export class GameState {
         // クリエイティブ切替で復元する資源だけを値コピーとして取得する。
         return {
             steamPower: this.steamPower,
+            power: this.power,
             water: this.water,
             fog: this.fog,
             liquidMetal: this.liquidMetal,
@@ -241,6 +246,7 @@ export class GameState {
     restoreResourceSnapshot(snapshot) {
         // 保存済みの資源値を現在状態へ戻す。
         this.steamPower = snapshot.steamPower;
+        this.power = Number.isFinite(snapshot.power) ? snapshot.power : 0;
         this.water = snapshot.water;
         this.fog = snapshot.fog;
         this.liquidMetal = snapshot.liquidMetal;
@@ -327,6 +333,7 @@ export class GameState {
         // 資源・モード・ギア設定をJSON化して履歴に保存する。
         return JSON.stringify({
             steamPower: this.steamPower,
+            power: this.power,
             water: this.water,
             fog: this.fog,
             liquidMetal: this.liquidMetal,
@@ -368,6 +375,7 @@ export class GameState {
         // JSONスナップショットからギア実体を再生成し、ネットワークを再構築する。
         const data = JSON.parse(snapshot);
         this.steamPower = Number.isFinite(data.steamPower) ? data.steamPower : 100;
+        this.power = Number.isFinite(data.power) ? data.power : 0;
         this.water = data.water ?? 200;
         this.fog = data.fog ?? 0;
         this.liquidMetal = data.liquidMetal ?? 0;
@@ -451,6 +459,7 @@ export class GameState {
             ? this.createGear({ q: 0, r: 0, size: 'LL', layer: 0, isCore: true })
             : { q: 0, r: 0, sizeKey: 'LL', layer: 0, isCore: true, angle: 0 }];
         this.steamPower = 100;
+        this.power = 0;
         this.water = 200;
         this.fog = 0;
         this.liquidMetal = 0;
@@ -474,6 +483,7 @@ export class GameState {
         const data = {
             updatedAt: Date.now(),
             steamPower: this.steamPower,
+            power: this.power,
             water: this.water,
             fog: this.fog,
             liquidMetal: this.liquidMetal,
@@ -647,6 +657,7 @@ export class GameState {
             try {
                 const data = JSON.parse(saved);
                 this.steamPower = Number.isFinite(data.steamPower) ? data.steamPower : 100;
+                this.power = Number.isFinite(data.power) ? data.power : 0;
                 this.water = data.water ?? 200;
                 this.fog = data.fog ?? data.gasMetal ?? 0;
                 this.liquidMetal = data.liquidMetal ?? 0;
@@ -707,6 +718,7 @@ export class GameState {
         };
         const controlItemLabels = {
             fog: '霧',
+            power: '動力',
             liquid_metal: '液体金属',
             solid_metal: '固体金属',
             brass: '真鍮資材',
@@ -717,6 +729,7 @@ export class GameState {
             : `${Math.max(1, Number(gear?.controlRotationCount) || 1)}回転ごと`;
         const processInfo = {
             NONE: { name: '処理なし', input: '-', output: '-', rate: 0 },
+            POWER_STORAGE: { name: '動力を蓄積', input: '-', output: '動力', rate: rotationRate },
             FOG_COLLECTION: { name: '霧の回収', input: '-', output: '霧', rate: rotationRate * 10 },
             RESOURCE_COLLECTION: { name: '資材収集', input: '対象セル', output: 'セル資材', rate: rotationRate },
             TRANSFORM: { name: '水→スチーム', input: '水', output: 'スチーム', rate: rotationRate * 10 },
@@ -752,13 +765,17 @@ export class GameState {
                 target: { ...scrollRuntime.target },
                 mode: gear.processMode,
                 terrainTargetType: gear.terrainTargetType,
-                materials: this.materialInventory
+                materials: this.materialInventory,
+                power: this.power
             };
             const result = this.worldCellHandler(detail);
             if (!result?.success) continue;
             Object.entries(result.consumedItems || {}).forEach(([item, amount]) => {
                 this.materialInventory[item] = Math.max(0, (Number(this.materialInventory[item]) || 0) - amount);
             });
+            const consumedPower = Math.max(0, Number(result.consumedPower) || 0);
+            this.power = Math.max(0, this.power - consumedPower);
+            this.powerConsumedThisTick += consumedPower;
             Object.entries(result.producedItems || {}).forEach(([item, amount]) => {
                 this.materialInventory[item] = (Number(this.materialInventory[item]) || 0) + amount;
             });
@@ -828,6 +845,7 @@ export class GameState {
             const resourceProperties = {
                 water: 'water',
                 fog: 'fog',
+                power: 'power',
                 liquid_metal: 'liquidMetal',
                 solid_metal: 'solidMetal',
                 brass: 'brass',
@@ -901,6 +919,11 @@ export class GameState {
         this.water += elapsed * this.waterRecoveryRate;
         this.productionRate = 0;
         const gearRate = gear => gear.teeth * Math.abs(gear.angularVelocity || 0) * 0.012 / Math.max(elapsed, 1 / 240) / (Math.PI * 2);
+        this.powerGenerationRate = activeGears
+            .filter(gear => !gear.isCore && gear.designType === 'INDUSTRIAL' && gear.processMode === 'POWER_STORAGE')
+            .reduce((sum, gear) => sum + gear.teeth * Math.abs(gear.angularVelocity || 0) * 0.012 * 60 / (Math.PI * 2), 0);
+        this.power += this.powerGenerationRate * elapsed;
+        this.powerConsumedThisTick = 0;
         this.fogRecoveryRate = activeGears.filter(gear => gear.processMode === 'FOG_COLLECTION').reduce((sum, gear) => sum + gearRate(gear) * 10, 0);
         this.liquidMetalRate = activeGears.filter(gear => gear.designType === 'ALCHEMICAL' && gear.processMode === 'FOG_TO_LIQUID_METAL').reduce((sum, gear) => sum + gearRate(gear) * 0.1, 0);
         this.fogToWaterRate = activeGears.filter(gear => gear.designType === 'ALCHEMICAL' && gear.processMode === 'FOG_TO_WATER').reduce((sum, gear) => sum + gearRate(gear) * 2.5, 0);
@@ -1010,6 +1033,7 @@ export class GameState {
                 this.processScrollCellGear(gear, scrollRuntimeByGearId.get(gear.id), rotationDelta);
             }
         });
+        this.powerConsumptionRate = elapsed > 0 ? this.powerConsumedThisTick / elapsed : 0;
         let controlNetworkChanged = false;
         activeGears.forEach(gear => {
             const group = runtimeGroupByGearId.get(gear.id);

@@ -145,6 +145,8 @@
         .item-entry > svg { width: 34px; height: 34px; flex: 0 0 34px; }
         .item-entry h3 { margin: 0; color: var(--text); font-size: 12px; font-weight: 600; }
         .item-source { margin: 2px 0 0; color: var(--muted); font-size: 10px; line-height: 1.35; }
+        .item-power-cost { margin: 2px 0 0; color: var(--gold); font-size: 10px; line-height: 1.35; }
+        .item-catalog-note { margin: 0 0 12px; color: var(--muted); font-size: 12px; }
         .icon-catalog { margin-top: 38px; }
         .icon-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
         .icon-entry { display: flex; align-items: center; gap: 10px; min-width: 0; min-height: 66px; padding: 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 4px; }
@@ -330,6 +332,7 @@
                 <h2 id="item-catalog-title">採取アイテム</h2>
                 <p id="item-count"></p>
             </header>
+            <p class="item-catalog-note">資材の収集には素材ごとの動力を消費します。霧の回収と、霧から水を作る処理は動力を消費しません。</p>
             <div class="item-grid" id="item-grid"></div>
         </section>
 
@@ -347,9 +350,10 @@
         import {
             WORLD_CELL_TYPES,
             CELL_MATERIALS,
+            COLLECTION_POWER_COSTS,
             TERRAIN_TRANSFORM_RECIPES,
             getCellDrops
-        } from './js/worldCells.js?v=4';
+        } from './js/worldCells.js?v=5';
         import { getMosaicColor } from './js/cellRules.js?v=4';
 
         const categoryConfig = {
@@ -460,13 +464,16 @@
             .filter((materialId) => CELL_MATERIALS[materialId])
             .map((materialId) => {
                 const material = CELL_MATERIALS[materialId];
-                const sourceByCollect = Object.entries(WORLD_CELL_TYPES).find(([, definition]) => definition.collect === materialId);
+                const sourceByDrop = Object.entries(WORLD_CELL_TYPES).find(([typeKey]) =>
+                    Array.from({ length: 5 }, (_, count) => getCellDrops(typeKey, count)).flat().includes(materialId)
+                );
                 const sourceByRecipe = Object.entries(TERRAIN_TRANSFORM_RECIPES).find(([, recipe]) => Object.prototype.hasOwnProperty.call(recipe, materialId));
                 return {
                     id: materialId,
                     name: material.label,
                     icon: materialIconMap[materialId] || 'i-water',
-                    source: sourceByCollect ? sourceByCollect[1].label : sourceByRecipe ? WORLD_CELL_TYPES[sourceByRecipe[0]].label : ''
+                    source: sourceByDrop ? WORLD_CELL_TYPES[sourceByDrop[0]].label : sourceByRecipe ? WORLD_CELL_TYPES[sourceByRecipe[0]].label : '',
+                    powerCost: COLLECTION_POWER_COSTS[materialId] ?? 0
                 };
             })
             .filter((material) => material.source);
@@ -529,6 +536,7 @@
                 <div>
                     <h3>${material.name}</h3>
                     <p class="item-source">主な入手先: ${material.source}</p>
+                    <p class="item-power-cost">採取動力: ${material.powerCost} / 個${material.id === 'water' ? '（霧から生産: 0）' : ''}</p>
                 </div>
             </article>
         `).join('');
