@@ -184,11 +184,11 @@
             document.getElementById('saveMessage').textContent = '設定を保存しました。';
         };
         document.getElementById('backToGame').onclick = () => {
+            document.getElementById('loadingOverlay')?.removeAttribute('hidden');
             if (window.parent !== window) {
-                window.parent.postMessage({ type: 'fogsgear:close-page' }, '*');
+                window.parent.postMessage({ type: 'fogsgear:close-page' }, window.location.origin);
                 return;
             }
-            document.getElementById('loadingOverlay')?.removeAttribute('hidden');
             if (document.referrer.endsWith('/MapSystem/index.html')) {
                 window.history.back();
                 return;

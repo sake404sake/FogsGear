@@ -1274,7 +1274,7 @@ function openGuideModal() {
     modal.className = 'inventory-modal guide-modal';
     modal.setAttribute('role', 'dialog');
     modal.setAttribute('aria-modal', 'true');
-    modal.setAttribute('aria-label', 'セルガイド');
+    modal.setAttribute('aria-label', 'ガイド');
 
     const panel = document.createElement('div');
     panel.className = 'inventory-modal-panel guide-modal-panel';
@@ -1282,13 +1282,13 @@ function openGuideModal() {
     const closeButton = document.createElement('button');
     closeButton.type = 'button';
     closeButton.className = 'inventory-modal-close';
-    closeButton.setAttribute('aria-label', 'セルガイドを閉じる');
+    closeButton.setAttribute('aria-label', 'ガイドを閉じる');
     closeButton.textContent = '×';
     closeButton.addEventListener('click', closeGuideModal);
 
     const frame = document.createElement('iframe');
-    frame.title = 'セルガイド';
-    frame.src = 'cell-atlas.html?modal=1';
+    frame.title = 'ガイド';
+    frame.src = 'cell-atlas.html?modal=1&guide=2';
     frame.loading = 'lazy';
     frame.setAttribute('allowfullscreen', 'false');
 

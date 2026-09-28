@@ -4,14 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
     <title>Fogs Gear</title>
-    <link rel="stylesheet" href="css/style.css?v=gear-layout-8">
+    <link rel="stylesheet" href="css/style.css?v=gear-layout-9">
 </head>
 <body>
     <div id="loadingOverlay" class="loading-overlay" role="status" aria-live="polite">
         <div class="loading-panel"><div class="loading-spinner"></div><div>ギア編集画面を読み込んでいます...</div></div>
     </div>
     <div id="gear-notice" class="gear-notice" role="status" aria-live="polite" hidden></div>
-    <div class="panel">
+    <div id="gear-config-panel" class="panel">
         <div class="button-row" style="justify-content:flex-end; margin-bottom: 4px;">
             <button class="btn btn-action" type="button" data-action="return-map">マップへ戻る</button>
         </div>
@@ -130,7 +130,7 @@
     </div>
 
     <!-- 下部パネル：可視化・アクション操作盤 -->
-    <div class="panel">
+    <div id="gear-operations-panel" class="panel">
         <div class="control-group" style="margin-bottom: 8px;">
             <span class="group-label">— Visualization —</span>
             <div class="button-row">

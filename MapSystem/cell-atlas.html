@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>セルガイド | Fogs Gear</title>
+    <title>ガイド | Fogs Gear</title>
     <style>
         :root {
             color-scheme: dark;
@@ -34,7 +34,27 @@
         .masthead { display: flex; justify-content: space-between; align-items: end; gap: 24px; padding-bottom: 18px; border-bottom: 1px solid var(--line); }
         .eyebrow { margin: 0 0 6px; color: var(--mint); font: 11px monospace; letter-spacing: 1.6px; }
         h1 { margin: 0; color: var(--gold); font: 600 29px Georgia, "Yu Mincho", serif; text-shadow: 0 0 24px rgba(240, 199, 119, 0.25); }
-        .lede { max-width: 420px; margin: 0; color: var(--muted); font-size: 13px; }
+        .lede { max-width: 520px; margin: 0; color: var(--muted); font-size: 13px; }
+        .guide-tabs { display: flex; gap: 6px; margin: 16px 0 18px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+        .guide-tab { min-height: 36px; padding: 6px 16px; color: #c8d7cb; background: rgba(19, 26, 22, 0.82); border: 1px solid rgba(98, 194, 170, 0.25); border-radius: 4px; font: inherit; cursor: pointer; }
+        .guide-tab[aria-selected="true"] { color: #17120f; background: linear-gradient(180deg, #f3c653, #b8832d); border-color: #ffe69b; font-weight: 700; }
+        .guide-view[hidden] { display: none; }
+        .manual-heading { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(220px, 0.8fr); gap: 20px; align-items: end; margin: 4px 0 18px; padding: 14px 16px; background: linear-gradient(100deg, rgba(98, 194, 170, 0.10), rgba(28, 23, 19, 0.72)); border-left: 3px solid var(--mint); }
+        .manual-heading h2 { margin: 0 0 5px; color: var(--gold); font: 600 21px Georgia, "Yu Mincho", serif; }
+        .manual-heading p { margin: 0; color: #c9c5b7; font-size: 12px; }
+        .manual-note { color: var(--mint); font: 11px monospace; text-align: right; }
+        .manual-section { margin: 0 0 18px; padding: 0 0 15px; border-bottom: 1px solid var(--line); }
+        .manual-section h3 { margin: 0 0 8px; color: var(--mint); font-size: 15px; }
+        .manual-section h3 span { margin-right: 8px; color: var(--gold); font: 12px monospace; }
+        .manual-section p, .manual-section li { color: #d0cec4; font-size: 12px; line-height: 1.65; }
+        .manual-section p { margin: 5px 0; }
+        .manual-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 22px; }
+        .manual-flow { display: flex; flex-wrap: wrap; gap: 6px; margin: 9px 0; }
+        .manual-flow span { padding: 4px 8px; color: #e4d4a7; background: rgba(197, 160, 89, 0.08); border: 1px solid rgba(197, 160, 89, 0.26); border-radius: 3px; font-size: 11px; }
+        .manual-shots { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 10px 0 24px; }
+        .manual-shot { min-width: 0; margin: 0; overflow: hidden; background: #111713; border: 1px solid var(--line); border-radius: 4px; }
+        .manual-shot img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; object-position: center; background: #120e0c; }
+        .manual-shot figcaption { min-height: 34px; padding: 6px 8px; color: var(--muted); font-size: 10px; line-height: 1.4; }
         .toolbar { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin: 20px 0 18px; }
         .tabs { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px; border: 1px solid var(--line); background: rgba(17, 21, 18, 0.9); border-radius: 8px; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04); }
         .tab { min-height: 34px; padding: 6px 12px; color: #d5e2d5; background: transparent; border: 1px solid transparent; border-radius: 6px; font: inherit; font-size: 12px; cursor: pointer; transition: 0.2s ease; }
@@ -146,6 +166,23 @@
             .icon-entry > svg { width: 30px; height: 30px; flex-basis: 30px; }
             .item-entry { gap: 6px; padding: 6px; }
             .item-entry > svg { width: 30px; height: 30px; flex-basis: 30px; }
+            .manual-heading { grid-template-columns: minmax(0, 1fr); gap: 6px; padding: 10px; }
+            .manual-note { text-align: left; }
+            .manual-columns { grid-template-columns: minmax(0, 1fr); }
+            .manual-shots { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+            .manual-shot figcaption { font-size: 9px; }
+        }
+        @media (max-height: 520px) and (orientation: landscape) {
+            .page { padding: 10px 14px 22px; }
+            .masthead { padding-bottom: 10px; }
+            h1 { font-size: 22px; }
+            .guide-tabs { margin: 9px 0 10px; padding-bottom: 5px; }
+            .guide-tab { min-height: 30px; }
+            .manual-heading { margin-bottom: 10px; padding: 9px 12px; }
+            .manual-heading h2 { font-size: 17px; }
+            .manual-section { margin-bottom: 10px; padding-bottom: 8px; }
+            .manual-section p, .manual-section li { font-size: 11px; }
+            .manual-shots { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
         }
     </style>
 </head>
@@ -197,11 +234,84 @@
         <header class="masthead">
             <div>
                 <p class="eyebrow">FOGS GEAR / WORLD GUIDE</p>
-                <h1>セルの見た目と採取の目印</h1>
+                <h1>ガイド</h1>
             </div>
-            <p class="lede">各セルの見た目、採取物、変形候補をひと目で確認できるガイドです。探索中の判断材料として、色と模様を両方で読み取れるよう整理しました。</p>
+            <p class="lede">横向きスマートフォンを標準画面として、探索・スクロール・ギア操作を案内します。</p>
         </header>
 
+        <nav class="guide-tabs" role="tablist" aria-label="ガイドの内容">
+            <button class="guide-tab" id="how-to-tab" type="button" role="tab" aria-controls="how-to-page" aria-selected="true" data-guide-view="how-to-page">遊び方</button>
+            <button class="guide-tab" id="cell-guide-tab" type="button" role="tab" aria-controls="cell-guide-page" aria-selected="false" data-guide-view="cell-guide-page">セル・素材</button>
+        </nav>
+
+        <section id="how-to-page" class="guide-view" role="tabpanel" aria-labelledby="how-to-tab">
+            <header class="manual-heading">
+                <div>
+                    <p class="eyebrow">QUICK START / LANDSCAPE</p>
+                    <h2>横向きで、探索と動力をひと目に</h2>
+                    <p>マップ、操作パッド、保存スクロールのプレビュー、動力ダッシュボードを横長画面で切り替えて使います。</p>
+                </div>
+                <div class="manual-note">スマートフォンは横向き推奨<br>ページ切替: 横スワイプ / 下部ドット</div>
+            </header>
+
+            <div class="manual-columns">
+                <section class="manual-section">
+                    <h3><span>01</span>探索する</h3>
+                    <p>画面左のマップが探索フィールドです。下部の方向ボタンまたはジョイスティックで移動します。キーボードではW/A/S/Dまたは矢印キーを使います。</p>
+                    <p>マップをドラッグして視点を移動し、ホイールまたはピンチで拡大・縮小します。上部には現在の領域と地形、ステータスには座標が表示されます。</p>
+                </section>
+                <section class="manual-section">
+                    <h3><span>02</span>セルとインベントリ</h3>
+                    <p>上部の「インベントリ」から所持品を確認します。スクロール名を開くと詳細が表示され、スクロールブックから保存設計の一覧へ進めます。</p>
+                    <p>地形の色と記号、採取できる素材は「セル・素材」タブで確認できます。地形変化の結果は現在マップに保存されます。</p>
+                </section>
+                <section class="manual-section">
+                    <h3><span>03</span>コントロール部を切り替える</h3>
+                    <p>下部コントロール部は3ページです。操作、保存ギアプレビュー、動力ダッシュボードを横スワイプ、左右矢印または下のドットで切り替えます。</p>
+                    <div class="manual-flow"><span>操作・ジョイスティック</span><span>保存ギアプレビュー</span><span>動力ダッシュボード</span></div>
+                    <p>ダッシュボード内に縦スクロールがある場合は、その一覧を上下にスクロールします。</p>
+                </section>
+                <section class="manual-section">
+                    <h3><span>04</span>スクロールを使う</h3>
+                    <p>保存ギアプレビューで設計を選び、「スクロールを起動」を押します。稼働中は書庫一覧の先頭バーが発光します。同じボタンで個別に停止できます。</p>
+                    <p>稼働スクロールの対象セル、生成・消費量は動力ダッシュボードで確認します。保存設計の編集は一覧の歯車ボタンから行います。</p>
+                </section>
+                <section class="manual-section">
+                    <h3><span>05</span>ギアを作成・編集する</h3>
+                    <p>インベントリから紙/布スクロールを開き「ギア編集」を選択します。「ギア」でサイズを選び、盤面をタップして配置します。中心ギアは動力源として自動配置されます。</p>
+                    <p>ギアをタップして種類・処理内容・変成先を設定し、画面上部の保存欄で名前を付けて保存します。保存した設計はスクロールブックから再編集できます。</p>
+                </section>
+                <section class="manual-section">
+                    <h3><span>06</span>マップと設定</h3>
+                    <p>下部の「ナビゲーション」から全体マップ、ガイド、設定を開きます。全体マップはドラッグ・ピンチで閲覧できます。初期マップ/現在マップの切替は全体マップ上部にあります。</p>
+                    <p>スマートフォンは横向きを基準にしています。縦向きでもページをスクロールできますが、操作とマップを並べて使うには横向きが適しています。</p>
+                </section>
+            </div>
+
+            <section class="manual-section" aria-labelledby="screen-flow-title">
+                <h3 id="screen-flow-title"><span>SCREEN FLOW</span>画面遷移</h3>
+                <p>主要な画面とポップアップを、横向きスマートフォンの表示で記録しています。</p>
+                <div class="manual-shots">
+                    <figure class="manual-shot"><img src="assets/guide-screenshots/01-exploration-landscape.png" alt="横向きの探索画面" loading="lazy"><figcaption>探索・操作ページ</figcaption></figure>
+                    <figure class="manual-shot"><img src="assets/guide-screenshots/02-status.png" alt="ステータスポップアップ" loading="lazy"><figcaption>ステータス表示</figcaption></figure>
+                    <figure class="manual-shot"><img src="assets/guide-screenshots/03-inventory.png" alt="インベントリパネル" loading="lazy"><figcaption>インベントリ</figcaption></figure>
+                    <figure class="manual-shot"><img src="assets/guide-screenshots/03b-scroll-item.png" alt="インベントリ内のスクロール詳細" loading="lazy"><figcaption>スクロール詳細</figcaption></figure>
+                    <figure class="manual-shot"><img src="assets/guide-screenshots/04-scroll-book.png" alt="スクロールブック" loading="lazy"><figcaption>保存スクロール一覧</figcaption></figure>
+                    <figure class="manual-shot"><img src="assets/guide-screenshots/04b-scroll-detail.png" alt="スクロールブックで選択した設計" loading="lazy"><figcaption>保存設計のプレビュー</figcaption></figure>
+                    <figure class="manual-shot"><img src="assets/guide-screenshots/05-gear-editor.png" alt="ギア編集画面" loading="lazy"><figcaption>設計の作成・編集</figcaption></figure>
+                    <figure class="manual-shot"><img src="assets/guide-screenshots/06-control-preview.png" alt="保存ギアプレビュー" loading="lazy"><figcaption>コントロール部・プレビュー</figcaption></figure>
+                    <figure class="manual-shot"><img src="assets/guide-screenshots/07-dashboard.png" alt="動力ダッシュボード" loading="lazy"><figcaption>資源と稼働レート</figcaption></figure>
+                    <figure class="manual-shot"><img src="assets/guide-screenshots/08-navigation.png" alt="ナビゲーションメニュー" loading="lazy"><figcaption>ナビゲーション</figcaption></figure>
+                    <figure class="manual-shot"><img src="assets/guide-screenshots/09-world-map.png" alt="全体マップ" loading="lazy"><figcaption>全体マップ</figcaption></figure>
+                    <figure class="manual-shot"><img src="assets/guide-screenshots/10-guide.png" alt="ガイドの遊び方ページ" loading="lazy"><figcaption>ガイド</figcaption></figure>
+                    <figure class="manual-shot"><img src="assets/guide-screenshots/10b-cell-catalog.png" alt="ガイドのセルと素材一覧" loading="lazy"><figcaption>セル・素材の一覧</figcaption></figure>
+                    <figure class="manual-shot"><img src="assets/guide-screenshots/11-settings.png" alt="設定画面" loading="lazy"><figcaption>設定</figcaption></figure>
+                </div>
+            </section>
+        </section>
+
+        <section id="cell-guide-page" class="guide-view" role="tabpanel" aria-labelledby="cell-guide-tab" hidden>
+        <header class="group-head"><h2>セルの見た目と採取の目印</h2><p>色と模様、採取物、変形候補を確認できます。</p></header>
         <div class="toolbar">
             <div class="tabs" role="group" aria-label="地形のカテゴリ">
                 <button class="tab" type="button" data-filter="all" aria-pressed="true">全体</button>
@@ -229,6 +339,7 @@
                 <p id="icon-count"></p>
             </header>
             <div class="icon-grid" id="icon-grid"></div>
+        </section>
         </section>
     </main>
 
@@ -454,6 +565,13 @@
 
         tabs.forEach((tab) => tab.addEventListener('click', () => showGroup(tab.dataset.filter)));
         showGroup('all');
+
+        const guideTabs = [...document.querySelectorAll('.guide-tab')];
+        guideTabs.forEach((tab) => tab.addEventListener('click', () => {
+            const activeView = tab.dataset.guideView;
+            guideTabs.forEach((guideTab) => guideTab.setAttribute('aria-selected', String(guideTab === tab)));
+            document.querySelectorAll('.guide-view').forEach((view) => { view.hidden = view.id !== activeView; });
+        }));
     </script>
 </body>
 </html>
