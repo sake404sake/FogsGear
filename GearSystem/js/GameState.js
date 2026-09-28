@@ -153,6 +153,11 @@ export class GameState {
         if (signature === this.activeScrollSignature) return this.activeScrollRuntimes;
         this.activeScrollSignature = signature;
 
+        // ★修正点1: 再生成前に現在のランタイム状態を保持しておく
+        const previousRuntimes = new Map(
+            (this.activeScrollRuntimes || []).map(rt => [rt.scrollId, rt])
+        );
+
         let activeIds = [];
         let library = [];
         let targets = {};
@@ -180,6 +185,14 @@ export class GameState {
                 const sourceId = String(data.id || `preview-${index}`);
                 const gearId = `active-scroll:${scroll.id}:${sourceId}`;
                 const gear = this.createGear({ ...data, id: gearId });
+                
+                // ★修正点2: 以前のランタイムが存在していれば、ギアの角度を引き継ぐ
+                const prevRuntime = previousRuntimes.get(scroll.id);
+                if (prevRuntime) {
+                    const prevGear = prevRuntime.gears.find(g => g.id === gearId);
+                    if (prevGear) gear.angle = prevGear.angle;
+                }
+                
                 gearIdMap.set(sourceId, gearId);
                 return gear;
             });
