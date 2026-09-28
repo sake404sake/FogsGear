@@ -43,18 +43,29 @@
         .manual-heading h2 { margin: 0 0 5px; color: var(--gold); font: 600 21px Georgia, "Yu Mincho", serif; }
         .manual-heading p { margin: 0; color: #c9c5b7; font-size: 12px; }
         .manual-note { color: var(--mint); font: 11px monospace; text-align: right; }
-        .manual-section { margin: 0 0 18px; padding: 0 0 15px; border-bottom: 1px solid var(--line); }
-        .manual-section h3 { margin: 0 0 8px; color: var(--mint); font-size: 15px; }
-        .manual-section h3 span { margin-right: 8px; color: var(--gold); font: 12px monospace; }
-        .manual-section p, .manual-section li { color: #d0cec4; font-size: 12px; line-height: 1.65; }
-        .manual-section p { margin: 5px 0; }
-        .manual-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 22px; }
+        .manual-steps { display: grid; gap: 0; }
+        .manual-step { display: grid; grid-template-columns: minmax(0, .92fr) minmax(0, 1.08fr); gap: 18px 24px; align-items: center; padding: 16px 0 20px; border-bottom: 1px solid var(--line); }
+        .manual-step-copy { min-width: 0; }
+        .manual-step-copy h3 { margin: 0 0 8px; color: var(--mint); font-size: 16px; }
+        .manual-step-copy h3 span { margin-right: 8px; color: var(--gold); font: 12px monospace; }
+        .manual-step-copy p { margin: 6px 0; color: #d0cec4; font-size: 12px; line-height: 1.65; }
         .manual-flow { display: flex; flex-wrap: wrap; gap: 6px; margin: 9px 0; }
         .manual-flow span { padding: 4px 8px; color: #e4d4a7; background: rgba(197, 160, 89, 0.08); border: 1px solid rgba(197, 160, 89, 0.26); border-radius: 3px; font-size: 11px; }
-        .manual-shots { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 10px 0 24px; }
+        .manual-step-media { display: grid; gap: 8px; min-width: 0; }
         .manual-shot { min-width: 0; margin: 0; overflow: hidden; background: #111713; border: 1px solid var(--line); border-radius: 4px; }
         .manual-shot img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; object-position: center; background: #120e0c; }
-        .manual-shot figcaption { min-height: 34px; padding: 6px 8px; color: var(--muted); font-size: 10px; line-height: 1.4; }
+        .manual-shot figcaption { min-height: 30px; padding: 6px 8px; color: var(--muted); font-size: 10px; line-height: 1.4; }
+        .manual-callout { position: relative; display: grid; grid-template-columns: minmax(116px, .7fr) minmax(0, 1fr); align-items: center; gap: 10px; margin: 0; padding: 8px 10px; color: var(--text); background: linear-gradient(120deg, rgba(98,194,170,.12), rgba(29,23,20,.92)); border: 1px solid rgba(98,194,170,.38); border-left: 3px solid var(--mint); border-radius: 4px; }
+        .manual-callout::before { position: absolute; top: -6px; left: 22px; width: 10px; height: 10px; content: ''; background: #1b211d; border-top: 1px solid rgba(98,194,170,.38); border-left: 1px solid rgba(98,194,170,.38); transform: rotate(45deg); }
+        .manual-zoom { min-width: 0; aspect-ratio: 3 / 2; overflow: hidden; background: #100d0b; border: 1px solid rgba(243,198,83,.42); }
+        .manual-zoom img { display: block; width: 100%; height: 100%; object-fit: contain; }
+        .manual-callout--wide { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); }
+        .manual-callout--wide .manual-zoom { aspect-ratio: 5 / 1; }
+        .manual-callout--stacked { grid-template-columns: minmax(0, 1fr); }
+        .manual-callout--stacked .manual-zoom { aspect-ratio: 5.5 / 1; }
+        .manual-callout-note strong { display: block; margin-bottom: 3px; color: var(--gold); font-size: 11px; }
+        .manual-callout-note p { margin: 0; color: #d0cec4; font-size: 11px; line-height: 1.5; }
+        .manual-support-shots { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
         .toolbar { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin: 20px 0 18px; }
         .tabs { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px; border: 1px solid var(--line); background: rgba(17, 21, 18, 0.9); border-radius: 8px; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04); }
         .tab { min-height: 34px; padding: 6px 12px; color: #d5e2d5; background: transparent; border: 1px solid transparent; border-radius: 6px; font: inherit; font-size: 12px; cursor: pointer; transition: 0.2s ease; }
@@ -170,8 +181,10 @@
             .item-entry > svg { width: 30px; height: 30px; flex-basis: 30px; }
             .manual-heading { grid-template-columns: minmax(0, 1fr); gap: 6px; padding: 10px; }
             .manual-note { text-align: left; }
-            .manual-columns { grid-template-columns: minmax(0, 1fr); }
-            .manual-shots { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+            .manual-step { grid-template-columns: minmax(0, 1fr); gap: 10px; padding: 12px 0 16px; }
+            .manual-step-copy h3 { font-size: 15px; }
+            .manual-callout { grid-template-columns: minmax(102px, .64fr) minmax(0, 1fr); gap: 8px; padding: 7px; }
+            .manual-callout-note p { font-size: 10px; }
             .manual-shot figcaption { font-size: 9px; }
         }
         @media (max-height: 520px) and (orientation: landscape) {
@@ -182,9 +195,9 @@
             .guide-tab { min-height: 30px; }
             .manual-heading { margin-bottom: 10px; padding: 9px 12px; }
             .manual-heading h2 { font-size: 17px; }
-            .manual-section { margin-bottom: 10px; padding-bottom: 8px; }
-            .manual-section p, .manual-section li { font-size: 11px; }
-            .manual-shots { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+            .manual-step { gap: 10px 14px; padding: 10px 0 12px; }
+            .manual-step-copy p { font-size: 11px; }
+            .manual-callout { grid-template-columns: minmax(100px, .66fr) minmax(0, 1fr); }
         }
     </style>
 </head>
@@ -238,7 +251,7 @@
                 <p class="eyebrow">FOGS GEAR / WORLD GUIDE</p>
                 <h1>ガイド</h1>
             </div>
-            <p class="lede">横向きスマートフォンを標準画面として、探索・スクロール・ギア操作を案内します。</p>
+            <p class="lede">スマートフォンの横向き画面を使って、探索・スクロール・ギア操作を説明します。遊ぶ向きは自由です。</p>
         </header>
 
         <nav class="guide-tabs" role="tablist" aria-label="ガイドの内容">
@@ -249,67 +262,122 @@
         <section id="how-to-page" class="guide-view" role="tabpanel" aria-labelledby="how-to-tab">
             <header class="manual-heading">
                 <div>
-                    <p class="eyebrow">QUICK START / LANDSCAPE</p>
-                    <h2>横向きで、探索と動力をひと目に</h2>
-                    <p>マップ、操作パッド、保存スクロールのプレビュー、動力ダッシュボードを横長画面で切り替えて使います。</p>
+                    <p class="eyebrow">FIRST PLAY / HOW TO</p>
+                    <h2>探索からギア運用まで</h2>
+                    <p>探索、所持品、保存ギア、動力の順に、最初に必要な操作を画面で案内します。</p>
                 </div>
-                <div class="manual-note">スマートフォンは横向き推奨<br>ページ切替: 横スワイプ / 下部ドット</div>
+                <div class="manual-note">画面例: スマートフォン横向き<br>下部のドットで操作ページを切り替え</div>
             </header>
 
-            <div class="manual-columns">
-                <section class="manual-section">
-                    <h3><span>01</span>探索する</h3>
-                    <p>画面左のマップが探索フィールドです。下部の方向ボタンまたはジョイスティックで移動します。キーボードではW/A/S/Dまたは矢印キーを使います。</p>
-                    <p>マップをドラッグして視点を移動し、ホイールまたはピンチで拡大・縮小します。上部には現在の領域と地形、ステータスには座標が表示されます。</p>
+            <div class="manual-steps">
+                <section class="manual-step">
+                    <div class="manual-step-copy">
+                        <h3><span>01</span>マップを探索する</h3>
+                        <p>左側が探索マップ、下部が操作エリアです。方向ボタンまたは中央のスティックで移動します。キーボードではW/A/S/Dか矢印キーを使えます。</p>
+                        <p>マップをドラッグして視点を動かし、ホイールまたはピンチで拡大・縮小します。上部には現在地の領域と地形が表示されます。</p>
+                    </div>
+                    <div class="manual-step-media">
+                        <figure class="manual-shot"><img src="assets/guide-screenshots/01-exploration-landscape.png" alt="スマートフォンを横向きにした探索画面"><figcaption>このガイドではスマートフォン横向きの画面例を使っています。</figcaption></figure>
+                        <aside class="manual-callout">
+                            <div class="manual-zoom"><img src="assets/guide-screenshots/01b-movement-pad.png" alt="方向ボタンと中央ジョイスティック"></div>
+                            <div class="manual-callout-note"><strong>移動コントローラー</strong><p>方向ボタンかジョイスティックを使います。縦画面では下へスクロールするとナビゲーションへ進めます。</p></div>
+                        </aside>
+                    </div>
                 </section>
-                <section class="manual-section">
-                    <h3><span>02</span>セルとインベントリ</h3>
-                    <p>上部の「インベントリ」から所持品を確認します。スクロール名を開くと詳細が表示され、スクロールブックから保存設計の一覧へ進めます。</p>
-                    <p>地形の色と記号、採取できる素材は「セル・素材」タブで確認できます。地形変化の結果は現在マップに保存されます。</p>
+
+                <section class="manual-step">
+                    <div class="manual-step-copy">
+                        <h3><span>02</span>状態と現在地を確認する</h3>
+                        <p>上部の「ステータス」を開くと、体力、スチーム、座標を確認できます。マップ上で迷ったときは、座標と現在の地形を見比べてください。</p>
+                    </div>
+                    <div class="manual-step-media">
+                        <figure class="manual-shot"><img src="assets/guide-screenshots/02-status.png" alt="体力、スチーム、座標を表示したステータス画面"><figcaption>ステータスを開いた状態</figcaption></figure>
+                        <aside class="manual-callout manual-callout--stacked">
+                            <div class="manual-zoom"><img src="assets/guide-screenshots/02b-status-values.png" alt="体力、スチーム、座標をまとめたステータス欄"></div>
+                            <div class="manual-callout-note"><strong>座標とスチーム</strong><p>スクロールの対象セルや運転状況を確認するときに使います。</p></div>
+                        </aside>
+                    </div>
                 </section>
-                <section class="manual-section">
-                    <h3><span>03</span>コントロール部を切り替える</h3>
-                    <p>下部コントロール部は3ページです。操作、保存ギアプレビュー、動力ダッシュボードを横スワイプ、左右矢印または下のドットで切り替えます。</p>
-                    <div class="manual-flow"><span>操作・ジョイスティック</span><span>保存ギアプレビュー</span><span>動力ダッシュボード</span></div>
-                    <p>ダッシュボード内に縦スクロールがある場合は、その一覧を上下にスクロールします。</p>
+
+                <section class="manual-step">
+                    <div class="manual-step-copy">
+                        <h3><span>03</span>インベントリを開く</h3>
+                        <p>上部の「インベントリ」から所持品と地形採取素材を確認します。スクロールブックを開くと、保存済みのギア設計を選べます。</p>
+                        <p>地形の記号・採取物・必要動力は「セル・素材」タブにまとめています。</p>
+                    </div>
+                    <div class="manual-step-media">
+                        <figure class="manual-shot"><img src="assets/guide-screenshots/03-inventory.png" alt="インベントリと地形採取素材の一覧"><figcaption>所持品と地形素材</figcaption></figure>
+                        <aside class="manual-callout manual-callout--wide">
+                            <div class="manual-zoom"><img src="assets/guide-screenshots/03b-scroll-book-button.png" alt="インベントリ内のスクロールブック項目"></div>
+                            <div class="manual-callout-note"><strong>保存設計へ</strong><p>スクロールブックから紙・布の保存ギアを選択します。</p></div>
+                        </aside>
+                    </div>
                 </section>
-                <section class="manual-section">
-                    <h3><span>04</span>スクロールを使う</h3>
-                    <p>保存ギアプレビューで設計を選び、「スクロールを起動」を押します。稼働中は書庫一覧の先頭バーが発光します。同じボタンで個別に停止できます。</p>
-                    <p>稼働スクロールの対象セル、生成・消費量は動力ダッシュボードで確認します。保存設計の編集は一覧の歯車ボタンから行います。</p>
+
+                <section class="manual-step">
+                    <div class="manual-step-copy">
+                        <h3><span>04</span>保存ギアを選んで起動する</h3>
+                        <p>下部のドットで「保存ギアプレビュー」へ切り替えます。設計を選んで接続とプレビューを確認し、「スクロールを起動」を押すと対象セルで動作します。</p>
+                        <p>稼働中は同じボタンで停止できます。設計を直すときは一覧の歯車ボタンから編集します。</p>
+                    </div>
+                    <div class="manual-step-media">
+                        <figure class="manual-shot"><img src="assets/guide-screenshots/06-control-preview.png" alt="保存ギア一覧、選択した設計と起動ボタン"><figcaption>選択した設計の接続プレビュー</figcaption></figure>
+                        <aside class="manual-callout manual-callout--wide">
+                            <div class="manual-zoom"><img src="assets/guide-screenshots/04b-scroll-start-button.png" alt="スクロールを起動・停止するボタン"></div>
+                            <div class="manual-callout-note"><strong>起動前に確認</strong><p>接続が正しいことを見てから起動します。稼働状況は動力ダッシュボードにも表示されます。</p></div>
+                        </aside>
+                    </div>
                 </section>
-                <section class="manual-section">
-                    <h3><span>05</span>ギアを作成・編集する</h3>
-                    <p>インベントリから紙/布スクロールを開き「ギア編集」を選択します。「ギア」でサイズを選び、盤面をタップして配置します。中心ギアは動力源として自動配置されます。</p>
-                    <p>ギアをタップして種類・処理内容・変成先を設定し、画面上部の保存欄で名前を付けて保存します。保存した設計はスクロールブックから再編集できます。</p>
+
+                <section class="manual-step">
+                    <div class="manual-step-copy">
+                        <h3><span>05</span>ギアを作成・編集する</h3>
+                        <p>インベントリから紙・布のスクロールを開き、「ギア編集」を押します。ギア編集でサイズを選び、盤面をタップして配置します。中心のメインギアから噛み合う位置につなげます。ギアを選ぶと右側の設定が開きます。</p>
+                        <p>工業・動力ギアは「動力を蓄積」を選ぶと、1回転ごとに歯数分の動力を生成します。設計名を付けて保存すると、スクロールブックから使えます。</p>
+                    </div>
+                    <div class="manual-step-media">
+                        <figure class="manual-shot"><img src="assets/guide-screenshots/05-gear-editor.png" alt="ギア編集盤面と選択ギアの設定"><figcaption>ギアを選択して種類と処理を設定</figcaption></figure>
+                        <aside class="manual-callout manual-callout--wide">
+                            <div class="manual-zoom"><img src="assets/guide-screenshots/05b-process-mode.png" alt="工業ギアの処理内容選択欄"></div>
+                            <div class="manual-callout-note"><strong>処理内容</strong><p>「動力を蓄積」や「資材収集」など、ギアの役割をここで選びます。</p></div>
+                        </aside>
+                    </div>
                 </section>
-                <section class="manual-section">
-                    <h3><span>06</span>マップと設定</h3>
-                    <p>下部の「ナビゲーション」から全体マップ、ガイド、設定を開きます。全体マップはドラッグ・ピンチで閲覧できます。初期マップ/現在マップの切替は全体マップ上部にあります。</p>
-                    <p>スマートフォンは横向きを基準にしています。縦向きでもページをスクロールできますが、操作とマップを並べて使うには横向きが適しています。</p>
+
+                <section class="manual-step">
+                    <div class="manual-step-copy">
+                        <h3><span>06</span>動力と資源の収支を見る</h3>
+                        <p>下部の「動力ダッシュボード」ページで、資源の保有量・生成レート・消費レートを確認します。動力が足りないと資材収集は進まず、必要量が貯まると再開します。</p>
+                        <p>霧の回収と霧から水を作る処理は動力を使いません。</p>
+                    </div>
+                    <div class="manual-step-media">
+                        <figure class="manual-shot"><img src="assets/guide-screenshots/07-dashboard.png" alt="資源ごとの保有量、生成、消費を示す動力ダッシュボード"><figcaption>保有量とレートをまとめて確認</figcaption></figure>
+                        <aside class="manual-callout manual-callout--wide">
+                            <div class="manual-zoom"><img src="assets/guide-screenshots/07b-power-row.png" alt="動力の保有量、生成、消費レート"></div>
+                            <div class="manual-callout-note"><strong>動力の行</strong><p>保有量と、1秒あたりの生成・消費が表示されます。</p></div>
+                        </aside>
+                    </div>
+                </section>
+
+                <section class="manual-step">
+                    <div class="manual-step-copy">
+                        <h3><span>07</span>マップと設定を開く</h3>
+                        <p>操作ページの「ナビゲーション」から全体マップ、ガイド、設定を開けます。全体マップはドラッグやピンチで移動・拡大できます。</p>
+                        <p>ワールドシードやマップ初期ズームは設定で変更できます。初期マップと現在マップの違いは全体マップで切り替えて確認します。</p>
+                    </div>
+                    <div class="manual-step-media">
+                        <figure class="manual-shot"><img src="assets/guide-screenshots/08-navigation.png" alt="全体マップ、ガイド、設定を開くナビゲーション"><figcaption>ナビゲーションから各画面へ</figcaption></figure>
+                        <aside class="manual-callout">
+                            <div class="manual-zoom"><img src="assets/guide-screenshots/08b-navigation-actions.png" alt="ナビゲーションの各画面へのボタン"></div>
+                            <div class="manual-callout-note"><strong>画面移動</strong><p>全体マップで探索範囲を見渡し、設定からシードとズームを調整できます。</p></div>
+                        </aside>
+                        <div class="manual-support-shots">
+                            <figure class="manual-shot"><img src="assets/guide-screenshots/09-world-map.png" alt="全体マップの現在地と地形"><figcaption>全体マップ</figcaption></figure>
+                            <figure class="manual-shot"><img src="assets/guide-screenshots/11-settings.png" alt="ワールドシードと表示設定"><figcaption>ワールド設定</figcaption></figure>
+                        </div>
+                    </div>
                 </section>
             </div>
-
-            <section class="manual-section" aria-labelledby="screen-flow-title">
-                <h3 id="screen-flow-title"><span>SCREEN FLOW</span>画面遷移</h3>
-                <p>主要な画面とポップアップを、横向きスマートフォンの表示で記録しています。</p>
-                <div class="manual-shots">
-                    <figure class="manual-shot"><img src="assets/guide-screenshots/01-exploration-landscape.png" alt="横向きの探索画面" loading="lazy"><figcaption>探索・操作ページ</figcaption></figure>
-                    <figure class="manual-shot"><img src="assets/guide-screenshots/02-status.png" alt="ステータスポップアップ" loading="lazy"><figcaption>ステータス表示</figcaption></figure>
-                    <figure class="manual-shot"><img src="assets/guide-screenshots/03-inventory.png" alt="インベントリパネル" loading="lazy"><figcaption>インベントリ</figcaption></figure>
-                    <figure class="manual-shot"><img src="assets/guide-screenshots/03b-scroll-item.png" alt="インベントリ内のスクロール詳細" loading="lazy"><figcaption>スクロール詳細</figcaption></figure>
-                    <figure class="manual-shot"><img src="assets/guide-screenshots/04-scroll-book.png" alt="スクロールブック" loading="lazy"><figcaption>保存スクロール一覧</figcaption></figure>
-                    <figure class="manual-shot"><img src="assets/guide-screenshots/04b-scroll-detail.png" alt="スクロールブックで選択した設計" loading="lazy"><figcaption>保存設計のプレビュー</figcaption></figure>
-                    <figure class="manual-shot"><img src="assets/guide-screenshots/05-gear-editor.png" alt="ギア編集画面" loading="lazy"><figcaption>設計の作成・編集</figcaption></figure>
-                    <figure class="manual-shot"><img src="assets/guide-screenshots/06-control-preview.png" alt="保存ギアプレビュー" loading="lazy"><figcaption>コントロール部・プレビュー</figcaption></figure>
-                    <figure class="manual-shot"><img src="assets/guide-screenshots/07-dashboard.png" alt="動力ダッシュボード" loading="lazy"><figcaption>資源と稼働レート</figcaption></figure>
-                    <figure class="manual-shot"><img src="assets/guide-screenshots/08-navigation.png" alt="ナビゲーションメニュー" loading="lazy"><figcaption>ナビゲーション</figcaption></figure>
-                    <figure class="manual-shot"><img src="assets/guide-screenshots/09-world-map.png" alt="全体マップ" loading="lazy"><figcaption>全体マップ</figcaption></figure>
-                    <figure class="manual-shot"><img src="assets/guide-screenshots/10-guide.png" alt="ガイドの遊び方ページ" loading="lazy"><figcaption>ガイド</figcaption></figure>
-                    <figure class="manual-shot"><img src="assets/guide-screenshots/10b-cell-catalog.png" alt="ガイドのセルと素材一覧" loading="lazy"><figcaption>セル・素材の一覧</figcaption></figure>
-                    <figure class="manual-shot"><img src="assets/guide-screenshots/11-settings.png" alt="設定画面" loading="lazy"><figcaption>設定</figcaption></figure>
-                </div>
-            </section>
         </section>
 
         <section id="cell-guide-page" class="guide-view" role="tabpanel" aria-labelledby="cell-guide-tab" hidden>
