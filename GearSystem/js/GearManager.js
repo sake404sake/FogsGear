@@ -1,5 +1,5 @@
 /** GearManager - ギア仕様定義・配置・補正計算ロジック */
-import { Gear, GearNetwork } from './GearSystem.js?v=network-5';
+import { Gear, GearNetwork } from './GearSystem.js?v=network-7';
 export const GEAR_CONFIG = {
     'XXS': { teeth: 4, radius: 12, cost: 4, pattern: 'ring' }, 'SS': { teeth: 6, radius: 18, cost: 6, pattern: 'sunburst' }, 'S': { teeth: 10, radius: 30, cost: 10, pattern: 'holes' }, 'M': { teeth: 14, radius: 42, cost: 14, pattern: 'triangular' }, 'L': { teeth: 18, radius: 54, cost: 18, pattern: 'wave' }, 'LL': { teeth: 24, radius: 72, cost: 24, pattern: 'crown' }, '3L': { teeth: 32, radius: 96, cost: 32, pattern: 'lattice' }, '4L': { teeth: 40, radius: 120, cost: 40, pattern: 'radial' }, 'MAX': { teeth: 48, radius: 144, cost: 48, pattern: 'industrial' }
 };
@@ -224,6 +224,41 @@ export class GearManager {
         });
     }
 
+    findNearestClearMeshPosition(x, y, config, layer, anchors) {
+        const meshOverlap = Math.max(3, config.radius * 0.015);
+        const angleOffsets = [0];
+        for (let degrees = 5; degrees <= 180; degrees += 5) {
+            const offset = degrees * Math.PI / 180;
+            angleOffsets.push(offset, -offset);
+        }
+        let best = null;
+        anchors.forEach(anchor => {
+            const desiredAngle = Math.atan2(y - anchor.y, x - anchor.x);
+            const targetDistance = anchor.radius + config.radius - meshOverlap;
+            angleOffsets.forEach(offset => {
+                const angle = desiredAngle + offset;
+                const position = {
+                    x: anchor.x + Math.cos(angle) * targetDistance,
+                    y: anchor.y + Math.sin(angle) * targetDistance
+                };
+                const blocked = this.state.placedGears.some(other => other.layer === layer
+                    && other.id !== anchor.id
+                    && Math.hypot(position.x - other.x, position.y - other.y) < config.radius + other.radius - 2);
+                if (blocked) return;
+
+                const otherPitch = Math.PI * 2 / anchor.teeth;
+                const selfPitch = Math.PI * 2 / config.teeth;
+                const otherTooth = anchor.angle + Math.round((angle - anchor.angle) / otherPitch) * otherPitch;
+                const fineToothCorrection = config.teeth === 40 || config.teeth === 48 ? selfPitch / 2 : 0;
+                const meshAngle = otherTooth + Math.PI + selfPitch / 2 + fineToothCorrection;
+                const cursorDistance = Math.hypot(position.x - x, position.y - y);
+                const score = cursorDistance + Math.abs(offset) * 0.01;
+                if (!best || score < best.score) best = { ...position, angle: meshAngle, score };
+            });
+        });
+        return best;
+    }
+
     updateGhost(mouseX, mouseY, pointerOffsetY = 110) {
         // ポインター位置を配置候補へ変換し、軸合わせ・噛み合わせ・接続候補を計算する。
         const sizeKey = this.state.selectedSize;
@@ -249,10 +284,11 @@ export class GearManager {
         });
         let position = { x, y };
         let hex = pixelToHex(x, y);
-        const nearest = sameLayer.reduce((best, gear) => {
-            const distance = Math.hypot(x - gear.x, y - gear.y);
-            return distance < best.distance ? { gear, distance } : best;
-        }, { gear: null, distance: Infinity });
+        const nearbyGears = sameLayer
+            .map(gear => ({ gear, distance: Math.hypot(x - gear.x, y - gear.y) }))
+            .filter(({ gear, distance }) => distance < gear.radius + config.radius + 50)
+            .sort((first, second) => first.distance - second.distance)
+            .map(({ gear }) => gear);
         const nearestAxis = allAxes.reduce((best, axis) => {
             const distance = Math.hypot(x - axis.x, y - axis.y);
             return distance < best.distance ? { axis, distance } : best;
@@ -261,49 +297,41 @@ export class GearManager {
         const axisOccupied = axisGear && sameLayer.some(gear => gear.q === nearestAxis.axis.q && gear.r === nearestAxis.axis.r);
         if (axisGear && !axisOccupied && nearestAxis.distance < 70) {
             const axisPosition = hexToPixel(nearestAxis.axis.q, nearestAxis.axis.r);
-            const designType = ['INDUSTRIAL', 'ALCHEMICAL', 'CLOCKWORK'][layer] || 'INDUSTRIAL';
-            const connections = this.findMeshConnections(axisPosition.x, axisPosition.y, config.radius, layer);
-            this.state.ghostGear = {
-                ...axisPosition,
-                q: nearestAxis.axis.q,
-                r: nearestAxis.axis.r,
-                layer,
-                sizeKey,
-                designType,
-                radius: config.radius,
-                teeth: config.teeth,
-                pattern: config.pattern,
-                angle: axisGear.angle,
-                valid,
-                connectionIds: connections.map(gear => gear.id),
-                blockedIds: []
-            };
-            return;
+            const blockedBy = sameLayer.filter(gear => Math.hypot(axisPosition.x - gear.x, axisPosition.y - gear.y) < config.radius + gear.radius - 2);
+            if (!blockedBy.length) {
+                const designType = ['INDUSTRIAL', 'ALCHEMICAL', 'CLOCKWORK'][layer] || 'INDUSTRIAL';
+                const connections = this.findMeshConnections(axisPosition.x, axisPosition.y, config.radius, layer);
+                this.state.ghostGear = {
+                    ...axisPosition,
+                    q: nearestAxis.axis.q,
+                    r: nearestAxis.axis.r,
+                    layer,
+                    sizeKey,
+                    designType,
+                    radius: config.radius,
+                    teeth: config.teeth,
+                    pattern: config.pattern,
+                    angle: axisGear.angle,
+                    valid,
+                    connectionIds: connections.map(gear => gear.id),
+                    blockedIds: []
+                };
+                return;
+            }
         }
-        if (nearest.gear && nearest.distance < nearest.gear.radius + config.radius + 50) {
-            const angle = Math.atan2(y - nearest.gear.y, x - nearest.gear.x);
-            const meshOverlap = Math.max(3, config.radius * 0.015);
-            const targetDistance = nearest.gear.radius + config.radius - meshOverlap;
-            position = {
-                x: nearest.gear.x + Math.cos(angle) * targetDistance,
-                y: nearest.gear.y + Math.sin(angle) * targetDistance
-            };
-            hex = pixelToHex(position.x, position.y);
-            const otherPitch = Math.PI * 2 / nearest.gear.teeth;
-            const selfPitch = Math.PI * 2 / config.teeth;
-            const otherTooth = nearest.gear.angle + Math.round((angle - nearest.gear.angle) / otherPitch) * otherPitch;
-            const fineToothCorrection = sizeKey === '4L' || sizeKey === 'MAX' ? selfPitch / 2 : 0;
-            const meshAngle = otherTooth + Math.PI + selfPitch / 2 + fineToothCorrection;
-            const blockedBy = sameLayer.filter(gear => gear !== nearest.gear && Math.hypot(position.x - gear.x, position.y - gear.y) < config.radius + gear.radius - 2);
+        if (nearbyGears.length) {
+            const meshPosition = this.findNearestClearMeshPosition(x, y, config, layer, nearbyGears);
             const designType = ['INDUSTRIAL', 'ALCHEMICAL', 'CLOCKWORK'][layer] || 'INDUSTRIAL';
-            if (blockedBy.length) {
+            if (!meshPosition) {
                 const cursorBlockedBy = sameLayer.filter(gear => Math.hypot(x - gear.x, y - gear.y) < config.radius + gear.radius - 2);
                 const cursorConnections = this.findMeshConnections(x, y, config.radius, layer);
                 this.state.ghostGear = { x, y, q: pixelToHex(x, y).q, r: pixelToHex(x, y).r, layer, sizeKey, designType, radius: config.radius, teeth: config.teeth, pattern: config.pattern, angle: 0, valid: false, connectionIds: cursorConnections.map(gear => gear.id), blockedIds: cursorBlockedBy.map(gear => gear.id) };
                 return;
             }
+            position = { x: meshPosition.x, y: meshPosition.y };
+            hex = pixelToHex(position.x, position.y);
             const connections = this.findMeshConnections(position.x, position.y, config.radius, layer);
-            this.state.ghostGear = { ...position, q: hex.q, r: hex.r, layer, sizeKey, designType, radius: config.radius, teeth: config.teeth, pattern: config.pattern, angle: meshAngle, valid, connectionIds: connections.map(gear => gear.id), blockedIds: blockedBy.map(gear => gear.id) };
+            this.state.ghostGear = { ...position, q: hex.q, r: hex.r, layer, sizeKey, designType, radius: config.radius, teeth: config.teeth, pattern: config.pattern, angle: meshPosition.angle, valid, connectionIds: connections.map(gear => gear.id), blockedIds: [] };
             return;
         } else {
             let closestAxis = null;

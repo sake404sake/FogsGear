@@ -229,14 +229,25 @@ export class GearNetwork {
                 const direction = axis || belt ? current.direction : -current.direction;
                 const next = { gear: other, speed, direction };
                 const existing = rotationStates.get(other.id);
-                if (existing && (Math.abs(existing.speed - next.speed) > 0.001 || existing.direction !== next.direction)) {
-                    conflicts.add(other.id);
+                if (existing) {
+                    if (Math.abs(existing.speed - next.speed) > 0.001 || existing.direction !== next.direction) {
+                        conflicts.add(other.id);
+                    }
                     continue;
                 }
-                if (!existing) queue.push(next);
+                queue.push(next);
             }
         }
         const deadlocked = new Set([...invalidLockedAxes, ...conflicts]);
+        const blockedQueue = [...deadlocked];
+        while (blockedQueue.length) {
+            const blockedId = blockedQueue.shift();
+            for (const connectedId of this.connections.get(blockedId) || []) {
+                if (!rotationStates.has(connectedId) || deadlocked.has(connectedId)) continue;
+                deadlocked.add(connectedId);
+                blockedQueue.push(connectedId);
+            }
+        }
         this.gears.forEach(gear => {
             const known = rotationStates.get(gear.id);
             if (deadlocked.has(gear.id)) {

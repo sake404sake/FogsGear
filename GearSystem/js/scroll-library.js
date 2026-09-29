@@ -1,6 +1,6 @@
 import { CanvasRenderer } from './CanvasRenderer.js?v=render-1';
-import { GEAR_CONFIG, hexToPixel } from './GearManager.js';
-import { GearNetwork } from './GearSystem.js?v=network-5';
+import { GEAR_CONFIG, hexToPixel } from './GearManager.js?v=runtime-7';
+import { GearNetwork } from './GearSystem.js?v=network-7';
 
 const LIBRARY_KEY = 'fogsgear_scroll_library';
 const ACTIVE_SCROLL_KEY = 'fogsgear_active_scroll_id';

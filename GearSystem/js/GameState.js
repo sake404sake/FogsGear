@@ -1,4 +1,4 @@
-import { GearNetwork } from './GearSystem.js?v=network-5';
+import { GearNetwork } from './GearSystem.js?v=network-7';
 import { ACTIVE_SCROLL_TARGETS_KEY, CELL_MATERIALS, TERRAIN_TRANSFORM_RECIPES, WORLD_CELL_TYPES } from '../../MapSystem/js/worldCells.js?v=3';
 
 const ACTIVE_SCROLL_SYNC_STATE_KEY = 'fogsgear_active_scroll_sync_state';
