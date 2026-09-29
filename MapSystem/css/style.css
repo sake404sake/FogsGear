@@ -312,7 +312,6 @@ h1 {
 .navigation-panel .btn:first-child {
     grid-column: 1 / -1;
 }
-.navigation-panel .btn[data-action="toggle-fullscreen"] { grid-column: 1 / -1; }
 
 .dashboard-title { margin-bottom: 6px; color: #a7f0d9; font: 0.65rem monospace; letter-spacing: 2px; }
 .dashboard-resource-table { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; font-size: 0.75rem; }
@@ -730,7 +729,7 @@ canvas.engine-runtime-canvas { display: none; }
     .main-page-track, .main-page { height: 100%; }
     .main-page-dots { gap: 12px; margin-top: 8px; }
     .main-page-dot { width: 12px; height: 12px; }
-    .gear-preview-page iframe { height: 620px; min-height: 0; }
+    .gear-preview-page iframe { height: 100%; min-height: 0; flex: 1 1 auto; }
     .engine-dashboard-page { min-height: 500px; padding: 18px 5px; }
     .settings-form { gap: 10px; margin: 18px auto; }
     .setting-control { grid-template-columns: minmax(0, 1fr); }

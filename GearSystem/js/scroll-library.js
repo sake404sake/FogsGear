@@ -6,6 +6,7 @@ const LIBRARY_KEY = 'fogsgear_scroll_library';
 const ACTIVE_SCROLL_KEY = 'fogsgear_active_scroll_id';
 const ACTIVE_SCROLL_RUNNING_KEY = 'fogsgear_active_scroll_running';
 const ACTIVE_SCROLL_TARGETS_KEY = 'fogsgear_active_scroll_targets';
+const ACTIVE_SCROLL_SYNC_STATE_KEY = 'fogsgear_active_scroll_sync_state';
 const GAME_SAVE_KEY = 'fog_thermo_save';
 const canvas = document.getElementById('previewCanvas');
 const ctx = canvas.getContext('2d');
@@ -92,6 +93,7 @@ let currentMaterial = 'all';
 let selectedScrollId = null;
 let library = [];
 let renderedScrollId = null;
+let runtimePreviewScrollId = null;
 
 function readLibrary() {
     try {
@@ -255,6 +257,35 @@ function renderPreview(scroll) {
     renderedScrollId = scroll.id;
 }
 
+function syncPreviewLocks(scroll) {
+    if (!getActiveScrollIds().includes(scroll.id)) {
+        if (runtimePreviewScrollId === scroll.id) {
+            runtimePreviewScrollId = null;
+            renderedScrollId = null;
+            renderPreview(scroll);
+        }
+        return;
+    }
+    let syncState = {};
+    try {
+        syncState = JSON.parse(localStorage.getItem(ACTIVE_SCROLL_SYNC_STATE_KEY) || '{}');
+    } catch (error) {}
+    const locks = syncState[scroll.id];
+    if (!locks || typeof locks !== 'object') return;
+    runtimePreviewScrollId = scroll.id;
+    let changed = false;
+    previewState.placedGears.forEach(gear => {
+        const isLocked = locks[gear.id];
+        if (typeof isLocked !== 'boolean' || gear.isLocked === isLocked) return;
+        gear.isLocked = isLocked;
+        changed = true;
+    });
+    if (!changed) return;
+    previewState.network.rebuild(previewState.placedGears, previewState.belts).updateRotation();
+    previewState.invalid = previewState.placedGears.some(gear => gear.isDeadlocked || gear.angleError);
+    if (previewState.invalid) previewState.running = false;
+}
+
 function renderList() {
     const filtered = library.filter(scroll => currentMaterial === 'all' || getMaterial(scroll) === currentMaterial);
     const activeScrollIds = new Set(getActiveScrollIds());
@@ -295,6 +326,7 @@ function renderDetail() {
     const isRunning = requestedRunning && enginePowered;
     previewState.running = isRunning;
     renderPreview(scroll);
+    syncPreviewLocks(scroll);
     const effectiveRunning = isRunning && !previewState.invalid;
     if (requestedRunning && !enginePowered) stopAllScrolls();
     else if (requestedRunning && previewState.invalid) setScrollRunning(scroll.id, false);
@@ -337,11 +369,10 @@ function selectScroll(scrollId) {
 }
 
 function resizePreview() {
-    if (!isEmbedded || !previewFrame.clientWidth || !previewFrame.clientHeight) return;
-    const previousWidth = canvas.width;
-    const previousHeight = canvas.height;
+    if (!previewFrame.clientWidth || !previewFrame.clientHeight) return;
     renderer.resizeCanvas();
-    if (canvas.width !== previousWidth || canvas.height !== previousHeight) renderer.render();
+    fitPreview();
+    renderer.render();
 }
 
 tabs.forEach(tab => tab.addEventListener('click', () => {
@@ -402,7 +433,7 @@ choiceModal?.addEventListener('click', event => {
 previewFrame?.addEventListener('pointerup', () => setListVisibility(false));
 
 window.addEventListener('storage', event => {
-    if (event.key === LIBRARY_KEY || event.key === ACTIVE_SCROLL_KEY || event.key === ACTIVE_SCROLL_RUNNING_KEY || event.key === ACTIVE_SCROLL_TARGETS_KEY || event.key === GAME_SAVE_KEY) {
+    if (event.key === LIBRARY_KEY || event.key === ACTIVE_SCROLL_KEY || event.key === ACTIVE_SCROLL_RUNNING_KEY || event.key === ACTIVE_SCROLL_TARGETS_KEY || event.key === ACTIVE_SCROLL_SYNC_STATE_KEY || event.key === GAME_SAVE_KEY) {
         library = readLibrary();
         if (!library.some(scroll => scroll.id === selectedScrollId)) selectedScrollId = library[0]?.id || null;
         if (event.key === LIBRARY_KEY) renderedScrollId = null;
@@ -412,7 +443,7 @@ window.addEventListener('storage', event => {
     }
 });
 
-if (isEmbedded && 'ResizeObserver' in window) {
+if ('ResizeObserver' in window) {
     new ResizeObserver(resizePreview).observe(previewFrame);
 }
 window.addEventListener('resize', resizePreview);

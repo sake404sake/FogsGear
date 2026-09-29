@@ -1,6 +1,8 @@
 import { GearNetwork } from './GearSystem.js?v=network-5';
 import { ACTIVE_SCROLL_TARGETS_KEY, CELL_MATERIALS, TERRAIN_TRANSFORM_RECIPES, WORLD_CELL_TYPES } from '../../MapSystem/js/worldCells.js?v=3';
 
+const ACTIVE_SCROLL_SYNC_STATE_KEY = 'fogsgear_active_scroll_sync_state';
+
 /**
  * GameState - リソース、ギア、保存データ、Undo/Redo履歴の管理モジュール
  */
@@ -214,7 +216,23 @@ export class GameState {
             localStorage.setItem(ACTIVE_SCROLL_TARGETS_KEY, JSON.stringify(targets));
             window.dispatchEvent(new CustomEvent('fogsgear:scroll-targets-changed', { detail: targets }));
         }
+        this.publishActiveScrollSyncState(this.activeScrollRuntimes);
         return this.activeScrollRuntimes;
+    }
+
+    publishActiveScrollSyncState(runtimeGroups) {
+        const syncState = {};
+        runtimeGroups.forEach(group => {
+            if (!group.scrollId) return;
+            const prefix = `active-scroll:${group.scrollId}:`;
+            syncState[group.scrollId] = Object.fromEntries(group.gears.map(gear => [
+                gear.id.startsWith(prefix) ? gear.id.slice(prefix.length) : gear.id,
+                Boolean(gear.isLocked)
+            ]));
+        });
+        try {
+            localStorage.setItem(ACTIVE_SCROLL_SYNC_STATE_KEY, JSON.stringify(syncState));
+        } catch (error) {}
     }
 
     setCreativeMode(active) {
@@ -1055,6 +1073,7 @@ export class GameState {
                     gear.angularVelocity = 0;
                 });
             });
+            this.publishActiveScrollSyncState(runtimeGroups);
         }
         runtimeGroups.forEach(group => group.network?.synchronizeLockedAxes());
         const currentTime = performance.now();

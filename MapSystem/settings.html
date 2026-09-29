@@ -47,6 +47,7 @@
         </div>
         <div class="button-row settings-actions">
             <button class="btn btn-action" id="saveSettings" type="button">設定を保存</button>
+            <button class="btn btn-reset" id="clearCacheReload" type="button">キャッシュを消して再読み込み</button>
             <button class="btn btn-reset" id="backToGame" type="button">ゲーム画面へ戻る</button>
         </div>
         <p id="saveMessage" class="rule-text" aria-live="polite"></p>
@@ -182,6 +183,31 @@
             zoomInput.value = zoom;
             zoomInput.dispatchEvent(new Event('input'));
             document.getElementById('saveMessage').textContent = '設定を保存しました。';
+        };
+        document.getElementById('clearCacheReload').onclick = async (event) => {
+            const button = event.currentTarget;
+            button.disabled = true;
+            document.getElementById('saveMessage').textContent = 'アプリのキャッシュを削除しています...';
+            try {
+                const cacheNames = 'caches' in window ? await caches.keys() : [];
+                await Promise.all(cacheNames
+                    .filter(name => name.startsWith('steampunk-explorer-'))
+                    .map(name => caches.delete(name)));
+                if ('serviceWorker' in navigator) {
+                    const appScope = new URL('.', window.location.href).pathname;
+                    const registrations = await navigator.serviceWorker.getRegistrations();
+                    await Promise.all(registrations
+                        .filter(registration => new URL(registration.scope).pathname.startsWith(appScope))
+                        .map(registration => registration.unregister()));
+                }
+                const targetWindow = window.parent !== window ? window.parent : window;
+                const reloadUrl = new URL('./index.html', window.location.href);
+                reloadUrl.searchParams.set('cacheReset', String(Date.now()));
+                targetWindow.location.replace(reloadUrl.href);
+            } catch (error) {
+                button.disabled = false;
+                document.getElementById('saveMessage').textContent = 'キャッシュを削除できませんでした。';
+            }
         };
         document.getElementById('backToGame').onclick = () => {
             document.getElementById('loadingOverlay')?.removeAttribute('hidden');

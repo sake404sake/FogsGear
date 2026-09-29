@@ -5,7 +5,7 @@ import { CELL_DEFINITIONS, canEnterCell, getCellEntryRule, getMosaicColor } from
 import { drawCellIcon, loadCellIconAtlas } from './cellIconRenderer.js?v=3';
 import { ACTIVE_SCROLL_TARGETS_KEY, CELL_MATERIALS, TERRAIN_TRANSFORM_RECIPES, WORLD_CELL_TYPES, applyCellChanges, chooseEraCellType, getCellCollectionPowerCost, getCellDrops, readCellChanges, saveCellChange } from './worldCells.js?v=3';
 import { buildTerritoryBorderSegments } from './territoryBorders.js?v=35';
-import { GameState as EngineGameState } from '../../GearSystem/js/GameState.js?v=runtime-15';
+import { GameState as EngineGameState } from '../../GearSystem/js/GameState.js?v=runtime-16';
 import { GearManager as EngineGearManager } from '../../GearSystem/js/GearManager.js?v=runtime-2';
 
 const canvas = document.getElementById('gameCanvas');
@@ -1382,6 +1382,43 @@ function updateFullscreenButton() {
     button.setAttribute('aria-pressed', String(isFullscreen));
 }
 
+let lockedOrientationType = null;
+
+function updateOrientationLockButton() {
+    const button = document.querySelector('[data-action="toggle-orientation-lock"]');
+    if (!button) return;
+    const isLocked = Boolean(lockedOrientationType);
+    button.textContent = isLocked ? '固定を解除' : '向きを固定';
+    button.setAttribute('aria-pressed', String(isLocked));
+    button.title = isLocked ? '画面方向の固定を解除' : '現在の画面方向を固定';
+}
+
+async function toggleOrientationLock() {
+    const orientation = window.screen?.orientation;
+    if (typeof orientation?.lock !== 'function') {
+        showAppNotice('このブラウザーは画面方向の固定に対応していません。');
+        return;
+    }
+    if (lockedOrientationType) {
+        orientation.unlock?.();
+        lockedOrientationType = null;
+        updateOrientationLockButton();
+        return;
+    }
+    const currentType = orientation.type;
+    try {
+        await orientation.lock(currentType);
+        lockedOrientationType = currentType;
+        updateOrientationLockButton();
+    } catch (error) {
+        showAppNotice(document.fullscreenElement
+            ? 'この端末では画面方向を固定できません。'
+            : '画面方向の固定には全画面表示が必要です。先に全画面表示にしてください。');
+    }
+}
+
+updateOrientationLockButton();
+
 let appPageFrame = null;
 let gearEditorFrame = null;
 
@@ -1497,7 +1534,7 @@ document.addEventListener('click', (event) => {
     }
     if (button.dataset.action === 'inspect-inventory-item') {
         if (button.dataset.itemKey === 'scroll_book') {
-            openAppPage('../GearSystem/scroll-library.html?embed=1&v=7', 'スクロール書庫');
+            openAppPage('../GearSystem/scroll-library.html?embed=1&v=8', 'スクロール書庫');
             return;
         }
         openInventoryItem(button.dataset.itemKey);
@@ -1537,6 +1574,10 @@ document.addEventListener('click', (event) => {
     }
     if (button.dataset.action === 'toggle-fullscreen') {
         toggleFullscreen().catch(() => {});
+        return;
+    }
+    if (button.dataset.action === 'toggle-orientation-lock') {
+        toggleOrientationLock().catch(() => showAppNotice('画面方向を固定できませんでした。'));
     }
 });
 
@@ -1629,7 +1670,12 @@ window.addEventListener('keydown', (event) => {
 });
 
 document.addEventListener('fullscreenchange', () => {
+    if (!document.fullscreenElement && lockedOrientationType) {
+        window.screen?.orientation?.unlock?.();
+        lockedOrientationType = null;
+    }
     updateFullscreenButton();
+    updateOrientationLockButton();
     resize();
     scheduleDraw();
 });

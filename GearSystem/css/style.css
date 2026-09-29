@@ -624,7 +624,7 @@ canvas {
 .embedded-library .scroll-detail-footer { position: absolute; z-index: 2; right: 14px; bottom: 10px; left: 14px; justify-content: flex-end; margin: 0; pointer-events: none; }
 .embedded-library .scroll-actions { pointer-events: auto; }
 .embedded-library .scroll-actions .btn { padding: 6px 10px; font-size: 0.7rem; }
-.embedded-library .scroll-list-panel { position: absolute; z-index: 4; top: 36px; bottom: 0; left: 0; width: 168px; box-sizing: border-box; background: rgba(18, 14, 12, 0.96); box-shadow: 8px 0 20px rgba(0, 0, 0, 0.38); transition: transform 180ms ease, opacity 180ms ease; }
+.embedded-library .scroll-list-panel { position: absolute; z-index: 4; top: 36px; bottom: 0; left: 0; width: 168px; box-sizing: border-box; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; touch-action: pan-y; background: rgba(18, 14, 12, 0.96); box-shadow: 8px 0 20px rgba(0, 0, 0, 0.38); transition: transform 180ms ease, opacity 180ms ease; }
 .embedded-library .scroll-library-layout { position: relative; display: block; }
 .embedded-library.scroll-list-hidden .scroll-list-panel { transform: translateX(-105%); opacity: 0; pointer-events: none; }
 .embedded-library.scroll-is-running .scroll-detail-heading h2 { display: inline-block; }
