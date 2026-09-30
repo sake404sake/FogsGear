@@ -11,6 +11,7 @@ import { GearManager as EngineGearManager } from '../../GearSystem/js/GearManage
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 let cellIconAtlas = null;
+const INVENTORY_ITEMS_KEY = 'steampunk_explorer_inventory_items';
 
 const state = {
     player: {
@@ -42,15 +43,19 @@ const state = {
     activeScrollTargets: {},
     cellEntryRules: { types: {}, cells: {} }
 };
+try {
+    const savedItems = JSON.parse(localStorage.getItem(INVENTORY_ITEMS_KEY) || '[]');
+    if (Array.isArray(savedItems)) state.inventoryItems = new Set(savedItems.filter(item => typeof item === 'string'));
+} catch (error) {}
 
 const activePointers = new Map();
 const MAP_UNLOCK_KEY = 'fogsgear_world_unlocks';
 const COASTAL_MAP_SIZE = { width: 640, height: 360 };
 const FULL_MAP_SIZE = { width: 2000, height: 1000 };
 const SAVE_BACKUP_FORMAT = 'fogsgear-save';
-const SAVE_BACKUP_VERSION = 1;
+const SAVE_BACKUP_VERSION = 2;
 const CELL_CHANGES_PREFIX = 'fogsgear_world_cell_changes:';
-const SAVE_BACKUP_KEYS = [
+const LEGACY_SAVE_BACKUP_KEYS = [
     'fog_thermo_save',
     'steampunk_explorer_settings',
     'steampunk_explorer_player_pos',
@@ -64,12 +69,30 @@ const SAVE_BACKUP_KEYS = [
     'steampunk_explorer_skin_source',
     'steampunk_explorer_skin_name'
 ];
-const TRANSIENT_SAVE_KEYS = [
+const SAVE_BACKUP_KEYS = [
+    ...LEGACY_SAVE_BACKUP_KEYS,
+    INVENTORY_ITEMS_KEY,
     'fogsgear_active_scroll_id',
     'fogsgear_active_scroll_running',
-    'fogsgear_active_scroll_targets'
+    ACTIVE_SCROLL_TARGETS_KEY,
+    'fogsgear_active_scroll_sync_state'
 ];
 let pendingSaveBackup = null;
+
+function isGameSaveStorageKey(key) {
+    return key === 'fog_thermo_save'
+        || key?.startsWith('fogsgear_') && !key.startsWith(CELL_CHANGES_PREFIX)
+        || key?.startsWith('steampunk_explorer_');
+}
+
+function getSaveBackupKeys() {
+    const keys = new Set(SAVE_BACKUP_KEYS);
+    for (let index = 0; index < localStorage.length; index++) {
+        const key = localStorage.key(index);
+        if (isGameSaveStorageKey(key)) keys.add(key);
+    }
+    return [...keys];
+}
 
 function isMainlandUnlocked() {
     try {
@@ -150,7 +173,8 @@ function showAppNotice(message) {
 }
 
 function collectSaveBackup() {
-    const data = Object.fromEntries(SAVE_BACKUP_KEYS.map(key => [key, localStorage.getItem(key)]));
+    const data = Object.fromEntries(getSaveBackupKeys().map(key => [key, localStorage.getItem(key)]));
+    data[INVENTORY_ITEMS_KEY] = JSON.stringify([...state.inventoryItems].filter(item => typeof item === 'string'));
     const cellChanges = {};
     for (let index = 0; index < localStorage.length; index++) {
         const key = localStorage.key(index);
@@ -187,11 +211,25 @@ function validateSaveBackupValue(key, value) {
     if (value === null) return;
     if (typeof value !== 'string' || value.length > 8_000_000) throw new Error('保存データの形式が正しくありません。');
     if (key.startsWith('steampunk_explorer_skin_')) return;
+    if (key === 'fogsgear_active_scroll_id') {
+        let parsed;
+        try { parsed = JSON.parse(value); }
+        catch (error) { if (value.trim()) return; throw new Error('起動スクロールの状態が不正です。'); }
+        if (typeof parsed !== 'string' && (!Array.isArray(parsed) || parsed.some(id => typeof id !== 'string'))) throw new Error('起動スクロールの状態が不正です。');
+        return;
+    }
+    if (key === 'fogsgear_active_scroll_running') {
+        if (value !== 'true' && value !== 'false') throw new Error('起動スクロールの状態が不正です。');
+        return;
+    }
     let parsed;
     try { parsed = JSON.parse(value); }
-    catch (error) { throw new Error('JSON内の保存データを解析できません。'); }
+    catch (error) {
+        if (!LEGACY_SAVE_BACKUP_KEYS.includes(key) && !SAVE_BACKUP_KEYS.includes(key)) return;
+        throw new Error('JSON内の保存データを解析できません。');
+    }
     if (key === 'fog_thermo_save') {
-        if (!isRecord(parsed) || (parsed.gears !== undefined && !Array.isArray(parsed.gears)) || (parsed.placedGears !== undefined && !Array.isArray(parsed.placedGears))) throw new Error('ギアのセーブデータが不正です。');
+        if (!isRecord(parsed) || (parsed.gears !== undefined && !Array.isArray(parsed.gears)) || (parsed.placedGears !== undefined && !Array.isArray(parsed.placedGears)) || (parsed.materialInventory !== undefined && !isRecord(parsed.materialInventory))) throw new Error('ギアのセーブデータが不正です。');
     } else if (key === 'steampunk_explorer_settings') {
         if (!isRecord(parsed) || (parsed.seed !== undefined && typeof parsed.seed !== 'string')) throw new Error('ワールド設定が不正です。');
     } else if (key === 'steampunk_explorer_player_pos') {
@@ -202,21 +240,32 @@ function validateSaveBackupValue(key, value) {
         if (!isRecord(parsed) || !Array.isArray(parsed.gears)) throw new Error('編集中ギアのデータが不正です。');
     } else if (key === 'fogsgear_scroll_effect_log') {
         if (!Array.isArray(parsed)) throw new Error('スクロール履歴が不正です。');
-    } else if (!isRecord(parsed)) {
+    } else if (key === INVENTORY_ITEMS_KEY) {
+        if (!Array.isArray(parsed) || parsed.some(item => typeof item !== 'string')) throw new Error('所持アイテムのデータが不正です。');
+    } else if (key === ACTIVE_SCROLL_TARGETS_KEY) {
+        if (!isRecord(parsed) || Object.values(parsed).some(target => !isRecord(target) || !Number.isInteger(target.x) || !Number.isInteger(target.y))) throw new Error('スクロール対象位置が不正です。');
+    } else if (key === 'fogsgear_active_scroll_sync_state') {
+        if (!isRecord(parsed) || Object.values(parsed).some(locks => !isRecord(locks) || Object.values(locks).some(locked => typeof locked !== 'boolean'))) throw new Error('スクロール同期状態が不正です。');
+    } else if (['fogsgear_world_unlocks', 'fogsgear_cell_entry_rules'].includes(key) && !isRecord(parsed)) {
         throw new Error('設定データの形式が正しくありません。');
     }
 }
 
 function validateSaveBackup(backup) {
-    if (!isRecord(backup) || backup.format !== SAVE_BACKUP_FORMAT || backup.version !== SAVE_BACKUP_VERSION) {
+    if (!isRecord(backup) || backup.format !== SAVE_BACKUP_FORMAT || ![1, SAVE_BACKUP_VERSION].includes(backup.version)) {
         throw new Error('FogsGearの対応セーブJSONではありません。');
     }
     if (!isRecord(backup.data) || !isRecord(backup.cellChanges)) throw new Error('セーブJSONの構造が不正です。');
-    for (const key of SAVE_BACKUP_KEYS) {
+    const requiredKeys = backup.version === 1 ? LEGACY_SAVE_BACKUP_KEYS : SAVE_BACKUP_KEYS;
+    for (const key of requiredKeys) {
         if (!Object.hasOwn(backup.data, key)) throw new Error('セーブJSONに必要な項目がありません。');
         validateSaveBackupValue(key, backup.data[key]);
     }
-    if (Object.keys(backup.data).some(key => !SAVE_BACKUP_KEYS.includes(key))) throw new Error('未対応の保存項目が含まれています。');
+    const hasUnsupportedKey = Object.keys(backup.data).some(key => backup.version === 1
+        ? !LEGACY_SAVE_BACKUP_KEYS.includes(key)
+        : !isGameSaveStorageKey(key));
+    if (hasUnsupportedKey) throw new Error('未対応の保存項目が含まれています。');
+    Object.entries(backup.data).forEach(([key, value]) => validateSaveBackupValue(key, value));
     Object.entries(backup.cellChanges).forEach(([key, value]) => {
         if (!key.startsWith(CELL_CHANGES_PREFIX) || key.length <= CELL_CHANGES_PREFIX.length || typeof value !== 'string') throw new Error('地形変更データが不正です。');
         let changes;
@@ -230,27 +279,35 @@ function validateSaveBackup(backup) {
 function openSaveImportConfirmation(backup) {
     pendingSaveBackup = backup;
     const changedCells = Object.values(backup.cellChanges).reduce((sum, value) => sum + Object.keys(JSON.parse(value)).length, 0);
-    document.getElementById('save-transfer-meta').textContent = `${backup.exportedAt ? `書き出し日時: ${backup.exportedAt} / ` : ''}保存ギア ${JSON.parse(backup.data.fogsgear_scroll_library || '[]').length}件 / 地形変更 ${changedCells}件`;
+    const scrolls = JSON.parse(backup.data.fogsgear_scroll_library || '[]');
+    let activeScrollIds = [];
+    try {
+        const active = JSON.parse(backup.data.fogsgear_active_scroll_id || '[]');
+        activeScrollIds = Array.isArray(active) ? active : typeof active === 'string' ? [active] : [];
+    } catch (error) {
+        if (backup.data.fogsgear_active_scroll_running === 'true') activeScrollIds = [backup.data.fogsgear_active_scroll_id];
+    }
+    const itemCount = Object.values(JSON.parse(backup.data.fog_thermo_save || '{}').materialInventory || {}).filter(count => Number(count) > 0).length
+        + JSON.parse(backup.data[INVENTORY_ITEMS_KEY] || '[]').length;
+    document.getElementById('save-transfer-meta').textContent = `${backup.exportedAt ? `書き出し日時: ${backup.exportedAt} / ` : ''}保存ギア ${Array.isArray(scrolls) ? scrolls.length : 0}件 / 起動スクロール ${activeScrollIds.filter(Boolean).length}件 / 所持品 ${itemCount}種 / 地形変更 ${changedCells}件`;
     document.getElementById('save-transfer-modal').hidden = false;
 }
 
 function applySaveBackup(backup) {
-    const affectedKeys = new Set([...SAVE_BACKUP_KEYS, ...TRANSIENT_SAVE_KEYS]);
+    const affectedKeys = new Set([...SAVE_BACKUP_KEYS, ...getSaveBackupKeys()]);
     for (let index = 0; index < localStorage.length; index++) {
         const key = localStorage.key(index);
-        if (key?.startsWith(CELL_CHANGES_PREFIX)) affectedKeys.add(key);
+        if (key?.startsWith(CELL_CHANGES_PREFIX) || isGameSaveStorageKey(key)) affectedKeys.add(key);
     }
     Object.keys(backup.cellChanges).forEach(key => affectedKeys.add(key));
     const previousValues = new Map([...affectedKeys].map(key => [key, localStorage.getItem(key)]));
     try {
-        SAVE_BACKUP_KEYS.forEach(key => {
-            const value = backup.data[key];
-            if (value === null) localStorage.removeItem(key);
-            else localStorage.setItem(key, value);
+        [...affectedKeys].filter(isGameSaveStorageKey).forEach(key => localStorage.removeItem(key));
+        Object.entries(backup.data).forEach(([key, value]) => {
+            if (value !== null) localStorage.setItem(key, value);
         });
         [...affectedKeys].filter(key => key.startsWith(CELL_CHANGES_PREFIX)).forEach(key => localStorage.removeItem(key));
         Object.entries(backup.cellChanges).forEach(([key, value]) => localStorage.setItem(key, value));
-        TRANSIENT_SAVE_KEYS.forEach(key => localStorage.removeItem(key));
     } catch (error) {
         affectedKeys.forEach(key => {
             try { localStorage.removeItem(key); }
