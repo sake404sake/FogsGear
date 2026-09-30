@@ -476,24 +476,30 @@ export class UIController {
         const actionNeedsTargets = ['SYNC_AXIS', 'UNSYNC_AXIS', 'TOGGLE_SYNC_AXIS'].includes(gear.controlAction);
         document.getElementById('gear-control-target-fieldset').hidden = !actionNeedsTargets;
         const targets = this.state.placedGears.filter(target => !target.isCore && target.id !== gear.id && target.q === gear.q && target.r === gear.r);
-        targetList.replaceChildren();
-        if (!targets.length) {
-            const empty = document.createElement('span');
-            empty.className = 'control-target-empty';
-            empty.textContent = '同軸操作するギアを先に配置してください。';
-            targetList.appendChild(empty);
+        const targetSignature = JSON.stringify(targets.map(target => target.id));
+        if (targetList.dataset.targetSignature !== targetSignature) {
+            targetList.dataset.targetSignature = targetSignature;
+            targetList.replaceChildren();
+            if (!targets.length) {
+                const empty = document.createElement('span');
+                empty.className = 'control-target-empty';
+                empty.textContent = '同軸操作するギアを先に配置してください。';
+                targetList.appendChild(empty);
+            }
+            targets.forEach(target => {
+                const label = document.createElement('label');
+                label.className = 'control-target-option';
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.value = target.id;
+                const name = document.createElement('span');
+                name.textContent = `${target.sizeKey} / ${target.layer + 1}段目 / (${target.q}, ${target.r})`;
+                label.append(checkbox, name);
+                targetList.appendChild(label);
+            });
         }
-        targets.forEach(target => {
-            const label = document.createElement('label');
-            label.className = 'control-target-option';
-            const checkbox = document.createElement('input');
-            checkbox.type = 'checkbox';
-            checkbox.value = target.id;
-            checkbox.checked = targetGearIds.has(target.id);
-            const name = document.createElement('span');
-            name.textContent = `${target.sizeKey} / ${target.layer + 1}段目 / (${target.q}, ${target.r})`;
-            label.append(checkbox, name);
-            targetList.appendChild(label);
+        targetList.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+            checkbox.checked = targetGearIds.has(checkbox.value);
         });
         const usesItemCount = conditionSelect.value === 'ITEM_COUNT' || conditionSelect.value === 'ITEM_COUNT_BELOW';
         document.getElementById('gear-control-rotation-row').hidden = usesItemCount;

@@ -115,11 +115,15 @@ export class GameState {
     }
 
     getRuntimeGears() {
-        return this.isScrollEditing ? (this.runtimeGears || []) : this.placedGears;
+        if (!this.isScrollEditing) return this.placedGears;
+        if (this.runtimeGears !== this.placedGears) this.runtimeGears = this.placedGears;
+        return this.runtimeGears || this.placedGears;
     }
 
     getRuntimeBelts() {
-        return this.isScrollEditing ? (this.runtimeBelts || []) : this.belts;
+        if (!this.isScrollEditing) return this.belts;
+        if (this.runtimeBelts !== this.belts) this.runtimeBelts = this.belts;
+        return this.runtimeBelts || this.belts;
     }
 
     syncActiveScrollTargets(value = null) {
@@ -904,9 +908,10 @@ export class GameState {
         const runtimeGears = this.getRuntimeGears();
         const runtimeBelts = this.getRuntimeBelts();
         const runtimeNetwork = this.runtimeNetwork || this.network;
+        const activeScrollRuntimes = this.getActiveScrollRuntimes(now);
         const runtimeGroups = [
-            { gears: runtimeGears, belts: runtimeBelts, network: runtimeNetwork },
-            ...this.getActiveScrollRuntimes(now)
+            ...(this.isEditorRuntimeContext() ? [{ gears: runtimeGears, belts: runtimeBelts, network: runtimeNetwork }] : []),
+            ...activeScrollRuntimes
         ];
         runtimeGroups.forEach(group => {
             if (group.network && this.mainGearRunning && (this.creativeMode || this.steamPower > 0)) {
