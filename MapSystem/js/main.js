@@ -4,7 +4,7 @@ import { SkinRenderer } from './skinRenderer.js?v=2';
 import { CELL_DEFINITIONS, canEnterCell, getCellEntryRule, getMosaicColor } from './cellRules.js';
 import { drawCellIcon, loadCellIconAtlas } from './cellIconRenderer.js?v=3';
 import { ACTIVE_SCROLL_TARGETS_KEY, CELL_MATERIALS, TERRAIN_TRANSFORM_RECIPES, WORLD_CELL_TYPES, applyCellChanges, chooseEraCellType, getCellCollectionPowerCost, getCellDrops, readCellChanges, saveCellChange } from './worldCells.js?v=3';
-import { CRAFTING_ITEMS, CRAFTING_ITEM_BY_ID, CRAFTING_RATE_MULTIPLIER, CRAFTING_RECIPES } from './craftingData.js?v=1';
+import { CRAFTING_ITEMS, CRAFTING_ITEM_BY_ID, CRAFTING_RATE_MULTIPLIER, CRAFTING_RECIPES } from './craftingData.js?v=2';
 import { buildTerritoryBorderSegments } from './territoryBorders.js?v=35';
 import { GameState as EngineGameState } from '../../GearSystem/js/GameState.js?v=runtime-24';
 import { GearManager as EngineGearManager } from '../../GearSystem/js/GearManager.js?v=runtime-5';

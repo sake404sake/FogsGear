@@ -39,6 +39,11 @@
         .guide-tab { min-height: 36px; padding: 6px 16px; color: #c8d7cb; background: rgba(19, 26, 22, 0.82); border: 1px solid rgba(98, 194, 170, 0.25); border-radius: 4px; font: inherit; cursor: pointer; }
         .guide-tab[aria-selected="true"] { color: #17120f; background: linear-gradient(180deg, #f3c653, #b8832d); border-color: #ffe69b; font-weight: 700; }
         .guide-view[hidden] { display: none; }
+        .guide-resource-links { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin: 0 0 18px; padding: 14px 16px; background: linear-gradient(100deg, rgba(243, 198, 83, 0.12), rgba(28, 23, 19, 0.72)); border: 1px solid rgba(198, 154, 82, 0.42); border-left: 3px solid var(--gold); }
+        .guide-resource-links h2 { margin: 0 0 4px; color: var(--gold); font: 600 18px Georgia, "Yu Mincho", serif; }
+        .guide-resource-links p:last-child { margin: 0; color: #d0cec4; font-size: 12px; }
+        .guide-resource-link { display: inline-flex; align-items: center; gap: 10px; flex: 0 0 auto; padding: 9px 12px; color: #17120f; background: linear-gradient(180deg, #f3c653, #b8832d); border: 1px solid #ffe69b; border-radius: 3px; font-weight: 700; text-decoration: none; }
+        .guide-resource-link span { font-size: 1.2em; }
         .manual-heading { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(220px, 0.8fr); gap: 20px; align-items: end; margin: 4px 0 18px; padding: 14px 16px; background: linear-gradient(100deg, rgba(98, 194, 170, 0.10), rgba(28, 23, 19, 0.72)); border-left: 3px solid var(--mint); }
         .manual-heading h2 { margin: 0 0 5px; color: var(--gold); font: 600 21px Georgia, "Yu Mincho", serif; }
         .manual-heading p { margin: 0; color: #c9c5b7; font-size: 12px; }
@@ -181,6 +186,8 @@
             .item-entry > svg { width: 30px; height: 30px; flex-basis: 30px; }
             .manual-heading { grid-template-columns: minmax(0, 1fr); gap: 6px; padding: 10px; }
             .manual-note { text-align: left; }
+            .guide-resource-links { align-items: stretch; flex-direction: column; gap: 10px; padding: 10px; }
+            .guide-resource-link { justify-content: center; }
             .manual-step { grid-template-columns: minmax(0, 1fr); gap: 10px; padding: 12px 0 16px; }
             .manual-step-copy h3 { font-size: 15px; }
             .manual-callout { grid-template-columns: minmax(102px, .64fr) minmax(0, 1fr); gap: 8px; padding: 7px; }
@@ -258,6 +265,15 @@
             <button class="guide-tab" id="how-to-tab" type="button" role="tab" aria-controls="how-to-page" aria-selected="true" data-guide-view="how-to-page">遊び方</button>
             <button class="guide-tab" id="cell-guide-tab" type="button" role="tab" aria-controls="cell-guide-page" aria-selected="false" data-guide-view="cell-guide-page">セル・素材</button>
         </nav>
+
+        <section class="guide-resource-links" aria-labelledby="resource-links-title">
+            <div>
+                <p class="eyebrow">CRAFTING REFERENCE</p>
+                <h2 id="resource-links-title">真鍮資材と合成ツリー</h2>
+                <p>真鍮資材は、銅鉱石・亜鉛鉱石・石炭を炉で直接配合する序盤の基本素材です。</p>
+            </div>
+            <a class="guide-resource-link" href="../design/item-crafting-tree-draft.html">合成ツリー案を開く<span aria-hidden="true">→</span></a>
+        </section>
 
         <section id="how-to-page" class="guide-view" role="tabpanel" aria-labelledby="how-to-tab">
             <header class="manual-heading">

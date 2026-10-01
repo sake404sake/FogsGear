@@ -136,8 +136,10 @@ const zincSmeltingRecipe = recipes.find(recipe => recipe[3] === 'zinc-ingot');
 zincSmeltingRecipe[1] = '亜鉛精鉱を製錬する';
 zincSmeltingRecipe[2] = [['zinc-concentrate', 1], ['coal', 1]];
 const brassRecipe = recipes.find(recipe => recipe[3] === 'brass-ingot');
-brassRecipe[1] = '銅と亜鉛から真鍮資材を配合する';
-brassRecipe[2].push(['coal', 1]);
+brassRecipe[1] = '銅鉱石と亜鉛鉱石から真鍮資材を作る';
+brassRecipe[2] = [['copper-ore', 10], ['zinc-ore', 5], ['coal', 5]];
+brassRecipe[5] = '序盤から作れる基本の機械資材。';
+brassRecipe[7] = 55;
 brassRecipe[3] = 'brass-stock';
 recipes.splice(recipes.findIndex(recipe => recipe[3] === 'brass-gear'), 1);
 recipes.forEach(recipe => {
