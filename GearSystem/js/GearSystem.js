@@ -5,9 +5,10 @@ export const Layer = Object.freeze({ GOLD: 0, SILVER: 1, BRONZE: 2 });
 // ギアの外観分類。処理モードとは独立した設定値として保持する。
 export const GearDesignType = Object.freeze({ INDUSTRIAL: 'INDUSTRIAL', ALCHEMICAL: 'ALCHEMICAL', LOGISTICS: 'LOGISTICS', CLOCKWORK: 'CLOCKWORK', PRODUCTION: 'PRODUCTION' });
 // 資源変換や霧回収の種類。実際の資源処理はGameStateが担当する。
-export const ProcessMode = Object.freeze({ NONE: 'NONE', POWER_STORAGE: 'POWER_STORAGE', FOG_COLLECTION: 'FOG_COLLECTION', RESOURCE_COLLECTION: 'RESOURCE_COLLECTION', TRANSFORM: 'TRANSFORM', FOG_TO_WATER: 'FOG_TO_WATER', FOG_TO_LIQUID_METAL: 'FOG_TO_LIQUID_METAL', LIQUID_TO_SOLID_METAL: 'LIQUID_TO_SOLID_METAL', SOLID_TO_BRASS: 'SOLID_TO_BRASS', TERRAIN_TRANSFORM: 'TERRAIN_TRANSFORM', ERA_SHIFT: 'ERA_SHIFT', TARGET_SHIFT_UP: 'TARGET_SHIFT_UP', TARGET_SHIFT_DOWN: 'TARGET_SHIFT_DOWN', TARGET_SHIFT_LEFT: 'TARGET_SHIFT_LEFT', TARGET_SHIFT_RIGHT: 'TARGET_SHIFT_RIGHT', CONDITIONAL_CONTROL: 'CONDITIONAL_CONTROL' });
+export const ProcessMode = Object.freeze({ NONE: 'NONE', POWER_STORAGE: 'POWER_STORAGE', FOG_COLLECTION: 'FOG_COLLECTION', RESOURCE_COLLECTION: 'RESOURCE_COLLECTION', TRANSFORM: 'TRANSFORM', FOG_TO_WATER: 'FOG_TO_WATER', TERRAIN_TRANSFORM: 'TERRAIN_TRANSFORM', ERA_SHIFT: 'ERA_SHIFT', TARGET_SHIFT_UP: 'TARGET_SHIFT_UP', TARGET_SHIFT_DOWN: 'TARGET_SHIFT_DOWN', TARGET_SHIFT_LEFT: 'TARGET_SHIFT_LEFT', TARGET_SHIFT_RIGHT: 'TARGET_SHIFT_RIGHT', CONDITIONAL_CONTROL: 'CONDITIONAL_CONTROL' });
 
 const layerDesigns = [GearDesignType.INDUSTRIAL, GearDesignType.ALCHEMICAL, GearDesignType.CLOCKWORK];
+const removedProcessModes = new Set(['FOG_TO_LIQUID_METAL', 'GAS_TO_LIQUID_METAL', 'LIQUID_TO_SOLID_METAL', 'SOLID_TO_BRASS']);
 
 export class Gear {
     // ギア1個の永続設定と、ネットワークが毎 tick 更新する回転状態を保持する。
@@ -19,7 +20,7 @@ export class Gear {
         this.layer = layer;
         this.isLocked = isLocked ?? isCore;
         this.designType = designType || layerDesigns[layer];
-        this.processMode = processMode === 'POWER' ? ProcessMode.NONE : processMode;
+        this.processMode = processMode === 'POWER' || removedProcessModes.has(processMode) ? ProcessMode.NONE : processMode;
         this.terrainTargetType = terrainTargetType;
         this.controlAction = controlAction === 'STOP_GEARS' ? 'STOP_MAIN_GEAR'
             : controlAction === 'START_GEARS' ? 'START_MAIN_GEAR'

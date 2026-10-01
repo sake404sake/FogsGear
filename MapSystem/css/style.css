@@ -318,8 +318,34 @@ h1 {
 .dashboard-resource-row { display: flex; justify-content: space-between; align-items: center; gap: 6px; border: 1px solid rgba(98, 194, 170, 0.14); padding: 4px 6px; min-width: 0; }
 .dashboard-resource-row span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dashboard-resource-row strong { color: #d9fff2; }
+.dashboard-resource-row[hidden] { display: none !important; }
 .inventory-item-card { width: 100%; color: var(--text-main); background: rgba(98, 194, 170, 0.05); font: inherit; text-align: left; cursor: pointer; }
 .inventory-item-card:hover { color: #f7d77d; background: rgba(98, 194, 170, 0.18); border-color: rgba(243, 198, 83, 0.65); }
+.inventory-view-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; margin: 8px 0; }
+.inventory-view-tab { min-height: 34px; color: #c6aa72; background: #1c1511; border: 1px solid var(--border-sub); cursor: pointer; }
+.inventory-view-tab.active { color: #fff1b1; border-color: #62c2aa; background: rgba(98, 194, 170, 0.12); }
+.inventory-item-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 6px; max-height: 42vh; overflow-y: auto; }
+.inventory-item-card { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; align-items: center; gap: 6px; min-height: 48px; padding: 5px 7px; }
+.inventory-item-icon, .crafting-item-icon { display: inline-grid; place-items: center; width: 32px; height: 32px; flex: 0 0 32px; color: #e5c25d; font-size: 1.25rem; }
+.inventory-item-icon svg, .crafting-item-icon svg { display: block; width: 100%; height: 100%; }
+.inventory-item-name { min-width: 0; overflow-wrap: anywhere; font-size: 0.7rem; line-height: 1.25; }
+.inventory-item-count { color: #f7d77d; font: 700 0.78rem monospace; }
+.inventory-empty { grid-column: 1 / -1; padding: 12px; color: var(--text-muted); text-align: center; font-size: 0.74rem; }
+.crafting-filter-row { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 8px; margin-bottom: 8px; color: #a7f0d9; font-size: 0.72rem; }
+.crafting-filter-row select { min-width: 0; width: 100%; padding: 5px; color: var(--text-main); background: #1c1511; border: 1px solid var(--border-sub); }
+.crafting-recipe-list { display: grid; gap: 7px; max-height: 48vh; overflow-y: auto; }
+.crafting-recipe-card { min-width: 0; padding: 8px; border: 1px solid rgba(198, 154, 82, 0.35); background: rgba(18, 14, 12, 0.5); }
+.crafting-recipe-title { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; color: #f3d27a; font-size: 0.75rem; }
+.crafting-recipe-title small { color: var(--text-muted); font-size: 0.62rem; }
+.crafting-recipe-flow { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; margin: 7px 0; }
+.crafting-item-chip { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; padding: 2px 5px 2px 2px; color: var(--text-main); background: rgba(98, 194, 170, 0.08); border: 1px solid rgba(98, 194, 170, 0.25); font-size: 0.65rem; }
+.crafting-item-chip .crafting-item-icon { width: 22px; height: 22px; flex-basis: 22px; font-size: 0.9rem; }
+.crafting-recipe-plus, .crafting-recipe-arrow { color: #d8c47c; font-size: 0.72rem; }
+.crafting-recipe-footer { display: flex; justify-content: space-between; align-items: center; gap: 8px; color: var(--text-muted); font-size: 0.62rem; }
+.crafting-recipe-footer button { min-width: 66px; min-height: 30px; padding: 4px 8px; color: #f7d77d; background: rgba(98, 194, 170, 0.12); border: 1px solid rgba(98, 194, 170, 0.5); cursor: pointer; }
+.crafting-recipe-footer button:disabled { opacity: 0.4; cursor: not-allowed; }
+.crafting-recipe-note { margin-top: 4px; color: var(--text-muted); font-size: 0.62rem; line-height: 1.35; }
+.crafting-view[hidden], .inventory-view[hidden] { display: none !important; }
 .inventory-scroll-button {
     background: linear-gradient(180deg, rgba(98, 194, 170, 0.2), rgba(98, 194, 170, 0.08));
     color: #d9fff2;

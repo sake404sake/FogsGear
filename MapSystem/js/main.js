@@ -4,9 +4,10 @@ import { SkinRenderer } from './skinRenderer.js?v=2';
 import { CELL_DEFINITIONS, canEnterCell, getCellEntryRule, getMosaicColor } from './cellRules.js';
 import { drawCellIcon, loadCellIconAtlas } from './cellIconRenderer.js?v=3';
 import { ACTIVE_SCROLL_TARGETS_KEY, CELL_MATERIALS, TERRAIN_TRANSFORM_RECIPES, WORLD_CELL_TYPES, applyCellChanges, chooseEraCellType, getCellCollectionPowerCost, getCellDrops, readCellChanges, saveCellChange } from './worldCells.js?v=3';
+import { CRAFTING_ITEMS, CRAFTING_ITEM_BY_ID, CRAFTING_RATE_MULTIPLIER, CRAFTING_RECIPES } from './craftingData.js?v=1';
 import { buildTerritoryBorderSegments } from './territoryBorders.js?v=35';
-import { GameState as EngineGameState } from '../../GearSystem/js/GameState.js?v=runtime-19';
-import { GearManager as EngineGearManager } from '../../GearSystem/js/GearManager.js?v=runtime-4';
+import { GameState as EngineGameState } from '../../GearSystem/js/GameState.js?v=runtime-24';
+import { GearManager as EngineGearManager } from '../../GearSystem/js/GearManager.js?v=runtime-5';
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
@@ -108,24 +109,31 @@ let cameraStart = { x: 0, y: 0 };
 let initialPinchDist = null;
 let initialZoom = 1.0;
 let selectedSavedScrollId = null;
+let inventoryRenderSignature = '';
+let craftingRenderSignature = '';
 
 const INVENTORY_ITEM_DEFINITIONS = {
-    brass_gear: { name: '真鍮の歯車', description: '動力を伝えるための基本部品。霧の機械文明では、さまざまな大きさと歯数のものが使われます。', icon: '⚙', image: '../MainSystem/icons/items/brass-gear.png', meta: '資材・機械部品' },
-    old_screw: { name: '古びたネジ', description: '長く使われた跡のある固定具。小さな部品の修理や工作に役立ちます。', icon: '🔩', image: '../MainSystem/icons/items/old-screw.png', meta: '資材・工作部品' },
-    pressure_gauge: { name: '圧力計', description: '蒸気や霧の圧力を読み取る計器。設備の状態を確認するのに欠かせません。', icon: '⏱', image: '../MainSystem/icons/items/pressure-gauge.png', meta: '計器・探索道具' },
     paper_scroll: { name: 'スクロール（紙）', description: '新しいギア設計を記録する紙の巻物。ギア編集画面で設計を作成できます。', icon: '📜', image: null, meta: '未使用・新規設計用' },
     cloth_scroll: { name: 'スクロール（布）', description: '新しいギア設計を記録する布の巻物。ギア編集画面で設計を作成できます。', icon: '🧵', image: null, meta: '未使用・新規設計用' },
     scroll_book: { name: 'スクロールブック', description: '保存済みスクロールを一覧で確認し、使用やギア編集を行える記録帳です。', icon: '📖', image: null, meta: '保存済み設計図' }
 };
 
 function openInventoryItem(itemKey, scroll = null) {
-    const definition = INVENTORY_ITEM_DEFINITIONS[itemKey] || INVENTORY_ITEM_DEFINITIONS.paper_scroll;
+    const craftingItem = CRAFTING_ITEM_BY_ID.get(itemKey);
+    const definition = craftingItem
+        ? { name: craftingItem[1], description: craftingItem[4], meta: `${craftingItem[2]} / ${craftingItem[3]}`, icon: CELL_MATERIALS[itemKey]?.icon || '◈' }
+        : INVENTORY_ITEM_DEFINITIONS[itemKey] || INVENTORY_ITEM_DEFINITIONS.paper_scroll;
     const modal = document.getElementById('inventory-item-modal');
     const icon = document.getElementById('inventory-modal-icon');
     const useButton = document.getElementById('inventory-modal-use');
     const editButton = document.getElementById('inventory-modal-edit');
     if (!modal || !icon) return;
-    icon.textContent = definition.icon;
+    icon.replaceChildren();
+    if (craftingItem) {
+        icon.appendChild(createCraftingIcon(itemKey));
+    } else {
+        icon.textContent = definition.icon;
+    }
     if (definition.image) {
         const image = document.createElement('img');
         image.src = definition.image;
@@ -145,6 +153,17 @@ function openInventoryItem(itemKey, scroll = null) {
         editButton.dataset.material = itemKey === 'cloth_scroll' ? 'cloth' : 'paper';
     }
     modal.hidden = false;
+}
+
+function createCraftingIcon(itemId) {
+    const svgNamespace = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(svgNamespace, 'svg');
+    const use = document.createElementNS(svgNamespace, 'use');
+    svg.setAttribute('viewBox', '0 0 64 64');
+    svg.setAttribute('aria-hidden', 'true');
+    use.setAttribute('href', `../MainSystem/icons/items/crafting-icons.svg?v=1#i-${itemId}`);
+    svg.appendChild(use);
+    return svg;
 }
 
 function closeInventoryItem() {
@@ -229,7 +248,14 @@ function validateSaveBackupValue(key, value) {
         throw new Error('JSON内の保存データを解析できません。');
     }
     if (key === 'fog_thermo_save') {
-        if (!isRecord(parsed) || (parsed.gears !== undefined && !Array.isArray(parsed.gears)) || (parsed.placedGears !== undefined && !Array.isArray(parsed.placedGears)) || (parsed.materialInventory !== undefined && !isRecord(parsed.materialInventory))) throw new Error('ギアのセーブデータが不正です。');
+        const invalidCraftingJobs = parsed?.craftingJobs !== undefined && (!Array.isArray(parsed.craftingJobs)
+            || parsed.craftingJobs.some(job => !isRecord(job) || typeof job.recipeKey !== 'string'
+                || typeof job.outputItem !== 'string' || !Number.isFinite(Number(job.outputAmount))
+                || !Number.isFinite(Number(job.completesAt))));
+        if (!isRecord(parsed) || (parsed.gears !== undefined && !Array.isArray(parsed.gears))
+            || (parsed.placedGears !== undefined && !Array.isArray(parsed.placedGears))
+            || (parsed.materialInventory !== undefined && !isRecord(parsed.materialInventory))
+            || invalidCraftingJobs) throw new Error('ギアのセーブデータが不正です。');
     } else if (key === 'steampunk_explorer_settings') {
         if (!isRecord(parsed) || (parsed.seed !== undefined && typeof parsed.seed !== 'string')) throw new Error('ワールド設定が不正です。');
     } else if (key === 'steampunk_explorer_player_pos') {
@@ -835,31 +861,182 @@ function updateCellInspection() {
     }));
 }
 
+function getCraftingItemCount(itemId) {
+    if (itemId === 'brass-stock') return Math.max(0, Number(engineRuntimeState?.brass) || 0);
+    const resourceKey = { water: 'water', fog: 'fog', power: 'power', steam_power: 'steamPower' }[itemId];
+    if (resourceKey) return Math.max(0, Number(engineRuntimeState?.[resourceKey]) || 0);
+    return Math.max(0, Number(engineRuntimeState?.materialInventory?.[itemId]) || 0);
+}
+
+function getCraftingItemName(itemId) {
+    return CRAFTING_ITEM_BY_ID.get(itemId)?.[1] || CELL_MATERIALS[itemId]?.label || INVENTORY_ITEM_DEFINITIONS[itemId]?.name
+        || ({ fog: '霧', power: '動力', steam_power: 'スチーム' }[itemId]) || itemId;
+}
+
+function formatInventoryCount(itemId, count) {
+    const amount = Number(count) || 0;
+    if (!['water', 'fog', 'power', 'steam_power'].includes(itemId)) return String(Math.floor(amount));
+    return amount.toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1');
+}
+
+function createInventoryIcon(itemId) {
+    if (CRAFTING_ITEM_BY_ID.has(itemId)) return createCraftingIcon(itemId);
+    const icon = document.createElement('span');
+    icon.className = 'inventory-item-icon-fallback';
+    icon.textContent = CELL_MATERIALS[itemId]?.icon || INVENTORY_ITEM_DEFINITIONS[itemId]?.icon
+        || ({ fog: '≋', power: '⚙', steam_power: '♨' }[itemId]) || '◈';
+    return icon;
+}
+
 function renderCellMaterials() {
-    const list = document.getElementById('cell-material-list');
-    if (!list || !engineRuntimeState) return;
-    list.replaceChildren();
-    const entries = Object.entries(engineRuntimeState.materialInventory || {}).filter(([, count]) => Number(count) > 0);
-    if (!entries.length) {
-        const empty = document.createElement('span');
-        empty.className = 'saved-scroll-empty';
-        empty.textContent = '地形素材はありません';
-        list.appendChild(empty);
+    if (!engineRuntimeState) return;
+    const inventoryList = document.getElementById('inventory-item-list');
+    const inventoryIds = new Set(Object.entries(engineRuntimeState.materialInventory || {})
+        .filter(([, count]) => Number(count) > 0)
+        .map(([item]) => item));
+    if (engineRuntimeState.brass > 0) inventoryIds.add('brass-stock');
+    ['water', 'fog', 'power', 'steam_power'].forEach(itemId => {
+        if (getCraftingItemCount(itemId) > 0) inventoryIds.add(itemId);
+    });
+    const orderedIds = [
+        ...CRAFTING_ITEMS.map(([id]) => id).filter(id => inventoryIds.has(id)),
+        ...[...inventoryIds].filter(id => !CRAFTING_ITEM_BY_ID.has(id))
+    ];
+    const inventorySignature = JSON.stringify(orderedIds.map(id => [id, getCraftingItemCount(id)]));
+    if (inventoryList && inventorySignature !== inventoryRenderSignature) {
+        inventoryRenderSignature = inventorySignature;
+        inventoryList.replaceChildren();
+        if (!orderedIds.length) {
+            const empty = document.createElement('span');
+            empty.className = 'inventory-empty';
+            empty.textContent = '所持品はありません';
+            inventoryList.appendChild(empty);
+        }
+        orderedIds.forEach(itemId => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'inventory-item-card';
+            button.dataset.action = 'inspect-inventory-item';
+            button.dataset.itemKey = itemId;
+            const icon = document.createElement('span');
+            icon.className = 'inventory-item-icon';
+            icon.appendChild(createInventoryIcon(itemId));
+            const name = document.createElement('span');
+            name.className = 'inventory-item-name';
+            name.textContent = getCraftingItemName(itemId);
+            const count = document.createElement('strong');
+            count.className = 'inventory-item-count';
+            count.textContent = formatInventoryCount(itemId, getCraftingItemCount(itemId));
+            button.append(icon, name, count);
+            inventoryList.appendChild(button);
+        });
+    }
+
+    const recipeList = document.getElementById('crafting-recipe-list');
+    if (!recipeList) return;
+    const selectedFamily = document.getElementById('crafting-family-filter')?.value || 'all';
+    const visibleRecipes = CRAFTING_RECIPES.map((recipe, index) => ({ recipe, index }))
+        .filter(({ recipe }) => selectedFamily === 'all' || recipe[0] === selectedFamily);
+    const now = Date.now();
+    const jobSignature = JSON.stringify((engineRuntimeState.craftingJobs || []).map(job => [job.recipeKey, Math.max(0, Math.ceil((Number(job.completesAt) - now) / 1000))]));
+    const craftingSignature = `${selectedFamily}:${JSON.stringify(orderedIds.map(id => [id, getCraftingItemCount(id)]))}:${jobSignature}`;
+    if (craftingSignature === craftingRenderSignature) return;
+    craftingRenderSignature = craftingSignature;
+    recipeList.replaceChildren();
+    visibleRecipes.forEach(({ recipe, index }) => {
+        const [family, title, inputs, output, station, note, batch = 1, duration = 0] = recipe;
+        const recipeKey = `${family}:${title}`;
+        const activeJob = (engineRuntimeState.craftingJobs || []).find(job => job.recipeKey === recipeKey);
+        const card = document.createElement('article');
+        card.className = 'crafting-recipe-card';
+        const heading = document.createElement('div');
+        heading.className = 'crafting-recipe-title';
+        const titleText = document.createElement('strong');
+        titleText.textContent = title;
+        const groupText = document.createElement('small');
+        groupText.textContent = family;
+        heading.append(titleText, groupText);
+        const flow = document.createElement('div');
+        flow.className = 'crafting-recipe-flow';
+        inputs.forEach(([itemId, amount], inputIndex) => {
+            if (inputIndex > 0) {
+                const plus = document.createElement('span');
+                plus.className = 'crafting-recipe-plus';
+                plus.textContent = '+';
+                flow.appendChild(plus);
+            }
+            flow.appendChild(createCraftingChip(itemId, amount));
+        });
+        const arrow = document.createElement('span');
+        arrow.className = 'crafting-recipe-arrow';
+        arrow.textContent = '→';
+        flow.append(arrow, createCraftingChip(output, batch));
+        const footer = document.createElement('div');
+        footer.className = 'crafting-recipe-footer';
+        const stationLabel = document.createElement('span');
+        stationLabel.textContent = activeJob
+            ? `${station} / 残り${Math.max(0, Math.ceil((Number(activeJob.completesAt) - now) / 1000))}秒`
+            : `${station} / ${Math.max(1, Math.round(duration / CRAFTING_RATE_MULTIPLIER))}秒`;
+        const craftButton = document.createElement('button');
+        craftButton.type = 'button';
+        craftButton.dataset.action = 'craft-recipe';
+        craftButton.dataset.recipeIndex = String(index);
+        craftButton.textContent = activeJob ? '製作中' : `製作 ×${batch}`;
+        craftButton.disabled = Boolean(activeJob) || inputs.some(([itemId, amount]) => getCraftingItemCount(itemId) < amount);
+        footer.append(stationLabel, craftButton);
+        const noteElement = document.createElement('p');
+        noteElement.className = 'crafting-recipe-note';
+        noteElement.textContent = note;
+        card.append(heading, flow, footer, noteElement);
+        recipeList.appendChild(card);
+    });
+}
+
+function createCraftingChip(itemId, amount) {
+    const chip = document.createElement('span');
+    chip.className = 'crafting-item-chip';
+    const icon = document.createElement('span');
+    icon.className = 'crafting-item-icon';
+    icon.appendChild(createInventoryIcon(itemId));
+    const label = document.createElement('span');
+    label.textContent = `${getCraftingItemName(itemId)} ×${amount}`;
+    chip.append(icon, label);
+    return chip;
+}
+
+function craftRecipe(recipeIndex) {
+    const recipe = CRAFTING_RECIPES[recipeIndex];
+    const creative = Boolean(engineRuntimeState?.creativeMode);
+    if (!recipe || (!creative && recipe[2].some(([itemId, amount]) => getCraftingItemCount(itemId) < amount))) {
+        showAppNotice('合成に必要な素材が足りません。');
         return;
     }
-    entries.forEach(([item, count]) => {
-        const material = CELL_MATERIALS[item];
-        if (!material) return;
-        const entry = document.createElement('div');
-        entry.className = 'saved-scroll-item';
-        const name = document.createElement('span');
-        name.className = 'saved-scroll-name';
-        name.textContent = `${material.icon} ${material.label}`;
-        const amount = document.createElement('strong');
-        amount.textContent = String(count);
-        entry.append(name, amount);
-        list.appendChild(entry);
+    const recipeKey = `${recipe[0]}:${recipe[1]}`;
+    if (engineRuntimeState.craftingJobs.some(job => job.recipeKey === recipeKey)) return;
+    engineRuntimeState.saveState();
+    if (!creative) recipe[2].forEach(([itemId, amount]) => {
+        if (itemId === 'brass-stock') engineRuntimeState.brass -= amount;
+        else if (['water', 'fog', 'power', 'steam_power'].includes(itemId)) {
+            const resourceKey = { water: 'water', fog: 'fog', power: 'power', steam_power: 'steamPower' }[itemId];
+            engineRuntimeState[resourceKey] = Math.max(0, Number(engineRuntimeState[resourceKey]) - amount);
+        }
+        else engineRuntimeState.materialInventory[itemId] = Math.max(0, getCraftingItemCount(itemId) - amount);
     });
+    const outputAmount = Number(recipe[6]) || 1;
+    const duration = Math.max(1000, Math.round((Number(recipe[7]) || 90) / CRAFTING_RATE_MULTIPLIER * 1000));
+    const startedAt = Date.now();
+    engineRuntimeState.craftingJobs.push({
+        jobId: `${recipeKey}:${startedAt}:${Math.random().toString(36).slice(2)}`,
+        recipeKey,
+        outputItem: recipe[3],
+        outputAmount,
+        startedAt,
+        completesAt: startedAt + duration
+    });
+    engineRuntimeState.saveGameData();
+    engineRuntimeState.notify();
+    updateEngineDashboard();
+    showAppNotice(`${getCraftingItemName(recipe[3])}の製作を開始しました。`);
 }
 
 function syncLandscapePanelHeights() {
@@ -1343,7 +1520,12 @@ function movePlayer(dx, dy) {
 
     if (newX >= 0 && newX < state.cols && newY >= 0 && newY < state.rows) {
         const targetTile = state.map[newY][newX];
-        if (canEnterCell(targetTile, { rules: state.cellEntryRules, items: state.inventoryItems })) {
+        const ownedItems = new Set(state.inventoryItems);
+        Object.entries(engineRuntimeState.materialInventory || {}).forEach(([item, count]) => {
+            if (Number(count) > 0) ownedItems.add(item);
+        });
+        if (engineRuntimeState.brass > 0) ownedItems.add('brass-stock');
+        if (canEnterCell(targetTile, { rules: state.cellEntryRules, items: ownedItems })) {
             state.player.x = newX;
             state.player.y = newY;
             savePlayerPos();
@@ -1397,9 +1579,6 @@ function updateEngineDashboard() {
         'main-engine-steam': save.steamPower,
         'main-engine-water': save.water,
         'main-engine-fog': save.fog,
-        'main-engine-liquid-metal': save.liquidMetal,
-        'main-engine-solid-metal': save.solidMetal,
-        'main-engine-brass': save.brass,
         'main-engine-power': save.power
     };
     Object.entries(values).forEach(([id, value]) => {
@@ -1413,11 +1592,6 @@ function updateEngineDashboard() {
         'main-water-consumption': save.waterConsumptionRate,
         'main-fog-generation': save.fogRecoveryRate,
         'main-fog-consumption': save.fogConsumptionRate,
-        'main-liquid-generation': save.liquidMetalRate,
-        'main-liquid-consumption': save.liquidMetalConsumptionRate,
-        'main-solid-generation': save.solidMetalRate,
-        'main-solid-consumption': save.solidMetalConsumptionRate,
-        'main-brass-generation': save.brassGenerationRate,
         'main-power-generation': save.powerGenerationRate,
         'main-power-consumption': save.powerConsumptionRate,
         'main-steam-generation': save.steamGenerationRate,
@@ -1427,6 +1601,15 @@ function updateEngineDashboard() {
         const element = document.getElementById(id);
         if (!element) return;
         element.textContent = `${formatCompact(value)} /秒`;
+    });
+    const generationRates = {
+        water: save.waterGenerationRate,
+        fog: save.fogRecoveryRate,
+        power: save.powerGenerationRate,
+        steam: save.steamGenerationRate
+    };
+    document.querySelectorAll('[data-generated-resource]').forEach(row => {
+        row.hidden = !(Number(generationRates[row.dataset.generatedResource]) > 0);
     });
     renderCellMaterials();
 }
@@ -1557,6 +1740,21 @@ function openGuideModal() {
 document.addEventListener('click', (event) => {
     const button = event.target.closest('button');
     if (!button) return;
+    if (button.dataset.inventoryView) {
+        const view = button.dataset.inventoryView;
+        document.querySelectorAll('.inventory-view-tab').forEach(tab => {
+            const active = tab === button;
+            tab.classList.toggle('active', active);
+            tab.setAttribute('aria-selected', String(active));
+        });
+        document.getElementById('inventory-items-view').hidden = view !== 'items';
+        document.getElementById('inventory-crafting-view').hidden = view !== 'crafting';
+        return;
+    }
+    if (button.dataset.action === 'craft-recipe') {
+        craftRecipe(Number(button.dataset.recipeIndex));
+        return;
+    }
     if (button.dataset.action === 'export-save') {
         try { exportSaveBackup(); }
         catch (error) { showAppNotice('セーブデータを書き出せませんでした。'); }
@@ -1656,6 +1854,11 @@ document.getElementById('save-import-file')?.addEventListener('change', async ev
             : error.message || 'FogsGearのセーブJSONを読み込めませんでした。';
         showAppNotice(message);
     }
+});
+
+document.getElementById('crafting-family-filter')?.addEventListener('change', () => {
+    craftingRenderSignature = '';
+    renderCellMaterials();
 });
 
 document.getElementById('save-transfer-modal')?.addEventListener('click', event => {

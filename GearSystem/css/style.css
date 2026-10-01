@@ -181,6 +181,7 @@ h1 {
 .creative-mode-indicator { padding: 3px 7px; color: #17120f; background: #f3c653; border: 1px solid #ffe69b; border-radius: 3px; font: bold 0.62rem monospace; letter-spacing: 0.8px; white-space: nowrap; }
 .dashboard-resource-table { display: grid; gap: 0; font-size: 0.68rem; }
 .dashboard-resource-row { display: grid; grid-template-columns: 1.1fr repeat(3, 1fr); gap: 8px; align-items: center; min-height: 28px; border-bottom: 1px solid rgba(98, 194, 170, 0.14); }
+.dashboard-resource-row[hidden] { display: none !important; }
 .dashboard-resource-row > *:not(:first-child) { text-align: right; }
 .dashboard-resource-row > span:first-child { color: var(--text-muted); }
 .dashboard-resource-row strong { color: #d9fff2; font: bold 0.95rem monospace; }

@@ -416,7 +416,7 @@ export class UIController {
         // ギア種類ごとに選べる処理モードを返す。新しい処理はここへ追加する。
         if (designType === 'INDUSTRIAL') return [['NONE', '処理なし'], ['POWER_STORAGE', '動力を蓄積']];
         if (designType === 'PRODUCTION') return [['NONE', '処理なし'], ['FOG_COLLECTION', '霧の回収'], ['RESOURCE_COLLECTION', '資材収集']];
-        if (designType === 'ALCHEMICAL') return [['NONE', '処理なし'], ['TRANSFORM', '水→スチーム'], ['FOG_TO_WATER', '霧→水'], ['FOG_TO_LIQUID_METAL', '霧→液体金属'], ['LIQUID_TO_SOLID_METAL', '液体金属→固体金属'], ['SOLID_TO_BRASS', '固体金属→真鍮資材'], ['TERRAIN_TRANSFORM', '地形変成'], ['ERA_SHIFT', '時代変質']];
+        if (designType === 'ALCHEMICAL') return [['NONE', '処理なし'], ['TRANSFORM', '水→スチーム'], ['FOG_TO_WATER', '霧→水'], ['TERRAIN_TRANSFORM', '地形変成'], ['ERA_SHIFT', '時代変質']];
         if (designType === 'CLOCKWORK') return [['NONE', '処理なし'], ['TARGET_SHIFT_UP', '対象セルを上へシフト'], ['TARGET_SHIFT_DOWN', '対象セルを下へシフト'], ['TARGET_SHIFT_LEFT', '対象セルを左へシフト'], ['TARGET_SHIFT_RIGHT', '対象セルを右へシフト'], ['CONDITIONAL_CONTROL', '条件制御']];
         return [['NONE', '処理なし']];
     }
@@ -461,8 +461,6 @@ export class UIController {
                 ...Object.entries(CELL_MATERIALS),
                 ['fog', { label: '霧' }],
                 ['power', { label: '動力' }],
-                ['liquid_metal', { label: '液体金属' }],
-                ['solid_metal', { label: '固体金属' }],
                 ['brass', { label: '真鍮資材' }],
                 ['steam_power', { label: 'スチーム' }]
             ];
@@ -636,14 +634,6 @@ export class UIController {
             dashboardFog: this.state.fog,
             fogGenerationRate: this.state.fogRecoveryRate,
             fogConsumptionRate: this.state.fogConsumptionRate,
-            dashboardLiquidMetal: this.state.liquidMetal,
-            liquidMetalGenerationRate: this.state.liquidMetalRate,
-            liquidMetalConsumptionRate: this.state.liquidMetalConsumptionRate,
-            dashboardSolidMetal: this.state.solidMetal,
-            solidMetalGenerationRate: this.state.solidMetalRate,
-            solidMetalConsumptionRate: this.state.solidMetalConsumptionRate,
-            dashboardBrass: this.state.brass,
-            brassGenerationRate: this.state.brassGenerationRate,
             dashboardPower: this.state.power,
             powerGenerationRate: this.state.powerGenerationRate,
             powerConsumptionRate: this.state.powerConsumptionRate,
@@ -660,7 +650,7 @@ export class UIController {
             const [threshold, suffix] = unit;
             return `${(number / threshold).toFixed(2).replace(/\.00$/, '').replace(/(\.[0-9])0$/, '$1')}${suffix}`;
         };
-        const integerDashboardIds = new Set(['dashboardBrass', 'dashboardSteamPower']);
+        const integerDashboardIds = new Set(['dashboardSteamPower']);
         Object.entries(dashboardValues).forEach(([id, value]) => {
             const element = document.getElementById(id);
             if (!element) return;
@@ -668,6 +658,15 @@ export class UIController {
                 ? Math.floor(value || 0)
                 : value);
             element.textContent = displayValue + (id.startsWith('dashboard') ? '' : ' /秒');
+        });
+        const generationRates = {
+            water: this.state.waterGenerationRate,
+            fog: this.state.fogRecoveryRate,
+            power: this.state.powerGenerationRate,
+            steam: this.state.steamGenerationRate
+        };
+        document.querySelectorAll('[data-generated-resource]').forEach(row => {
+            row.hidden = !(Number(generationRates[row.dataset.generatedResource]) > 0);
         });
         const selectedGear = this.gearManager.findGearById(this.state.selectedGearId);
         if (selectedGear) {

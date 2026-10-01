@@ -104,7 +104,7 @@
         const storedSkin = getStoredSkin();
         skinUrlInput.value = storedSkin.url;
         skinName.textContent = `選択中: ${storedSkin.name}`;
-        const resourceDefaults = { steamPower: 100, power: 0, water: 200, fog: 0, liquidMetal: 0, solidMetal: 0, brass: 300 };
+        const resourceDefaults = { steamPower: 100, power: 0, water: 200, fog: 0, brass: 300 };
         const getGearSave = () => {
             try {
                 const saved = JSON.parse(localStorage.getItem('fog_thermo_save') || '{}');

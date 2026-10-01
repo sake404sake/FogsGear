@@ -1,7 +1,18 @@
-import { GearNetwork } from './GearSystem.js?v=network-7';
+import { GearNetwork } from './GearSystem.js?v=network-8';
 import { ACTIVE_SCROLL_TARGETS_KEY, CELL_MATERIALS, TERRAIN_TRANSFORM_RECIPES, WORLD_CELL_TYPES } from '../../MapSystem/js/worldCells.js?v=3';
 
 const ACTIVE_SCROLL_SYNC_STATE_KEY = 'fogsgear_active_scroll_sync_state';
+const INITIAL_MATERIAL_INVENTORY = Object.freeze({ 'iron-screw': 12, 'pressure-gauge': 1, paper_scroll: 10, cloth_scroll: 10, scroll_book: 1 });
+
+function restoreMaterialInventory(value) {
+    const inventory = { ...INITIAL_MATERIAL_INVENTORY, ...(value && typeof value === 'object' && !Array.isArray(value) ? value : {}) };
+    if (Number(inventory.old_screw) > 0) inventory['iron-screw'] = (Number(inventory['iron-screw']) || 0) + Number(inventory.old_screw);
+    delete inventory.old_screw;
+    delete inventory.brass_gear;
+    delete inventory.liquid_metal;
+    delete inventory.solid_metal;
+    return inventory;
+}
 
 /**
  * GameState - リソース、ギア、保存データ、Undo/Redo履歴の管理モジュール
@@ -13,12 +24,11 @@ export class GameState {
         this.power = 0;
         this.water = 200;
         this.fog = 0;
-        this.liquidMetal = 0;
-        this.solidMetal = 0;
         this.brass = 300;
         this.creativeMode = false;
         this.creativeSnapshot = null;
-        this.materialInventory = {};
+        this.materialInventory = { ...INITIAL_MATERIAL_INVENTORY };
+        this.craftingJobs = [];
         this.productionRate = 0;
         this.rotationProgress = new Map();
         this.controlStates = new Map();
@@ -28,16 +38,10 @@ export class GameState {
         this.fogRecoveryRate = 0;
         this.fogConsumptionRate = 0;
         this.fogToWaterRate = 0;
-        this.liquidMetalRate = 0;
-        this.liquidMetalConsumptionRate = 0;
-        this.solidMetalRate = 0;
-        this.solidMetalConsumptionRate = 0;
-        this.solidMetalToBrassRate = 0;
         this.steamTransformRate = 0;
         this.generatedSteamRate = 0;
         this.steamGenerationRate = 0;
         this.steamConsumptionRate = 0;
-        this.brassGenerationRate = 0;
         this.powerGenerationRate = 0;
         this.powerConsumptionRate = 0;
         this.powerConsumedThisTick = 0;
@@ -259,8 +263,6 @@ export class GameState {
             power: this.power,
             water: this.water,
             fog: this.fog,
-            liquidMetal: this.liquidMetal,
-            solidMetal: this.solidMetal,
             brass: this.brass
         };
     }
@@ -271,8 +273,6 @@ export class GameState {
         this.power = Number.isFinite(snapshot.power) ? snapshot.power : 0;
         this.water = snapshot.water;
         this.fog = snapshot.fog;
-        this.liquidMetal = snapshot.liquidMetal;
-        this.solidMetal = snapshot.solidMetal;
         this.brass = snapshot.brass;
     }
 
@@ -358,8 +358,6 @@ export class GameState {
             power: this.power,
             water: this.water,
             fog: this.fog,
-            liquidMetal: this.liquidMetal,
-            solidMetal: this.solidMetal,
             brass: this.brass,
             mainGearRunning: this.mainGearRunning,
             userStoppedMainGear: this.userStoppedMainGear,
@@ -367,15 +365,11 @@ export class GameState {
             creativeMode: this.creativeMode,
             creativeSnapshot: this.creativeSnapshot,
             materialInventory: this.materialInventory,
+            craftingJobs: this.craftingJobs,
             waterGenerationRate: this.waterGenerationRate,
             waterConsumptionRate: this.waterConsumptionRate,
             fogRecoveryRate: this.fogRecoveryRate,
             fogConsumptionRate: this.fogConsumptionRate,
-            liquidMetalRate: this.liquidMetalRate,
-            liquidMetalConsumptionRate: this.liquidMetalConsumptionRate,
-            solidMetalRate: this.solidMetalRate,
-            solidMetalConsumptionRate: this.solidMetalConsumptionRate,
-            brassGenerationRate: this.brassGenerationRate,
             steamGenerationRate: this.steamGenerationRate,
             steamConsumptionRate: this.steamConsumptionRate,
             belts: this.belts,
@@ -400,10 +394,8 @@ export class GameState {
         this.power = Number.isFinite(data.power) ? data.power : 0;
         this.water = data.water ?? 200;
         this.fog = data.fog ?? 0;
-        this.liquidMetal = data.liquidMetal ?? 0;
-        this.solidMetal = data.solidMetal ?? 0;
         this.brass = data.brass;
-        this.materialInventory = data.materialInventory && typeof data.materialInventory === 'object' ? { ...data.materialInventory } : {};
+        this.materialInventory = restoreMaterialInventory(data.materialInventory);
         const editorRuntime = this.isEditorRuntimeContext();
         const savedManualStop = data.userStoppedMainGear === true;
         const savedMainGearRunning = data.mainGearRunning ?? true;
@@ -415,6 +407,9 @@ export class GameState {
         this.lastExternalSaveAt = Number(data.updatedAt) || 0;
         this.creativeMode = data.creativeMode ?? false;
         this.creativeSnapshot = data.creativeSnapshot ?? null;
+        this.craftingJobs = Array.isArray(data.craftingJobs) ? data.craftingJobs.filter(job =>
+            job && typeof job.recipeKey === 'string' && typeof job.outputItem === 'string'
+            && Number.isFinite(Number(job.outputAmount)) && Number.isFinite(Number(job.completesAt))) : [];
         const gears = data.gears || data.placedGears || [];
         this.placedGears = this.createGear
             ? gears.map(gear => this.createGear(gear))
@@ -484,10 +479,9 @@ export class GameState {
         this.power = 0;
         this.water = 200;
         this.fog = 0;
-        this.liquidMetal = 0;
-        this.solidMetal = 0;
         this.brass = 300;
-        this.materialInventory = {};
+        this.materialInventory = { ...INITIAL_MATERIAL_INVENTORY };
+        this.craftingJobs = [];
         this.mainGearRunning = true;
         this.userStoppedMainGear = false;
         this.autoStoppedBySteam = false;
@@ -508,8 +502,6 @@ export class GameState {
             power: this.power,
             water: this.water,
             fog: this.fog,
-            liquidMetal: this.liquidMetal,
-            solidMetal: this.solidMetal,
             brass: this.brass,
             mainGearRunning: this.mainGearRunning,
             userStoppedMainGear: this.userStoppedMainGear,
@@ -517,15 +509,11 @@ export class GameState {
             creativeMode: this.creativeMode,
             creativeSnapshot: this.creativeSnapshot,
             materialInventory: this.materialInventory,
+            craftingJobs: this.craftingJobs,
             waterGenerationRate: this.waterGenerationRate,
             waterConsumptionRate: this.waterConsumptionRate,
             fogRecoveryRate: this.fogRecoveryRate,
             fogConsumptionRate: this.fogConsumptionRate,
-            liquidMetalRate: this.liquidMetalRate,
-            liquidMetalConsumptionRate: this.liquidMetalConsumptionRate,
-            solidMetalRate: this.solidMetalRate,
-            solidMetalConsumptionRate: this.solidMetalConsumptionRate,
-            brassGenerationRate: this.brassGenerationRate,
             steamGenerationRate: this.steamGenerationRate,
             steamConsumptionRate: this.steamConsumptionRate,
             belts: this.getRuntimeBelts(),
@@ -682,10 +670,8 @@ export class GameState {
                 this.power = Number.isFinite(data.power) ? data.power : 0;
                 this.water = data.water ?? 200;
                 this.fog = data.fog ?? data.gasMetal ?? 0;
-                this.liquidMetal = data.liquidMetal ?? 0;
-                this.solidMetal = data.solidMetal ?? 0;
                 this.brass = data.brass ?? 300;
-                this.materialInventory = data.materialInventory && typeof data.materialInventory === 'object' ? { ...data.materialInventory } : {};
+                this.materialInventory = restoreMaterialInventory(data.materialInventory);
                 const editorRuntime = this.isEditorRuntimeContext();
                 const savedManualStop = data.userStoppedMainGear === true;
                 const savedMainGearRunning = data.mainGearRunning ?? true;
@@ -697,6 +683,9 @@ export class GameState {
                 this.lastExternalSaveAt = Number(data.updatedAt) || 0;
                 this.creativeMode = data.creativeMode ?? false;
                 this.creativeSnapshot = data.creativeSnapshot ?? null;
+                this.craftingJobs = Array.isArray(data.craftingJobs) ? data.craftingJobs.filter(job =>
+                    job && typeof job.recipeKey === 'string' && typeof job.outputItem === 'string'
+                    && Number.isFinite(Number(job.outputAmount)) && Number.isFinite(Number(job.completesAt))) : [];
                 this.belts = Array.isArray(data.belts) ? data.belts.filter(belt => Array.isArray(belt?.gearIds) && belt.gearIds.length >= 2) : [];
                 this.placedGears = (data.gears || data.placedGears || []).map(createGear);
                 if (this.placedGears.length > 0 && !this.placedGears.some(gear => gear.isCore)) {
@@ -741,8 +730,6 @@ export class GameState {
         const controlItemLabels = {
             fog: '霧',
             power: '動力',
-            liquid_metal: '液体金属',
-            solid_metal: '固体金属',
             brass: '真鍮資材',
             steam_power: 'スチーム'
         };
@@ -756,9 +743,6 @@ export class GameState {
             RESOURCE_COLLECTION: { name: '資材収集', input: '対象セル', output: 'セル資材', rate: rotationRate },
             TRANSFORM: { name: '水→スチーム', input: '水', output: 'スチーム', rate: rotationRate * 10 },
             FOG_TO_WATER: { name: '霧→水', input: '霧', output: '水', rate: rotationRate * 2.5 },
-            FOG_TO_LIQUID_METAL: { name: '霧→液体金属', input: '霧', output: '液体金属', rate: rotationRate * 0.1 },
-            LIQUID_TO_SOLID_METAL: { name: '液体金属→固体金属', input: '液体金属', output: '固体金属', rate: rotationRate },
-            SOLID_TO_BRASS: { name: '固体金属→真鍮資材', input: '固体金属', output: '真鍮資材', rate: rotationRate },
             TERRAIN_TRANSFORM: { name: '地形変成', input: terrainInput, output: WORLD_CELL_TYPES[terrainTargetType]?.label || '地形セル', rate: rotationRate },
             ERA_SHIFT: { name: '時代変質', input: '対象セル', output: 'ランダムな時代セル', rate: rotationRate },
             TARGET_SHIFT_UP: { name: '対象セルを上へシフト', input: '-', output: '対象座標', rate: rotationRate },
@@ -768,9 +752,7 @@ export class GameState {
             CONDITIONAL_CONTROL: { name: '条件制御', input: controlCondition, output: controlActions[gear?.controlAction] || controlActions.STOP_MAIN_GEAR, rate: rotationRate }
         };
         const info = processInfo[gear?.processMode] || processInfo.NONE;
-        const inputMultiplier = gear?.processMode === 'FOG_TO_WATER'
-            ? 2
-            : gear?.processMode === 'FOG_TO_LIQUID_METAL' ? 10 : 1;
+        const inputMultiplier = gear?.processMode === 'FOG_TO_WATER' ? 2 : 1;
         return { ...info, inputRate: info.rate * inputMultiplier, outputRate: info.rate };
     }
 
@@ -868,8 +850,6 @@ export class GameState {
                 water: 'water',
                 fog: 'fog',
                 power: 'power',
-                liquid_metal: 'liquidMetal',
-                solid_metal: 'solidMetal',
                 brass: 'brass',
                 steam_power: 'steamPower'
             };
@@ -898,12 +878,27 @@ export class GameState {
         return networkChanged;
     }
 
+    completeCraftingJobs(now = Date.now()) {
+        const completed = this.craftingJobs.filter(job => Number(job.completesAt) <= now);
+        if (!completed.length) return;
+        const completedIds = new Set(completed.map(job => job.jobId));
+        this.craftingJobs = this.craftingJobs.filter(job => !completedIds.has(job.jobId));
+        completed.forEach(job => {
+            const amount = Math.max(1, Math.floor(Number(job.outputAmount) || 1));
+            if (job.outputItem === 'brass-stock') this.brass += amount;
+            else this.materialInventory[job.outputItem] = (Number(this.materialInventory[job.outputItem]) || 0) + amount;
+        });
+        this.saveGameData();
+        this.notify();
+    }
+
     tick() {
         // 1フレーム分の時間を基準に、回転・資源変換・UI表示値を更新する。
         const now = performance.now();
         const elapsed = Math.min(0.25, Math.max(0, (now - this.lastTickAt) / 1000));
         this.lastTickAt = now;
         this.lastTickElapsed = elapsed;
+        this.completeCraftingJobs();
         this.syncExternalEngineControl();
         const runtimeGears = this.getRuntimeGears();
         const runtimeBelts = this.getRuntimeBelts();
@@ -948,10 +943,7 @@ export class GameState {
         this.power += this.powerGenerationRate * elapsed;
         this.powerConsumedThisTick = 0;
         this.fogRecoveryRate = activeGears.filter(gear => gear.processMode === 'FOG_COLLECTION').reduce((sum, gear) => sum + gearRate(gear) * 10, 0);
-        this.liquidMetalRate = activeGears.filter(gear => gear.designType === 'ALCHEMICAL' && gear.processMode === 'FOG_TO_LIQUID_METAL').reduce((sum, gear) => sum + gearRate(gear) * 0.1, 0);
         this.fogToWaterRate = activeGears.filter(gear => gear.designType === 'ALCHEMICAL' && gear.processMode === 'FOG_TO_WATER').reduce((sum, gear) => sum + gearRate(gear) * 2.5, 0);
-        this.solidMetalRate = activeGears.filter(gear => gear.designType === 'ALCHEMICAL' && gear.processMode === 'LIQUID_TO_SOLID_METAL').reduce((sum, gear) => sum + gearRate(gear), 0);
-        this.solidMetalToBrassRate = activeGears.filter(gear => gear.designType === 'ALCHEMICAL' && gear.processMode === 'SOLID_TO_BRASS').reduce((sum, gear) => sum + gearRate(gear), 0);
         this.steamTransformRate = activeGears.filter(gear => gear.designType === 'ALCHEMICAL' && gear.processMode === 'TRANSFORM').reduce((sum, gear) => sum + gearRate(gear), 0);
         const steamConsumption = this.mainGearRunning && !this.creativeMode && activeCount > 0
             ? activeGearGroups.reduce((sum, group) => sum + group.network.calculateSteamConsumption(group.gears), 0)
@@ -962,11 +954,8 @@ export class GameState {
         this.waterConsumptionRate = this.steamTransformRate;
         // 水1に対してスチーム10を生成するため、水→スチームの出力は水消費量から直接算出する。
         this.generatedSteamRate = this.waterConsumptionRate * 10;
-        // 霧→水は水5に霧10、霧→液体金属は生成1に霧10を要する。
-        this.fogConsumptionRate = this.fogToWaterRate * 2 + this.liquidMetalRate * 10;
-        this.liquidMetalConsumptionRate = this.solidMetalRate;
-        this.solidMetalConsumptionRate = this.solidMetalToBrassRate;
-        this.brassGenerationRate = this.solidMetalToBrassRate;
+        // 霧→水は水5に霧10を要する。
+        this.fogConsumptionRate = this.fogToWaterRate * 2;
         this.steamGenerationRate = this.generatedSteamRate + (this.creativeMode && elapsed > 0 ? 1 : this.waterRecoveryRate) + steamAutoRecoveryRate;
         this.steamConsumptionRate = steamConsumption;
         if (this.creativeMode) {
@@ -983,15 +972,9 @@ export class GameState {
             this.mainGearRunning = false;
             this.fogRecoveryRate = 0;
             this.fogToWaterRate = 0;
-            this.liquidMetalRate = 0;
-            this.solidMetalRate = 0;
-            this.solidMetalToBrassRate = 0;
             this.steamTransformRate = 0;
             this.waterConsumptionRate = 0;
             this.fogConsumptionRate = 0;
-            this.liquidMetalConsumptionRate = 0;
-            this.solidMetalConsumptionRate = 0;
-            this.brassGenerationRate = 0;
             this.steamConsumptionRate = 0;
         } else if (!this.creativeMode && this.steamPower > 0.25) {
             this.autoStoppedBySteam = false;
@@ -1027,30 +1010,16 @@ export class GameState {
                     this.water -= transformed;
                     this.steamPower += transformed * 10;
                 }
-                if (gear.designType === 'ALCHEMICAL' && (gear.processMode === 'FOG_TO_WATER' || gear.processMode === 'FOG_TO_LIQUID_METAL' || gear.processMode === 'LIQUID_TO_SOLID_METAL' || gear.processMode === 'SOLID_TO_BRASS')) {
+                if (gear.designType === 'ALCHEMICAL' && gear.processMode === 'FOG_TO_WATER') {
                     const progressKey = `${gear.id}:${gear.processMode}`;
                     const progress = (this.rotationProgress.get(progressKey) || 0) + Math.abs(rotationDelta);
                     const completedRotations = Math.floor(progress / (Math.PI * 2));
                     this.rotationProgress.set(progressKey, progress % (Math.PI * 2));
                     if (completedRotations > 0) {
                         const amount = completedRotations * gear.teeth;
-                        if (gear.processMode === 'FOG_TO_WATER') {
-                            const transformed = Math.min(this.fog, amount * 10);
-                            this.fog -= transformed;
-                            this.water += transformed * 2.5;
-                        } else if (gear.processMode === 'FOG_TO_LIQUID_METAL') {
-                            const transformed = Math.min(this.fog, amount * 10);
-                            this.fog -= transformed;
-                            this.liquidMetal += transformed * 0.1;
-                        } else if (gear.processMode === 'LIQUID_TO_SOLID_METAL') {
-                            const transformed = Math.min(this.liquidMetal, amount);
-                            this.liquidMetal -= transformed;
-                            this.solidMetal += transformed;
-                        } else {
-                            const transformed = Math.min(this.solidMetal, amount);
-                            this.solidMetal -= transformed;
-                            this.brass += transformed;
-                        }
+                        const transformed = Math.min(this.fog, amount * 10);
+                        this.fog -= transformed;
+                        this.water += transformed * 2.5;
                     }
                 }
                 this.processScrollCellGear(gear, scrollRuntimeByGearId.get(gear.id), rotationDelta);

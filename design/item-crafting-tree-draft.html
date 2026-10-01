@@ -1,4 +1,7 @@
 <!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
 <script>
 const addedItems = [
 ['fiber','麻繊維','raw','草地','縄、布、濾過面の原料。'],['reed','葦','raw','湿地','紙、容器、面具の軽量素材。'],['ash','炉灰','raw','焚き跡','耐熱陶材の釉薬・調整材。'],['magnetite','磁鉄鉱','raw','山地','羅針盤の磁針と方位機構に使う。'],['mica','雲母片','raw','岩場','耐熱積層材、坩堝の補強材。'],['obsidian','黒曜石','raw','火山岩地','土壌採取錐の鋭い刃先。'],['pumice','軽石','raw','火山岩地','研磨材、霧濾過の多孔質材。'],['seaweed','海藻','raw','海岸','縄・面具の繊維、保存材。'],
@@ -48,9 +51,6 @@ const addedRecipes = [
 ['machine','耐霧種子箱を簡易組立する',[['sealed-board',2],['resin-gasket',3],['mica-laminate',1]],'seed-vault','木工作業台','真鍮板を使わず軽量に仕上げる。',1,125]
 ];
  </script>
-<html lang="ja">
-<head>
-<meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>素材と合成ツリー案 | Fogs Gear</title>
 <style>
@@ -116,10 +116,55 @@ const recipes = [
 const baseRecipeRates = [[2,40],[1,35],[2,75],[2,70],[2,70],[2,70],[3,80],[1,80],[1,80],[1,110],[4,45],[1,85],[1,90],[3,60],[2,80],[1,65],[2,80],[1,80],[2,50],[2,70],[2,75],[1,80],[1,80],[1,90],[1,90],[1,95],[1,90],[1,120],[1,150],[1,140]];
 recipes.forEach((recipe,index)=>{recipe[6]=baseRecipeRates[index][0];recipe[7]=baseRecipeRates[index][1];});
 recipes.push(...addedRecipes);
+const brassItem = items.find(item => item[0] === 'brass-ingot');
+brassItem.splice(0, 5, 'brass-stock', '真鍮資材', 'processed', '炉', 'ギア設置の初期資材。銅と亜鉛から追加生産し、板材や装置にも使う。');
+items.splice(items.findIndex(item => item[0] === 'brass-gear'), 1);
+items.push(
+	['copper-concentrate', '銅精鉱', 'processed', '選鉱台', '銅鉱石を洗い、製錬前に脈石を分ける。'],
+	['zinc-concentrate', '亜鉛精鉱', 'processed', '選鉱台', '序盤の真鍮生産に使う亜鉛鉱石の濃縮物。']
+);
+const copperOreItem = items.find(item => item[0] === 'copper-ore');
+copperOreItem[3] = '初期鉱脈';
+copperOreItem[4] = '序盤から採掘でき、選鉱後に真鍮や導管の原料となる。';
+const zincOreItem = items.find(item => item[0] === 'zinc-ore');
+zincOreItem[3] = '初期鉱脈';
+zincOreItem[4] = '序盤から採掘でき、選鉱後に真鍮の副成分となる。';
+const copperSmeltingRecipe = recipes.find(recipe => recipe[3] === 'copper-ingot');
+copperSmeltingRecipe[1] = '銅精鉱を製錬する';
+copperSmeltingRecipe[2] = [['copper-concentrate', 1], ['coal', 1]];
+const zincSmeltingRecipe = recipes.find(recipe => recipe[3] === 'zinc-ingot');
+zincSmeltingRecipe[1] = '亜鉛精鉱を製錬する';
+zincSmeltingRecipe[2] = [['zinc-concentrate', 1], ['coal', 1]];
+const brassRecipe = recipes.find(recipe => recipe[3] === 'brass-ingot');
+brassRecipe[1] = '銅と亜鉛から真鍮資材を配合する';
+brassRecipe[2].push(['coal', 1]);
+brassRecipe[3] = 'brass-stock';
+recipes.splice(recipes.findIndex(recipe => recipe[3] === 'brass-gear'), 1);
+recipes.forEach(recipe => {
+	recipe[2] = recipe[2].map(([id, amount]) => [id === 'brass-ingot' || id === 'brass-gear' ? 'brass-stock' : id, amount]);
+});
+recipes.push(
+	['smelting', '銅鉱石を水洗選鉱する', [['copper-ore', 2], ['water', 1]], 'copper-concentrate', '選鉱台', '鉱石を洗って製錬効率を上げる。', 2, 90],
+	['smelting', '亜鉛鉱石を水洗選鉱する', [['zinc-ore', 2], ['water', 1]], 'zinc-concentrate', '選鉱台', '初期鉱脈から真鍮の副成分を得る。', 2, 90]
+);
+const CRAFTING_RATE_MULTIPLIER = 1.5;
+recipes.forEach(recipe => {
+	if (!Number.isFinite(recipe[6])) recipe[6] = 1;
+	if (!Number.isFinite(recipe[7])) recipe[7] = 90;
+});
+const CRAFTING_INPUT_MULTIPLIERS = { forest: 5, smelting: 5, ceramic: 5, bio: 5, machine: 10 };
+recipes.forEach(recipe => {
+	const multiplier = CRAFTING_INPUT_MULTIPLIERS[recipe[0]] || 1;
+	recipe[2] = recipe[2].map(([item, amount]) => [item, amount * multiplier]);
+});
+const steamWinchRecipe = recipes.find(recipe => recipe[3] === 'steam-winch');
+steamWinchRecipe[2] = steamWinchRecipe[2].map(([item, amount]) => [item, item === 'rope' ? 100 : amount]);
+const relicCoreRecipe = recipes.find(recipe => recipe[3] === 'relic-core');
+relicCoreRecipe[2] = relicCoreRecipe[2].map(([item, amount]) => [item, item === 'relic-fragment' ? 100 : amount]);
 const families={forest:{name:'森林加工',desc:'木材・樹脂を建材へ。',color:'#9fb985'},smelting:{name:'製錬・合金',desc:'鉱石から金属と機械部品へ。',color:'#d4b75f'},ceramic:{name:'ガラス・陶材',desc:'地質素材を光学・耐熱材へ。',color:'#70aeb5'},bio:{name:'菌糸・薬草',desc:'湿地と生物素材を保存・育成へ。',color:'#a7b879'},machine:{name:'機械・遺物',desc:'部品を探索・調整装置へ。',color:'#d18a61'}};
 const stages=[['raw','採取素材'],['processed','加工素材'],['part','機械部品'],['finished','道具・装置']];
 const itemMap=new Map(items.map(([id,name,stage,source,use])=>[id,{id,name,stage,source,use}]));
-function icon(id){return `<svg aria-hidden="true" focusable="false"><use href="./item-crafting-icons-draft.svg#i-${id}"></use></svg>`;}
+function icon(id){return `<svg aria-hidden="true" focusable="false"><use href="./item-crafting-icons-draft.svg?v=2#i-${id}"></use></svg>`;}
 function renderStages(){document.querySelector('#stage-board').innerHTML=stages.map(([stage,title])=>`<section class="stage ${stage}"><h3>${title} / ${items.filter(item=>item[2]===stage).length}</h3><div class="item-grid">${items.filter(item=>item[2]===stage).map(([id,name,,source,use])=>`<article class="item-node" data-item="${id}" data-search="${`${name} ${source} ${use}`.toLowerCase()}">${icon(id)}<div><strong>${name}</strong><small>${source} · ${use}</small></div></article>`).join('')}</div></section>`).join('');}
 function renderRecipes(){document.querySelector('#recipe-groups').innerHTML=Object.entries(families).map(([key,family])=>{const rows=recipes.filter(recipe=>recipe[0]===key);return `<section class="recipe-family" data-family="${key}" style="--family-color:${family.color}"><header class="family-head"><h3>${family.name}</h3><p>${family.desc}</p></header><div class="recipe-list">${rows.map(([,title,inputs,output,station,note])=>`<article class="recipe" data-recipe data-search="${`${title} ${note} ${station} ${inputs.map(([id])=>itemMap.get(id).name).join(' ')} ${itemMap.get(output).name}`.toLowerCase()}"><div class="inputs">${inputs.map(([id,count])=>`<span class="chip">${icon(id)}<span>${itemMap.get(id).name} <b class="qty">×${count}</b></span></span>`).join('<span class="qty">+</span>')}</div><span class="arrow" aria-hidden="true">→</span><div class="output"><span class="chip">${icon(output)}<strong>${itemMap.get(output).name}</strong></span><small>${note}</small></div><div class="recipe-meta"><span>作業設備: <b>${station}</b></span><span>案: <b>${title}</b></span></div></article>`).join('')}</div></section>`}).join('');}
 let activeFilter='all';const search=document.querySelector('#search');
@@ -129,7 +174,7 @@ const treeFrame=document.querySelector('#tree-frame');
 let treeDimensions={width:1,height:1};
 let treeScale=0.65;
 function updateSummary(){document.querySelector('#item-total').textContent=items.length;document.querySelector('#recipe-total').textContent=recipes.length;document.querySelector('#family-total').textContent=Object.keys(families).length;document.querySelector('#icon-total').textContent=items.length;}
-function renderRecipeRates(){Object.keys(families).forEach(key=>{const group=document.querySelector(`.recipe-family[data-family="${key}"]`);const rows=recipes.filter(recipe=>recipe[0]===key);group.querySelectorAll('[data-recipe]').forEach((card,index)=>{const recipe=rows[index];const batch=recipe[6];const seconds=recipe[7];const rate=(batch*60/seconds).toFixed(1);const value=document.createElement('span');value.className='rate';value.innerHTML=`生産: <b>${batch}個 / ${seconds}秒（${rate}個/分）</b>`;card.querySelector('.recipe-meta').append(value);});});}
+function renderRecipeRates(){Object.keys(families).forEach(key=>{const group=document.querySelector(`.recipe-family[data-family="${key}"]`);const rows=recipes.filter(recipe=>recipe[0]===key);group.querySelectorAll('[data-recipe]').forEach((card,index)=>{const recipe=rows[index];const batch=recipe[6];const seconds=Math.max(1,Math.round(recipe[7]/CRAFTING_RATE_MULTIPLIER));const rate=(batch*60/seconds).toFixed(1);const value=document.createElement('span');value.className='rate';value.innerHTML=`生産: <b>${batch}個 / ${seconds}秒（${rate}個/分）</b>`;card.querySelector('.recipe-meta').append(value);});});}
 function renderTree(){
 	const depth=new Map(items.filter(item=>item[2]==='raw').map(([id])=>[id,0]));
 	for(let pass=0;pass<items.length;pass++){let changed=false;recipes.forEach(([,title,inputs,output])=>{const inputDepths=inputs.map(([id])=>depth.get(id));if(inputDepths.some(value=>value===undefined))return;const nextDepth=Math.max(...inputDepths)+1;if(nextDepth>(depth.get(output)??-1)){depth.set(output,nextDepth);changed=true;}});if(!changed)break;}
@@ -147,7 +192,7 @@ function renderTree(){
 	const edges=recipes.flatMap(([family,title,inputs,output])=>inputs.map(([input])=>{const source=positions.get(input),target=positions.get(output);if(!source||!target)return '';const x1=source.x+nodeWidth,y1=source.y+nodeHeight/2,x2=target.x,y2=target.y+nodeHeight/2,curve=Math.max(22,(x2-x1)*0.42);return `<path class="tree-edge ${family}" data-family="${family}" data-from="${input}" data-to="${output}" d="M${x1} ${y1} C${x1+curve} ${y1} ${x2-curve} ${y2} ${x2} ${y2}"><title>${itemMap.get(input).name} → ${itemMap.get(output).name} / ${title}</title></path>`;})).join('');
 	const nodes=items.map(([id,name,stage,source,use])=>{const point=positions.get(id);return `<g class="tree-node" data-tree-item="${id}" data-stage="${stage}" transform="translate(${point.x} ${point.y})"><title>${name} / ${source} / ${use}</title><rect width="${nodeWidth}" height="${nodeHeight}" rx="4"/><use href="./item-crafting-icons-draft.svg#i-${id}" x="8" y="8" width="36" height="36"/><text x="52" y="23">${name}</text><text class="node-meta" x="52" y="39">${source}</text></g>`;}).join('');
 	treeSvg.innerHTML=`<defs><marker id="tree-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0 8 4 0 8z" fill="#d4bd75"/></marker></defs>${columns}${edges}${nodes}`;
-	document.querySelector('#tree-caption').textContent=`${items.length} items · ${recipes.length} recipes · ${recipes.reduce((sum,recipe)=>sum+recipe[2].length,0)} material links / 列はレシピ依存段数。数値はすべて検討用レート。`;
+	document.querySelector('#tree-caption').textContent=`${items.length} items · ${recipes.length} recipes · ${recipes.reduce((sum,recipe)=>sum+recipe[2].length,0)} material links / 銅・亜鉛は初期鉱脈から選鉱。材料量は加工5倍・機械組立10倍、一部は100個。合成レートは初稿比約${CRAFTING_RATE_MULTIPLIER}倍、数値はすべて検討用。`;
 	applyTreeZoom(document.querySelector('#tree-zoom').value);
 }
 function applyTreeZoom(value){treeScale=Number(value)/100;treeSvg.style.width=`${treeDimensions.width*treeScale}px`;treeSvg.style.height=`${treeDimensions.height*treeScale}px`;document.querySelector('#tree-zoom').value=String(value);document.querySelector('#tree-zoom-value').value=`${value}%`;document.querySelector('#tree-zoom-value').textContent=`${value}%`;}
@@ -158,6 +203,22 @@ document.querySelector('#tree-fit').addEventListener('click',()=>{const percent=
 treeSearch.addEventListener('input',updateTreeState);
 function updateView(){const query=search.value.trim().toLowerCase();let visible=0;document.querySelectorAll('.recipe-family').forEach(group=>{const allowed=activeFilter==='all'||group.dataset.family===activeFilter;let groupHas=false;group.querySelectorAll('[data-recipe]').forEach(recipe=>{const matches=allowed&&(!query||recipe.dataset.search.includes(query));recipe.hidden=!matches;if(matches){groupHas=true;visible++;}});group.hidden=!groupHas;});document.querySelectorAll('.item-node').forEach(node=>{node.hidden=Boolean(query)&&!node.dataset.search.includes(query);});document.querySelector('#empty').classList.toggle('show',visible===0);updateTreeState();}
 document.querySelectorAll('.filter').forEach(button=>button.addEventListener('click',()=>{activeFilter=button.dataset.filter;document.querySelectorAll('.filter').forEach(item=>item.setAttribute('aria-pressed',String(item===button)));updateView();}));search.addEventListener('input',updateView);
+</script>
+<script type="module">
+import { CRAFTING_ITEMS, CRAFTING_RECIPES } from '../MapSystem/js/craftingData.js?v=1';
+
+items.splice(0, items.length, ...CRAFTING_ITEMS.map(item => [...item]));
+recipes.splice(0, recipes.length, ...CRAFTING_RECIPES.map(recipe => [
+	recipe[0], recipe[1], recipe[2].map(input => [...input]), recipe[3], recipe[4], recipe[5], recipe[6], recipe[7]
+]));
+itemMap.clear();
+items.forEach(([id, name, stage, source, use]) => itemMap.set(id, { id, name, stage, source, use }));
+renderStages();
+renderRecipes();
+renderRecipeRates();
+renderTree();
+updateSummary();
+updateView();
 </script>
 </body>
 </html>
