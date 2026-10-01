@@ -278,6 +278,7 @@ export class UIController {
         if (this.state.selectedItem === 'BELT') {
             const gear = this.selectGearAt(point.x, point.y);
             if (gear && this.isTouchPointer(event)) {
+                this.pointerDownGear = gear;
                 this.startLongPress(gear, event);
                 this.canvas.setPointerCapture(event.pointerId);
             }
@@ -361,7 +362,9 @@ export class UIController {
         // ギア編集、配置確定、または通常の盤面操作を終了する。
         if (event.button === 2) return;
         if (this.state.selectedItem === 'BELT') {
+            if (this.pointerDownGear && this.isTouchPointer(event)) this.openGearPopover(this.pointerDownGear);
             this.cancelLongPress();
+            this.pointerDownGear = null;
             return;
         }
         if (this.pointerDownGear) {

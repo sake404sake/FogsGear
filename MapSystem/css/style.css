@@ -718,6 +718,7 @@ canvas.engine-runtime-canvas { display: none; }
 /* レスポンシブ操作レイアウト */
 @media (min-width: 901px) {
     body { padding: 20px 28px; }
+    body:has(#gameCanvas) { grid-template-columns: minmax(0, 1fr) minmax(360px, 1fr); }
     body > .panel { max-width: 1080px; }
     .map-wrapper { max-width: 1100px !important; }
     #canvas-container { max-width: 1100px; }
@@ -1123,6 +1124,12 @@ canvas.engine-runtime-canvas { display: none; }
     body:has(#gameCanvas) > .panel:last-of-type {
         position: relative;
         z-index: 1;
+    }
+}
+
+@media (min-width: 1001px) and (min-aspect-ratio: 1/1) {
+    body:has(#gameCanvas) {
+        grid-template-columns: minmax(0, 1fr) minmax(360px, 1fr);
     }
 }
 
