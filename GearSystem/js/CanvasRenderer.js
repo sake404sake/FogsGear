@@ -23,6 +23,7 @@ export class CanvasRenderer {
         this.sortedGearSource = null;
         this.gearImages = {};
         this.tintedImages = {};
+        this.gearSprites = new Map();
         this.resizeObserver = null;
         this.loadGearImages();
         this.resizeCanvas();
@@ -53,6 +54,7 @@ export class CanvasRenderer {
             image.onload = () => {
                 this.gearImages[name] = image;
                 this.tintedImages = {};
+                this.gearSprites.clear();
             };
             image.src = `assets/gear-${name}.png`;
         });
@@ -381,10 +383,54 @@ export class CanvasRenderer {
         }
     }
 
-    drawGear(gear, isGhost = false) {
+    getGearSprite(gear) {
+        const palette = this.layerColors[gear.layer % 3];
+        const assetName = gear.isCore ? 'core' : String(gear.designType || 'INDUSTRIAL').toLowerCase();
+        const assetColor = gear.isDeadlocked ? '#b52a2a' : gear.isCore ? '#f5c942' : gear.powered ? palette.fill : '#2f231e';
+        const key = [assetName, assetColor, gear.radius, gear.teeth, gear.layer, gear.pattern, gear.sizeKey, gear.processMode, Boolean(gear.isDeadlocked), Boolean(gear.powered)].join(':');
+        const cached = this.gearSprites.get(key);
+        if (cached) return cached;
+
+        const scale = 2;
+        const padding = Math.max(24, Math.ceil(gear.radius * 0.2));
+        const worldSize = Math.ceil((gear.radius + padding) * 2);
+        const sprite = document.createElement('canvas');
+        sprite.width = worldSize * scale;
+        sprite.height = worldSize * scale;
+        const originalContext = this.ctx;
+        this.ctx = sprite.getContext('2d');
+        this.ctx.scale(scale, scale);
+        this.ctx.translate(worldSize / 2, worldSize / 2);
+        try {
+            this.drawGear({ ...gear, x: 0, y: 0, angle: 0 }, false, false, false);
+        } finally {
+            this.ctx = originalContext;
+        }
+        this.gearSprites.set(key, sprite);
+        return sprite;
+    }
+
+    drawGearLayerLabel(gear) {
+        if (gear.layer <= 0) return;
+        this.ctx.fillStyle = '#f0c674';
+        this.ctx.font = 'bold 10px sans-serif';
+        this.ctx.fillText(`L${gear.layer + 1}`, gear.x - 10, gear.y - gear.radius + 10);
+    }
+
+    drawGear(gear, isGhost = false, useSpriteCache = true, showLayerLabel = true) {
         // 状態に応じた色を選び、画像またはフォールバック図形で1個のギアを描画する。
         const ctx = this.ctx;
         const radius = gear.radius;
+        if (!isGhost && useSpriteCache) {
+            const sprite = this.getGearSprite(gear);
+            ctx.save();
+            ctx.translate(gear.x, gear.y);
+            ctx.rotate(gear.angle);
+            ctx.drawImage(sprite, -sprite.width / 4, -sprite.height / 4, sprite.width / 2, sprite.height / 2);
+            ctx.restore();
+            if (showLayerLabel) this.drawGearLayerLabel(gear);
+            return;
+        }
         const palette = this.layerColors[gear.layer % 3];
         let fill = palette.fill;
         let stroke = palette.stroke;
@@ -420,10 +466,7 @@ export class CanvasRenderer {
             this.drawProcessIndicator(gear, radius, isGhost);
             ctx.shadowBlur = 0;
             ctx.restore();
-            if (!isGhost && gear.layer > 0) {
-                ctx.fillStyle = '#f0c674'; ctx.font = 'bold 10px sans-serif';
-                ctx.fillText(`L${gear.layer + 1}`, gear.x - 10, gear.y - radius + 10);
-            }
+            if (!isGhost && showLayerLabel) this.drawGearLayerLabel(gear);
             return;
         }
         ctx.fillStyle = isGhost ? fill : this.metalGradient(radius, palette, gear.isCore);
@@ -471,10 +514,7 @@ export class CanvasRenderer {
         }
         this.drawProcessIndicator(gear, radius, isGhost);
         ctx.restore();
-        if (!isGhost && gear.layer > 0) {
-            ctx.fillStyle = '#f0c674'; ctx.font = 'bold 10px sans-serif';
-            ctx.fillText(`L${gear.layer + 1}`, gear.x - 10, gear.y - radius + 10);
-        }
+        if (!isGhost && showLayerLabel) this.drawGearLayerLabel(gear);
     }
 
     drawProcessIndicator(gear, radius, isGhost) {

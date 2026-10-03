@@ -268,6 +268,14 @@ h1 {
 .dashboard-shortcuts .dashboard-toggle span { display: grid; place-items: center; width: 20px; height: 20px; color: inherit; border: 1px solid currentColor; border-radius: 3px; font-size: 0.95rem; line-height: 1; }
 .dashboard-popup { position: fixed; top: 50%; left: 50%; z-index: 1050; width: min(650px, calc(100vw - 28px)); max-height: min(70vh, 520px); box-sizing: border-box; margin: 0; transform: translate(-50%, -50%); box-shadow: 0 16px 48px rgba(0, 0, 0, 0.82), 0 0 0 100vmax rgba(6, 5, 4, 0.58); }
 .dashboard-popup[hidden] { display: none; }
+#inventory-panel.dashboard-popup { width: min(860px, calc(100vw - 24px)); max-height: min(88dvh, 760px); overflow: hidden; }
+#inventory-panel.dashboard-popup:not([hidden]) { display: flex; flex-direction: column; }
+#inventory-panel.dashboard-popup[hidden] { display: none !important; }
+#inventory-panel .dashboard-popup-head, #inventory-panel .inventory-view-tabs { flex: 0 0 auto; }
+#inventory-panel .inventory-view:not([hidden]) { display: flex; flex: 1 1 auto; flex-direction: column; min-height: 0; overflow: hidden; }
+#inventory-panel #inventory-item-list, #inventory-panel #building-item-list { flex: 1 1 auto; min-height: 0; max-height: none; overflow-y: auto; overscroll-behavior: contain; }
+#inventory-panel .crafting-filter-row { flex: 0 0 auto; }
+#inventory-panel .crafting-recipe-list { flex: 1 1 auto; min-height: 0; max-height: none; overscroll-behavior: contain; }
 .dashboard-popup-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; min-height: 30px; margin-bottom: 8px; }
 .dashboard-popup-close { flex: 0 0 30px; width: 30px; height: 30px; padding: 0; color: var(--text-muted); background: transparent; border: 0; font-size: 1.5rem; line-height: 1; cursor: pointer; }
 .dashboard-popup-close:hover { color: #f7d77d; }
@@ -322,9 +330,35 @@ h1 {
 .inventory-item-card { width: 100%; color: var(--text-main); background: rgba(98, 194, 170, 0.05); font: inherit; text-align: left; cursor: pointer; }
 .inventory-item-card:hover { color: #f7d77d; background: rgba(98, 194, 170, 0.18); border-color: rgba(243, 198, 83, 0.65); }
 .inventory-view-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; margin: 8px 0; }
+.inventory-view-tabs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .inventory-view-tab { min-height: 34px; color: #c6aa72; background: #1c1511; border: 1px solid var(--border-sub); cursor: pointer; }
 .inventory-view-tab.active { color: #fff1b1; border-color: #62c2aa; background: rgba(98, 194, 170, 0.12); }
 .inventory-item-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 6px; max-height: 42vh; overflow-y: auto; }
+.building-item-grid { max-height: 50vh; }
+.building-item-card { grid-template-columns: 42px minmax(0, 1fr); min-height: 58px; border: 1px solid rgba(198, 154, 82, 0.3); }
+.building-item-icon { display: grid; place-items: center; width: 36px; height: 36px; overflow: hidden; color: #e5c25d; background: linear-gradient(145deg, #61756a, #26372f); border: 1px solid #a27c42; }
+.building-item-icon-svg { display: block; width: 100%; height: 100%; }
+.building-item-copy { display: grid; min-width: 0; gap: 3px; }
+.building-item-name { overflow-wrap: anywhere; color: #f0dfb0; font-size: 0.7rem; line-height: 1.2; }
+.building-item-meta { color: var(--text-muted); font: 0.58rem/1.25 monospace; }
+.building-item-meta.is-affordable { color: #8edbc6; }
+.building-item-meta.is-unaffordable { color: #e49a79; }
+.building-item-card.is-foundation .building-item-icon { background: linear-gradient(145deg, #7a8581, #3e4844); }
+.building-item-card.is-decoration .building-item-icon { background: linear-gradient(145deg, #876b43, #47392b); }
+.building-item-card.is-rail .building-item-icon { color: #d8d2bf; background: linear-gradient(145deg, #656c68, #343936); }
+.building-item-card.is-vehicle .building-item-icon { color: #f0d37b; background: linear-gradient(145deg, #76513a, #352a20); }
+.building-placement-controls { display: grid; gap: 7px; margin: 0 auto 8px; padding: 9px; color: #f0dfb0; background: linear-gradient(145deg, rgba(46, 38, 26, .98), rgba(20, 20, 17, .98)); border: 1px solid #b68b48; box-shadow: 0 4px 14px rgba(0, 0, 0, .42); font-size: .72rem; }
+.building-placement-controls[hidden] { display: none; }
+.building-placement-controls.is-invalid { border-color: #bd6551; }
+.building-placement-orientation { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: #d8c17b; font: .68rem monospace; }
+.building-placement-orientation[hidden] { display: none !important; }
+.building-placement-orientation .btn { min-height: 34px; padding: 4px 10px; }
+.building-placement-continuous { display: flex; align-items: center; gap: 7px; min-height: 32px; color: #e8d39e; cursor: pointer; }
+.building-placement-continuous input { width: 17px; height: 17px; margin: 0; accent-color: #c79b4c; }
+.building-placement-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.building-placement-actions .btn { min-height: 40px; }
+.building-placement-actions .btn:disabled { opacity: .45; cursor: not-allowed; }
+.building-menu-panel { max-width: 430px; }
 .inventory-item-card { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; align-items: center; gap: 6px; min-height: 48px; padding: 5px 7px; }
 .inventory-item-icon, .crafting-item-icon { display: inline-grid; place-items: center; width: 32px; height: 32px; flex: 0 0 32px; color: #e5c25d; font-size: 1.25rem; }
 .inventory-item-icon svg, .crafting-item-icon svg { display: block; width: 100%; height: 100%; }
@@ -334,17 +368,37 @@ h1 {
 .crafting-filter-row { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 8px; margin-bottom: 8px; color: #a7f0d9; font-size: 0.72rem; }
 .crafting-filter-row select { min-width: 0; width: 100%; padding: 5px; color: var(--text-main); background: #1c1511; border: 1px solid var(--border-sub); }
 .crafting-recipe-list { display: grid; gap: 7px; max-height: 48vh; overflow-y: auto; }
-.crafting-recipe-card { min-width: 0; padding: 8px; border: 1px solid rgba(198, 154, 82, 0.35); background: rgba(18, 14, 12, 0.5); }
-.crafting-recipe-title { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; color: #f3d27a; font-size: 0.75rem; }
+.crafting-recipe-card { display: grid; gap: 9px; min-width: 0; padding: 11px; border: 1px solid rgba(198, 154, 82, 0.35); background: rgba(18, 14, 12, 0.5); }
+.crafting-recipe-title { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; color: #f3d27a; font-size: 0.8rem; }
 .crafting-recipe-title small { color: var(--text-muted); font-size: 0.62rem; }
-.crafting-recipe-flow { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; margin: 7px 0; }
-.crafting-item-chip { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; padding: 2px 5px 2px 2px; color: var(--text-main); background: rgba(98, 194, 170, 0.08); border: 1px solid rgba(98, 194, 170, 0.25); font-size: 0.65rem; }
-.crafting-item-chip .crafting-item-icon { width: 22px; height: 22px; flex-basis: 22px; font-size: 0.9rem; }
+.crafting-recipe-output { display: grid; gap: 3px; padding: 8px 10px; background: linear-gradient(100deg, rgba(193, 143, 63, .18), rgba(35, 46, 39, .72)); border: 1px solid rgba(225, 189, 98, .62); border-left: 3px solid #e1bd62; }
+.crafting-output-caption, .crafting-materials-caption { color: #c6aa72; font: .6rem/1.3 monospace; }
+.crafting-output-main { display: grid; grid-template-columns: 46px minmax(0, 1fr) auto; align-items: center; gap: 9px; min-width: 0; }
+.crafting-output-icon { display: grid; place-items: center; width: 44px; height: 44px; color: #f1d17c; background: rgba(7, 13, 10, .56); border: 1px solid rgba(225, 189, 98, .38); }
+.crafting-output-icon svg { display: block; width: 100%; height: 100%; }
+.crafting-output-name { min-width: 0; color: #fff0bd; font-size: .92rem; line-height: 1.2; overflow-wrap: anywhere; }
+.crafting-output-count { padding: 4px 8px; color: #21190f; background: #e1bd62; font: 700 .75rem monospace; white-space: nowrap; }
+.crafting-recipe-materials { display: grid; gap: 5px; }
+.crafting-materials-list { display: flex; flex-wrap: wrap; gap: 5px; min-width: 0; }
+.crafting-item-chip { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; align-items: center; gap: 5px; flex: 1 1 150px; min-width: 0; max-width: 100%; min-height: 34px; padding: 3px 7px 3px 3px; color: var(--text-main); background: rgba(98, 194, 170, 0.08); border: 1px solid rgba(98, 194, 170, 0.25); font-size: 0.68rem; }
+.crafting-item-chip .crafting-item-icon { width: 24px; height: 24px; flex-basis: 24px; font-size: 0.9rem; }
+.crafting-item-name { min-width: 0; line-height: 1.2; overflow-wrap: anywhere; }
+.crafting-item-quantity { color: #f0d17b; font: 700 .68rem monospace; white-space: nowrap; }
 .crafting-recipe-plus, .crafting-recipe-arrow { color: #d8c47c; font-size: 0.72rem; }
 .crafting-recipe-footer { display: flex; justify-content: space-between; align-items: center; gap: 8px; color: var(--text-muted); font-size: 0.62rem; }
 .crafting-recipe-footer button { min-width: 66px; min-height: 30px; padding: 4px 8px; color: #f7d77d; background: rgba(98, 194, 170, 0.12); border: 1px solid rgba(98, 194, 170, 0.5); cursor: pointer; }
 .crafting-recipe-footer button:disabled { opacity: 0.4; cursor: not-allowed; }
 .crafting-recipe-note { margin-top: 4px; color: var(--text-muted); font-size: 0.62rem; line-height: 1.35; }
+@media(max-width:520px){
+    #inventory-panel.dashboard-popup { width: calc(100vw - 16px); max-height: 90dvh; padding: 10px; }
+    #inventory-panel .dashboard-popup-head { margin-bottom: 5px; }
+    #inventory-panel .inventory-view-tabs { margin: 5px 0 8px; }
+    .crafting-recipe-card { gap: 7px; padding: 8px; }
+    .crafting-output-main { grid-template-columns: 40px minmax(0, 1fr) auto; gap: 7px; }
+    .crafting-output-icon { width: 38px; height: 38px; }
+    .crafting-output-name { font-size: .84rem; }
+    .crafting-item-chip { flex-basis: 130px; }
+}
 .crafting-view[hidden], .inventory-view[hidden] { display: none !important; }
 .inventory-scroll-button {
     background: linear-gradient(180deg, rgba(98, 194, 170, 0.2), rgba(98, 194, 170, 0.08));
@@ -618,6 +672,8 @@ h1 {
 }
 
 .engine-runtime-canvas { position: fixed; left: -10000px; top: -10000px; width: 1px; height: 1px; pointer-events: none; opacity: 0; }
+.vehicle-animation-layer { position: absolute; inset: 0; z-index: 2; overflow: hidden; pointer-events: none; }
+.vehicle-motion-sprite { position: absolute; left: 0; top: 0; display: block; image-rendering: auto; will-change: transform; }
 
 canvas {
     display: block;
@@ -718,7 +774,7 @@ canvas.engine-runtime-canvas { display: none; }
 /* レスポンシブ操作レイアウト */
 @media (min-width: 901px) {
     body { padding: 20px 28px; }
-    body:has(#gameCanvas) { grid-template-columns: minmax(0, 1fr) minmax(360px, 1fr); }
+    body:has(#gameCanvas) { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
     body > .panel { max-width: 1080px; }
     .map-wrapper { max-width: 1100px !important; }
     #canvas-container { max-width: 1100px; }
@@ -1129,7 +1185,7 @@ canvas.engine-runtime-canvas { display: none; }
 
 @media (min-width: 1001px) and (min-aspect-ratio: 1/1) {
     body:has(#gameCanvas) {
-        grid-template-columns: minmax(0, 1fr) minmax(360px, 1fr);
+        grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
     }
 }
 

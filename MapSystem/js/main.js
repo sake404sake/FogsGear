@@ -2,17 +2,22 @@
 import { MapGenerator, BIOME_COLORS, loadMapSnapshot, saveMapSnapshot } from './mapGenerator.js?v=89';
 import { SkinRenderer } from './skinRenderer.js?v=2';
 import { CELL_DEFINITIONS, canEnterCell, getCellEntryRule, getMosaicColor } from './cellRules.js';
-import { drawCellIcon, loadCellIconAtlas } from './cellIconRenderer.js?v=3';
-import { ACTIVE_SCROLL_TARGETS_KEY, CELL_MATERIALS, TERRAIN_TRANSFORM_RECIPES, WORLD_CELL_TYPES, applyCellChanges, chooseEraCellType, getCellCollectionPowerCost, getCellDrops, readCellChanges, saveCellChange } from './worldCells.js?v=3';
+import { drawCellIcon, loadCellIconAtlas } from './cellIconRenderer.js?v=4';
+import { ACTIVE_SCROLL_TARGETS_KEY, CELL_MATERIALS, TERRAIN_TRANSFORM_RECIPES, WORLD_CELL_TYPES, applyCellChanges, chooseEraCellType, getCellCollectionPowerCost, getCellDrops, readCellChanges, saveCellChange } from './worldCells.js?v=4';
 import { CRAFTING_ITEMS, CRAFTING_ITEM_BY_ID, CRAFTING_RATE_MULTIPLIER, CRAFTING_RECIPES } from './craftingData.js?v=2';
+import { BUILDING_BY_ID, BUILDING_DEFINITIONS, canPlaceBuildingOnTerrainCell, drawBuilding, getRailAutoRotation, getRailConnections, getTileEffectsUnderFootprint, getVehicleRailRotation, loadBuildingIconImages } from './buildingData.js?v=15';
 import { buildTerritoryBorderSegments } from './territoryBorders.js?v=35';
-import { GameState as EngineGameState } from '../../GearSystem/js/GameState.js?v=runtime-24';
+import { directionToVehicleRotation, findNextRailStep, getTrackDirection, getVehicleRenderState, STATION_CONTROL_DEFAULTS, VEHICLE_DEFAULTS } from './railwayRuntime.js?v=8';
+import { GameState as EngineGameState } from '../../GearSystem/js/GameState.js?v=runtime-25';
 import { GearManager as EngineGearManager } from '../../GearSystem/js/GearManager.js?v=runtime-5';
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
+const vehicleAnimationLayer = document.getElementById('vehicleAnimationLayer');
+const vehicleMotionSprites = new Map();
 let cellIconAtlas = null;
 const INVENTORY_ITEMS_KEY = 'steampunk_explorer_inventory_items';
+const BUILDINGS_STORAGE_KEY = 'fogsgear_world_buildings';
 
 const state = {
     player: {
@@ -40,10 +45,15 @@ const state = {
     generator: null,
     skin: new SkinRenderer(),
     inventoryItems: new Set(),
+    buildings: [],
     cellChanges: {},
     activeScrollTargets: {},
     cellEntryRules: { types: {}, cells: {} }
 };
+let activeBuildingPlacement = null;
+let selectedBuildingInstanceId = null;
+let buildingPressCandidate = null;
+let buildingPressTimer = null;
 try {
     const savedItems = JSON.parse(localStorage.getItem(INVENTORY_ITEMS_KEY) || '[]');
     if (Array.isArray(savedItems)) state.inventoryItems = new Set(savedItems.filter(item => typeof item === 'string'));
@@ -54,7 +64,7 @@ const MAP_UNLOCK_KEY = 'fogsgear_world_unlocks';
 const COASTAL_MAP_SIZE = { width: 640, height: 360 };
 const FULL_MAP_SIZE = { width: 2000, height: 1000 };
 const SAVE_BACKUP_FORMAT = 'fogsgear-save';
-const SAVE_BACKUP_VERSION = 2;
+const SAVE_BACKUP_VERSION = 3;
 const CELL_CHANGES_PREFIX = 'fogsgear_world_cell_changes:';
 const LEGACY_SAVE_BACKUP_KEYS = [
     'fog_thermo_save',
@@ -73,6 +83,7 @@ const LEGACY_SAVE_BACKUP_KEYS = [
 const SAVE_BACKUP_KEYS = [
     ...LEGACY_SAVE_BACKUP_KEYS,
     INVENTORY_ITEMS_KEY,
+    BUILDINGS_STORAGE_KEY,
     'fogsgear_active_scroll_id',
     'fogsgear_active_scroll_running',
     ACTIVE_SCROLL_TARGETS_KEY,
@@ -111,17 +122,18 @@ let initialZoom = 1.0;
 let selectedSavedScrollId = null;
 let inventoryRenderSignature = '';
 let craftingRenderSignature = '';
+let buildingRenderSignature = '';
 
 const INVENTORY_ITEM_DEFINITIONS = {
-    paper_scroll: { name: 'スクロール（紙）', description: '新しいギア設計を記録する紙の巻物。ギア編集画面で設計を作成できます。', icon: '📜', image: null, meta: '未使用・新規設計用' },
-    cloth_scroll: { name: 'スクロール（布）', description: '新しいギア設計を記録する布の巻物。ギア編集画面で設計を作成できます。', icon: '🧵', image: null, meta: '未使用・新規設計用' },
-    scroll_book: { name: 'スクロールブック', description: '保存済みスクロールを一覧で確認し、使用やギア編集を行える記録帳です。', icon: '📖', image: null, meta: '保存済み設計図' }
+    paper_scroll: { name: 'スクロール（紙）', description: '新しいギア設計を記録する紙の巻物。ギア編集画面で設計を作成できます。', iconId: 'paper_scroll', image: null, meta: '未使用・新規設計用' },
+    cloth_scroll: { name: 'スクロール（布）', description: '新しいギア設計を記録する布の巻物。ギア編集画面で設計を作成できます。', iconId: 'cloth_scroll', image: null, meta: '未使用・新規設計用' },
+    scroll_book: { name: 'スクロールブック', description: '保存済みスクロールを一覧で確認し、使用やギア編集を行える記録帳です。', iconId: 'scroll_book', image: null, meta: '保存済み設計図' }
 };
 
 function openInventoryItem(itemKey, scroll = null) {
     const craftingItem = CRAFTING_ITEM_BY_ID.get(itemKey);
     const definition = craftingItem
-        ? { name: craftingItem[1], description: craftingItem[4], meta: `${craftingItem[2]} / ${craftingItem[3]}`, icon: CELL_MATERIALS[itemKey]?.icon || '◈' }
+        ? { name: craftingItem[1], description: craftingItem[4], meta: `${craftingItem[2]} / ${craftingItem[3]}`, iconId: itemKey }
         : INVENTORY_ITEM_DEFINITIONS[itemKey] || INVENTORY_ITEM_DEFINITIONS.paper_scroll;
     const modal = document.getElementById('inventory-item-modal');
     const icon = document.getElementById('inventory-modal-icon');
@@ -129,11 +141,7 @@ function openInventoryItem(itemKey, scroll = null) {
     const editButton = document.getElementById('inventory-modal-edit');
     if (!modal || !icon) return;
     icon.replaceChildren();
-    if (craftingItem) {
-        icon.appendChild(createCraftingIcon(itemKey));
-    } else {
-        icon.textContent = definition.icon;
-    }
+    icon.appendChild(createCraftingIcon(definition.iconId || itemKey));
     if (definition.image) {
         const image = document.createElement('img');
         image.src = definition.image;
@@ -161,7 +169,7 @@ function createCraftingIcon(itemId) {
     const use = document.createElementNS(svgNamespace, 'use');
     svg.setAttribute('viewBox', '0 0 64 64');
     svg.setAttribute('aria-hidden', 'true');
-    use.setAttribute('href', `../MainSystem/icons/items/crafting-icons.svg?v=1#i-${itemId}`);
+    use.setAttribute('href', `../MainSystem/icons/items/crafting-icons.svg?v=2#i-${itemId}`);
     svg.appendChild(use);
     return svg;
 }
@@ -268,6 +276,11 @@ function validateSaveBackupValue(key, value) {
         if (!Array.isArray(parsed)) throw new Error('スクロール履歴が不正です。');
     } else if (key === INVENTORY_ITEMS_KEY) {
         if (!Array.isArray(parsed) || parsed.some(item => typeof item !== 'string')) throw new Error('所持アイテムのデータが不正です。');
+    } else if (key === BUILDINGS_STORAGE_KEY) {
+        if (!Array.isArray(parsed) || parsed.some(building => !isRecord(building)
+            || typeof building.id !== 'string' || !BUILDING_BY_ID.has(building.id)
+            || !Number.isInteger(building.x) || !Number.isInteger(building.y)
+            || typeof building.instanceId !== 'string')) throw new Error('建築物の配置データが不正です。');
     } else if (key === ACTIVE_SCROLL_TARGETS_KEY) {
         if (!isRecord(parsed) || Object.values(parsed).some(target => !isRecord(target) || !Number.isInteger(target.x) || !Number.isInteger(target.y))) throw new Error('スクロール対象位置が不正です。');
     } else if (key === 'fogsgear_active_scroll_sync_state') {
@@ -278,11 +291,13 @@ function validateSaveBackupValue(key, value) {
 }
 
 function validateSaveBackup(backup) {
-    if (!isRecord(backup) || backup.format !== SAVE_BACKUP_FORMAT || ![1, SAVE_BACKUP_VERSION].includes(backup.version)) {
+    if (!isRecord(backup) || backup.format !== SAVE_BACKUP_FORMAT || ![1, 2, SAVE_BACKUP_VERSION].includes(backup.version)) {
         throw new Error('FogsGearの対応セーブJSONではありません。');
     }
     if (!isRecord(backup.data) || !isRecord(backup.cellChanges)) throw new Error('セーブJSONの構造が不正です。');
-    const requiredKeys = backup.version === 1 ? LEGACY_SAVE_BACKUP_KEYS : SAVE_BACKUP_KEYS;
+    const requiredKeys = backup.version === 1 ? LEGACY_SAVE_BACKUP_KEYS
+        : backup.version === 2 ? SAVE_BACKUP_KEYS.filter(key => key !== BUILDINGS_STORAGE_KEY)
+            : SAVE_BACKUP_KEYS;
     for (const key of requiredKeys) {
         if (!Object.hasOwn(backup.data, key)) throw new Error('セーブJSONに必要な項目がありません。');
         validateSaveBackupValue(key, backup.data[key]);
@@ -566,11 +581,10 @@ async function init() {
     state.cellEntryRules = loadCellEntryRules();
     state.zoom = Math.max(state.minZoom, Number(settings.zoom));
     state.worldSeed = String(settings.seed || 'SteampunkIsland_01');
-    try {
-        cellIconAtlas = await loadCellIconAtlas();
-    } catch (error) {
+    const cellIconPromise = loadCellIconAtlas().catch(error => {
         console.warn('Cell icon atlas failed to load; rendering the map without terrain icons.');
-    }
+        return null;
+    });
     const mainlandUnlocked = isMainlandUnlocked();
     const mapSize = mainlandUnlocked ? FULL_MAP_SIZE : COASTAL_MAP_SIZE;
     state.cols = mapSize.width;
@@ -585,7 +599,7 @@ async function init() {
         saveMapSnapshot(generated, state.worldSeed, mapSize.width, mapSize.height).catch(() => {});
     }
     state.map = generated.grid;
-    state.map.forEach(row => row.forEach(tile => { tile.initialType = tile.type; }));
+    loadBuildings();
     state.cellChanges = applyCellChanges(state.map, state.worldSeed);
     try {
         const targets = JSON.parse(localStorage.getItem(ACTIVE_SCROLL_TARGETS_KEY) || '{}');
@@ -593,14 +607,14 @@ async function init() {
     } catch (error) {
         state.activeScrollTargets = {};
     }
-    state.territories = generated.territories || [];
+    state.territories = state.generator.coastalOnly ? [] : generated.territories || [];
     state.rivers = generated.rivers || [];
     state.ruins = generated.ruins || [];
     state.routes = generated.routes || [];
-    state.territoryBorderSegments = buildTerritoryBorderSegments(state.map);
+    state.territoryBorderSegments = state.generator.coastalOnly ? [] : buildTerritoryBorderSegments(state.map);
     state.labels = buildLabelEntries();
 
-    findSafeSpawn();
+    findSafeSpawn(generated.playerPos);
 
     let savedSkin = './5504543579.png';
     let savedSkinName = '5504543579.png';
@@ -611,12 +625,6 @@ async function init() {
         if (storedName && savedSkin !== './5504543579.png') savedSkinName = storedName;
     } catch(e) {}
 
-    try {
-        await loadAndApplySkin(savedSkin, savedSkinName);
-    } catch(e) {
-        console.warn('Skin load failed, using fallback');
-    }
-
     resize();
     centerCameraOnPlayer();
     updateUI();
@@ -625,13 +633,56 @@ async function init() {
     renderCellLegend();
     gameLoop();
     document.getElementById('loadingOverlay')?.setAttribute('hidden', '');
+    cellIconPromise.then(atlas => {
+        if (!atlas) return;
+        cellIconAtlas = atlas;
+        scheduleDraw();
+    });
+    const placedBuildingIds = [...new Set(state.buildings.map(placed => placed.id))];
+    const loadDeferredAssets = () => {
+        loadAndApplySkin(savedSkin, savedSkinName).then(scheduleDraw).catch(error => {
+            console.warn('Skin load failed, using fallback');
+        });
+        if (!placedBuildingIds.length) return;
+        loadBuildingIconImages(placedBuildingIds).then(() => {
+            buildingRenderSignature = '';
+            if (!document.getElementById('inventory-building-view')?.hidden) renderBuildingInventory();
+            scheduleDraw();
+        }).catch(error => {
+            console.warn('Building SVG atlas failed to load; rendering fallback building icons.');
+        });
+    };
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+        if (window.requestIdleCallback) window.requestIdleCallback(loadDeferredAssets, { timeout: 1500 });
+        else window.setTimeout(loadDeferredAssets, 0);
+    }));
 }
 
-function findSafeSpawn() {
+function findSafeSpawn(preferredPosition = null) {
     let savedPlayer = null;
     try {
         savedPlayer = JSON.parse(localStorage.getItem('steampunk_explorer_player_pos'));
     } catch(e) {}
+
+    const isSafePosition = position => {
+        if (!Number.isInteger(position?.x) || !Number.isInteger(position?.y)
+            || position.x < 0 || position.x >= state.cols || position.y < 0 || position.y >= state.rows) return false;
+        const tile = state.map[position.y]?.[position.x];
+        return Boolean(tile?.isIsland && tile.isLand && !tile.isSea && !tile.isOcean && !tile.isLake);
+    };
+    const hasSavedPosition = savedPlayer && savedPlayer.spawnVersion === 4 && savedPlayer.seed === state.worldSeed;
+    if (hasSavedPosition && isSafePosition(savedPlayer)) {
+        state.player.x = savedPlayer.x;
+        state.player.y = savedPlayer.y;
+        savePlayerPos();
+        return;
+    }
+    if (isSafePosition(preferredPosition)) {
+        state.player.x = preferredPosition.x;
+        state.player.y = preferredPosition.y;
+        savePlayerPos();
+        return;
+    }
 
     const visited = new Set();
     const islandComponents = [];
@@ -675,18 +726,6 @@ function findSafeSpawn() {
             return neighbor?.isSea || neighbor?.isOcean;
         });
     };
-
-    const hasSavedPosition = savedPlayer && savedPlayer.spawnVersion === 4 && savedPlayer.seed === state.worldSeed && Number.isInteger(savedPlayer.x) && Number.isInteger(savedPlayer.y);
-    if (hasSavedPosition) {
-        const tx = savedPlayer.x;
-        const ty = savedPlayer.y;
-        if (tx >= 0 && tx < state.cols && ty >= 0 && ty < state.rows && largestIslandSet.has(`${tx},${ty}`)) {
-            state.player.x = tx;
-            state.player.y = ty;
-            savePlayerPos();
-            return;
-        }
-    }
 
     const islandCenterX = Math.floor(state.cols * (state.generator.coastalOnly ? 0.5 : 0.86));
     const islandCenterY = Math.floor(state.rows * (state.generator.coastalOnly ? 0.5 : 0.56));
@@ -792,7 +831,7 @@ function handleWorldCellOperation(operation) {
             transformCount: nextTransformCount,
             collectionCount: nextCollectionCount
         });
-        if (typeChanged) state.territoryBorderSegments = buildTerritoryBorderSegments(state.map);
+        if (typeChanged) state.territoryBorderSegments = state.generator.coastalOnly ? [] : buildTerritoryBorderSegments(state.map);
         updateUI();
         scheduleDraw();
     };
@@ -879,17 +918,128 @@ function formatInventoryCount(itemId, count) {
     return amount.toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1');
 }
 
+function createBuildingSvgIcon(buildingId) {
+    const namespace = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(namespace, 'svg');
+    const use = document.createElementNS(namespace, 'use');
+    svg.classList.add('building-item-icon-svg');
+    svg.setAttribute('viewBox', '0 0 96 96');
+    svg.setAttribute('aria-hidden', 'true');
+    use.setAttribute('href', `assets/building-icons.svg?v=1#building-${buildingId}`);
+    use.setAttribute('x', '0');
+    use.setAttribute('y', '0');
+    use.setAttribute('width', '96');
+    use.setAttribute('height', '96');
+    svg.appendChild(use);
+    return svg;
+}
+
+function renderBuildingInventory() {
+    if (document.getElementById('inventory-building-view')?.hidden) return;
+    const list = document.getElementById('building-item-list');
+    if (!list || !engineRuntimeState) return;
+    const brass = Math.max(0, Number(engineRuntimeState.brass) || 0);
+    const creative = Boolean(engineRuntimeState.creativeMode);
+    const signature = `${brass}:${creative}`;
+    if (signature === buildingRenderSignature) return;
+    buildingRenderSignature = signature;
+    list.replaceChildren();
+    BUILDING_DEFINITIONS.forEach(building => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = `inventory-item-card building-item-card is-${building.role}`;
+        button.dataset.action = 'select-building';
+        button.dataset.buildingId = building.id;
+        const icon = document.createElement('span');
+        icon.className = 'building-item-icon';
+        icon.appendChild(createBuildingSvgIcon(building.id));
+        const copy = document.createElement('span');
+        copy.className = 'building-item-copy';
+        const name = document.createElement('strong');
+        name.className = 'building-item-name';
+        name.textContent = building.name;
+        const cost = document.createElement('small');
+        const affordable = creative || brass >= building.brassCost;
+        cost.className = `building-item-meta ${affordable ? 'is-affordable' : 'is-unaffordable'}`;
+        const placementRule = building.requiresFoundation ? ' / 基礎必須' : building.role === 'vehicle' ? ' / 線路必須' : '';
+        cost.textContent = `${building.width}×${building.height} / 真鍮 ${building.brassCost}${placementRule}${affordable ? '' : ' 不足'}`;
+        copy.append(name, cost);
+        button.append(icon, copy);
+        list.appendChild(button);
+    });
+}
+
+function saveBuildings() {
+    try {
+        localStorage.setItem(BUILDINGS_STORAGE_KEY, JSON.stringify(state.buildings));
+    } catch (error) {
+        showAppNotice('建築物を保存できませんでした。');
+    }
+}
+
+function loadBuildings() {
+    try {
+        const saved = JSON.parse(localStorage.getItem(BUILDINGS_STORAGE_KEY) || '[]');
+        const validBuildings = Array.isArray(saved) ? saved.filter(building => isRecord(building)
+            && BUILDING_BY_ID.has(building.id) && Number.isInteger(building.x) && Number.isInteger(building.y)
+            && typeof building.instanceId === 'string'
+            && building.x >= 0 && building.y >= 0
+            && building.x + BUILDING_BY_ID.get(building.id).width <= state.cols
+            && building.y + BUILDING_BY_ID.get(building.id).height <= state.rows) : [];
+        const railPositions = new Set(validBuildings.filter(building => BUILDING_BY_ID.get(building.id)?.role === 'rail')
+            .map(building => `${building.x},${building.y}`));
+        let migrated = false;
+        state.buildings = validBuildings.map(building => {
+            const placed = { ...building };
+            const definition = BUILDING_BY_ID.get(placed.id);
+            if (definition.role === 'vehicle') {
+                if (!isRecord(placed.vehicle)) {
+                    const legacyCenter = { x: placed.x + 1, y: placed.y + 1 };
+                    if (railPositions.has(`${legacyCenter.x},${legacyCenter.y}`)) Object.assign(placed, legacyCenter);
+                    placed.vehicle = { ...VEHICLE_DEFAULTS, resources: { ...VEHICLE_DEFAULTS.resources } };
+                    migrated = true;
+                } else {
+                    const hasVehicleResources = isRecord(placed.vehicle.resources);
+                    placed.vehicle = {
+                        ...VEHICLE_DEFAULTS,
+                        ...placed.vehicle,
+                        resources: { ...VEHICLE_DEFAULTS.resources, ...(isRecord(placed.vehicle.resources) ? placed.vehicle.resources : {}) }
+                    };
+                    if (!hasVehicleResources) migrated = true;
+                    if (placed.vehicle.running) {
+                        placed.vehicle.running = false;
+                        placed.vehicle.stopReason = '再読み込み後は停止';
+                        placed.vehicle.previousRail = null;
+                        placed.vehicle.movement = null;
+                        placed.vehicle.nextMoveAt = 0;
+                        migrated = true;
+                    }
+                }
+            } else if (definition.kind === 'station' && !isRecord(placed.stationControl)) {
+                placed.stationControl = { ...STATION_CONTROL_DEFAULTS, destinations: [], conditions: [] };
+                migrated = true;
+            }
+            return placed;
+        });
+        if (migrated) saveBuildings();
+    } catch (error) {
+        state.buildings = [];
+    }
+}
+
 function createInventoryIcon(itemId) {
-    if (CRAFTING_ITEM_BY_ID.has(itemId)) return createCraftingIcon(itemId);
+    if (CRAFTING_ITEM_BY_ID.has(itemId) || itemId === 'grain' || itemId === 'paper_scroll' || itemId === 'cloth_scroll' || itemId === 'scroll_book' || itemId === 'fog' || itemId === 'power' || itemId === 'steam_power') {
+        return createCraftingIcon(itemId);
+    }
     const icon = document.createElement('span');
     icon.className = 'inventory-item-icon-fallback';
-    icon.textContent = CELL_MATERIALS[itemId]?.icon || INVENTORY_ITEM_DEFINITIONS[itemId]?.icon
-        || ({ fog: '≋', power: '⚙', steam_power: '♨' }[itemId]) || '◈';
+    icon.textContent = '・';
     return icon;
 }
 
 function renderCellMaterials() {
     if (!engineRuntimeState) return;
+    renderBuildingInventory();
     const inventoryList = document.getElementById('inventory-item-list');
     const inventoryIds = new Set(Object.entries(engineRuntimeState.materialInventory || {})
         .filter(([, count]) => Number(count) > 0)
@@ -933,7 +1083,7 @@ function renderCellMaterials() {
     }
 
     const recipeList = document.getElementById('crafting-recipe-list');
-    if (!recipeList) return;
+    if (!recipeList || document.getElementById('inventory-crafting-view')?.hidden) return;
     const selectedFamily = document.getElementById('crafting-family-filter')?.value || 'all';
     const visibleRecipes = CRAFTING_RECIPES.map((recipe, index) => ({ recipe, index }))
         .filter(({ recipe }) => selectedFamily === 'all' || recipe[0] === selectedFamily);
@@ -956,21 +1106,34 @@ function renderCellMaterials() {
         const groupText = document.createElement('small');
         groupText.textContent = family;
         heading.append(titleText, groupText);
-        const flow = document.createElement('div');
-        flow.className = 'crafting-recipe-flow';
-        inputs.forEach(([itemId, amount], inputIndex) => {
-            if (inputIndex > 0) {
-                const plus = document.createElement('span');
-                plus.className = 'crafting-recipe-plus';
-                plus.textContent = '+';
-                flow.appendChild(plus);
-            }
-            flow.appendChild(createCraftingChip(itemId, amount));
-        });
-        const arrow = document.createElement('span');
-        arrow.className = 'crafting-recipe-arrow';
-        arrow.textContent = '→';
-        flow.append(arrow, createCraftingChip(output, batch));
+        const outputBlock = document.createElement('div');
+        outputBlock.className = 'crafting-recipe-output';
+        const outputCaption = document.createElement('span');
+        outputCaption.className = 'crafting-output-caption';
+        outputCaption.textContent = '生成物';
+        const outputMain = document.createElement('div');
+        outputMain.className = 'crafting-output-main';
+        const outputIcon = document.createElement('span');
+        outputIcon.className = 'crafting-output-icon';
+        outputIcon.appendChild(createInventoryIcon(output));
+        const outputName = document.createElement('strong');
+        outputName.className = 'crafting-output-name';
+        outputName.textContent = getCraftingItemName(output);
+        const outputCount = document.createElement('span');
+        outputCount.className = 'crafting-output-count';
+        outputCount.textContent = `×${batch}`;
+        outputMain.append(outputIcon, outputName, outputCount);
+        outputBlock.append(outputCaption, outputMain);
+
+        const materialsBlock = document.createElement('div');
+        materialsBlock.className = 'crafting-recipe-materials';
+        const materialsCaption = document.createElement('span');
+        materialsCaption.className = 'crafting-materials-caption';
+        materialsCaption.textContent = '必要素材';
+        const materialsList = document.createElement('div');
+        materialsList.className = 'crafting-materials-list';
+        inputs.forEach(([itemId, amount]) => materialsList.appendChild(createCraftingChip(itemId, amount)));
+        materialsBlock.append(materialsCaption, materialsList);
         const footer = document.createElement('div');
         footer.className = 'crafting-recipe-footer';
         const stationLabel = document.createElement('span');
@@ -987,7 +1150,7 @@ function renderCellMaterials() {
         const noteElement = document.createElement('p');
         noteElement.className = 'crafting-recipe-note';
         noteElement.textContent = note;
-        card.append(heading, flow, footer, noteElement);
+        card.append(heading, outputBlock, materialsBlock, footer, noteElement);
         recipeList.appendChild(card);
     });
 }
@@ -999,8 +1162,12 @@ function createCraftingChip(itemId, amount) {
     icon.className = 'crafting-item-icon';
     icon.appendChild(createInventoryIcon(itemId));
     const label = document.createElement('span');
-    label.textContent = `${getCraftingItemName(itemId)} ×${amount}`;
-    chip.append(icon, label);
+    label.className = 'crafting-item-name';
+    label.textContent = getCraftingItemName(itemId);
+    const quantity = document.createElement('strong');
+    quantity.className = 'crafting-item-quantity';
+    quantity.textContent = `×${amount}`;
+    chip.append(icon, label, quantity);
     return chip;
 }
 
@@ -1149,6 +1316,88 @@ function scheduleDraw() {
     });
 }
 
+let vehicleFrameQueued = false;
+
+function scheduleVehicleAnimation() {
+    if (vehicleFrameQueued) return;
+    vehicleFrameQueued = true;
+    requestAnimationFrame(now => {
+        vehicleFrameQueued = false;
+        tickVehicleRuntime(now);
+        drawVehicleAnimation(now);
+        if (state.buildings.some(placed => placed.vehicle?.running || placed.vehicle?.movement)) scheduleVehicleAnimation();
+    });
+}
+
+function getVehicleMotionSprite(placed) {
+    let sprite = vehicleMotionSprites.get(placed.instanceId);
+    if (sprite) return sprite;
+    const element = document.createElement('canvas');
+    element.className = 'vehicle-motion-sprite';
+    element.setAttribute('aria-hidden', 'true');
+    vehicleAnimationLayer.appendChild(element);
+    sprite = { element, animation: null, movementKey: '', viewKey: '' };
+    vehicleMotionSprites.set(placed.instanceId, sprite);
+    return sprite;
+}
+
+function drawVehicleAnimation(now) {
+    const viewW = canvas.width / state.zoom;
+    const viewH = canvas.height / state.zoom;
+    const left = state.camera.x - viewW / 2;
+    const top = state.camera.y - viewH / 2;
+    const startCol = Math.max(0, Math.floor(left / state.tileSize));
+    const endCol = Math.min(state.cols, Math.ceil((left + viewW) / state.tileSize));
+    const startRow = Math.max(0, Math.floor(top / state.tileSize));
+    const endRow = Math.min(state.rows, Math.ceil((top + viewH) / state.tileSize));
+    const activeSprites = new Set();
+    state.buildings.forEach(placed => {
+        const definition = BUILDING_BY_ID.get(placed.id);
+        if (definition?.role !== 'vehicle' || !placed.vehicle?.movement) return;
+        activeSprites.add(placed.instanceId);
+        const frame = getVehicleRenderState(placed, now);
+        const sprite = getVehicleMotionSprite(placed);
+        const pixelRatio = Math.max(1, window.devicePixelRatio || 1);
+        const spriteSize = Math.round(state.tileSize * pixelRatio);
+        if (sprite.element.width !== spriteSize || sprite.element.height !== spriteSize) {
+            sprite.element.width = spriteSize;
+            sprite.element.height = spriteSize;
+        }
+        const spriteContext = sprite.element.getContext('2d');
+        spriteContext.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+        spriteContext.clearRect(0, 0, state.tileSize, state.tileSize);
+        drawBuilding(spriteContext, { ...definition, x: 0, y: 0, rotation: frame.rotation }, state.tileSize, { zoom: 1 });
+        sprite.element.style.width = `${state.tileSize * state.zoom}px`;
+        sprite.element.style.height = `${state.tileSize * state.zoom}px`;
+        const movement = placed.vehicle.movement;
+        const movementKey = `${movement.startedAt}:${movement.from.x},${movement.from.y}:${movement.to.x},${movement.to.y}:${movement.durationMs}`;
+        const viewKey = `${state.camera.x},${state.camera.y},${state.zoom},${canvas.width},${canvas.height}`;
+        if (sprite.movementKey !== movementKey || sprite.viewKey !== viewKey) {
+            sprite.animation?.cancel();
+            const fromLeft = (movement.from.x * state.tileSize - state.camera.x) * state.zoom + canvas.width / 2;
+            const fromTop = (movement.from.y * state.tileSize - state.camera.y) * state.zoom + canvas.height / 2;
+            const toLeft = (movement.to.x * state.tileSize - state.camera.x) * state.zoom + canvas.width / 2;
+            const toTop = (movement.to.y * state.tileSize - state.camera.y) * state.zoom + canvas.height / 2;
+            const startTransform = `translate3d(${fromLeft}px, ${fromTop}px, 0)`;
+            const endTransform = `translate3d(${toLeft}px, ${toTop}px, 0)`;
+            const duration = Math.max(1, Number(movement.durationMs) || 1);
+            sprite.element.style.transform = startTransform;
+            sprite.animation = sprite.element.animate([
+                { transform: startTransform },
+                { transform: endTransform }
+            ], { duration, easing: 'linear', fill: 'both' });
+            sprite.animation.currentTime = Math.max(0, Math.min(duration, now - movement.startedAt));
+            sprite.movementKey = movementKey;
+            sprite.viewKey = viewKey;
+        }
+    });
+    vehicleMotionSprites.forEach((sprite, instanceId) => {
+        if (activeSprites.has(instanceId)) return;
+        sprite.element.remove();
+        vehicleMotionSprites.delete(instanceId);
+    });
+}
+
 function drawGridOverlay(startCol, endCol, startRow, endRow) {
     if (state.zoom < 0.5) return;
     ctx.save();
@@ -1198,7 +1447,220 @@ function drawTargetCellHighlights(left, top, viewW, viewH) {
     });
 }
 
+function hasBuildingResources(building) {
+    return Boolean(engineRuntimeState?.creativeMode) || getCraftingItemCount('brass-stock') >= building.brassCost;
+}
+
+function getBuildingPlacementIssue(building, x, y) {
+    if (!building) return '建築データがありません';
+    if (x < 0 || y < 0 || x + building.width > state.cols || y + building.height > state.rows) return 'マップの範囲外です';
+    if (!hasBuildingResources(building)) return '真鍮が不足しています';
+    const right = x + building.width;
+    const bottom = y + building.height;
+    const vehicle = building.role === 'vehicle';
+    if (building.role === 'rail' && state.buildings.some(placed => BUILDING_BY_ID.get(placed.id)?.role === 'rail' && placed.x === x && placed.y === y)) return 'このセルにはすでに線路があります';
+    for (const placed of state.buildings) {
+        const other = BUILDING_BY_ID.get(placed.id);
+        if (!other || placed.instanceId === activeBuildingPlacement?.ignoreInstanceId) continue;
+        const overlaps = x < placed.x + other.width && right > placed.x && y < placed.y + other.height && bottom > placed.y;
+        if (!overlaps || !building.blocksConstruction || !other.blocksConstruction) continue;
+        if (vehicle && other.role === 'rail') continue;
+        return other.role === 'rail' ? '建築物は線路を避けてください' : '別の建築物と重なっています';
+    }
+    if (state.player.x >= x && state.player.x < right && state.player.y >= y && state.player.y < bottom) return 'プレイヤーの位置を避けてください';
+    for (let row = y; row < bottom; row++) {
+        for (let column = x; column < right; column++) {
+            const tile = state.map[row]?.[column];
+            if (!canPlaceBuildingOnTerrainCell(building, tile)) return building.role === 'rail' ? '海や湖には線路を置けません' : '陸地を選んでください';
+        }
+    }
+    if (vehicle) {
+        const railY = y + Math.floor(building.height / 2);
+        for (let column = x; column < right; column++) {
+            if (!state.buildings.some(placed => BUILDING_BY_ID.get(placed.id)?.role === 'rail' && placed.x === column && placed.y === railY)) return '車両全長分の線路が必要です';
+        }
+    }
+    if (building.requiresFoundation) {
+        let missingFoundationCount = 0;
+        for (let row = y; row < bottom; row++) {
+            for (let column = x; column < right; column++) {
+                if (!state.buildings.some(placed => placed.id === 'foundation-cell' && placed.x === column && placed.y === row)) missingFoundationCount++;
+            }
+        }
+        if (missingFoundationCount) return `基礎セルが${missingFoundationCount}マス不足しています`;
+    }
+    return '';
+}
+
+function isBuildingPlacementValid(building, x, y) {
+    return !getBuildingPlacementIssue(building, x, y);
+}
+
+function getBuildingRotationLabel(building, rotation) {
+    const labels = building.kind === 'rail-curve'
+        ? ['北東', '東南', '南西', '西北']
+        : building.kind === 'rail-switch'
+            ? ['東', '南', '西', '北']
+            : ['北南', '東西', '南北', '西東'];
+    return labels[rotation % 4];
+}
+
+function updateBuildingPlacementControls() {
+    const controls = document.getElementById('building-placement-controls');
+    const message = document.getElementById('building-placement-message');
+    const confirm = document.getElementById('building-placement-confirm');
+    const rotate = document.getElementById('building-placement-rotate');
+    const continuousToggle = document.getElementById('building-placement-continuous');
+    const orientation = document.getElementById('building-placement-orientation');
+    const direction = document.getElementById('building-placement-direction');
+    if (!controls || !activeBuildingPlacement) {
+        if (controls) controls.hidden = true;
+        return;
+    }
+    const building = BUILDING_BY_ID.get(activeBuildingPlacement.buildingId);
+    const continuous = Boolean(activeBuildingPlacement.continuous);
+    const previewVisible = activeBuildingPlacement.previewVisible !== false;
+    const affordable = hasBuildingResources(building);
+    const valid = isBuildingPlacementValid(building, activeBuildingPlacement.x, activeBuildingPlacement.y);
+    activeBuildingPlacement.valid = valid;
+    controls.hidden = !activeBuildingPlacement.awaitingConfirmation && !continuous;
+    controls.classList.toggle('is-invalid', !valid && previewVisible);
+    if (continuousToggle) continuousToggle.checked = continuous;
+    if (orientation) orientation.hidden = building.role !== 'rail';
+    if (rotate) rotate.hidden = building.role !== 'rail';
+    if (direction) direction.textContent = getBuildingRotationLabel(building, activeBuildingPlacement.rotation || 0);
+    if (message) {
+        const reason = valid ? 'この位置に配置できます' : getBuildingPlacementIssue(building, activeBuildingPlacement.x, activeBuildingPlacement.y);
+        const orientationLabel = building.role === 'rail' ? ` / 向き ${direction?.textContent || ''}` : '';
+        message.textContent = continuous && !previewVisible
+            ? `${building.name} / 続けて配置中`
+            : `${building.name} / ${building.width}×${building.height}セル / (${activeBuildingPlacement.x}, ${activeBuildingPlacement.y})${orientationLabel} / ${reason}${continuous ? ' / タップまたはドラッグで配置' : ''}`;
+    }
+    if (confirm) {
+        confirm.disabled = !valid;
+        confirm.hidden = continuous;
+    }
+}
+
+function drawPlacedBuildings(startCol, endCol, startRow, endRow, now) {
+    const drawOrder = { foundation: 0, decoration: 1, rail: 2, structure: 3, vehicle: 4 };
+    [...state.buildings].sort((left, right) => {
+        const leftRole = BUILDING_BY_ID.get(left.id)?.role || 'structure';
+        const rightRole = BUILDING_BY_ID.get(right.id)?.role || 'structure';
+        return drawOrder[leftRole] - drawOrder[rightRole];
+    }).forEach(placed => {
+        const building = BUILDING_BY_ID.get(placed.id);
+        if (!building) return;
+        if (building.role === 'vehicle' && placed.vehicle?.movement) return;
+        if (placed.x + building.width < startCol || placed.x > endCol || placed.y + building.height < startRow || placed.y > endRow) return;
+        drawBuilding(ctx, { ...building, x: placed.x, y: placed.y, rotation: placed.rotation || 0 }, state.tileSize, { zoom: state.zoom });
+    });
+}
+
+function drawBuildingGhost() {
+    if (!activeBuildingPlacement || activeBuildingPlacement.previewVisible === false) return;
+    const building = BUILDING_BY_ID.get(activeBuildingPlacement.buildingId);
+    if (!building) return;
+    drawBuilding(ctx, { ...building, x: activeBuildingPlacement.x, y: activeBuildingPlacement.y, rotation: activeBuildingPlacement.rotation || 0 }, state.tileSize, {
+        ghost: true,
+        valid: activeBuildingPlacement.valid,
+        zoom: state.zoom
+    });
+}
+
+function supportsBuildingPlacementStroke(building) {
+    return ['foundation', 'decoration', 'rail'].includes(building?.role);
+}
+
+function getBuildingPlacementCell(event) {
+    if (!activeBuildingPlacement) return null;
+    const building = BUILDING_BY_ID.get(activeBuildingPlacement.buildingId);
+    const point = getWorldPointFromEvent(event, true);
+    return {
+        x: Math.floor(point.x / state.tileSize - building.width / 2 + .5),
+        y: Math.floor(point.y / state.tileSize - building.height / 2 + .5)
+    };
+}
+
+function getGridLineCells(start, end) {
+    const cells = [{ ...start }];
+    const deltaX = end.x - start.x;
+    const deltaY = end.y - start.y;
+    const stepX = Math.sign(deltaX);
+    const stepY = Math.sign(deltaY);
+    const distanceX = Math.abs(deltaX);
+    const distanceY = Math.abs(deltaY);
+    let progressedX = 0;
+    let progressedY = 0;
+    let x = start.x;
+    let y = start.y;
+    while (x !== end.x || y !== end.y) {
+        const nextXFraction = progressedX < distanceX ? (progressedX + .5) / distanceX : Infinity;
+        const nextYFraction = progressedY < distanceY ? (progressedY + .5) / distanceY : Infinity;
+        if (nextXFraction <= nextYFraction) {
+            x += stepX;
+            progressedX++;
+        } else {
+            y += stepY;
+            progressedY++;
+        }
+        cells.push({ x, y });
+    }
+    return cells;
+}
+
+function appendBuildingPlacementStroke(placement, cell) {
+    if (!placement.strokeLastCell) {
+        placement.strokeCells = [{ ...cell }];
+    } else {
+        placement.strokeCells.push(...getGridLineCells(placement.strokeLastCell, cell).slice(1));
+    }
+    placement.strokeLastCell = { ...cell };
+}
+
+function getStrokeRailRotation(building, position, previousCell, nextCell) {
+    const pathDirections = [previousCell, nextCell].filter(Boolean).map(cell => [cell.x - position.x, cell.y - position.y]);
+    if (!pathDirections.length) return getRailAutoRotation(building, position.x, position.y, state.buildings);
+    let bestRotation = 0;
+    let bestScore = -1;
+    for (let rotation = 0; rotation < 4; rotation++) {
+        const connections = getRailConnections(building.kind, rotation);
+        const pathScore = pathDirections.filter(([dx, dy]) => connections.some(([cx, cy]) => cx === dx && cy === dy)).length;
+        const existingScore = connections.filter(([dx, dy]) => {
+            const neighbor = state.buildings.find(placed => placed.x === position.x + dx && placed.y === position.y + dy
+                && BUILDING_BY_ID.get(placed.id)?.role === 'rail');
+            const neighborDefinition = BUILDING_BY_ID.get(neighbor?.id);
+            return neighborDefinition && getRailConnections(neighborDefinition.kind, neighbor.rotation || 0)
+                .some(([neighborDx, neighborDy]) => neighborDx === -dx && neighborDy === -dy);
+        }).length;
+        const score = pathScore * 10 + existingScore;
+        if (score > bestScore) {
+            bestRotation = rotation;
+            bestScore = score;
+        }
+    }
+    return bestRotation;
+}
+
+function updateBuildingPlacementFromEvent(event) {
+    if (!activeBuildingPlacement) return;
+    const building = BUILDING_BY_ID.get(activeBuildingPlacement.buildingId);
+    const cell = getBuildingPlacementCell(event);
+    activeBuildingPlacement.x = cell.x;
+    activeBuildingPlacement.y = cell.y;
+    activeBuildingPlacement.previewVisible = true;
+    if (building.role === 'rail' && !activeBuildingPlacement.manualRotation) {
+        activeBuildingPlacement.rotation = getRailAutoRotation(building, activeBuildingPlacement.x, activeBuildingPlacement.y, state.buildings);
+    } else if (building.role === 'vehicle') {
+        activeBuildingPlacement.rotation = getVehicleRailRotation(building, activeBuildingPlacement.x, activeBuildingPlacement.y, state.buildings);
+    }
+    activeBuildingPlacement.valid = isBuildingPlacementValid(building, activeBuildingPlacement.x, activeBuildingPlacement.y);
+    scheduleDraw();
+    updateBuildingPlacementControls();
+}
+
 function draw() {
+    const now = performance.now();
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = '#071317';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -1243,6 +1705,8 @@ function draw() {
     }
 
     drawGridOverlay(startCol, endCol, startRow, endRow);
+    drawPlacedBuildings(startCol, endCol, startRow, endRow, now);
+    drawBuildingGhost();
     drawTerritoryOverlay(startCol, endCol, startRow, endRow);
     drawTargetCellHighlights(left, top, viewW, viewH);
 
@@ -1269,6 +1733,7 @@ function draw() {
     });
 
     ctx.restore();
+    if (state.buildings.some(placed => placed.vehicle?.movement)) scheduleVehicleAnimation();
 }
 
 function drawWaterCoastline(startCol, endCol, startRow, endRow) {
@@ -1430,7 +1895,469 @@ function setZoom(newZoom, pivotCanvasX, pivotCanvasY) {
     scheduleDraw();
 }
 
+function closeBuildingMenu() {
+    const modal = document.getElementById('building-menu-modal');
+    if (modal) modal.hidden = true;
+    selectedBuildingInstanceId = null;
+}
+
+function getVehicleState(placed) {
+    const saved = isRecord(placed.vehicle) ? placed.vehicle : {};
+    placed.vehicle = {
+        ...VEHICLE_DEFAULTS,
+        ...saved,
+        resources: { ...VEHICLE_DEFAULTS.resources, ...(isRecord(saved.resources) ? saved.resources : {}) }
+    };
+    return placed.vehicle;
+}
+
+function getRailAt(x, y) {
+    return state.buildings.find(placed => placed.x === x && placed.y === y
+        && BUILDING_BY_ID.get(placed.id)?.role === 'rail');
+}
+
+function getStationControlAtRail(x, y) {
+    for (const placed of state.buildings) {
+        const definition = BUILDING_BY_ID.get(placed.id);
+        if (definition?.kind !== 'station') continue;
+        const nearestX = Math.max(placed.x, Math.min(x, placed.x + definition.width - 1));
+        const nearestY = Math.max(placed.y, Math.min(y, placed.y + definition.height - 1));
+        if (Math.abs(nearestX - x) + Math.abs(nearestY - y) !== 1) continue;
+        return placed.stationControl ? { ...placed.stationControl, stationId: placed.instanceId } : null;
+    }
+    return null;
+}
+
+function getStationDirection(control) {
+    return ({ north: [0, -1], east: [1, 0], south: [0, 1], west: [-1, 0] })[control?.departureDirection] || null;
+}
+
+function vehicleStopLabel(vehicle) {
+    if (vehicle.running) return '運行中';
+    return vehicle.stopReason ? `停止: ${vehicle.stopReason}` : '停止中';
+}
+
+function renderVehicleMenu(placed, definition) {
+    const controls = document.getElementById('vehicle-menu-controls');
+    const start = document.getElementById('building-menu-start-vehicle');
+    const status = document.getElementById('vehicle-status');
+    const resourceSettings = document.getElementById('vehicle-resource-settings');
+    const scrollSelect = document.getElementById('vehicle-movement-scroll');
+    const isLocomotive = definition.kind === 'locomotive';
+    if (controls) controls.hidden = !isLocomotive;
+    if (!isLocomotive) {
+        if (start) start.hidden = true;
+        return;
+    }
+    const vehicle = getVehicleState(placed);
+    if (start) {
+        start.hidden = false;
+        start.textContent = vehicle.running ? '停止' : '起動';
+        start.classList.toggle('inventory-modal-secondary', vehicle.running);
+        start.classList.toggle('saved-scroll-use', !vehicle.running);
+    }
+    if (status) status.textContent = `${vehicleStopLabel(vehicle)} / 将来消費枠: 動力 ${vehicle.powerPerCell}・蒸気 ${vehicle.steamPerCell} / セル`;
+    if (resourceSettings) resourceSettings.textContent = `車載在庫: 動力 ${vehicle.resources.power} / 蒸気 ${vehicle.resources.steam} (未接続) / 速度 ${vehicle.speedCellsPerSecond}セル/秒`;
+    if (!scrollSelect) return;
+    const selectedScrollId = vehicle.movementScrollId || '';
+    let scrolls = [];
+    try {
+        const saved = JSON.parse(localStorage.getItem('fogsgear_scroll_library') || '[]');
+        scrolls = Array.isArray(saved) ? saved.filter(scroll => typeof scroll?.id === 'string') : [];
+    } catch (error) {}
+    scrollSelect.replaceChildren(new Option('未割当', ''));
+    scrolls.forEach(scroll => scrollSelect.add(new Option(scroll.name || scroll.id, scroll.id)));
+    if (selectedScrollId && !scrolls.some(scroll => scroll.id === selectedScrollId)) {
+        scrollSelect.add(new Option(`未登録 (${selectedScrollId})`, selectedScrollId));
+    }
+    scrollSelect.value = selectedScrollId;
+}
+
+function openBuildingMenu(instanceId) {
+    const placed = state.buildings.find(building => building.instanceId === instanceId);
+    const definition = BUILDING_BY_ID.get(placed?.id);
+    if (!placed || !definition) return;
+    selectedBuildingInstanceId = instanceId;
+    document.getElementById('building-menu-title').textContent = definition.name;
+    renderVehicleMenu(placed, definition);
+    const tileEffects = getTileEffectsUnderFootprint(state.buildings, placed.x, placed.y, definition.width, definition.height);
+    const effectSummary = tileEffects.length
+        ? ` / タイル効果: ${tileEffects.map(effect => effect.label || effect.id || effect.type).join('、')}`
+        : '';
+    const vehicleNote = definition.role === 'vehicle' ? ' / 線路配置済みの車両' : '';
+    const foundationNote = definition.requiresFoundation ? ' / 基礎上に建設' : '';
+    const railOrientation = definition.role === 'rail' ? ` / 向き ${getBuildingRotationLabel(definition, placed.rotation || 0)}` : '';
+    document.getElementById('building-menu-details').textContent = `${definition.width}×${definition.height}セル / 座標 (${placed.x}, ${placed.y}) / 建設真鍮 ${definition.brassCost}${railOrientation}${foundationNote}${vehicleNote}${effectSummary}`;
+    const demolish = document.getElementById('building-menu-demolish');
+    demolish.dataset.armed = '';
+    demolish.textContent = `解体（真鍮 ${Math.floor(definition.brassCost / 2)} 返却）`;
+    document.getElementById('building-menu-modal').hidden = false;
+}
+
+const VEHICLE_STOP_MESSAGES = {
+    'missing-track': '線路上にありません',
+    'connection-mismatch': '線路の接続方向が一致しません',
+    'disconnected-track': '線路が途切れています',
+    'ambiguous-junction': '分岐に駅舎の指示がありません',
+    'track-ended': '線路の終端です',
+    'station-route-unavailable': '駅舎の指定方向へ接続する線路がありません',
+    collision: 'ほかの車両と衝突しました'
+};
+
+function getVehicleNextStep(placed, vehicle) {
+    const rail = getRailAt(placed.x, placed.y);
+    if (!rail) return { error: 'missing-track' };
+    const stationControl = getStationControlAtRail(placed.x, placed.y);
+    const stationDirection = getStationDirection(stationControl);
+    const preferredDirection = stationDirection || (!vehicle.previousRail ? getTrackDirection(rail.rotation || 0) : null);
+    const step = findNextRailStep(state.buildings, BUILDING_BY_ID, placed, vehicle.previousRail, preferredDirection, Boolean(stationDirection));
+    if (stationDirection && !step.error
+        && (step.direction[0] !== stationDirection[0] || step.direction[1] !== stationDirection[1])) {
+        return { error: 'station-route-unavailable' };
+    }
+    return step;
+}
+
+function settleVehicleMovement(placed, vehicle, now) {
+    const movement = vehicle.movement;
+    if (!movement) return;
+    const progress = Math.max(0, Math.min(1, (now - movement.startedAt) / movement.durationMs));
+    if (progress >= 0.5) {
+        placed.x = movement.to.x;
+        placed.y = movement.to.y;
+        vehicle.previousRail = { ...movement.from };
+        vehicle.direction = movement.direction;
+        placed.rotation = movement.toRotation;
+        const stationControl = getStationControlAtRail(placed.x, placed.y);
+        if (stationControl) vehicle.lastStationId = stationControl.stationId || '';
+    }
+    vehicle.movement = null;
+}
+
+function startSelectedVehicle() {
+    const placed = state.buildings.find(building => building.instanceId === selectedBuildingInstanceId);
+    if (!placed || BUILDING_BY_ID.get(placed.id)?.kind !== 'locomotive') return;
+    const vehicle = getVehicleState(placed);
+    if (vehicle.running) {
+        settleVehicleMovement(placed, vehicle, performance.now());
+        vehicle.running = false;
+        vehicle.stopReason = '手動停止';
+        vehicle.nextMoveAt = 0;
+    } else {
+        const rail = getRailAt(placed.x, placed.y);
+        if (!rail) {
+            vehicle.stopReason = VEHICLE_STOP_MESSAGES['missing-track'];
+        } else {
+            vehicle.running = true;
+            vehicle.stopReason = '';
+            vehicle.previousRail = null;
+            vehicle.direction = getStationDirection(getStationControlAtRail(placed.x, placed.y)) || getTrackDirection(rail.rotation || 0);
+            const firstStep = getVehicleNextStep(placed, vehicle);
+            if (firstStep.error) {
+                vehicle.running = false;
+                vehicle.stopReason = VEHICLE_STOP_MESSAGES[firstStep.error] || '線路を確認してください';
+            } else {
+                vehicle.direction = firstStep.direction;
+                placed.rotation = directionToVehicleRotation(firstStep.direction);
+                vehicle.nextMoveAt = performance.now();
+            }
+        }
+    }
+    saveBuildings();
+    renderVehicleMenu(placed, BUILDING_BY_ID.get(placed.id));
+    scheduleDraw();
+    scheduleVehicleAnimation();
+}
+
+function tickVehicleRuntime(now) {
+    if (!state.map.length) return;
+    let changed = false;
+    let startedVehicleMotion = false;
+    const settledVehicles = new Set();
+    const locomotives = state.buildings.filter(placed => BUILDING_BY_ID.get(placed.id)?.kind === 'locomotive');
+    for (const placed of locomotives) {
+        const vehicle = getVehicleState(placed);
+        if (!vehicle.running) continue;
+        const wasMoving = Boolean(vehicle.movement);
+        let segmentStartAt = now;
+        if (vehicle.movement) {
+            const movementEndAt = vehicle.movement.startedAt + vehicle.movement.durationMs;
+            if (now < movementEndAt) continue;
+            settleVehicleMovement(placed, vehicle, movementEndAt);
+            settledVehicles.add(placed);
+            vehicle.nextMoveAt = movementEndAt;
+            segmentStartAt = movementEndAt;
+            changed = true;
+        }
+        if (now < vehicle.nextMoveAt) continue;
+        const step = getVehicleNextStep(placed, vehicle);
+        if (step.error) {
+            vehicle.running = false;
+            vehicle.stopReason = VEHICLE_STOP_MESSAGES[step.error] || '線路を確認してください';
+            vehicle.nextMoveAt = 0;
+            changed = true;
+            continue;
+        }
+        const blockingVehicle = state.buildings.find(other => other.instanceId !== placed.instanceId
+            && BUILDING_BY_ID.get(other.id)?.role === 'vehicle'
+            && (other.x === step.position.x && other.y === step.position.y
+                || other.vehicle?.movement?.to.x === step.position.x && other.vehicle?.movement?.to.y === step.position.y));
+        if (blockingVehicle) {
+            vehicle.running = false;
+            vehicle.stopReason = VEHICLE_STOP_MESSAGES.collision;
+            vehicle.nextMoveAt = 0;
+            if (BUILDING_BY_ID.get(blockingVehicle.id)?.kind === 'locomotive') {
+                const otherVehicle = getVehicleState(blockingVehicle);
+                settleVehicleMovement(blockingVehicle, otherVehicle, now);
+                settledVehicles.add(blockingVehicle);
+                otherVehicle.running = false;
+                otherVehicle.stopReason = VEHICLE_STOP_MESSAGES.collision;
+                otherVehicle.nextMoveAt = 0;
+            }
+            changed = true;
+            continue;
+        }
+        const durationMs = 1000 / Math.max(0.1, Number(vehicle.speedCellsPerSecond) || 1);
+        const from = { x: placed.x, y: placed.y };
+        const direction = step.direction;
+        vehicle.movement = {
+            from,
+            to: step.position,
+            direction,
+            fromRotation: placed.rotation || 0,
+            toRotation: directionToVehicleRotation(direction),
+            startedAt: segmentStartAt,
+            durationMs
+        };
+        vehicle.nextMoveAt = segmentStartAt + durationMs;
+        if (!wasMoving) startedVehicleMotion = true;
+        changed = true;
+    }
+    if (!changed) return;
+    saveBuildings();
+    if (selectedBuildingInstanceId) {
+        const selected = state.buildings.find(placed => placed.instanceId === selectedBuildingInstanceId);
+        if (selected && BUILDING_BY_ID.get(selected.id)?.kind === 'locomotive') renderVehicleMenu(selected, BUILDING_BY_ID.get(selected.id));
+    }
+    if (startedVehicleMotion || [...settledVehicles].some(placed => !placed.vehicle?.movement)) scheduleDraw();
+    if (state.buildings.some(placed => placed.vehicle?.movement)) scheduleVehicleAnimation();
+}
+
+function startBuildingPlacement(buildingId) {
+    const building = BUILDING_BY_ID.get(buildingId);
+    if (!building) return;
+    closeInventoryItem();
+    closeBuildingMenu();
+    const inventoryPanel = document.getElementById('inventory-panel');
+    if (inventoryPanel) inventoryPanel.hidden = true;
+    document.querySelectorAll('[data-action="toggle-inventory"]').forEach(button => button.setAttribute('aria-expanded', 'false'));
+    const x = Math.round(state.player.x - (building.width - 1) / 2);
+    const y = Math.round(state.player.y - (building.height - 1) / 2);
+    activeBuildingPlacement = {
+        buildingId,
+        x,
+        y,
+        rotation: building.role === 'vehicle'
+            ? getVehicleRailRotation(building, x, y, state.buildings)
+            : getRailAutoRotation(building, x, y, state.buildings),
+        pointerId: null,
+        awaitingConfirmation: false,
+        valid: false,
+        continuous: false,
+        previewVisible: true,
+        strokeCells: [],
+        strokeLastCell: null
+    };
+    updateBuildingPlacementControls();
+    scheduleDraw();
+}
+
+function cancelBuildingPlacement() {
+    activeBuildingPlacement = null;
+    activePointers.clear();
+    isDragging = false;
+    updateBuildingPlacementControls();
+    scheduleDraw();
+}
+
+function rotateBuildingPlacement() {
+    if (!activeBuildingPlacement || BUILDING_BY_ID.get(activeBuildingPlacement.buildingId)?.role !== 'rail') return;
+    activeBuildingPlacement.rotation = ((activeBuildingPlacement.rotation || 0) + 1) % 4;
+    activeBuildingPlacement.manualRotation = true;
+    updateBuildingPlacementControls();
+    scheduleDraw();
+}
+
+function placeBuildingAt(placement) {
+    const definition = BUILDING_BY_ID.get(placement.buildingId);
+    if (!definition) return { issue: '建築データがありません' };
+    const issue = getBuildingPlacementIssue(definition, placement.x, placement.y);
+    if (issue) return { issue };
+    if (!engineRuntimeState.creativeMode) engineRuntimeState.brass = Math.max(0, Number(engineRuntimeState.brass) - definition.brassCost);
+    if (definition.role === 'foundation' || definition.role === 'decoration' || definition.role === 'rail') {
+        state.buildings = state.buildings.filter(placed => {
+            const placedDefinition = BUILDING_BY_ID.get(placed.id);
+            return !(placed.x === placement.x && placed.y === placement.y
+                && (placed.id === definition.id || definition.role === 'decoration' && placedDefinition?.role === 'decoration'
+                    || definition.role === 'rail' && placedDefinition?.role === 'rail'));
+        });
+    }
+    const placedBuilding = {
+        id: definition.id,
+        x: placement.x,
+        y: placement.y,
+        rotation: placement.rotation || 0,
+        instanceId: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+    };
+    if (definition.role === 'vehicle') {
+        placedBuilding.vehicle = {
+            ...VEHICLE_DEFAULTS,
+            resources: { ...VEHICLE_DEFAULTS.resources },
+            direction: getTrackDirection(placedBuilding.rotation)
+        };
+    }
+    if (definition.kind === 'station') {
+        placedBuilding.stationControl = { ...STATION_CONTROL_DEFAULTS, destinations: [], conditions: [] };
+    }
+    state.buildings.push(placedBuilding);
+    return { definition };
+}
+
+function commitBuildingPlacementCells(cells, orientRailsFromStroke = false) {
+    const building = BUILDING_BY_ID.get(activeBuildingPlacement?.buildingId);
+    if (!building) return { placedCount: 0, issue: '建築データがありません' };
+    let placedCount = 0;
+    let issue = '';
+    const visited = new Set();
+    for (let index = 0; index < cells.length; index++) {
+        const cell = cells[index];
+        const key = `${cell.x},${cell.y}`;
+        if (visited.has(key)) continue;
+        visited.add(key);
+        const placement = { ...activeBuildingPlacement, ...cell };
+        if (orientRailsFromStroke && building.role === 'rail') {
+            placement.rotation = getStrokeRailRotation(building, cell, cells[index - 1], cells[index + 1]);
+        }
+        const result = placeBuildingAt(placement);
+        if (!result.definition) {
+            issue = result.issue;
+            break;
+        }
+        placedCount++;
+    }
+    if (placedCount) {
+        engineRuntimeState.saveGameData();
+        engineRuntimeState.notify();
+        saveBuildings();
+        buildingRenderSignature = '';
+        renderCellMaterials();
+        scheduleDraw();
+    }
+    return { placedCount, issue };
+}
+
+function showBuildingPlacementResult(definition, placedCount, issue = '') {
+    if (!placedCount) {
+        showAppNotice(issue === '真鍮が不足しています' ? '建設に必要な真鍮が足りません。' : 'この位置には建築できません。');
+        return;
+    }
+    const placementMessage = placedCount === 1
+        ? `${definition.name}を配置しました。`
+        : `${definition.name}を${placedCount}個配置しました。`;
+    showAppNotice(issue ? `${placementMessage}以降は配置を停止しました: ${issue}` : placementMessage);
+}
+
+function confirmBuildingPlacement() {
+    if (!activeBuildingPlacement) return;
+    const placement = { ...activeBuildingPlacement };
+    const definition = BUILDING_BY_ID.get(placement.buildingId);
+    const result = commitBuildingPlacementCells([placement]);
+    if (!result.placedCount) {
+        updateBuildingPlacementControls();
+        showBuildingPlacementResult(definition, 0, result.issue);
+        return;
+    }
+    activeBuildingPlacement = null;
+    updateBuildingPlacementControls();
+    showBuildingPlacementResult(definition, result.placedCount, result.issue);
+}
+
+function demolishSelectedBuilding() {
+    const button = document.getElementById('building-menu-demolish');
+    if (!selectedBuildingInstanceId || !button) return;
+    if (button.dataset.armed !== selectedBuildingInstanceId) {
+        button.dataset.armed = selectedBuildingInstanceId;
+        button.textContent = 'もう一度押して解体';
+        return;
+    }
+    const index = state.buildings.findIndex(building => building.instanceId === selectedBuildingInstanceId);
+    const placed = state.buildings[index];
+    const definition = BUILDING_BY_ID.get(placed?.id);
+    if (!definition) return closeBuildingMenu();
+    state.buildings.splice(index, 1);
+    engineRuntimeState.brass += Math.floor(definition.brassCost / 2);
+    engineRuntimeState.saveGameData();
+    engineRuntimeState.notify();
+    saveBuildings();
+    closeBuildingMenu();
+    buildingRenderSignature = '';
+    renderCellMaterials();
+    scheduleDraw();
+}
+
+function getWorldPointFromEvent(event, touchOffset = false) {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const pixelX = (event.clientX - rect.left) * scaleX;
+    const offset = touchOffset && event.pointerType !== 'mouse' ? 110 * scaleY : 0;
+    const pixelY = (event.clientY - rect.top) * scaleY - offset;
+    return {
+        x: state.camera.x - canvas.width / (2 * state.zoom) + pixelX / state.zoom,
+        y: state.camera.y - canvas.height / (2 * state.zoom) + pixelY / state.zoom
+    };
+}
+
+function findBuildingAtEvent(event) {
+    const point = getWorldPointFromEvent(event);
+    const cellX = Math.floor(point.x / state.tileSize);
+    const cellY = Math.floor(point.y / state.tileSize);
+    let underlay = null;
+    for (let index = state.buildings.length - 1; index >= 0; index--) {
+        const placed = state.buildings[index];
+        const building = BUILDING_BY_ID.get(placed.id);
+        if (!building || cellX < placed.x || cellX >= placed.x + building.width || cellY < placed.y || cellY >= placed.y + building.height) continue;
+        if (building.role === 'structure' || building.role === 'vehicle') return placed;
+        underlay ||= placed;
+    }
+    return underlay;
+}
+
+function clearBuildingPress() {
+    if (buildingPressTimer) clearTimeout(buildingPressTimer);
+    buildingPressTimer = null;
+    buildingPressCandidate = null;
+}
+
+function startBuildingPress(placed, event) {
+    clearBuildingPress();
+    buildingPressCandidate = { instanceId: placed.instanceId, pointerId: event.pointerId, x: event.clientX, y: event.clientY, opened: false };
+    buildingPressTimer = setTimeout(() => {
+        if (!buildingPressCandidate || buildingPressCandidate.pointerId !== event.pointerId) return;
+        buildingPressCandidate.opened = true;
+        isDragging = false;
+        openBuildingMenu(placed.instanceId);
+    }, 550);
+}
+
 function setupControls() {
+    document.getElementById('building-placement-continuous')?.addEventListener('change', event => {
+        if (!activeBuildingPlacement) return;
+        activeBuildingPlacement.continuous = event.currentTarget.checked;
+        updateBuildingPlacementControls();
+        scheduleDraw();
+    });
+
     window.addEventListener('resize', () => {
         resize();
         scheduleDraw();
@@ -1452,6 +2379,30 @@ function setupControls() {
         activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
         canvas.setPointerCapture(e.pointerId);
 
+        if (activeBuildingPlacement) {
+            activeBuildingPlacement.pointerId = e.pointerId;
+            activeBuildingPlacement.awaitingConfirmation = false;
+            activeBuildingPlacement.previewVisible = true;
+            const placementCell = getBuildingPlacementCell(e);
+            const building = BUILDING_BY_ID.get(activeBuildingPlacement.buildingId);
+            activeBuildingPlacement.strokeCells = activeBuildingPlacement.continuous && supportsBuildingPlacementStroke(building)
+                ? [{ ...placementCell }]
+                : [];
+            activeBuildingPlacement.strokeLastCell = activeBuildingPlacement.continuous && supportsBuildingPlacementStroke(building)
+                ? { ...placementCell }
+                : null;
+            isDragging = false;
+            updateBuildingPlacementFromEvent(e);
+            return;
+        }
+
+        const placedBuilding = findBuildingAtEvent(e);
+        if (placedBuilding) {
+            isDragging = false;
+            startBuildingPress(placedBuilding, e);
+            return;
+        }
+
         if (activePointers.size === 1) {
             isDragging = true;
             dragStart = { x: e.clientX, y: e.clientY };
@@ -1465,6 +2416,33 @@ function setupControls() {
     });
 
     canvas.addEventListener('pointermove', (e) => {
+        if (activeBuildingPlacement) {
+            if (activeBuildingPlacement.awaitingConfirmation) return;
+            if (activeBuildingPlacement.pointerId === null || activeBuildingPlacement.pointerId === e.pointerId) {
+                if (activeBuildingPlacement.pointerId !== null) {
+                    activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+                    const building = BUILDING_BY_ID.get(activeBuildingPlacement.buildingId);
+                    if (activeBuildingPlacement.continuous && supportsBuildingPlacementStroke(building)) {
+                        const cell = getBuildingPlacementCell(e);
+                        if (cell.x !== activeBuildingPlacement.strokeLastCell?.x || cell.y !== activeBuildingPlacement.strokeLastCell?.y) {
+                            activeBuildingPlacement.manualRotation = false;
+                            appendBuildingPlacementStroke(activeBuildingPlacement, cell);
+                        }
+                    }
+                }
+                updateBuildingPlacementFromEvent(e);
+            }
+            return;
+        }
+        if (buildingPressCandidate?.pointerId === e.pointerId) {
+            if (buildingPressCandidate.opened) return;
+            if (Math.hypot(e.clientX - buildingPressCandidate.x, e.clientY - buildingPressCandidate.y) <= 8) return;
+            const start = buildingPressCandidate;
+            clearBuildingPress();
+            dragStart = { x: start.x, y: start.y };
+            cameraStart = { x: state.camera.x, y: state.camera.y };
+            isDragging = true;
+        }
         if (!activePointers.has(e.pointerId)) return;
         e.preventDefault();
         activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -1497,6 +2475,45 @@ function setupControls() {
         if (canvas.hasPointerCapture(e.pointerId)) {
             try { canvas.releasePointerCapture(e.pointerId); } catch(err) {}
         }
+
+        if (activeBuildingPlacement?.pointerId === e.pointerId) {
+            activePointers.delete(e.pointerId);
+            if (activeBuildingPlacement.continuous) {
+                const placement = activeBuildingPlacement;
+                const building = BUILDING_BY_ID.get(placement.buildingId);
+                if (e.type === 'pointerup') {
+                    const cell = getBuildingPlacementCell(e);
+                    updateBuildingPlacementFromEvent(e);
+                    const cells = supportsBuildingPlacementStroke(building)
+                        ? (appendBuildingPlacementStroke(placement, cell), placement.strokeCells)
+                        : [{ ...cell, rotation: placement.rotation }];
+                    const result = commitBuildingPlacementCells(cells, supportsBuildingPlacementStroke(building) && cells.length > 1);
+                    showBuildingPlacementResult(building, result.placedCount, result.issue);
+                }
+                placement.pointerId = null;
+                placement.awaitingConfirmation = true;
+                placement.previewVisible = false;
+                placement.strokeCells = [];
+                placement.strokeLastCell = null;
+                isDragging = false;
+                updateBuildingPlacementControls();
+                scheduleDraw();
+                return;
+            }
+            activeBuildingPlacement.pointerId = null;
+            activeBuildingPlacement.awaitingConfirmation = e.type !== 'pointercancel';
+            isDragging = false;
+            updateBuildingPlacementControls();
+            scheduleDraw();
+            return;
+        }
+
+        if (buildingPressCandidate?.pointerId === e.pointerId) {
+            activePointers.delete(e.pointerId);
+            clearBuildingPress();
+            isDragging = false;
+            return;
+        }
         activePointers.delete(e.pointerId);
 
         if (activePointers.size === 1) {
@@ -1512,6 +2529,14 @@ function setupControls() {
 
     canvas.addEventListener('pointerup', handlePointerUp);
     canvas.addEventListener('pointercancel', handlePointerUp);
+    canvas.addEventListener('contextmenu', event => {
+        event.preventDefault();
+        if (activeBuildingPlacement) cancelBuildingPlacement();
+        else {
+            const building = findBuildingAtEvent(event);
+            if (building) openBuildingMenu(building.instanceId);
+        }
+    });
 }
 
 function movePlayer(dx, dy) {
@@ -1742,6 +2767,8 @@ document.addEventListener('click', (event) => {
     if (!button) return;
     if (button.dataset.inventoryView) {
         const view = button.dataset.inventoryView;
+        if (view === 'buildings') renderBuildingInventory();
+        if (view === 'crafting') renderCellMaterials();
         document.querySelectorAll('.inventory-view-tab').forEach(tab => {
             const active = tab === button;
             tab.classList.toggle('active', active);
@@ -1749,6 +2776,39 @@ document.addEventListener('click', (event) => {
         });
         document.getElementById('inventory-items-view').hidden = view !== 'items';
         document.getElementById('inventory-crafting-view').hidden = view !== 'crafting';
+        document.getElementById('inventory-building-view').hidden = view !== 'buildings';
+        return;
+    }
+    if (button.dataset.action === 'select-building') {
+        startBuildingPlacement(button.dataset.buildingId);
+        return;
+    }
+    if (button.dataset.action === 'confirm-building-placement') {
+        confirmBuildingPlacement();
+        return;
+    }
+    if (button.dataset.action === 'cancel-building-placement') {
+        cancelBuildingPlacement();
+        return;
+    }
+    if (button.dataset.action === 'rotate-building-placement') {
+        rotateBuildingPlacement();
+        return;
+    }
+    if (button.dataset.action === 'rotate-building-placement') {
+        rotateBuildingPlacement();
+        return;
+    }
+    if (button.dataset.action === 'close-building-menu') {
+        closeBuildingMenu();
+        return;
+    }
+    if (button.dataset.action === 'toggle-building-vehicle') {
+        startSelectedVehicle();
+        return;
+    }
+    if (button.dataset.action === 'demolish-building') {
+        demolishSelectedBuilding();
         return;
     }
     if (button.dataset.action === 'craft-recipe') {
@@ -1836,6 +2896,13 @@ document.addEventListener('click', (event) => {
     }
 });
 
+document.getElementById('vehicle-movement-scroll')?.addEventListener('change', event => {
+    const placed = state.buildings.find(building => building.instanceId === selectedBuildingInstanceId);
+    if (!placed || BUILDING_BY_ID.get(placed.id)?.kind !== 'locomotive') return;
+    getVehicleState(placed).movementScrollId = event.target.value;
+    saveBuildings();
+});
+
 document.getElementById('save-import-file')?.addEventListener('change', async event => {
     const input = event.currentTarget;
     const file = input.files?.[0];
@@ -1901,6 +2968,10 @@ document.getElementById('inventory-item-modal')?.addEventListener('click', (even
     if (event.target.id === 'inventory-item-modal') closeInventoryItem();
 });
 
+document.getElementById('building-menu-modal')?.addEventListener('click', event => {
+    if (event.target.id === 'building-menu-modal') closeBuildingMenu();
+});
+
 document.addEventListener('pointerup', (event) => {
     const target = event.target;
     const itemModal = document.getElementById('inventory-item-modal');
@@ -1923,6 +2994,8 @@ document.addEventListener('pointerup', (event) => {
 
 window.addEventListener('keydown', (event) => {
     if (event.key !== 'Escape') return;
+    if (activeBuildingPlacement) cancelBuildingPlacement();
+    closeBuildingMenu();
     closeInventoryItem();
     pendingSaveBackup = null;
     const transferModal = document.getElementById('save-transfer-modal');

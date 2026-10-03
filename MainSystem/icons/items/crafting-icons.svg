@@ -129,4 +129,11 @@
   
   
   
+  <symbol id="i-grain" viewBox="0 0 64 64"><path fill="#6f7f48" stroke="#d9c36b" stroke-width="3" stroke-linecap="round" d="M32 56V18m0 25L18 32m14 4 14-14M32 28 22 18" /><path fill="#e2c766" d="M20 13c7-2 12 3 12 10-7 1-12-3-12-10Zm24 2c-7-1-12 3-12 10 7 1 12-3 12-10ZM12 27c7-2 12 3 12 10-7 1-12-3-12-10Zm40 2c-7-1-12 3-12 10 7 1 12-3 12-10Z" /></symbol>
+  <symbol id="i-paper_scroll" viewBox="0 0 64 64"><path fill="#d8c28b" stroke="#6f553b" stroke-width="3" d="M17 10h32v44H17z" /><path fill="none" stroke="#9a7048" stroke-width="3" d="M24 21h18M24 30h15M24 39h18" /><path fill="#e7d7a7" stroke="#6f553b" stroke-width="3" d="M12 12c-5 0-7 4-4 8 2 3 6 3 9 0V12zm40 0c5 0 7 4 4 8-2 3-6 3-9 0V12z" /></symbol>
+  <symbol id="i-cloth_scroll" viewBox="0 0 64 64"><path fill="#668d84" stroke="#d6c16f" stroke-width="3" d="M18 10h28v44H18z" /><path fill="none" stroke="#b8e0c5" stroke-width="2" d="M24 20h16M24 29h16M24 38h11M24 47h16" /><path fill="#83b09b" stroke="#d6c16f" stroke-width="3" d="M13 12c-4 0-6 4-3 8 2 3 6 3 9 0V12zm38 0c4 0 6 4 3 8-2 3-6 3-9 0V12z" /></symbol>
+  <symbol id="i-scroll_book" viewBox="0 0 64 64"><path fill="#7c523b" stroke="#e0bd61" stroke-width="3" d="M11 13c9-4 17-2 21 3 4-5 12-7 21-3v40c-9-4-17-2-21 3-4-5-12-7-21-3z" /><path fill="#d8c488" d="M32 18v33c-4-5-10-6-16-4V19c6-2 12-1 16 4Zm0 0v33c4-5 10-6 16-4V19c-6-2-12-1-16 4Z" /><path fill="none" stroke="#8d6945" stroke-width="2" d="M20 27h7m17 0h-7M20 35h7m17 0h-7" /></symbol>
+  <symbol id="i-fog" viewBox="0 0 64 64"><path fill="none" stroke="#9bc8bd" stroke-width="5" stroke-linecap="round" d="M10 23h29c8 0 8 12 0 12H21c-8 0-8 12 0 12h33" /><path fill="none" stroke="#d7e5c5" stroke-width="4" stroke-linecap="round" d="M13 49h18M20 15h28" /></symbol>
+  <symbol id="i-power" viewBox="0 0 64 64"><path fill="#d5ad4f" stroke="#6f5429" stroke-width="3" d="m37 5-23 31h14l-2 23 24-35H36z" /></symbol>
+  <symbol id="i-steam_power" viewBox="0 0 64 64"><path fill="none" stroke="#d4c59d" stroke-width="5" stroke-linecap="round" d="M20 51c-8-8-2-15 4-20 7-7 1-13-3-18m20 38c-8-8-2-15 4-20 7-7 1-13-3-18" /><path fill="#d2a94e" d="M13 53h38v6H13z" /></symbol>
 </svg>

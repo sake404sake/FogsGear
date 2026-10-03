@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>建築・タイルアイコン案 | Fogs Gear</title>
+<style>
+:root{color-scheme:dark;--bg:#111916;--panel:#1d2924;--panel2:#263a32;--line:#536b60;--gold:#e1bd62;--mint:#82c8b0;--rust:#d28a61;--blue:#82bdc7;--text:#e8e4d6;--muted:#a9b5aa;--brick:#b8674d;--steel:#75908d;--wood:#bb8a51}*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;color:var(--text);background:radial-gradient(circle at 8% 0%,#294037 0,transparent 38%),linear-gradient(135deg,#101714,#1d211b 55%,#261c16);font:15px/1.5 Georgia,"Yu Mincho",serif}.page{width:min(1440px,100%);margin:auto;padding:26px clamp(14px,3vw,40px) 64px}header{padding:12px 0 22px;border-bottom:1px solid var(--line)}.eyebrow,.mono{font:11px/1.4 monospace;letter-spacing:.08em;text-transform:uppercase}.eyebrow{margin:0 0 6px;color:var(--mint)}h1{margin:0;color:#f2d486;font-size:34px;font-weight:500}header p{max-width:760px;margin:8px 0 0;color:var(--muted)}.count{display:inline-flex;gap:8px;align-items:center;margin-top:14px;padding:5px 9px;background:#17211d;border:1px solid #506359;color:#d7dbca;font:12px monospace}.count strong{color:var(--gold);font-size:16px}.group-nav{position:sticky;top:0;z-index:5;display:flex;gap:6px;overflow:auto;margin:14px 0;padding:8px 0;background:rgba(17,25,22,.94);border-bottom:1px solid var(--line)}.group-nav a{flex:none;padding:6px 9px;color:var(--text);text-decoration:none;background:#1d2924;border:1px solid #536b60;font:11px monospace}.group-nav a:hover,.group-nav a:focus-visible{color:#18211c;background:var(--gold);outline:none}.catalog-group{scroll-margin-top:58px;margin:28px 0 38px}.group-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--line)}h2{margin:0;color:#f0d78f;font-size:20px;font-weight:500}.group-head p{margin:0;color:var(--muted);font:11px monospace}.object-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px}.object-card{min-width:0;overflow:hidden;background:rgba(20,29,25,.88);border:1px solid var(--line);border-top:2px solid var(--item-accent)}.object-art{display:grid;place-items:center;height:116px;background:linear-gradient(180deg,rgba(130,200,176,.06),transparent),#18231f;border-bottom:1px solid rgba(130,189,199,.2)}.object-art svg{display:block;width:92px;height:92px;overflow:visible}.object-card.tile .object-art{height:104px}.object-copy{padding:9px 10px 11px}.object-title-row{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}.object-card h3{min-width:0;margin:0;color:var(--text);font-size:13px;font-weight:500;line-height:1.35}.object-size{flex:none;padding:2px 5px;color:#171a15;background:var(--item-accent);font:10px monospace;white-space:nowrap}.object-card p{min-height:34px;margin:6px 0;color:var(--muted);font-size:11px;line-height:1.45}.object-materials{display:block;color:#add9da;font:10px/1.4 monospace}.review-note{margin:18px 0 0;padding:11px 13px;color:var(--muted);background:#17211d;border-left:3px solid var(--gold);font-size:12px}@media(max-width:980px){.object-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(max-width:660px){h1{font-size:28px}.group-head{align-items:flex-start;flex-direction:column;gap:3px}.object-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.object-art{height:104px}.object-art svg{width:82px;height:82px}.object-card h3{font-size:12px}}@media(max-width:360px){.object-grid{grid-template-columns:1fr}}
+</style>
+<style>.object-placement{display:grid;gap:5px;padding:8px 10px 0;border-top:1px solid rgba(130,189,199,.2)}.placement-caption{color:var(--muted);font:9px monospace}.footprint-line{display:flex;align-items:center;justify-content:space-between;gap:7px;min-height:34px}.footprint-board{flex:none;width:calc(var(--cells-wide)*6px);height:calc(var(--cells-high)*6px);max-width:96px;max-height:96px;background-color:color-mix(in srgb,var(--item-accent) 32%,#18231f);background-image:linear-gradient(to right,rgba(229,231,210,.34) 1px,transparent 1px),linear-gradient(to bottom,rgba(229,231,210,.34) 1px,transparent 1px);background-size:6px 6px;border:1px solid var(--item-accent)}.footprint-data{display:grid;gap:2px;min-width:0;color:var(--muted);font:9px/1.35 monospace;text-align:right}.footprint-data strong{color:var(--text);font-size:10px;font-weight:500}.object-card .object-copy{padding-top:8px}@media(max-width:660px){.footprint-line{gap:4px}.footprint-board{max-width:96px}.footprint-data{font-size:8px}.footprint-data strong{font-size:9px}}
+</style>
+<style>.placement-examples{grid-template-columns:repeat(2,minmax(0,1fr))!important}.placement-board{box-sizing:content-box!important;display:block!important;background-size:var(--cell-size) var(--cell-size),var(--cell-size) var(--cell-size),auto!important}.placed-building{position:absolute;overflow:hidden;background:color-mix(in srgb,var(--item-accent) 22%,transparent);border:1px solid var(--item-accent);box-shadow:none}.placed-building svg{display:block;width:100%;height:100%}@media(max-width:980px){.placement-examples{grid-template-columns:repeat(2,minmax(0,1fr))!important}}@media(max-width:660px){.placement-examples{grid-template-columns:1fr!important}}</style>
+<style>
+#final .object-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+#final .object-card{background:linear-gradient(155deg,rgba(32,45,39,.98),rgba(17,25,22,.98));border-color:#927b4d;box-shadow:0 10px 28px rgba(0,0,0,.28)}
+#final .object-art{position:relative;height:220px;overflow:hidden;background:radial-gradient(ellipse at 50% 72%,rgba(194,143,70,.18),transparent 58%),linear-gradient(180deg,#24332d,#17211d);border-bottom-color:rgba(225,189,98,.42)}
+#final .object-art svg{position:absolute;top:50%;left:50%;width:auto;height:calc(100% - 24px);max-width:calc(100% - 24px);transform:translate(-50%,-50%);padding:0}
+#final .object-title-row h3{color:#f0d78f}
+@media(max-width:660px){#final .object-grid{grid-template-columns:1fr}#final .object-art{height:240px}}
+#production .object-art{height:148px}
+#automation .object-art,#mega .object-art{height:188px;background:radial-gradient(ellipse at 50% 78%,rgba(194,143,70,.14),transparent 62%),linear-gradient(180deg,#22312b,#17211d)}
+#production .object-art,#automation .object-art,#mega .object-art{position:relative;overflow:hidden}
+#production .object-art svg,#automation .object-art svg,#mega .object-art svg{position:absolute;top:50%;left:50%;width:auto;height:calc(100% - 16px);max-width:calc(100% - 16px);transform:translate(-50%,-50%)}
+</style>
+</head>
+<style>.foundation-area{position:absolute;z-index:1;background-color:#909799;background-image:linear-gradient(to right,rgba(44,51,53,.55) 1px,transparent 1px),linear-gradient(to bottom,rgba(44,51,53,.55) 1px,transparent 1px);background-size:var(--cell-size) var(--cell-size);border:1px solid #596164}.placed-building{z-index:2}</style>
+<style>.footprint-board{box-sizing:content-box!important;width:calc(var(--cells-wide)*10px)!important;height:calc(var(--cells-high)*10px)!important;max-width:160px!important;max-height:160px!important;background-size:10px 10px!important}@media(max-width:520px){.object-grid{grid-template-columns:1fr!important}.footprint-board{max-width:160px!important;max-height:160px!important}}</style>
+<style>
+.placement-scene{margin:22px 0 32px;padding:14px;background:rgba(20,29,25,.76);border:1px solid var(--line)}.placement-scene header{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:12px;padding:0 0 8px;border-bottom:1px solid var(--line)}.placement-scene h2{margin:0;color:#f0d78f;font-size:19px;font-weight:500}.placement-scene header p{margin:0;color:var(--muted);font:11px monospace}.placement-examples{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.placement-sample{min-width:0;padding:8px;background:#17211d;border:1px solid rgba(130,189,199,.28)}.placement-sample h3{min-height:34px;margin:0 0 6px;color:var(--text);font-size:12px;font-weight:500}.placement-board{position:relative;display:grid;place-items:center;max-width:100%;overflow:hidden;background-color:#879e75;background-image:linear-gradient(90deg,rgba(232,229,204,.24) 1px,transparent 1px),linear-gradient(rgba(232,229,204,.24) 1px,transparent 1px),linear-gradient(135deg,#8cae79,#668c65);background-size:12px 12px,12px 12px,auto;border:1px solid #536b60}.placement-board svg{display:block;flex:none}.placement-sample p{margin:6px 0 0;color:var(--muted);font:10px monospace}@media(max-width:980px){.placement-examples{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:660px){.placement-scene header{align-items:flex-start;flex-direction:column;gap:3px}.placement-examples{grid-template-columns:1fr}.placement-board{margin-inline:auto}}
+</style>
+<body>
+<main class="page">
+<header><p class="eyebrow">FOGS GEAR / OBJECT ICON STUDY</p><h1>建築・タイルオブジェクト アイコン案</h1><p>1セルの床材から16×16セルの最終施設まで、同じ真鍮・鋼・木材の意匠でサイズ差と用途を見比べる検討用アトラスです。</p><div class="count"><strong id="item-count">32</strong>個の案 / ゲーム未反映</div></header>
+<nav class="group-nav" aria-label="アイコン分類"><a href="building-development-draft.html">← 建築案へ</a><a href="#placement">配置例</a><a href="#constructed">基礎セル</a><a href="#finishes">床材</a><a href="#outpost">初期設備</a><a href="#production">中核生産</a><a href="#automation">高度加工・自動化</a><a href="#mega">大型施設</a><a href="#final">最終級</a></nav>
+<section id="placement" class="placement-scene" aria-labelledby="placement-title"><header><h2 id="placement-title">セル格子上の配置イメージ</h2><p>灰色セルは基礎。小型インフラは地形へ直置き。</p></header><div class="placement-examples" id="placement-examples"></div></section>
+<div id="catalog"></div>
+<p class="review-note">大きな建築は施工地形「基礎」を先に敷き、その上へ建てる想定です。簡易ストレージ、手回しポンプ、圧力計台、スチームベントなどの小型インフラは基礎不要。基礎材と施工レシピは未設計です。</p>
+<svg class="legacy-symbols" aria-hidden="true"><defs>
+<symbol id="i-furnace-plate" viewBox="0 0 96 96"><path fill="#25241f" d="M8 86h80v6H8z"/><path fill="#5f4638" d="M12 43h72v43H12z"/><path fill="#8d5a3e" stroke="#d4a85b" stroke-width="3" d="M18 36h60v50H18z"/><path fill="#4b5b50" d="M25 48h46v33H25z"/><path fill="#3c332b" d="M25 48h46v7H25z"/><path fill="#d16c42" d="M34 73c0-9 10-13 12-28 12 11 17 22 10 29-7 8-19 7-22-1Z"/><path fill="#f3d06c" d="M43 75c0-5 5-8 5-15 7 7 8 13 3 17-3 3-7 2-8-2Z"/><path fill="none" stroke="#efd788" stroke-width="3" d="M18 45h60M31 39V27m34 12V27"/><path fill="#606c62" stroke="#d4a85b" stroke-width="3" d="M34 25h28l-4-12H38z"/><path fill="#9ebbb0" d="M42 9h12v5H42z"/><path fill="none" stroke="#573b2e" stroke-width="2" d="M21 58h5m-5 9h5m45-9h5m-5 9h5"/></symbol>
+<symbol id="i-workshop-plate" viewBox="0 0 96 96"><path fill="#25241f" d="M8 86h80v6H8z"/><path fill="#5a4638" d="M10 45h76v40H10z"/><path fill="#a87443" stroke="#e1bd62" stroke-width="3" d="M7 45h82L48 20z"/><path fill="#6b4635" d="M48 20 89 45H77L48 28 19 45H7z"/><path fill="#314a42" d="M19 54h22v31H19zm36 0h22v31H55z"/><path fill="#d9b65e" d="M28 61h10v8H28zm31 8h12v8H59z"/><circle cx="48" cy="49" r="12" fill="#627d76" stroke="#e1bd62" stroke-width="3"/><circle cx="48" cy="49" r="4" fill="#eac86b"/><path fill="none" stroke="#90c5b2" stroke-width="3" d="M48 37v24M36 49h24"/><path fill="none" stroke="#c88e4e" stroke-width="3" d="M13 86h70"/><path fill="none" stroke="#f0d88a" stroke-width="2" d="M24 56h12m24 0h12"/></symbol>
+<symbol id="i-station-plate" viewBox="0 0 96 96"><path fill="#25241f" d="M5 84h86v8H5z"/><path fill="#5b493b" d="M7 40h82v42H7z"/><path fill="#d1aa59" stroke="#efd889" stroke-width="3" d="m5 40 43-28 43 28z"/><path fill="#87643e" d="M48 12 91 40H78L48 20 18 40H5z"/><path fill="#263d37" d="M17 49h15v33H17zm24 0h15v33H41zm24 0h14v33H65z"/><path fill="none" stroke="#b7d4c1" stroke-width="3" d="M17 88h63M8 84h80"/><path fill="#a56845" d="M36 67h24v15H36z"/><circle cx="48" cy="73" r="4" fill="#e1bd62"/><path fill="none" stroke="#f1d88a" stroke-width="2" d="M12 45h72"/></symbol>
+<symbol id="i-tower-plate" viewBox="0 0 96 96"><path fill="#25241f" d="M16 86h64v6H16z"/><path fill="#52635e" stroke="#d3ad5b" stroke-width="3" d="M27 18h42l-7 68H34z"/><path fill="#364941" d="M34 25h28v12H34zm-2 24h32v13H32z"/><path fill="#7e9c91" d="M34 25h28v5H34zm-2 24h32v5H32z"/><path fill="none" stroke="#e5d59b" stroke-width="3" d="M39 29h18M37 54h22M34 76h28"/><path fill="#6d4c37" d="M42 9h12v9H42z"/><path fill="#d7b45e" d="M36 6h24v5H36z"/><path fill="none" stroke="#b8ded0" stroke-width="3" d="M48 2v5M41 2h14"/><path fill="#d27747" d="M18 84h60v7H18z"/><path fill="#ebc86d" d="M42 28h5v6h-5zm8 23h5v6h-5z"/></symbol>
+</defs></svg>
+</main>
+<script>
+function intermeshedGear(centerX,centerY,radius,toothCount,color,rotation=0){
+	const rootRadius=radius*.72;
+	const step=Math.PI*2/toothCount;
+	const points=[];
+	for(let tooth=0;tooth<toothCount;tooth++){
+		const base=rotation+tooth*step;
+		for(const [offset,r] of [[-.5,rootRadius],[-.32,rootRadius],[-.32,radius], [.32,radius],[.32,rootRadius],[.5,rootRadius]]){
+			const angle=base+offset*step;
+			points.push(`${(centerX+Math.cos(angle)*r).toFixed(2)},${(centerY+Math.sin(angle)*r).toFixed(2)}`);
+		}
+	}
+	const spokes=[0,60,120].map(degrees=>{const angle=(degrees+rotation*180/Math.PI)*Math.PI/180;return `M${(centerX+Math.cos(angle)*radius*.22).toFixed(2)} ${(centerY+Math.sin(angle)*radius*.22).toFixed(2)}L${(centerX+Math.cos(angle)*radius*.62).toFixed(2)} ${(centerY+Math.sin(angle)*radius*.62).toFixed(2)}`}).join('');
+	return `<g class="dome-gear"><path d="M${points.join('L')}Z" fill="${color}" stroke="#283936" stroke-width="1.4"/><circle cx="${centerX}" cy="${centerY}" r="${(radius*.47).toFixed(2)}" fill="#30433d" stroke="#ead080" stroke-width="1.2"/><path d="${spokes}" fill="none" stroke="#e0c675" stroke-width="1.4"/><circle cx="${centerX}" cy="${centerY}" r="${(radius*.2).toFixed(2)}" fill="#bf8a4b" stroke="#34443d" stroke-width="1"/><circle cx="${centerX}" cy="${centerY}" r="${(radius*.07).toFixed(2)}" fill="#c9d0c1"/></g>`;
+}
+const glyphs={
+brick:'<rect x="12" y="12" width="72" height="72" fill="#9a503b" stroke="#e1bd62" stroke-width="4"/><path d="M12 30h72M12 49h72M12 68h72M30 12v18m36 0v19M30 49v19m36 0v16" stroke="#d28a61" stroke-width="2"/><path d="M16 16h64" stroke="#f0d78f" stroke-width="2"/>',
+concrete:'<rect x="12" y="12" width="72" height="72" fill="#667875" stroke="#9db1a6" stroke-width="3"/><path d="M48 14v68M14 48h68" stroke="#394640" stroke-width="3"/><path d="M16 16h64v64H16z" fill="none" stroke="#b7c6bb" stroke-width="1"/><circle cx="48" cy="48" r="4" fill="#bd9861"/>',
+grate:'<rect x="12" y="12" width="72" height="72" fill="#455652" stroke="#c9a65c" stroke-width="3"/><path d="M22 14v68m13-68v68m13-68v68m13-68v68m13-68v68M14 24h68M14 37h68M14 50h68M14 63h68M14 76h68" stroke="#aebdb3" stroke-width="2"/><path d="M17 17h62v62H17z" fill="none" stroke="#202a26" stroke-width="2"/>',
+wood:'<rect x="12" y="12" width="72" height="72" fill="#895b36" stroke="#d5b56e" stroke-width="3"/><path d="M30 13v70m19-70v70m19-70v70M13 31h16m20 0h18M13 56h16m20 0h18" stroke="#e1b56c" stroke-width="2"/><path d="M15 17h66v62H15z" fill="none" stroke="#503b2d" stroke-width="2"/>',
+furnace:'<path d="M20 35h56v47H20z" fill="#76503a" stroke="#d9a759" stroke-width="3"/><path d="M29 48h38v34H29z" fill="#29342f"/><path d="M36 73c-4-10 9-14 10-27 13 11 17 23 8 30-7 5-15 3-18-3Z" fill="#d46d43"/><path d="M46 76c-2-6 5-9 5-15 7 6 8 11 3 16-3 2-6 1-8-1Z" fill="#f3d06c"/><path d="M51 17h25v22H51z" fill="#536660" stroke="#dbb765" stroke-width="3"/><path d="M57 11h13v7H57z" fill="#9cb6aa"/><path d="M25 42h46" stroke="#f1d88a" stroke-width="3"/>',
+crate:'<path d="M19 32h58v48H19z" fill="#80543b" stroke="#e0b665" stroke-width="3"/><path d="m19 32 14-14h58L77 32z" fill="#bd8750" stroke="#e0b665" stroke-width="3"/><path d="M77 32 91 18v48L77 80z" fill="#5e4532" stroke="#d3a457" stroke-width="3"/><path d="M32 32v48m31-48v48M20 55h56" stroke="#d4aa63" stroke-width="3"/><path d="M36 43h20" stroke="#f1d88a" stroke-width="3"/>',
+pump:'<path d="M38 35h22v48H38z" fill="#536b62" stroke="#d2ad5e" stroke-width="3"/><path d="M49 35V20h28M48 22 32 12" fill="none" stroke="#bd8e55" stroke-width="5" stroke-linecap="round"/><circle cx="31" cy="12" r="5" fill="#d2ad5e"/><path d="M42 83h14m-7-8v13" stroke="#384640" stroke-width="4"/><path d="M60 53c8 7 8 13 0 18" fill="none" stroke="#82c8d0" stroke-width="3"/>',
+gauge:'<path d="M39 51h18v33H39z" fill="#68736a" stroke="#c9a45f" stroke-width="3"/><circle cx="48" cy="33" r="22" fill="#31443d" stroke="#d0ad61" stroke-width="5"/><circle cx="48" cy="33" r="15" fill="#cad0b9" stroke="#4e5247" stroke-width="2"/><path d="m48 33 9-10" stroke="#a94f3a" stroke-width="3"/><circle cx="48" cy="33" r="3" fill="#4a4435"/><path d="M44 84h26M48 83V55" stroke="#b58e54" stroke-width="3"/>',
+vent:'<path d="M28 45h40v37H28z" fill="#596d65" stroke="#d0ad61" stroke-width="3"/><path d="M36 45V20h24v25" fill="#667c73" stroke="#d0ad61" stroke-width="3"/><path d="M32 20h32v8H32z" fill="#bd8e55"/><path d="M43 13c-8-9 8-11 3-18m13 18c-7-7 8-10 3-17" fill="none" stroke="#b5d2c8" stroke-width="3" stroke-linecap="round"/><path d="M37 57h22M37 67h22" stroke="#9ebbb0" stroke-width="2"/>',
+fountain:'<ellipse cx="48" cy="76" rx="34" ry="10" fill="#445d54" stroke="#d0ad61" stroke-width="4"/><path d="M25 68h46l-7 9H32z" fill="#b48a53"/><path d="M39 65V43h18v22" fill="#647d74" stroke="#d8b65b" stroke-width="3"/><path d="M33 44h30l-6 7H39z" fill="#d0ad61"/><path d="M48 43V24m0 8c-12-8-12-14-5-17m5 17c12-8 12-14 5-17" fill="none" stroke="#83c6ce" stroke-width="4" stroke-linecap="round"/><circle cx="48" cy="23" r="4" fill="#ead18a"/>',
+warehouse:'<path d="M15 42h66v42H15z" fill="#634936" stroke="#d4ad61" stroke-width="3"/><path d="M10 43 48 17 86 43z" fill="#bd8750" stroke="#e0b665" stroke-width="3"/><path d="M29 55h38v29H29z" fill="#293a33" stroke="#ba9255" stroke-width="3"/><path d="M48 55v29m-16-15h32" stroke="#c99d5b" stroke-width="3"/><path d="M19 48h10m38 0h10" stroke="#9cb6aa" stroke-width="3"/>',
+bench:'<path d="M17 39h62v12H17z" fill="#bd8750" stroke="#57402d" stroke-width="3"/><path d="M24 51v32m48-32v32" stroke="#705036" stroke-width="6"/><path d="M31 29h27v10H31z" fill="#d1aa5b"/><circle cx="67" cy="32" r="13" fill="#546a61" stroke="#d2ad5e" stroke-width="4"/><circle cx="67" cy="32" r="4" fill="#e3c66f"/><path d="M62 27 72 37m0-10L62 37" stroke="#e3c66f" stroke-width="2"/>',
+gearforge:'<path d="M18 42h60v41H18z" fill="#694938" stroke="#d2a65d" stroke-width="3"/><path d="M26 50h26v33H26z" fill="#29342f"/><path d="M31 74c0-9 8-11 8-21 10 8 12 15 6 22-5 5-11 4-14-1Z" fill="#d16c42"/><path d="M59 54h17v29H59z" fill="#596d65" stroke="#cdaa60" stroke-width="2"/><path d="m66 31 3 2 4-1 2 5 3 2-2 4 1 4-5 2-2 3-4-2-4 1-2-5-3-2 2-4-1-4 5-2z" fill="#d3ad5b" stroke="#54432e" stroke-width="2"/><circle cx="68" cy="43" r="5" fill="#364840"/>',
+boiler:'<path d="M14 44h68v39H14z" fill="#604838" stroke="#d3a55d" stroke-width="3"/><path d="M21 51h54v32H21z" fill="#586e64"/><path d="M27 35h42v24H27z" fill="#a35e3f" stroke="#e0b665" stroke-width="3"/><path d="M33 35V17h13v18m13 0V9h12v26" fill="#667a71" stroke="#d0ad61" stroke-width="3"/><path d="M35 15h9m17-8h10" stroke="#f0d78f" stroke-width="3"/><circle cx="48" cy="68" r="10" fill="#2c3932" stroke="#e0b665" stroke-width="3"/><path d="m48 58 4 10-8 0z" fill="#d38b4d"/>',
+washer:'<path d="M13 48h70v34H13z" fill="#4c6159" stroke="#d0ad61" stroke-width="3"/><path d="M19 44V29h23v15m12 0V23h20v21" fill="#617970" stroke="#d4b060" stroke-width="3"/><path d="M18 57h24v19H18zm34 0h24v19H52z" fill="#315b60" stroke="#abc1af" stroke-width="2"/><path d="M21 66c6-9 12 9 19 0m15 0c6-9 12 9 19 0" fill="none" stroke="#83d0cf" stroke-width="3"/><path d="M42 34h12m-8-7v-8h13" fill="none" stroke="#d1a65c" stroke-width="4"/>',
+kiln:'<path d="M18 43h60v40H18z" fill="#805b42" stroke="#d3aa5f" stroke-width="3"/><path d="M24 47c0-21 12-31 24-31s24 10 24 31" fill="#7c8981" stroke="#d3aa5f" stroke-width="3"/><path d="M37 45V30h22v15" fill="#35443d"/><path d="M43 76c-3-9 6-12 7-22 9 9 10 16 5 23-4 4-10 3-12-1Z" fill="#d16c42"/><path d="M69 20h10V7H69z" fill="#687871" stroke="#cda45e" stroke-width="2"/><path d="M73 5c-4-6 8-6 4-12" fill="none" stroke="#b5d2c8" stroke-width="3"/>',
+watertower:'<path d="M29 41h38v43H29z" fill="#586d66" stroke="#d1aa5d" stroke-width="3"/><path d="M24 34h48v10H24z" fill="#b28750"/><path d="M35 22h26v13H35z" fill="#80a59a" stroke="#d1aa5d" stroke-width="3"/><path d="M39 22V12h18v10m-9-10V5" fill="none" stroke="#cfa960" stroke-width="4"/><path d="M35 53h26M35 65h26M35 77h26" stroke="#b9d2c2" stroke-width="2"/><path d="M41 84v7m14-7v7" stroke="#bd8e55" stroke-width="4"/>',
+lathe:'<path d="M13 62h70v19H13z" fill="#536960" stroke="#d1a65d" stroke-width="3"/><path d="M23 37h22v25H23zm37 0h17v25H60z" fill="#7b6045" stroke="#d1a65d" stroke-width="3"/><path d="M45 47h17m-16 8h17" stroke="#e0c77d" stroke-width="4"/><path d="M47 43v17m5-17v17" stroke="#303c36" stroke-width="2"/><circle cx="33" cy="48" r="7" fill="#30433b" stroke="#d3ad5d" stroke-width="3"/><path d="M27 27h40v8H27z" fill="#b88a50"/>',
+distillery:'<path d="M16 52h66v31H16z" fill="#53675e" stroke="#d0aa5d" stroke-width="3"/><path d="M27 50V29h15v21m17 0V21h15v29" fill="#83573d" stroke="#d0aa5d" stroke-width="3"/><path d="M32 29h5V14h-5zm17 33h15l-3 15H52z" fill="#97c4b6" stroke="#e0c776" stroke-width="2"/><path d="M57 62v-8l-4-6v-6h11v6l-4 6v8" fill="#7bbab5"/><path d="M20 58h7v19h-7zm49-46h18v6H69z" fill="#c08e53"/>',
+railstation:'<path d="M13 42h70v40H13z" fill="#59493a" stroke="#d2a85d" stroke-width="3"/><path d="m9 43 39-26 39 26z" fill="#c29454" stroke="#e0c77d" stroke-width="3"/><path d="M22 54h13v28H22zm20 0h13v28H42zm20 0h13v28H62z" fill="#31463f"/><path d="M9 87h78m-71 5h64" stroke="#c9c4b0" stroke-width="3"/><path d="M20 87v7m15-7v7m15-7v7m15-7v7" stroke="#b38a50" stroke-width="3"/>',
+turbine:'<path d="M17 44h62v39H17z" fill="#566d63" stroke="#dbb560" stroke-width="3"/><path d="M26 42V22h43v20" fill="#795b40" stroke="#dbb560" stroke-width="3"/><circle cx="48" cy="55" r="19" fill="#2c3932" stroke="#9db8a8" stroke-width="3"/><circle cx="48" cy="55" r="5" fill="#d6b35e"/><path d="M48 36v14m0 10v14M29 55h14m10 0h14m-32-13 10 10m14 6 10 10m0-26L55 52m-14 6L31 68" stroke="#d5b25d" stroke-width="3"/><path d="M37 19V9h9v10m7 0V5h9v14" fill="#60766d" stroke="#cfaa5a" stroke-width="2"/>',
+difference:'<path d="M29 13h38v70H29z" fill="#52645e" stroke="#d2ad5d" stroke-width="3"/><path d="M21 28h54v7H21zm-3 24h60v7H18zm8 23h44v7H26z" fill="#ad8751"/><circle cx="48" cy="30" r="13" fill="#36473f" stroke="#e1bd62" stroke-width="3"/><circle cx="48" cy="54" r="12" fill="#36473f" stroke="#e1bd62" stroke-width="3"/><circle cx="48" cy="76" r="10" fill="#36473f" stroke="#e1bd62" stroke-width="3"/><path d="M48 18v24M48 42v24M48 66v20" stroke="#e6ca74" stroke-width="3"/><path d="M38 30h20m-20 24h20m-18 22h16" stroke="#e6ca74" stroke-width="2"/>',
+drill:'<path d="M33 17h30v58H33z" fill="#596c62" stroke="#d0a75c" stroke-width="3"/><path d="M26 20h44l-7-11H33z" fill="#a77547" stroke="#e2bd69" stroke-width="3"/><path d="m40 75 8 14 8-14m-8-14v28" fill="none" stroke="#d4b263" stroke-width="5"/><path d="M18 30h15m30 0h15M20 48h13m30 0h13" stroke="#aab9a8" stroke-width="4"/><circle cx="48" cy="42" r="7" fill="#313e37" stroke="#dfbe68" stroke-width="3"/>',
+automaton:'<path d="M13 52h70v31H13z" fill="#57483a" stroke="#d0a95c" stroke-width="3"/><path d="M20 50V29h21v21m15 0V22h19v28" fill="#70543d" stroke="#d0a95c" stroke-width="3"/><rect x="38" y="28" width="23" height="29" rx="5" fill="#82948a" stroke="#e0bd67" stroke-width="3"/><circle cx="45" cy="39" r="2.5" fill="#e4c66c"/><circle cx="54" cy="39" r="2.5" fill="#e4c66c"/><path d="M44 48h11m-12 9-5 14m16-14 6 14m-16-29-9-5m21 5 8-9" fill="none" stroke="#d5b05d" stroke-width="4"/><path d="M19 23V10h7v13m45-3V8h8v12" fill="#677970" stroke="#d0a95c" stroke-width="2"/>',
+balloon:'<path d="M18 62h61v20H18z" fill="#76523b" stroke="#d1aa5d" stroke-width="3"/><path d="M24 62V47h14v15m17 0V42h15v20" fill="#586e64" stroke="#d1aa5d" stroke-width="2"/><path d="M30 43c-5-21 2-33 18-35 16 2 23 14 18 35-8 12-28 12-36 0Z" fill="#ba714c" stroke="#dfc26e" stroke-width="3"/><path d="M31 27h34m-33 9h32m-24-27v38m15-37v37" fill="none" stroke="#e4c579" stroke-width="2"/><path d="M39 47 45 58m17-11-6 11" stroke="#dac078" stroke-width="2"/>',
+guild:'<path d="M10 42h76v43H10z" fill="#624a39" stroke="#d5ae60" stroke-width="3"/><path d="m8 43 40-29 40 29z" fill="#b78c50" stroke="#e2c375" stroke-width="3"/><path d="M16 40V24h13v17m38 0V24h13v17" fill="#667a70" stroke="#d5ae60" stroke-width="3"/><path d="M39 85V54h18v31" fill="#2c3c35" stroke="#c6a45b" stroke-width="2"/><path d="M20 53h10v17H20zm46 0h10v17H66z" fill="#97b9a9"/><circle cx="48" cy="37" r="7" fill="#30433b" stroke="#e0bf68" stroke-width="2"/>',
+relic:'<path d="M15 74h66v10H15z" fill="#625446" stroke="#c9aa65" stroke-width="3"/><path d="M27 70V33l21-20 21 20v37" fill="#736b59" stroke="#d6c17c" stroke-width="4"/><circle cx="48" cy="45" r="17" fill="#303d37" stroke="#88beb1" stroke-width="4"/><circle cx="48" cy="45" r="8" fill="#81a99a" stroke="#e2cc7c" stroke-width="3"/><path d="M48 14V4m-21 29-9-7m51 7 9-7M27 63l-9 7m51-7 9 7" stroke="#cfad61" stroke-width="4"/>',
+hangar:'<path d="M12 42h72v42H12z" fill="#4d5d58" stroke="#d2ad61" stroke-width="3"/><path d="M8 43 48 14l40 29z" fill="#9f7950" stroke="#dfc176" stroke-width="3"/><path d="M25 43v41m15-47v47m16-47v47m15-41v41" stroke="#cfad66" stroke-width="3"/><path d="M28 62c10-16 30-16 40 0l-4 10H32z" fill="#627c73" stroke="#d9bd70" stroke-width="2"/><path d="M35 60h26" stroke="#9fd2c6" stroke-width="2"/>',
+filtertower:'<path d="M31 20h34l-7 63H38z" fill="#5a7167" stroke="#dbb661" stroke-width="3"/><path d="M26 20h44v9H26zm5 23h34v8H31zm-2 24h38v8H29z" fill="#b1824d" stroke="#d9bd70" stroke-width="2"/><path d="M38 32h20m-21 23h22m-23 22h24" stroke="#a6c7b8" stroke-width="3"/><path d="M40 15V7h16v8m-8-8V1" fill="none" stroke="#d4b15e" stroke-width="4"/><path d="M20 84h56" stroke="#d0ad61" stroke-width="5"/>',
+walker:'<path d="M32 20h32v26H32z" fill="#657970" stroke="#d7b663" stroke-width="3"/><circle cx="48" cy="16" r="10" fill="#485c52" stroke="#d7b663" stroke-width="3"/><circle cx="45" cy="15" r="2" fill="#e7ca71"/><circle cx="52" cy="15" r="2" fill="#e7ca71"/><path d="M36 45 27 58l-5 21m38-34 12 13 6 20M31 57 17 63 12 80m48-21 16 5 8 17" fill="none" stroke="#c49b59" stroke-width="7" stroke-linecap="round"/><path d="M15 81h15m41 0h15" stroke="#4c5d55" stroke-width="6"/><path d="M35 30h26" stroke="#a8beb2" stroke-width="3"/>',
+geothermal:'<path d="M27 17h42v61H27z" fill="#4c5e55" stroke="#d1aa5d" stroke-width="4"/><path d="M21 14h54v11H21z" fill="#a77948" stroke="#d9bd70" stroke-width="3"/><path d="M36 26v42m12-42v48m12-48v42" stroke="#b4c1af" stroke-width="4"/><path d="m33 78 15 11 15-11" fill="none" stroke="#d16c42" stroke-width="5"/><path d="M39 68c-8-8 8-10 2-19m14 19c-8-8 8-10 2-19" fill="none" stroke="#e5a265" stroke-width="3"/>',
+dome:'<path d="M6 78h84v10H6z" fill="#795638" stroke="#e1bd62" stroke-width="3"/><path d="M10 78V64h9v14m58 0V64h9v14M24 78V70h7v8m34 0V70h7v8" fill="#5b6f66" stroke="#c9a75d" stroke-width="2"/><path d="M12 77C12 43 26 15 48 8c22 7 36 35 36 69z" fill="#58857f" fill-opacity=".58" stroke="#c7d7c6" stroke-width="4"/><path d="M15 68C21 43 32 24 48 17c16 7 27 26 33 51" fill="none" stroke="#e1c56e" stroke-width="3"/><path d="M19 56C28 46 38 41 48 39c10 2 20 7 29 17M28 36c6-7 13-11 20-14 7 3 14 7 20 14" fill="none" stroke="#b8d0c7" stroke-width="2"/><path d="M20 71 48 9l28 62M33 76 48 18l15 58M12 59h72M16 44h64M23 29h50" fill="none" stroke="#dfbd63" stroke-width="2.5"/><path d="M20 75h56v-9H20z" fill="#6c5038" stroke="#d7b45e" stroke-width="2"/><path d="M26 65V54h14v11m16 0V49h14v16" fill="#916845" stroke="#d5b05d" stroke-width="2"/><path d="m26 54 7-7 7 7m16-5 7-8 7 8" fill="#c09253" stroke="#e0c574" stroke-width="2"/><path d="M43 64V35h10v29m-13-29h16v5H40z" fill="#526e64" stroke="#e0bf67" stroke-width="2"/><path d="M45 34V22h6v12m-8-12h10v4H43z" fill="#b0824b" stroke="#e5c873" stroke-width="1.5"/><path d="M46 20V10h4v10m-7-8h10v3H43z" fill="#d0a354"/><path d="M40 47h16m-16 7h16m-11-18v27m6-27v27" fill="none" stroke="#a9c9bd" stroke-width="1.5"/><path d="M19 74h9m40 0h9M8 82h80" stroke="#edcf78" stroke-width="2"/><circle cx="13" cy="83" r="2" fill="#e4cd86"/><circle cx="83" cy="83" r="2" fill="#e4cd86"/><circle cx="48" cy="75" r="3" fill="#92d0c2" stroke="#33463f" stroke-width="1"/><path d="M8 20h8v18H8zm72 0h8v18h-8z" fill="#536b63" stroke="#dfbd63" stroke-width="2"/><path d="M10 24h4m-4 5h4m-4 5h4m66-10h4m-4 5h4m-4 5h4" stroke="#bfd1c5" stroke-width="1.5"/><path d="M16 39h6v23h-5m57 0h-5V39h6" fill="none" stroke="#ceaa5c" stroke-width="3"/><path d="M22 61c-6 4-7 8-5 13m57-13c6 4 7 8 5 13" fill="none" stroke="#8fc3b6" stroke-width="2.5"/>'
+};
+Object.assign(glyphs,{
+stone:'<rect x="12" y="12" width="72" height="72" fill="#766e61" stroke="#c3b48d" stroke-width="3"/><path d="m12 32 20-20m-20 55 43-43m-13 61 41-41M33 84l51-51" stroke="#aaa18f" stroke-width="2"/><path d="M14 36h16m20-6h20M15 68h17m20-5h20" stroke="#4f5149" stroke-width="2"/>',
+drainTile:'<rect x="12" y="12" width="72" height="72" fill="#81968e" stroke="#d5c28a" stroke-width="3"/><path d="M16 28h64M16 66h64" stroke="#53665e" stroke-width="3"/><path d="M33 30v34m30-34v34" stroke="#b9c9b8" stroke-width="2"/><rect x="39" y="38" width="18" height="17" rx="2" fill="#273632" stroke="#c8ae6b" stroke-width="2"/><path d="M43 42v9m5-9v9m5-9v9" stroke="#98b1a5" stroke-width="1.5"/>',
+accessTile:'<rect x="12" y="12" width="72" height="72" fill="#626d64" stroke="#d7b764" stroke-width="4"/><path d="M20 20h56v56H20z" fill="none" stroke="#b7c1ad" stroke-width="2"/><rect x="32" y="32" width="32" height="32" fill="#36433b" stroke="#d7b764" stroke-width="3"/><circle cx="48" cy="48" r="9" fill="#987244" stroke="#ead18a" stroke-width="2"/><path d="M48 39v18m-9-9h18" stroke="#f1db93" stroke-width="2"/>',
+hearthTile:'<rect x="12" y="12" width="72" height="72" fill="#454c49" stroke="#bba46c" stroke-width="3"/><path d="M18 18h60v60H18z" fill="none" stroke="#9ba9a0" stroke-width="2"/><path d="M27 27h42v42H27z" fill="#312f2a" stroke="#d28a61" stroke-width="3"/><path d="M35 61c-5-10 7-14 9-25 11 10 14 19 7 27-5 5-13 4-16-2Z" fill="#d16c42"/><path d="M46 64c-2-5 4-8 4-13 6 5 6 10 2 14-2 2-5 1-6-1Z" fill="#f1ce78"/>',
+dryingRack:'<path d="M16 32h64v48H16z" fill="#6f5038" stroke="#d1aa5d" stroke-width="3"/><path d="M20 37h56m-56 14h56m-56 14h56" stroke="#c18c50" stroke-width="4"/><path d="M24 37v28m16-28v28m16-28v28m16-28v28" stroke="#4d4132" stroke-width="2"/><path d="M22 22h52l-5 9H27z" fill="#97a47d"/><path d="M33 22c0-8 8-8 8 0m12 0c0-8 8-8 8 0" fill="none" stroke="#d4c284" stroke-width="3"/>',
+charcoalKiln:'<path d="M18 45h60v38H18z" fill="#644936" stroke="#d0a85d" stroke-width="3"/><path d="M24 46c0-22 12-32 24-32s24 10 24 32" fill="#565b54" stroke="#d0a85d" stroke-width="3"/><path d="M37 49h22v34H37z" fill="#282a26" stroke="#a88552" stroke-width="2"/><path d="M42 70c-3-8 4-12 6-19 8 8 9 15 4 21-3 3-8 2-10-2Z" fill="#bc6541"/><path d="M29 30h38m-35 8h32" stroke="#9c9180" stroke-width="2"/><path d="M72 22h11v-11H72z" fill="#6a7169" stroke="#d0a85d" stroke-width="2"/>',
+cistern:'<path d="M20 31h56v52H20z" fill="#53665c" stroke="#d0aa5d" stroke-width="3"/><path d="M16 31h64v10H16z" fill="#bd9252"/><path d="M25 48h46v28H25z" fill="#31575a" stroke="#9bc6bd" stroke-width="2"/><path d="M28 57c8-7 14 7 22 0s14 7 18 0m-40 10c8-7 14 7 22 0s14 7 18 0" fill="none" stroke="#84c3c3" stroke-width="2"/><path d="M48 31V16h21v15m-13-15V8h17" fill="none" stroke="#d0aa5d" stroke-width="4"/><circle cx="69" cy="8" r="4" fill="#c6ddd2"/>',
+accumulator:'<path d="M24 28h48v56H24z" fill="#586e65" stroke="#d2ad5e" stroke-width="3"/><path d="M19 28h58v10H19zM30 17h36v11H30z" fill="#b2864e" stroke="#d7b764" stroke-width="2"/><circle cx="48" cy="52" r="16" fill="#273831" stroke="#9fc1b1" stroke-width="3"/><path d="m48 52 9-9" stroke="#e2c66f" stroke-width="3"/><circle cx="48" cy="52" r="3" fill="#d4ad5e"/><path d="M35 70h26m-20 8h14" stroke="#bad1c4" stroke-width="3"/><path d="M37 17V9h22v8" fill="none" stroke="#d4ad5e" stroke-width="3"/>',
+resinShop:'<path d="M15 42h66v42H15z" fill="#624a38" stroke="#d0aa5d" stroke-width="3"/><path d="m11 43 37-26 37 26z" fill="#b2824c" stroke="#dfbd70" stroke-width="3"/><path d="M24 53h19v31H24zm31 0h18v31H55z" fill="#36463e"/><path d="M59 59h10v17H59z" fill="#6f583d" stroke="#d2aa60" stroke-width="2"/><path d="M29 61h9m-9 8h9m22-13V45h10v12" stroke="#91c2b1" stroke-width="3"/><circle cx="49" cy="37" r="7" fill="#3b5146" stroke="#e1bd62" stroke-width="2"/>',
+});
+const groups=[
+{id:'finishes',name:'仕上げタイル',items:[
+{name:'真鍮縁どり赤煉瓦床タイル',size:'1×1',materials:'焼成煉瓦・真鍮枠',desc:'炉の周囲を区画する耐熱床。',art:'brick',accent:'#d28a61',tile:true},
+{name:'青鋼コンクリートパネル',size:'1×1',materials:'骨材・金属屑',desc:'重機械の基礎や通路に使う補強床。',art:'concrete',accent:'#82bdc7',tile:true},
+{name:'鋳鉄格子デッキ（メッシュ）',size:'1×1',materials:'鋳鉄・鋼材',desc:'下の配管や水路が透ける滑り止め床。',art:'grate',accent:'#9cb1a7',tile:true},
+{name:'銘木防水板仕上げ床',size:'1×1',materials:'防水板・樹脂パッキン',desc:'生活区や精密機器向けの木製床。',art:'wood',accent:'#d2b766',tile:true}
+]},
+{id:'outpost',name:'初期設備・小型インフラ',items:[
+{name:'簡易炉',size:'1×1',materials:'石材・粘土・木材',desc:'開拓初期に使う小型の単セル炉。',art:'furnace',accent:'#d28a61'},
+{name:'簡易ストレージ',size:'1×1',materials:'製材板・金属鋲',desc:'野営資材を小分けに保管する木箱。',art:'crate',accent:'#d2b766'},
+{name:'手回し式揚管ポンプ',size:'1×1',materials:'手回し柄・青銅軸受',desc:'人力で水を汲み上げる小型ポンプ。',art:'pump',accent:'#82bdc7'},
+{name:'圧力計ペデスタル塔',size:'1×1',materials:'圧力計・銅毛細管',desc:'配管網の圧力を見える形で示す。',art:'gauge',accent:'#e1bd62'},
+{name:'霧よけスチームベント',size:'1×1',materials:'蒸気ノズル・耐熱隔離環',desc:'熱蒸気で周辺の濃霧を一時的に押し返す。',art:'vent',accent:'#82c8b0'},
+{name:'歯車生成炉',size:'2×2',materials:'耐熱煉瓦・青銅・歯車素材',desc:'現行の炉案を改称。歯車素材の焼成・成形を行う。',art:'gearforge',accent:'#d28a61'},
+{name:'真鍮噴水 / スチームファンテン',size:'2×2',materials:'真鍮資材・水・蒸気ノズル',desc:'休息所と冷却、水汲み場を兼ねる。',art:'fountain',accent:'#82bdc7'},
+{name:'ストレージ倉庫',size:'2×2',materials:'真鍮資材・製材板',desc:'資材を多く積み上げて保管する中型倉庫。',art:'warehouse',accent:'#d2b766'},
+{name:'手鋸・細工作業台',size:'2×2',materials:'木材・真鍮資材',desc:'製材板づくりと初期部品の細工を行う。',art:'bench',accent:'#d2b766'}
+]},
+{id:'production',name:'中核生産施設',items:[
+{name:'蒸気ボイラー＆鍛造炉',size:'3×3',materials:'石炭・コークス・鋼塊',desc:'高圧蒸気の供給と金属精錬を担う。',art:'boiler',accent:'#d28a61'},
+{name:'水洗選鉱プラント',size:'3×3',materials:'銅鉱石・亜鉛鉱石・水',desc:'鉱石を洗浄し、銅・亜鉛精鉱へ高純度化。',art:'washer',accent:'#82bdc7'},
+{name:'耐熱ガラス・陶器窯',size:'3×3',materials:'粘土・砂・雲母片',desc:'ガラス素地や耐熱坩堝を焼成する。',art:'kiln',accent:'#d28a61'},
+{name:'蒸気揚水・濾過タワー',size:'3×3',materials:'蒸気ポンプ・活性炭層',desc:'不純水や霧水を揚水し、ろ過する。',art:'watertower',accent:'#82c8b0'},
+{name:'蒸気駆動機械旋盤所',size:'4×4',materials:'真鍮資材・鋼塊・回転軸',desc:'鉄ねじや耐圧筐体などを自動切削する。',art:'lathe',accent:'#e1bd62'},
+{name:'蒸気式錬金蒸留プラント',size:'4×4',materials:'蒸留器・薬液瓶・薬草',desc:'抽出液や薬液を精製し、瓶へ充填する。',art:'distillery',accent:'#82c8b0'},
+{name:'蒸気軌道貨物ステーション',size:'4×4',materials:'鋼材・蒸気巻上げ機・線路',desc:'採掘場から資材を運び込む物流拠点。',art:'railstation',accent:'#d39067'}
+]},
+{id:'automation',name:'高度加工・自動化',items:[
+{name:'中央蒸気タービン発電炉',size:'5×5',materials:'鋼塊・高圧蒸気・耐熱軸受',desc:'電気ではなく高圧蒸気を周辺へ供給する。',art:'turbine',accent:'#d28a61'},
+{name:'機械式階差演算タワー',size:'5×5',materials:'真鍮歯車・軸受・圧力膜',desc:'歯車演算で自動化ラインを制御する。',art:'difference',accent:'#e1bd62'},
+{name:'巨大深部土壌掘削ドリル',size:'5×5',materials:'黒曜石・蒸気ピストン・鋼材',desc:'深部鉱脈へ到達する大型掘削櫓。',art:'drill',accent:'#9cb1a7'},
+{name:'オートマトン製造工場',size:'6×6',materials:'遺物共振核・鋼ばね・真鍮資材',desc:'無人作業用の自動人形を組み立てる。',art:'automaton',accent:'#d2b766'},
+{name:'開拓気球・軽飛空艇ドック',size:'6×6',materials:'測量道具・羅針盤・防水布',desc:'偵察気球や小型貨物艇を整備・発着させる。',art:'balloon',accent:'#d39067'}
+]},
+{id:'mega',name:'大型メガストラクチャー',items:[
+{name:'開拓地総司令グランドギルド',size:'7×7',materials:'石材・鋼材・耐霧種子箱',desc:'地図統合と技術解放を担う中央拠点。',art:'guild',accent:'#e1bd62'},
+{name:'古代遺物共振解読炉',size:'7×7',materials:'遺物片・遺物探知器・共振核',desc:'巨大遺物を解読し、再起動を試みる。',art:'relic',accent:'#82bdc7'},
+{name:'大型飛空艇ドックヤード',size:'8×8',materials:'鋼材・木材・大型飛空艇部材',desc:'本国との物資輸送艇を建造・発着させる。',art:'hangar',accent:'#d39067'},
+{name:'環境浄化スチームタワー',size:'8×8',materials:'鋼材・活性炭層・耐熱隔離環',desc:'濃霧や胞子を熱分解・ろ過する巨大塔。',art:'filtertower',accent:'#82c8b0'}
+]},
+{id:'final',name:'ハイパープロジェクト / 最終級',items:[
+{name:'移動都市用走行脚フレーム',size:'10×10',materials:'鋼塊・大型蒸気ピストン・軸受',desc:'拠点を支え、危険域から移動させる巨脚。',art:'walker',accent:'#d28a61'},
+{name:'地熱ダイレクト蒸気コレクター',size:'12×12',materials:'耐圧鋼管・耐熱隔離環・蒸気弁',desc:'深部の地熱を直接、高圧蒸気として回収する。',art:'geothermal',accent:'#d28a61'},
+{name:'新天地テラフォーミングドーム',size:'16×16',materials:'雲母窓ガラス・大型フィルター網・蒸気調整弁',desc:'巨大歯車と濾過翼で霧・熱・湿度を段階調律し、広域居住圏を支える。',art:'dome',accent:'#82bdc7'}
+]}
+];
+glyphs.lodge='<path d="M14 42h68v42H14z" fill="#68503c" stroke="#d3ae63" stroke-width="3"/><path d="m10 43 38-26 38 26z" fill="#b58950" stroke="#e0c574" stroke-width="3"/><path d="M23 53h20v31H23zm31 0h20v31H54z" fill="#35473e" stroke="#d2ac60" stroke-width="2"/><path d="M29 60h8v13h-8zm31 0h8v13h-8z" fill="#94b7a6"/><path d="M44 58h9v26h-9z" fill="#2d3d35"/><path d="M18 49h60" stroke="#f0d88a" stroke-width="2"/>';
+Object.assign(glyphs,{stone:'<rect x="12" y="12" width="72" height="72" fill="#766e61" stroke="#c3b48d" stroke-width="3"/><path d="m12 32 20-20m-20 55 43-43m-13 61 41-41M33 84l51-51" stroke="#aaa18f" stroke-width="2"/><path d="M14 36h16m20-6h20M15 68h17m20-5h20" stroke="#4f5149" stroke-width="2"/>',drainTile:'<rect x="12" y="12" width="72" height="72" fill="#81968e" stroke="#d5c28a" stroke-width="3"/><path d="M16 28h64M16 66h64" stroke="#53665e" stroke-width="3"/><path d="M33 30v34m30-34v34" stroke="#b9c9b8" stroke-width="2"/><rect x="39" y="38" width="18" height="17" rx="2" fill="#273632" stroke="#c8ae6b" stroke-width="2"/><path d="M43 42v9m5-9v9m5-9v9" stroke="#98b1a5" stroke-width="1.5"/>',accessTile:'<rect x="12" y="12" width="72" height="72" fill="#626d64" stroke="#d7b764" stroke-width="4"/><path d="M20 20h56v56H20z" fill="none" stroke="#b7c1ad" stroke-width="2"/><rect x="32" y="32" width="32" height="32" fill="#36433b" stroke="#d7b764" stroke-width="3"/><circle cx="48" cy="48" r="9" fill="#987244" stroke="#ead18a" stroke-width="2"/><path d="M48 39v18m-9-9h18" stroke="#f1db93" stroke-width="2"/>',hearthTile:'<rect x="12" y="12" width="72" height="72" fill="#454c49" stroke="#bba46c" stroke-width="3"/><path d="M18 18h60v60H18z" fill="none" stroke="#9ba9a0" stroke-width="2"/><path d="M27 27h42v42H27z" fill="#312f2a" stroke="#d28a61" stroke-width="3"/><path d="M35 61c-5-10 7-14 9-25 11 10 14 19 7 27-5 5-13 4-16-2Z" fill="#d16c42"/><path d="M46 64c-2-5 4-8 4-13 6 5 6 10 2 14-2 2-5 1-6-1Z" fill="#f1ce78"/>',dryingRack:'<path d="M16 32h64v48H16z" fill="#6f5038" stroke="#d1aa5d" stroke-width="3"/><path d="M20 37h56m-56 14h56m-56 14h56" stroke="#c18c50" stroke-width="4"/><path d="M24 37v28m16-28v28m16-28v28m16-28v28" stroke="#4d4132" stroke-width="2"/><path d="M22 22h52l-5 9H27z" fill="#97a47d"/><path d="M33 22c0-8 8-8 8 0m12 0c0-8 8-8 8 0" fill="none" stroke="#d4c284" stroke-width="3"/>',charcoalKiln:'<path d="M18 45h60v38H18z" fill="#644936" stroke="#d0a85d" stroke-width="3"/><path d="M24 46c0-22 12-32 24-32s24 10 24 32" fill="#565b54" stroke="#d0a85d" stroke-width="3"/><path d="M37 49h22v34H37z" fill="#282a26" stroke="#a88552" stroke-width="2"/><path d="M42 70c-3-8 4-12 6-19 8 8 9 15 4 21-3 3-8 2-10-2Z" fill="#bc6541"/><path d="M29 30h38m-35 8h32" stroke="#9c9180" stroke-width="2"/><path d="M72 22h11v-11H72z" fill="#6a7169" stroke="#d0a85d" stroke-width="2"/>',cistern:'<path d="M20 31h56v52H20z" fill="#53665c" stroke="#d0aa5d" stroke-width="3"/><path d="M16 31h64v10H16z" fill="#bd9252"/><path d="M25 48h46v28H25z" fill="#31575a" stroke="#9bc6bd" stroke-width="2"/><path d="M28 57c8-7 14 7 22 0s14 7 18 0m-40 10c8-7 14 7 22 0s14 7 18 0" fill="none" stroke="#84c3c3" stroke-width="2"/><path d="M48 31V16h21v15m-13-15V8h17" fill="none" stroke="#d0aa5d" stroke-width="4"/><circle cx="69" cy="8" r="4" fill="#c6ddd2"/>',accumulator:'<path d="M24 28h48v56H24z" fill="#586e65" stroke="#d2ad5e" stroke-width="3"/><path d="M19 28h58v10H19zM30 17h36v11H30z" fill="#b2864e" stroke="#d7b764" stroke-width="2"/><circle cx="48" cy="52" r="16" fill="#273831" stroke="#9fc1b1" stroke-width="3"/><path d="m48 52 9-9" stroke="#e2c66f" stroke-width="3"/><circle cx="48" cy="52" r="3" fill="#d4ad5e"/><path d="M35 70h26m-20 8h14" stroke="#bad1c4" stroke-width="3"/><path d="M37 17V9h22v8" fill="none" stroke="#d4ad5e" stroke-width="3"/>',resinShop:'<path d="M15 42h66v42H15z" fill="#624a38" stroke="#d0aa5d" stroke-width="3"/><path d="m11 43 37-26 37 26z" fill="#b2824c" stroke="#dfbd70" stroke-width="3"/><path d="M24 53h19v31H24zm31 0h18v31H55z" fill="#36463e"/><path d="M59 59h10v17H59z" fill="#6f583d" stroke="#d2aa60" stroke-width="2"/><path d="M29 61h9m-9 8h9m22-13V45h10v12" stroke="#91c2b1" stroke-width="3"/><circle cx="49" cy="37" r="7" fill="#3b5146" stroke="#e1bd62" stroke-width="2"/>'});
+const domeMachineCore=`<path d="M19 53 31 46h34l12 7v22H19z" fill="#314a46" fill-opacity=".96" stroke="#9db9ad" stroke-width="1.6"/><path d="M22 56h68m-68 15h68" stroke="#b7c8b8" stroke-width="1"/><path d="M23 52V75m51-23v23M48 47v8m0 20v6" stroke="#b8874d" stroke-width="2"/>${intermeshedGear(31,61,12,12,'#c49350',.13)}${intermeshedGear(55,61,12,12,'#718e89',.39)}${intermeshedGear(43,41,9,10,'#b96f47',.1)}${intermeshedGear(43,26,6,8,'#abbeb2',.2)}<path d="M43 20v-6m0 36v2" stroke="#cbd6c8" stroke-width="1.5"/>`;
+glyphs.dome+=domeMachineCore;
+Object.assign(glyphs,{
+walker:`
+<ellipse cx="48" cy="89" rx="43" ry="5" fill="#111714" opacity=".8"/>
+<path d="m35 51-13 12-8 22m47-34 13 12 8 22M34 58 18 68 8 84m54-26 16 10 10 16" fill="none" stroke="#303e38" stroke-width="10" stroke-linecap="round"/>
+<path d="m35 51-13 12-8 22m47-34 13 12 8 22M34 58 18 68 8 84m54-26 16 10 10 16" fill="none" stroke="#c28c4a" stroke-width="5" stroke-linecap="round"/>
+<path d="m9 82 20 2-2 7H6zm66 0 19 2 2 7H73z" fill="#56685e" stroke="#d8b867" stroke-width="2"/>
+<path d="M16 39 29 25h39l14 14v24H16z" fill="#566b60" stroke="#e0bd68" stroke-width="3"/>
+<path d="m16 39 13-14h39l14 14-12 5H27z" fill="#a87442" stroke="#f0d183" stroke-width="2"/>
+<path d="M23 43h50v17H23z" fill="#33463e" stroke="#b8c6b6" stroke-width="2"/>
+<path d="M28 25V14h12v11m17 0V11h13v14" fill="#5f7469" stroke="#d8b867" stroke-width="3"/>
+<path d="M30 13V6h8v8m21-4V3h8v8" fill="#ad7143" stroke="#ebca76" stroke-width="2"/>
+<path d="M33 6c-5-8 7-8 3-14m26 10c-5-8 7-8 3-14" fill="none" stroke="#c5d5ca" stroke-width="2.5" stroke-linecap="round"/>
+<path d="M22 48H9v13h10m58-13h10v13H77M28 63v8h40v-8" fill="none" stroke="#d8b867" stroke-width="3"/>
+<circle cx="48" cy="17" r="7" fill="#d5b45e" stroke="#313f38" stroke-width="2"/><path d="M48 12v10m-5-5h10" stroke="#34443c" stroke-width="1.5"/>
+${intermeshedGear(34,51,10,10,'#bf8845',.1)}${intermeshedGear(62,51,10,10,'#79948a',.23)}
+<path d="M34 42v18m28-18v18M48 45v12" stroke="#d5b45e" stroke-width="1.5"/>`,
+geothermal:`
+<ellipse cx="48" cy="89" rx="43" ry="5" fill="#111714" opacity=".8"/><path d="M9 81h78v8H9z" fill="#52645b" stroke="#d3ad61" stroke-width="2"/>
+<path d="M17 79V42h62v37" fill="#394b43" stroke="#d5b45f" stroke-width="3"/><path d="m17 43 11-10h40l11 10H17z" fill="#a06d40" stroke="#ebc977" stroke-width="2"/>
+<path d="M26 77V46h44v31" fill="#293a34" stroke="#aebeb0" stroke-width="2"/><path d="M31 73h34M34 50v22m28-22v22" stroke="#bd9252" stroke-width="3"/>
+<path d="M37 70c-8-8 8-11 2-21m16 21c-8-8 8-11 2-21" fill="none" stroke="#ec9850" stroke-width="3" stroke-linecap="round"/>
+<path d="M25 43V17h13v26m20 0V11h14v32" fill="#63766c" stroke="#d5b45e" stroke-width="3"/><path d="M23 18h17v-7H23zm32-6h18V5H55z" fill="#a76e40" stroke="#e5c16a" stroke-width="2"/>
+<path d="M28 11V5h8v6m27-6V0h8v5" fill="#82958a" stroke="#dfbb62" stroke-width="2"/><path d="M28 3c-5-7 7-8 3-14m31 8c-5-7 7-8 3-14" fill="none" stroke="#bfd2c8" stroke-width="2.5" stroke-linecap="round"/>
+<path d="M17 54H8v-9h9m62 9h9v-9h-9M17 68H7v8h10m62-8h10v8H79" fill="none" stroke="#d2ae5c" stroke-width="3"/>
+<circle cx="48" cy="43" r="13" fill="#d1ad58" stroke="#263831" stroke-width="3"/><circle cx="48" cy="43" r="9" fill="#d6d0b0" stroke="#677a6d" stroke-width="2"/><path d="m48 43 5-6" stroke="#a84f37" stroke-width="2"/><circle cx="48" cy="43" r="1.5" fill="#35453d"/>
+${intermeshedGear(31,64,8,10,'#b98042',.1)}${intermeshedGear(65,64,8,10,'#83978b',.28)}
+<path d="M39 61h18m-9-6v18" stroke="#e2c36a" stroke-width="1.5"/>`,
+dome:`
+<ellipse cx="48" cy="90" rx="44" ry="5" fill="#111714" opacity=".8"/><path d="M6 80h84v9H6z" fill="#8d633b" stroke="#f0d17a" stroke-width="2"/>
+<path d="M11 77h74v7H11z" fill="#42564b" stroke="#d5b260" stroke-width="2"/><path d="M13 78V54h8v24m54 0V54h8v24M25 78V65h7v13m37 0V65h7v13" fill="#60746a" stroke="#dbba66" stroke-width="2"/>
+<path d="M10 75C10 39 25 13 48 7c23 6 38 32 38 68z" fill="#4c7771" fill-opacity=".58" stroke="#d9e0cb" stroke-width="3"/>
+<path d="M16 72C20 43 32 22 48 15c16 7 28 28 32 57M23 72C27 47 37 29 48 23c11 6 21 24 25 49" fill="none" stroke="#dfbd62" stroke-width="2.5"/>
+<path d="M12 61h72M15 48h66M21 35h54M30 23h36M23 74 48 8l25 66M36 77 48 15l12 62" fill="none" stroke="#b9cfc2" stroke-width="1.5"/>
+<path d="M43 68V34h10v34m-14-34h18l-4-7h-10z" fill="#687f72" stroke="#e2c16a" stroke-width="2"/>
+<path d="M45 27V13h6v14m-9-14h12v4H42z" fill="#bb8248" stroke="#e9c976" stroke-width="1.5"/><path d="M48 13V4h4v9m-7-6h10v3H45z" fill="#d3a354"/>
+<path d="M36 47h24m-24 7h24m-17-19v28m10-28v28" fill="none" stroke="#b4cbbd" stroke-width="1.5"/>
+<path d="M8 42h9V20H8zm71 0h9V20h-9z" fill="#596f64" stroke="#e0be67" stroke-width="2.5"/><path d="M10 25h5m-5 6h5m-5 6h5m66-12h5m-5 6h5m-5 6h5" stroke="#d6d6bd" stroke-width="1.5"/>
+<path d="M12 20V9h7v11m58 0V6h8v14" fill="#6f8176" stroke="#d1aa5d" stroke-width="2.5"/><path d="M11 9h9V5h-9zm57 1h18V5H68z" fill="#a66f43" stroke="#e3bd66" stroke-width="2"/>
+<path d="M14 4V0h5v5m56 0V-3h7v9" fill="#91a79a" stroke="#d9b85e" stroke-width="2"/><path d="M15 0c-5-7 7-8 3-14m56 11c-5-7 7-8 3-14" fill="none" stroke="#cadbd0" stroke-width="2.5" stroke-linecap="round"/>
+<path d="M20 71h56v-7H20zM14 82h68" fill="#785638" stroke="#e0bd63" stroke-width="2"/><path d="M19 74H8v-9m69 9h11v-9M22 67 8 57m66 10 14-10" fill="none" stroke="#d2ad5c" stroke-width="3"/>
+${intermeshedGear(31,61,11,12,'#c49350',.13)}${intermeshedGear(65,61,11,12,'#718e89',.39)}${intermeshedGear(48,42,8,10,'#b96f47',.1)}
+<circle cx="48" cy="27" r="5" fill="#9bc7b6" stroke="#e8d17a" stroke-width="2"/><path d="M48 21v12m-6-6h12" stroke="#d9bd67" stroke-width="1.2"/>`
+});
+Object.assign(glyphs,{
+lathe:`
+<path d="M8 78h80v9H8z" fill="#202b26"/><path d="M12 67h72v12H12z" fill="#53685e" stroke="#d7b360" stroke-width="3"/><path d="M19 79v8m59-8v8" stroke="#a77443" stroke-width="5"/>
+<path d="M19 38h23v29H19zm38 0h20v29H57z" fill="#697d70" stroke="#d8b663" stroke-width="3"/><path d="M22 41h17v8H22zm39 0h14v7H61z" fill="#34483f"/>
+<circle cx="31" cy="54" r="10" fill="#283a33" stroke="#dfbd64" stroke-width="3"/><circle cx="31" cy="54" r="4" fill="#a67641"/><path d="M40 51h23m-20 6h20" stroke="#d9c477" stroke-width="4"/>
+<path d="M61 51h16m-8-8v22" stroke="#bac8b8" stroke-width="2"/><path d="M20 34h19v-7H20zm39 0h18v-7H59z" fill="#b27d47" stroke="#e1bd62" stroke-width="2"/>
+${intermeshedGear(22,27,8,10,'#bd8847',.1)}${intermeshedGear(43,29,7,9,'#708d81',.3)}<path d="M30 26V18h31v8m-23-8V12h12v6" fill="none" stroke="#c6a055" stroke-width="3"/>
+<circle cx="70" cy="23" r="12" fill="#384b41" stroke="#d8b766" stroke-width="3"/><circle cx="70" cy="23" r="8" fill="#d6d1af" stroke="#778577" stroke-width="2"/><path d="m70 23 4-6" stroke="#a64d37" stroke-width="2"/><path d="M68 36v-5m8 5v-5" stroke="#d7b45d" stroke-width="2"/>`,
+distillery:`
+<path d="M10 78h76v9H10z" fill="#202a25"/><path d="M15 65h66v14H15z" fill="#536960" stroke="#d8b562" stroke-width="3"/><path d="M21 69h13v7H21zm42 0h13v7H63z" fill="#344941"/>
+<path d="M19 64V36h18v28m22 0V28h18v36" fill="#80583f" stroke="#dab45e" stroke-width="3"/><path d="M22 42h12m-12 9h12m18-15h16m-16 9h16" stroke="#d4bc78" stroke-width="2"/>
+<path d="M23 36V24h10v12m29-8V17h10v11" fill="#60786d" stroke="#d5b45f" stroke-width="2.5"/><path d="M21 24h14v-5H21zm29-7h24v-5H50z" fill="#b57d43" stroke="#e0bc67" stroke-width="2"/>
+<path d="M28 19V13h8v6m20-1V7h12v10" fill="#76897e" stroke="#e2c168" stroke-width="2"/><path d="M36 48h13v16H36z" fill="#3b655f" stroke="#b8d1bb" stroke-width="2"/><path d="M39 54c3-4 6 4 8 0m-8 5c3-4 6 4 8 0" fill="none" stroke="#a2d2c3" stroke-width="1.5"/>
+<path d="M42 48V39l-5-7v-6h15v6l-5 7v9m-9-19h13" fill="#718d82" stroke="#e1c36d" stroke-width="2"/><path d="M47 26v-9h17" fill="none" stroke="#c38a4a" stroke-width="3"/><circle cx="65" cy="17" r="3" fill="#e2c46e"/>
+<path d="M17 59h-7V38h10m56 0h10v20h-8" fill="none" stroke="#cf9c52" stroke-width="3"/><circle cx="48" cy="18" r="7" fill="#34483e" stroke="#deb85f" stroke-width="2"/><path d="m48 18 3-4" stroke="#edcf78" stroke-width="2"/>`,
+railstation:`
+<path d="M7 69h82v8H7z" fill="#5a4737" stroke="#d4ad5e" stroke-width="2"/><path d="M12 77h72m-65 6h58" stroke="#c7c4b1" stroke-width="3"/><path d="M20 77v7m14-7v7m14-7v7m14-7v7m14-7v7" stroke="#ad8049" stroke-width="3"/>
+<path d="M13 40h70v29H13z" fill="#54483a" stroke="#d4ad5e" stroke-width="3"/><path d="m8 41 40-28 40 28z" fill="#ba8d4d" stroke="#e2c476" stroke-width="3"/><path d="M18 43h60v5H18z" fill="#e0c16b"/>
+<path d="M20 52h13v17H20zm20 0h16v17H40zm23 0h17v17H63z" fill="#31453d" stroke="#a9c1b3" stroke-width="2"/><path d="M24 56h5m16 0h8m-8 6h8m-8 5h8m27-13v14" stroke="#d7bf73" stroke-width="2"/>
+<path d="M11 37V22h9v15m57 0V22h9v15" fill="#62766c" stroke="#d2ae5c" stroke-width="2"/><path d="M14 23h4m59 0h4" stroke="#e2c270" stroke-width="2"/>
+<path d="M36 69V58h18v11" fill="#8c5e3d" stroke="#dab461" stroke-width="2"/><circle cx="45" cy="62" r="4" fill="#d5b261"/><path d="M7 88h82" stroke="#ba8a4e" stroke-width="2"/>`,
+difference:`
+<path d="M22 17h52v68H22z" fill="#465b51" stroke="#d8b661" stroke-width="3"/><path d="M14 29h68v8H14zm-4 25h76v8H10zm6 24h64v8H16z" fill="#ae824d" stroke="#e1c06d" stroke-width="2"/>
+<circle cx="48" cy="32" r="13" fill="#2c4037" stroke="#e1c36c" stroke-width="3"/><circle cx="48" cy="57" r="12" fill="#2c4037" stroke="#d5af59" stroke-width="3"/><circle cx="48" cy="80" r="9" fill="#2c4037" stroke="#d5af59" stroke-width="3"/>
+${intermeshedGear(48,32,8,10,'#c18a45',.12)}${intermeshedGear(48,57,7,10,'#799286',.3)}${intermeshedGear(48,80,5,8,'#b56f47',.1)}
+<path d="M48 18V7m0 10-17-6m17 6 17-6M48 45v24m0 0v19" fill="none" stroke="#e5ca75" stroke-width="2"/><path d="M30 27H17v36h13m36-36h13v36H66" fill="none" stroke="#9cb7a7" stroke-width="2"/>
+<circle cx="80" cy="17" r="9" fill="#33463e" stroke="#e0bd66" stroke-width="2"/><path d="M80 17v-6m0 6 5 3" stroke="#f0d07a" stroke-width="1.5"/><path d="M31 11V5h34v6" fill="none" stroke="#bd8d4d" stroke-width="3"/>`,
+drill:`
+<path d="M9 79h78v9H9z" fill="#252f2a"/><path d="M17 77V28h62v49M23 71V34h50v37" fill="none" stroke="#657b70" stroke-width="4"/><path d="M17 30h62M22 42h52M20 60h56" stroke="#d3ac59" stroke-width="3"/><path d="M25 30 17 77m54-47 8 47" stroke="#9eac9f" stroke-width="2"/>
+<path d="M37 19h22v38H37z" fill="#546b60" stroke="#d9b864" stroke-width="3"/><path d="M33 19h30l-5-9H38z" fill="#b17d45" stroke="#e2c36b" stroke-width="2"/><path d="M41 28h14v19H41z" fill="#2e4038" stroke="#9cb5a8" stroke-width="2"/><path d="M45 32v12m6-12v12" stroke="#dfbd65" stroke-width="2"/>
+<path d="M44 56h8v13l9 11-13 13-13-13 9-11z" fill="#ba884a" stroke="#ead078" stroke-width="2.5"/><path d="M48 68v22m-9-10h18" stroke="#596b60" stroke-width="2"/>
+<path d="M26 27V14h9m35 13V11h-9" fill="none" stroke="#c98e48" stroke-width="4"/><circle cx="27" cy="15" r="5" fill="#82968b" stroke="#d9b762" stroke-width="2"/><circle cx="69" cy="12" r="5" fill="#82968b" stroke="#d9b762" stroke-width="2"/>
+<path d="M13 50H6v15h11m62-15h11v15H79" fill="none" stroke="#c9a45a" stroke-width="3"/><path d="M34 74h28" stroke="#e3c36d" stroke-width="3"/>`,
+automaton:`
+<path d="M10 65h76v21H10z" fill="#514638" stroke="#d7b360" stroke-width="3"/><path d="M17 69h62v13H17z" fill="#293a33"/><path d="M20 86v5m56-5v5" stroke="#a57543" stroke-width="4"/><path d="M13 42h18v22H13zm52-7h18v29H65z" fill="#667a6f" stroke="#d8b55e" stroke-width="3"/>
+<path d="M35 39h27v25H35z" fill="#9a7046" stroke="#e3c36c" stroke-width="3"/><rect x="39" y="28" width="20" height="31" rx="5" fill="#899c8e" stroke="#ead080" stroke-width="3"/><path d="M43 36h4m5 0h4" stroke="#333f37" stroke-width="3"/><path d="M44 46h10" stroke="#3b4a41" stroke-width="2"/>
+<path d="M40 57 34 67l-4 12m24-22 8 10 3 12M40 62l-9-5-8 4m34 1 9-8 7 3" fill="none" stroke="#d2ad5d" stroke-width="4" stroke-linecap="round"/>
+${intermeshedGear(22,48,9,10,'#bd8744',.1)}${intermeshedGear(74,47,9,10,'#809489',.3)}
+<path d="M16 40V23h11v13m43-3V17h12v18" fill="#596e63" stroke="#d9b760" stroke-width="2.5"/><path d="M13 23h17v-5H13zm42-6h21v-5H55z" fill="#a97543" stroke="#e2bf66" stroke-width="2"/>
+<path d="M21 29h54m-53 8h54" stroke="#aebeb0" stroke-width="2"/><circle cx="48" cy="18" r="5" fill="#d9b75e" stroke="#34443c" stroke-width="2"/>`,
+guild:`
+<path d="M9 75h78v11H9z" fill="#594435" stroke="#d4ad5d" stroke-width="3"/><path d="M14 42h68v34H14z" fill="#624b38" stroke="#d1ad61" stroke-width="3"/><path d="m9 43 39-29 39 29z" fill="#b98c4e" stroke="#e3c471" stroke-width="3"/>
+<path d="M19 42V25h13v17m32 0V25h13v17" fill="#5a7065" stroke="#d6b45f" stroke-width="2.5"/><path d="M21 29h9m36 0h9" stroke="#dfc372" stroke-width="2"/>
+<path d="M39 76V48h18v28" fill="#293a33" stroke="#caa354" stroke-width="2"/><path d="M20 52h13v17H20zm43 0h13v17H63z" fill="#344a40" stroke="#d4b05c" stroke-width="2"/>
+<path d="M38 42V24h20v18M34 25l14-15 14 15" fill="#64786b" stroke="#e1be64" stroke-width="3"/><circle cx="48" cy="31" r="8" fill="#d5ceb0" stroke="#37483f" stroke-width="2"/><path d="M48 31v-5m0 5 4 2" stroke="#a44e36" stroke-width="1.5"/>
+<path d="M43 11V5h10v6m-8-2h6" fill="none" stroke="#d8b65e" stroke-width="3"/><path d="M12 80h72M18 47h60" stroke="#ecd17c" stroke-width="2"/>`,
+relic:`
+<path d="M8 78h80v10H8z" fill="#534b3d" stroke="#d5b763" stroke-width="3"/><path d="M15 74V32l12-12h42l12 12v42" fill="#635f50" stroke="#d6c17b" stroke-width="3"/><path d="M20 70V36l9-9h38l9 9v34" fill="#37443c" stroke="#b5aa78" stroke-width="2"/>
+<path d="M31 71V42h34v29" fill="#273831" stroke="#d9c77e" stroke-width="3"/><circle cx="48" cy="48" r="17" fill="#243832" stroke="#8fc2b0" stroke-width="4"/><circle cx="48" cy="48" r="9" fill="#86b7a7" stroke="#e2d07c" stroke-width="3"/><path d="M48 39v18m-9-9h18" stroke="#4a6658" stroke-width="2"/>
+${intermeshedGear(28,57,8,10,'#b9a060',.2)}${intermeshedGear(68,57,8,10,'#82998e',.1)}
+<path d="M48 13V4m-21 18-8-8m50 8 8-8M20 56h-9m74 0h-9M26 71l-9 9m53-9 9 9" stroke="#d7b861" stroke-width="3"/>
+<path d="M37 28 48 18l11 10m-26 4H19m58 0H61" fill="none" stroke="#9bc3b2" stroke-width="2"/><circle cx="48" cy="48" r="3" fill="#ebd781"/>`,
+hangar:`
+<path d="M7 79h82v8H7z" fill="#554638" stroke="#d6b15f" stroke-width="2"/><path d="M11 40h74v39H11z" fill="#4a5e55" stroke="#d1ad60" stroke-width="3"/><path d="m7 41 41-29 41 29z" fill="#9a754b" stroke="#ddbe6d" stroke-width="3"/><path d="M18 42v37m15-43v43m30-43v43m15-37v37" stroke="#c7a55a" stroke-width="3"/>
+<path d="M22 72V54l10-10h32l10 10v18" fill="#263830" stroke="#d7b962" stroke-width="2"/><path d="M29 56 39 46h18l10 10-6 10H35z" fill="#71877a" stroke="#d9c06c" stroke-width="2"/><path d="M31 55h34m-26-8 4 19m18-19-4 19" fill="none" stroke="#d0b15f" stroke-width="2"/>
+<path d="M34 57h28m-14-11v20m-19 4h38" stroke="#a9c6b6" stroke-width="2"/><path d="M39 66 48 80l9-14" fill="#8e6640" stroke="#d6b55d" stroke-width="2"/>
+<path d="M13 47H8v17h12m58-17h10v17H75" fill="none" stroke="#d6b25b" stroke-width="3"/><path d="M18 83h60" stroke="#c8c4ad" stroke-width="2"/>`,
+filtertower:`
+<path d="M8 80h80v8H8z" fill="#252f2a"/><path d="M20 77V23h56v54" fill="#536a60" stroke="#dfbb62" stroke-width="3"/><path d="M28 72V30h40v42" fill="#2c4139" stroke="#aabeb1" stroke-width="2"/>
+<path d="M25 37h46v8H25zm-3 16h52v8H22zm-1 16h54v7H21z" fill="#a87e48" stroke="#dec06e" stroke-width="2"/><path d="M33 31v40m15-40v40m15-40v40" stroke="#b8cfc2" stroke-width="3"/>
+<path d="M27 23V11h12v12m18 0V6h13v17" fill="#657b70" stroke="#d8b660" stroke-width="3"/><path d="M24 12h18V7H24zm30-5h20V2H54z" fill="#b57e44" stroke="#e1bf65" stroke-width="2"/><path d="M31 7V2h6v5m22-5v-7h8v7" fill="#8ba196" stroke="#ddba62" stroke-width="2"/>
+<circle cx="48" cy="23" r="8" fill="#303f37" stroke="#e2c36c" stroke-width="2"/><path d="M48 23v-5m0 5 4 2" stroke="#ecd37a" stroke-width="1.5"/>
+<path d="M20 42H9v10h11m56-10h11v10H76M20 63H8v10h13m55-10h12v10H76" fill="none" stroke="#d3ad5c" stroke-width="3"/>
+${intermeshedGear(31,60,7,10,'#bd8745',.1)}${intermeshedGear(65,60,7,10,'#81988c',.3)}
+<path d="M13 79V34h7m63 45V34h-7" fill="none" stroke="#94b1a4" stroke-width="2.5"/>`
+});
+const catalogAdditions={
+finishes:[
+	{name:'玄武岩耐熱石畳',size:'1×1',materials:'火山岩・石灰材',desc:'炉前や煙道まわりの高温床。',art:'stone',accent:'#b0a38d',tile:true},
+	{name:'陶器排水タイル',size:'1×1',materials:'粘土・釉薬',desc:'洗浄場や揚水設備の排水に使う床。',art:'drainTile',accent:'#82bdc7',tile:true},
+	{name:'真鍮点検口付き舗装',size:'1×1',materials:'石材・真鍮資材',desc:'地下配管へアクセスする点検蓋付き床。',art:'accessTile',accent:'#e1bd62',tile:true},
+	{name:'石炭炉前鋳鉄床',size:'1×1',materials:'鋳鉄・耐火煉瓦',desc:'火の粉と重荷重に耐える炉前パネル。',art:'hearthTile',accent:'#d28a61',tile:true}
+],
+outpost:[
+	{name:'木材乾燥棚',size:'2×2',materials:'木材・防水板',desc:'製材前の木を風通しよく乾かす。',art:'dryingRack',accent:'#d2b766'},
+	{name:'炭焼き窯',size:'2×2',materials:'石材・粘土・木材',desc:'木材から炉用の木炭を作る。',art:'charcoalKiln',accent:'#d28a61'},
+	{name:'霧水貯蔵槽',size:'2×2',materials:'石材・防水板・銅管',desc:'集めた霧水を蓄えて設備へ送る。',art:'cistern',accent:'#82bdc7'}
+],
+production:[
+	{name:'蒸気蓄圧器',size:'3×3',materials:'鋼塊・耐熱隔離環・圧力計',desc:'余剰蒸気を一時的に蓄える圧力槽。',art:'accumulator',accent:'#82bdc7'},
+	{name:'樹脂パッキン加工所',size:'3×3',materials:'樹脂・真鍮資材・蒸気',desc:'配管や弁に使う耐圧シールを成形する。',art:'resinShop',accent:'#d2b766'},
+	{name:'真鍮工房',size:'3×2',materials:'真鍮資材・製材板',desc:'既存案を統合。歯車や弁を組み立てる。',legacySymbol:'i-workshop-plate',accent:'#d2b766'},
+	{name:'蒸気炉塔',size:'2×3',materials:'鋼材・圧力計・蒸気管',desc:'既存案を統合。燃料蒸気を拠点へ配る。',legacySymbol:'i-tower-plate',accent:'#82c8b0'},
+	{name:'貨物駅',size:'3×2',materials:'木材・鋼材・線路',desc:'既存案を統合。列車の積み下ろしを行う。',legacySymbol:'i-station-plate',accent:'#d39067'}
+],
+automation:[
+	{name:'開拓者宿舎・診療所',size:'3×3',materials:'製材板・ガラス・薬液',desc:'交代要員の休息と軽傷の手当てを行う。',art:'lodge',accent:'#82c8b0'}
+]
+};
+for(const group of groups){
+	group.items.push(...(catalogAdditions[group.id]||[]));
+}
+for(const [groupId,itemName,symbol] of [['outpost','歯車生成炉','i-furnace-plate'],['production','真鍮工房','i-workshop-plate'],['production','蒸気炉塔','i-tower-plate'],['production','貨物駅','i-station-plate']]){
+	const item=groups.find(group=>group.id===groupId)?.items.find(entry=>entry.name===itemName);
+	if(item)item.legacySymbol=symbol;
+}
+glyphs.foundationTile='<rect x="4" y="4" width="88" height="88" fill="#909799" stroke="#394144" stroke-width="4"/><path d="M4 26h88M4 48h88M4 70h88M26 4v88m22-88v88m22-88v88" fill="none" stroke="#6e7779" stroke-width="3"/><path d="M9 9h78v78H9z" fill="none" stroke="#c1c6c7" stroke-width="2"/><circle cx="48" cy="48" r="10" fill="#b8bdbd" stroke="#4b5355" stroke-width="3"/>';
+groups.unshift({id:'constructed',name:'施工地形',items:[{name:'基礎セル',size:'1×1',materials:'石材・石灰岩・水（素材案）',desc:'建築物の下に敷く人工地面。自然生成せず、施工して作る。',art:'foundationTile',accent:'#909799',tile:true}]});
+function renderIcon(item){
+	const isTile=item.tile;
+	const foundation=isTile?'':`<path d="M12 77h72l-8 9H20z" fill="#080d0b" opacity=".65"/><path d="M15 72h66l-7 8H22z" fill="#4c5548" stroke="#cfaa5d" stroke-width="2"/>`;
+	const drawing=item.legacySymbol?`<use href="#${item.legacySymbol}" x="4" y="4" width="88" height="88"/>`:`${foundation}${glyphs[item.art]}`;
+	return `<svg viewBox="0 0 96 96" preserveAspectRatio="none" role="img" aria-label="${item.name} ${item.size}"><title>${item.name} / ${item.size}</title>${drawing}</svg>`;
+}
+function expandArtworkToBounds(svg){
+	const bounds=svg.getBBox();
+	if(!bounds.width||!bounds.height)return;
+	const padding=1;
+	svg.setAttribute('viewBox',`${bounds.x-padding} ${bounds.y-padding} ${bounds.width+padding*2} ${bounds.height+padding*2}`);
+	svg.setAttribute('preserveAspectRatio','none');
+}
+function renderFootprint(item){
+	const [cellsWide,cellsHigh]=item.size.split('×').map(Number);
+	return `<div class="object-placement"><span class="placement-caption">占有セル / 1セル = 32px</span><div class="footprint-line"><div class="footprint-board" style="--cells-wide:${cellsWide};--cells-high:${cellsHigh}" role="img" aria-label="${cellsWide}列×${cellsHigh}行の占有セル"></div><div class="footprint-data"><strong>${cellsWide}×${cellsHigh} セル</strong><span>${cellsWide*32}×${cellsHigh*32} px</span></div></div></div>`;
+}
+const catalog=document.getElementById('catalog');
+let total=0;
+for(const group of groups){
+	total+=group.items.length;
+	const section=document.createElement('section');
+	section.className='catalog-group';
+	section.id=group.id;
+	const cards=group.items.map(item=>`<article class="object-card${item.tile?' tile':''}" style="--item-accent:${item.accent}"><div class="object-art">${renderIcon(item)}</div>${renderFootprint(item)}<div class="object-copy"><div class="object-title-row"><h3>${item.name}</h3><span class="object-size">${item.size}</span></div><p>${item.desc}</p><small class="object-materials">${item.materials}</small></div></article>`).join('');
+	section.innerHTML=`<div class="group-head"><h2>${group.name}</h2><p>${group.items.length}案</p></div><div class="object-grid">${cards}</div>`;
+	catalog.append(section);
+}
+document.querySelectorAll('.object-art svg').forEach(expandArtworkToBounds);
+document.getElementById('item-count').textContent=String(total);
+function renderPlacementExamples(){
+	const perCell=14;
+	document.querySelector('#placement header p').textContent=`実ゲーム1セル=32px。灰色は基礎、表示は一律${perCell}px/セル。`;
+	const findItem=name=>groups.flatMap(group=>group.items).find(item=>item.name===name);
+	const foundationExemptions=new Set(['簡易ストレージ','手回し式揚管ポンプ','圧力計ペデスタル塔','霧よけスチームベント']);
+	const examples=[
+		{title:'開拓初期の作業区画',cols:6,rows:5,placements:[['簡易炉',0,0],['簡易ストレージ',2,0],['手回し式揚管ポンプ',4,0],['歯車生成炉',0,2]]},
+		{title:'中核生産区画',cols:9,rows:7,placements:[['蒸気ボイラー＆鍛造炉',0,0],['水洗選鉱プラント',3,0],['真鍮工房',6,0],['蒸気駆動機械旋盤所',0,3],['貨物駅',4,3],['蒸気炉塔',7,2]]},
+		{title:'大型拠点',cols:15,rows:8,placements:[['開拓地総司令グランドギルド',0,0],['大型飛空艇ドックヤード',7,0]]},
+		{title:'最終施設',cols:16,rows:16,placements:[['新天地テラフォーミングドーム',0,0]]}
+	];
+	const container=document.getElementById('placement-examples');
+	container.innerHTML=examples.map(example=>{
+		const buildings=example.placements.map(([name,x,y])=>{
+			const item=findItem(name);
+			const [width,height]=item.size.split('×').map(Number);
+			const needsFoundation=!item.tile&&!foundationExemptions.has(name);
+			const footprintStyle=`left:${x*perCell}px;top:${y*perCell}px;width:${width*perCell}px;height:${height*perCell}px`;
+			const foundation=needsFoundation?`<div class="foundation-area" data-ground="FOUNDATION" style="${footprintStyle}"></div>`:'';
+			const building=`<div class="placed-building" data-blocks-movement="true" data-requires-foundation="${needsFoundation}" data-footprint="${width}×${height}" aria-label="${name} ${width}×${height}セル、footprint全域は通行不可" style="--item-accent:${item.accent};${footprintStyle}">${renderIcon(item)}</div>`;
+			return `${foundation}${building}`;
+		}).join('');
+		return `<article class="placement-sample"><h3>${example.title}</h3><div class="placement-board" style="--board-width:${example.cols*perCell}px;--board-height:${example.rows*perCell}px;--cell-size:${perCell}px;width:${example.cols*perCell}px;height:${example.rows*perCell}px">${buildings}</div><p>${example.cols}×${example.rows}セル / 建物は実寸比で配置</p></article>`;
+	}).join('');
+	container.querySelectorAll('.placed-building svg').forEach(expandArtworkToBounds);
+		const ruleNote=document.createElement('p');
+		ruleNote.className='review-note';
+		ruleNote.textContent='歩行ルール案: 建物の占有 footprint 全セルは通行不可。絵に描かれない内側の余白も建物用地として予約し、歩行可能な通路や中庭を作る場合は別の通行セルとして明示します。ゲーム内移動判定には未接続です。';
+		container.after(ruleNote);
+}
+renderPlacementExamples();
+</script>
+</body>
+</html>

@@ -910,7 +910,7 @@ export class GameState {
         ];
         runtimeGroups.forEach(group => {
             if (group.network && this.mainGearRunning && (this.creativeMode || this.steamPower > 0)) {
-                group.network.rebuild(group.gears, group.belts).updateRotation();
+                group.network.updateRotation({ rebuildConnections: false });
             } else {
                 group.gears.forEach(gear => {
                     gear.powered = false;
@@ -1061,6 +1061,9 @@ export class GameState {
     updatePowerGrid() {
         if (this.network) {
             this.network.rebuild(this.placedGears, this.belts).updateRotation();
+            if (this.runtimeNetwork && this.runtimeNetwork !== this.network) {
+                this.runtimeNetwork.rebuild(this.getRuntimeGears(), this.getRuntimeBelts()).updateRotation();
+            }
             if (!this.mainGearRunning || (!this.creativeMode && this.steamPower <= 0)) this.placedGears.forEach(gear => { gear.powered = false; gear.rotationDir = 0; gear.angularVelocity = 0; });
             return;
         }

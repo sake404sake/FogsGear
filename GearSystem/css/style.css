@@ -532,7 +532,7 @@ canvas {
 .scroll-list-item:hover, .scroll-list-item.active { color: #fff1b1; background: linear-gradient(145deg, rgba(80, 61, 35, 0.96), rgba(31, 25, 19, 0.98)); border-color: #f3c653; border-left-color: transparent; box-shadow: inset 0 0 14px rgba(243, 198, 83, 0.1), 0 0 10px rgba(243, 198, 83, 0.16); }
 .scroll-list-item.running { border-color: rgba(98, 194, 170, 0.9); border-left-color: #a7f0d9; box-shadow: inset 0 0 12px rgba(98, 194, 170, 0.13), 0 0 11px rgba(98, 194, 170, 0.34); }
 .scroll-list-select { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 9px; align-items: center; min-width: 0; padding: 5px 4px 5px 8px; color: inherit; background: transparent; border: 0; text-align: left; cursor: pointer; font: inherit; }
-.scroll-list-edit { display: grid; place-items: center; width: 24px; margin: 5px 0; padding: 0; color: #8a8f8c; background: transparent; border: 1px solid transparent; border-radius: 3px; font-size: 0.9rem; cursor: pointer; }
+.scroll-list-edit { display: grid; place-items: center; width: 24px; margin: 5px 0; padding: 0; color: #8a8f8c; background: transparent; border: 1px solid transparent; border-radius: 3px; font-size: 1.15rem; line-height: 1; cursor: pointer; }
 .scroll-list-edit:hover { color: #d3d7d4; background: rgba(180, 188, 184, 0.16); border-color: rgba(180, 188, 184, 0.4); }
 .scroll-list-type { display: grid; place-items: center; width: 26px; height: 26px; color: #17120f; background: linear-gradient(145deg, #f3c653, #9f7127); border: 1px solid #ffe69b; border-radius: 3px; font: bold 0.7rem monospace; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35); }
 .scroll-list-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -42,6 +42,7 @@
         .guide-resource-links { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin: 0 0 18px; padding: 14px 16px; background: linear-gradient(100deg, rgba(243, 198, 83, 0.12), rgba(28, 23, 19, 0.72)); border: 1px solid rgba(198, 154, 82, 0.42); border-left: 3px solid var(--gold); }
         .guide-resource-links h2 { margin: 0 0 4px; color: var(--gold); font: 600 18px Georgia, "Yu Mincho", serif; }
         .guide-resource-links p:last-child { margin: 0; color: #d0cec4; font-size: 12px; }
+        .guide-resource-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
         .guide-resource-link { display: inline-flex; align-items: center; gap: 10px; flex: 0 0 auto; padding: 9px 12px; color: #17120f; background: linear-gradient(180deg, #f3c653, #b8832d); border: 1px solid #ffe69b; border-radius: 3px; font-weight: 700; text-decoration: none; }
         .guide-resource-link span { font-size: 1.2em; }
         .manual-heading { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(220px, 0.8fr); gap: 20px; align-items: end; margin: 4px 0 18px; padding: 14px 16px; background: linear-gradient(100deg, rgba(98, 194, 170, 0.10), rgba(28, 23, 19, 0.72)); border-left: 3px solid var(--mint); }
@@ -130,6 +131,7 @@
         .pattern-forest { --pattern: radial-gradient(ellipse at 50% 30%, rgba(188,205,128,.9) 0 2px, transparent 2.7px), linear-gradient(70deg, transparent 47%, rgba(31,69,45,.95) 49% 53%, transparent 55%); --pattern-size: 25px 23px; }
         .pattern-mountain { --pattern: repeating-linear-gradient(145deg, transparent 0 10px, rgba(221,213,193,.8) 11px 12px, transparent 13px 23px); --pattern-size: 38px 32px; }
         .pattern-sand { --pattern: radial-gradient(ellipse at 40% 65%, transparent 0 8px, rgba(245,224,167,.9) 9px 10px, transparent 11px 18px), radial-gradient(circle, rgba(102,80,48,.55) 0 1px, transparent 1.7px); --pattern-size: 36px 25px, 13px 13px; }
+        .pattern-foundation { --pattern: linear-gradient(90deg, transparent 47%, rgba(54,61,63,.55) 48% 51%, transparent 52%), linear-gradient(0deg, transparent 47%, rgba(54,61,63,.55) 48% 51%, transparent 52%); --pattern-size: 18px 18px; }
         .pattern-ruin { --pattern: repeating-linear-gradient(0deg, transparent 0 13px, rgba(239,180,101,.8) 14px 15px, transparent 16px 28px), repeating-linear-gradient(90deg, transparent 0 18px, rgba(239,180,101,.7) 19px 20px, transparent 21px 38px); --pattern-size: 38px 29px; }
         .pattern-iron { --pattern: radial-gradient(circle at 25% 35%, #c0bcb0 0 2px, transparent 2.8px), radial-gradient(circle at 72% 68%, #42464a 0 3px, transparent 3.8px), repeating-linear-gradient(135deg, transparent 0 17px, rgba(185,186,177,.45) 18px 19px, transparent 20px 31px); --pattern-size: 34px 31px; }
         .pattern-copper { --pattern: repeating-linear-gradient(132deg, transparent 0 12px, rgba(226,151,93,.95) 13px 15px, transparent 16px 28px); --pattern-size: 32px 32px; }
@@ -187,6 +189,7 @@
             .manual-heading { grid-template-columns: minmax(0, 1fr); gap: 6px; padding: 10px; }
             .manual-note { text-align: left; }
             .guide-resource-links { align-items: stretch; flex-direction: column; gap: 10px; padding: 10px; }
+            .guide-resource-actions { flex-direction: column; }
             .guide-resource-link { justify-content: center; }
             .manual-step { grid-template-columns: minmax(0, 1fr); gap: 10px; padding: 12px 0 16px; }
             .manual-step-copy h3 { font-size: 15px; }
@@ -251,6 +254,7 @@
         <symbol id="cell-mycelium" viewBox="0 0 24 24"><path fill="none" stroke="#e7d4ad" stroke-width="1.5" stroke-linecap="round" d="M12 22V13m0 4-5-4m5 2 5-5m-10 9-3-2m13-5 3-2"/><circle cx="4" cy="11" r="2" fill="#d5b78c"/><circle cx="19" cy="8" r="2.5" fill="#ead9b5"/><circle cx="7" cy="12" r="1" fill="#f4e7cb"/><circle cx="17" cy="10" r="1" fill="#f4e7cb"/><circle cx="12" cy="6" r="1.5" fill="#c5ae86"/></symbol>
         <symbol id="cell-machinery" viewBox="0 0 24 24"><path fill="#68756f" d="m2 4 8-1 1 3-3 2-1 5-4 1-2-3zm12 0h7v3h-7zm-2 7 3-2 3 3 4-1v10h-9z"/><path fill="#293632" d="M3 5h5l-1 4-4 1zm12 7h6v6h-6z"/><circle cx="6" cy="17" r="4" fill="#3b4641" stroke="#c29b51" stroke-width="1.3"/><circle cx="6" cy="17" r="1.2" fill="#d9bd72"/><path fill="none" stroke="#d0a958" stroke-width="1.4" d="m3 3 1-2m5 5 3-2m2 12 3 2M3 22l-2 1"/><path fill="#b06e49" d="m17 2 2 2-2 2-2-2z"/></symbol>
         <symbol id="cell-airship" viewBox="0 0 24 24"><path fill="#dbc58f" d="M3 8c2-5 16-6 19 0-2 5-16 6-19 0Z"/><path fill="#7eb9ad" d="M7 8c3-2 8-2 11 0-3 2-8 2-11 0Z"/><path fill="#b8894f" d="m9 13 6 0 2 3H7zm3 3v4m-4-1h8"/><path fill="#e9dfbe" d="M11 7h2v2h-2z"/></symbol>
+        <symbol id="cell-foundation" viewBox="0 0 24 24"><path fill="#92999b" stroke="#394144" stroke-width="1.2" d="M2 3h20v18H2z"/><path fill="none" stroke="#6e7779" stroke-width=".8" d="M3 8h18M3 13h18M3 18h18M8 3v18m5-18v18m5-18v18"/><path fill="none" stroke="#c1c6c7" stroke-width=".7" d="M4 4h16v16H4z"/><circle cx="12" cy="12" r="2.3" fill="#b8bdbd" stroke="#4b5355" stroke-width=".8"/></symbol>
     </svg>
     <main class="page">
         <header class="masthead">
@@ -272,7 +276,10 @@
                 <h2 id="resource-links-title">真鍮資材と合成ツリー</h2>
                 <p>真鍮資材は、銅鉱石・亜鉛鉱石・石炭を炉で直接配合する序盤の基本素材です。</p>
             </div>
-            <a class="guide-resource-link" href="../design/item-crafting-tree-draft.html">合成ツリー案を開く<span aria-hidden="true">→</span></a>
+            <div class="guide-resource-actions">
+                <a class="guide-resource-link" href="../design/item-crafting-tree-draft.html">合成ツリー案を開く<span aria-hidden="true">→</span></a>
+                <a class="guide-resource-link" href="../design/building-development-draft.html">建築開発案を開く<span aria-hidden="true">→</span></a>
+            </div>
         </section>
 
         <section id="how-to-page" class="guide-view" role="tabpanel" aria-labelledby="how-to-tab">
@@ -332,7 +339,22 @@
 
                 <section class="manual-step">
                     <div class="manual-step-copy">
-                        <h3><span>04</span>保存ギアを選んで起動する</h3>
+                        <h3><span>04</span>線路・建築物を連続配置する</h3>
+                        <p>インベントリの「建築」から配置するものを選びます。通常は配置位置を選んで「ここに配置」を押します。「続けて配置」を有効にすると、タップのたびに配置して選択状態を保てます。</p>
+                        <p>線路、基礎セル、床タイルはドラッグでも連続配置できます。線路の向きはドラッグ経路と接続先から自動で決まります。大型建築物や車両はタップごとに配置されます。終わるときは「キャンセル」を押します。</p>
+                    </div>
+                    <div class="manual-step-media">
+                        <figure class="manual-shot"><img src="assets/guide-screenshots/12-building-placement.png" alt="マップ上で線路を連続配置している状態"><figcaption>線路をドラッグして連続配置</figcaption></figure>
+                        <aside class="manual-callout manual-callout--wide">
+                            <div class="manual-zoom"><img src="assets/guide-screenshots/12b-continuous-placement.png" alt="続けて配置を有効にした配置コントロール"></div>
+                            <div class="manual-callout-note"><strong>配置モード</strong><p>配置可能なセルだけが置かれます。真鍮は配置数に応じて消費されます。</p></div>
+                        </aside>
+                    </div>
+                </section>
+
+                <section class="manual-step">
+                    <div class="manual-step-copy">
+                        <h3><span>05</span>保存ギアを選んで起動する</h3>
                         <p>下部のドットで「保存ギアプレビュー」へ切り替えます。設計を選んで接続とプレビューを確認し、「スクロールを起動」を押すと対象セルで動作します。</p>
                         <p>稼働中は同じボタンで停止できます。設計を直すときは一覧の歯車ボタンから編集します。</p>
                     </div>
@@ -347,7 +369,7 @@
 
                 <section class="manual-step">
                     <div class="manual-step-copy">
-                        <h3><span>05</span>ギアを作成・編集する</h3>
+                        <h3><span>06</span>ギアを作成・編集する</h3>
                         <p>インベントリから紙・布のスクロールを開き、「ギア編集」を押します。ギア編集でサイズを選び、盤面をタップして配置します。中心のメインギアから噛み合う位置につなげます。ギアを選ぶと右側の設定が開きます。</p>
                         <p>工業・動力ギアは「動力を蓄積」を選ぶと、1回転ごとに歯数分の動力を生成します。設計名を付けて保存すると、スクロールブックから使えます。</p>
                     </div>
@@ -362,7 +384,7 @@
 
                 <section class="manual-step">
                     <div class="manual-step-copy">
-                        <h3><span>06</span>動力と資源の収支を見る</h3>
+                        <h3><span>07</span>動力と資源の収支を見る</h3>
                         <p>下部の「動力ダッシュボード」ページで、資源の保有量・生成レート・消費レートを確認します。動力が足りないと資材収集は進まず、必要量が貯まると再開します。</p>
                         <p>霧の回収と霧から水を作る処理は動力を使いません。</p>
                     </div>
@@ -377,7 +399,7 @@
 
                 <section class="manual-step">
                     <div class="manual-step-copy">
-                        <h3><span>07</span>マップと設定を開く</h3>
+                        <h3><span>08</span>マップと設定を開く</h3>
                         <p>操作ページの「ナビゲーション」から全体マップ、ガイド、設定を開けます。全体マップはドラッグやピンチで移動・拡大できます。</p>
                         <p>ワールドシードやマップ初期ズームは設定で変更できます。初期マップと現在マップの違いは全体マップで切り替えて確認します。</p>
                     </div>
@@ -405,6 +427,7 @@
                 <button class="tab" type="button" data-filter="direct" aria-pressed="false">変質地形</button>
                 <button class="tab" type="button" data-filter="item" aria-pressed="false">採取素材</button>
                 <button class="tab" type="button" data-filter="event" aria-pressed="false">発見地形</button>
+                <button class="tab" type="button" data-filter="constructed" aria-pressed="false">施工地形</button>
             </div>
             <span class="count" id="cell-count" aria-live="polite"></span>
         </div>
@@ -437,14 +460,15 @@
             COLLECTION_POWER_COSTS,
             TERRAIN_TRANSFORM_RECIPES,
             getCellDrops
-        } from './js/worldCells.js?v=5';
+        } from './js/worldCells.js?v=6';
         import { getMosaicColor } from './js/cellRules.js?v=4';
 
         const categoryConfig = {
             initial: { title: '初期地形', description: 'マップ生成時に広がりやすい基本地形です。' },
             direct: { title: '変質地形', description: '通常の地形変化で増える資源セルです。' },
             item: { title: '採取素材', description: '再利用しやすい素材の収集先です。' },
-            event: { title: '発見地形', description: '通常の探索では出現しにくく、特別な発見や変化が発生します。' }
+            event: { title: '発見地形', description: '通常の探索では出現しにくく、特別な発見や変化が発生します。' },
+            constructed: { title: '施工地形', description: 'プレイヤーが基礎材を敷いて作る人工地面です。自然生成・採取・時代変化の対象外です。' }
         };
 
         const patternMap = {
@@ -471,7 +495,8 @@
             HERB_FIELD: 'herb',
             RESIN_FOREST: 'resin',
             MACHINE_WRECK: 'machinery',
-            AIRSHIP_WRECK: 'airship'
+            AIRSHIP_WRECK: 'airship',
+            FOUNDATION: 'foundation'
         };
 
         const glyphMap = {
@@ -498,7 +523,8 @@
             HERB_FIELD: 'i-herb',
             RESIN_FOREST: 'i-resin',
             MACHINE_WRECK: 'cell-machinery',
-            AIRSHIP_WRECK: 'cell-airship'
+            AIRSHIP_WRECK: 'cell-airship',
+            FOUNDATION: 'cell-foundation'
         };
 
         const materialIconMap = {
@@ -612,6 +638,7 @@
                 <div class="grid">${group.cells.map(renderCard).join('')}</div>
             </section>
         `).join('');
+        groupsRoot.querySelectorAll('[data-group="constructed"] .origin').forEach((origin) => { origin.textContent = '施工'; });
 
         document.getElementById('item-count').textContent = `${allMaterials.length} 種類`;
         document.getElementById('item-grid').innerHTML = allMaterials.map((material) => `

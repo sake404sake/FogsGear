@@ -9,7 +9,9 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="icon" href="../MainSystem/icons/app-icon.jpg" type="image/jpeg">
-    <link rel="stylesheet" href="css/style.css?v=554">
+    <link rel="stylesheet" href="css/style.css?v=565">
+    <link rel="stylesheet" href="css/style.css?v=565">
+    <script type="module" src="js/main.js?v=609"></script>
 </head>
 <body>
     <div id="loadingOverlay" class="loading-overlay" role="status" aria-live="polite">
@@ -42,6 +44,7 @@
                 <div class="inventory-view-tabs" role="tablist" aria-label="インベントリ表示">
                     <button class="inventory-view-tab active" type="button" data-inventory-view="items" aria-selected="true">所持品</button>
                     <button class="inventory-view-tab" type="button" data-inventory-view="crafting" aria-selected="false">合成</button>
+                    <button class="inventory-view-tab" type="button" data-inventory-view="buildings" aria-selected="false">建築</button>
                 </div>
                 <section id="inventory-items-view" class="inventory-view">
                     <div id="inventory-item-list" class="inventory-item-grid" aria-live="polite"></div>
@@ -51,6 +54,9 @@
                         <option value="all">すべて</option><option value="forest">森林加工</option><option value="smelting">製錬・合金</option><option value="ceramic">ガラス・陶材</option><option value="bio">菌糸・薬草</option><option value="machine">機械・遺物</option>
                     </select></label>
                     <div id="crafting-recipe-list" class="crafting-recipe-list" aria-live="polite"></div>
+                </section>
+                <section id="inventory-building-view" class="inventory-view" hidden>
+                    <div id="building-item-list" class="inventory-item-grid building-item-grid" aria-live="polite"></div>
                 </section>
             </section>
             <button class="dashboard-toggle" data-action="toggle-cell-legend" aria-expanded="false">地形情報 <span>+</span></button>
@@ -64,10 +70,29 @@
         <div id="canvas-container">
             <div id="interaction-prompt" class="btn-item-confirm" style="display: none;">調べる [E]</div>
             <canvas id="gameCanvas" width="640" height="480"></canvas>
+            <div id="vehicleAnimationLayer" class="vehicle-animation-layer" aria-hidden="true"></div>
             <canvas id="gearCanvas" class="engine-runtime-canvas" width="800" height="600" aria-hidden="true"></canvas>
         </div>
     </div>
 
+    <div id="building-menu-modal" class="inventory-modal" hidden role="dialog" aria-modal="true" aria-labelledby="building-menu-title">
+        <div class="inventory-modal-panel building-menu-panel">
+            <button class="inventory-modal-close" type="button" data-action="close-building-menu" aria-label="建物メニューを閉じる">×</button>
+            <div class="inventory-modal-kicker">BUILDING CONTROL</div>
+            <h2 id="building-menu-title">建築物</h2>
+            <p id="building-menu-details"></p>
+            <section id="vehicle-menu-controls" hidden>
+                <p id="vehicle-status" role="status"></p>
+                <label>移動制御スクロール<select id="vehicle-movement-scroll"><option value="">未割当</option></select></label>
+                <p id="vehicle-resource-settings"></p>
+            </section>
+            <div class="inventory-modal-actions">
+                <button id="building-menu-start-vehicle" class="saved-scroll-use" type="button" data-action="toggle-building-vehicle" hidden>起動</button>
+                <button id="building-menu-demolish" class="inventory-modal-secondary" type="button" data-action="demolish-building">解体</button>
+                <button class="inventory-modal-secondary" type="button" data-action="close-building-menu">閉じる</button>
+            </div>
+        </div>
+    </div>
     <div id="inventory-item-modal" class="inventory-modal" hidden role="dialog" aria-modal="true" aria-labelledby="inventory-modal-title">
         <div class="inventory-modal-panel">
             <button class="inventory-modal-close" type="button" data-action="close-inventory-modal" aria-label="閉じる">×</button>
@@ -101,6 +126,18 @@
 
     <!-- 下部パネル：操作・メニュー -->
     <div class="panel">
+        <div id="building-placement-controls" class="building-placement-controls" hidden>
+            <span id="building-placement-message" role="status">配置位置を確認してください</span>
+            <div id="building-placement-orientation" class="building-placement-orientation" hidden>
+                <span id="building-placement-direction">東向き</span>
+                <button id="building-placement-rotate" class="btn btn-visibility" type="button" data-action="rotate-building-placement" aria-label="線路の向きを90度回転">↻ 回転</button>
+            </div>
+            <label class="building-placement-continuous"><input id="building-placement-continuous" type="checkbox">続けて配置</label>
+            <div class="building-placement-actions">
+                <button id="building-placement-confirm" class="btn btn-action" type="button" data-action="confirm-building-placement">ここに配置</button>
+                <button class="btn btn-visibility" type="button" data-action="cancel-building-placement">キャンセル</button>
+            </div>
+        </div>
         <div class="main-control-pager" id="main-control-pager" aria-label="メイン画面ページ">
             <button class="main-page-arrow" type="button" data-main-page="previous" aria-label="前のメイン画面ページ">‹</button>
             <div class="main-page-viewport" id="main-page-viewport">
@@ -138,7 +175,7 @@
         </div>
                     </section>
                     <section class="main-page gear-preview-page" aria-label="保存ギアプレビューページ">
-                        <iframe src="../GearSystem/scroll-library.html?embed=1&hideMapBack=1&v=14" title="保存スクロールのギアプレビュー"></iframe>
+                        <iframe src="../GearSystem/scroll-library.html?embed=1&hideMapBack=1&v=17" title="保存スクロールのギアプレビュー"></iframe>
                     </section>
                     <section class="main-page engine-dashboard-page" aria-label="動力ダッシュボードページ">
                         <div class="dashboard main-engine-dashboard">
@@ -163,6 +200,6 @@
         </div>
     </div>
 
-    <script type="module" src="js/main.js?v=564"></script>
+    <script type="module" src="js/main.js?v=609"></script>
 </body>
 </html>

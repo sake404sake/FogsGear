@@ -1,4 +1,4 @@
-import { CanvasRenderer } from './CanvasRenderer.js?v=render-1';
+import { CanvasRenderer } from './CanvasRenderer.js?v=render-2';
 import { GEAR_CONFIG, hexToPixel } from './GearManager.js?v=runtime-8';
 import { GearNetwork } from './GearSystem.js?v=network-8';
 
@@ -61,34 +61,60 @@ const previewState = {
     offsetY: 0,
     running: false,
     invalid: false,
+    rotationActive: false,
     network: new GearNetwork(),
     tick(elapsed) {
         if (!this.running || this.invalid) {
-            this.placedGears.forEach(gear => {
-                gear.powered = false;
-                gear.rotationDir = 0;
-                gear.angularVelocity = 0;
-            });
+            if (this.rotationActive || this.placedGears.some(gear => gear.powered || gear.rotationDir || gear.angularVelocity)) {
+                this.placedGears.forEach(gear => {
+                    gear.powered = false;
+                    gear.rotationDir = 0;
+                    gear.angularVelocity = 0;
+                });
+            }
+            this.rotationActive = false;
             return;
         }
-        this.network.updateRotation();
+        if (!this.rotationActive) {
+            this.network.updateRotation({ rebuildConnections: false });
+            this.network.synchronizeLockedAxes();
+            this.rotationActive = true;
+        }
         this.placedGears.forEach(gear => {
             if (!gear.powered || gear.isDeadlocked) return;
             gear.angle += 0.012 * 60 * elapsed * (gear.angularVelocity || 1) * (gear.rotationDir || 1);
         });
-        this.network.synchronizeLockedAxes();
     }
 };
 const renderer = new CanvasRenderer('previewCanvas', previewState, false);
 let lastPreviewFrame = 0;
+let previewFrameId = null;
 function animatePreview(now) {
-    requestAnimationFrame(animatePreview);
+    previewFrameId = null;
+    if (!previewState.running || previewState.invalid) {
+        previewState.tick(0);
+        renderer.render();
+        lastPreviewFrame = 0;
+        return;
+    }
+    previewFrameId = requestAnimationFrame(animatePreview);
     const elapsed = lastPreviewFrame ? Math.min(0.1, Math.max(0, (now - lastPreviewFrame) / 1000)) : 1 / 60;
     lastPreviewFrame = now;
     previewState.tick(elapsed);
     renderer.render();
 }
-requestAnimationFrame(animatePreview);
+function startPreviewAnimation() {
+    if (previewFrameId !== null) return;
+    lastPreviewFrame = 0;
+    previewFrameId = requestAnimationFrame(animatePreview);
+}
+function stopPreviewAnimation() {
+    if (previewFrameId !== null) cancelAnimationFrame(previewFrameId);
+    previewFrameId = null;
+    lastPreviewFrame = 0;
+    previewState.tick(0);
+    renderer.render();
+}
 let currentMaterial = 'all';
 let selectedScrollId = null;
 let library = [];
@@ -282,8 +308,10 @@ function syncPreviewLocks(scroll) {
     });
     if (!changed) return;
     previewState.network.rebuild(previewState.placedGears, previewState.belts).updateRotation();
+    previewState.network.synchronizeLockedAxes();
     previewState.invalid = previewState.placedGears.some(gear => gear.isDeadlocked || gear.angleError);
     if (previewState.invalid) previewState.running = false;
+    renderer.render();
 }
 
 function renderList() {
@@ -303,7 +331,7 @@ function renderList() {
         const item = document.createElement('div');
         item.className = `scroll-list-item${scroll.id === selectedScrollId ? ' active' : ''}${isRunning ? ' running' : ''}`;
         item.dataset.scrollId = scroll.id;
-        item.innerHTML = `<button class="scroll-list-select" type="button"><span class="scroll-list-type">${getMaterial(scroll) === 'cloth' ? '布' : '紙'}</span><span class="scroll-list-name"></span></button><button class="scroll-list-edit" type="button" aria-label="スクロールを編集" title="スクロールを編集">⚙</button>`;
+        item.innerHTML = `<button class="scroll-list-select" type="button"><span class="scroll-list-type">${getMaterial(scroll) === 'cloth' ? '布' : '紙'}</span><span class="scroll-list-name"></span></button><button class="scroll-list-edit" type="button" aria-label="スクロールを編集" title="スクロールを編集"><span aria-hidden="true">⚙︎</span></button>`;
         item.querySelector('.scroll-list-name').textContent = scroll.name || '名前なしスクロール';
         const selectButton = item.querySelector('.scroll-list-select');
         selectButton.dataset.scrollId = scroll.id;
@@ -331,6 +359,8 @@ function renderDetail() {
     if (requestedRunning && !enginePowered) stopAllScrolls();
     else if (requestedRunning && previewState.invalid) setScrollRunning(scroll.id, false);
     previewState.running = effectiveRunning;
+    if (effectiveRunning) startPreviewAnimation();
+    else stopPreviewAnimation();
     if (isEmbedded) document.body.classList.toggle('scroll-is-running', effectiveRunning);
     nameElement.textContent = scroll.name || '名前なしスクロール';
     materialElement.textContent = getMaterialLabel(scroll);
@@ -373,6 +403,15 @@ function resizePreview() {
     renderer.resizeCanvas();
     fitPreview();
     renderer.render();
+}
+
+if ('ResizeObserver' in window) {
+    const previewResizeObserver = new ResizeObserver(() => {
+        renderer.resizeCanvas();
+        fitPreview();
+        renderer.render();
+    });
+    previewResizeObserver.observe(previewFrame);
 }
 
 tabs.forEach(tab => tab.addEventListener('click', () => {

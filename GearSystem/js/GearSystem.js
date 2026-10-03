@@ -161,9 +161,9 @@ export class GearNetwork {
             });
         }
     }
-    updateRotation() {
+    updateRotation({ rebuildConnections = true } = {}) {
         // 接続グラフから各ギアの回転方向・速度を決める。処理設定は変更しない。
-        this.rebuildConnections(this.belts || []);
+        if (rebuildConnections) this.rebuildConnections(this.belts || []);
         const invalidLockedAxes = new Set();
         for (const edge of this.beltEdges) {
             const [firstId, secondId] = edge.split(':');

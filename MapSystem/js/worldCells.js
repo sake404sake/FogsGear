@@ -22,7 +22,8 @@ export const WORLD_CELL_TYPES = Object.freeze({
     HERB_FIELD: { label: '薬草地', color: '#5f824f', category: 'item', collect: 'herbs' },
     RESIN_FOREST: { label: '樹脂林', color: '#3e674a', category: 'item', collect: 'resin' },
     MACHINE_WRECK: { label: '機械の残骸', color: '#545d59', category: 'event', collect: 'salvage' },
-    AIRSHIP_WRECK: { label: '飛行船の墜落跡', color: '#625949', category: 'event', collect: 'navigation_crystal' }
+    AIRSHIP_WRECK: { label: '飛行船の墜落跡', color: '#625949', category: 'event', collect: 'navigation_crystal' },
+    FOUNDATION: { label: '基礎', color: '#909799', category: 'constructed', collect: null }
 });
 
 export const TERRAIN_TRANSFORM_RECIPES = Object.freeze({
@@ -35,12 +36,12 @@ export const TERRAIN_TRANSFORM_RECIPES = Object.freeze({
 });
 
 export const CELL_MATERIALS = Object.freeze({
-    water: { label: '水', icon: '💧' },
-    grain: { label: '穀物', icon: '🌾' },
-    wood: { label: '木材', icon: '🪵' },
+    water: { label: '水', icon: 'water' },
+    grain: { label: '穀物', icon: 'grain' },
+    wood: { label: '木材', icon: 'wood' },
     stone: { label: '石材', icon: '◈' },
     sand: { label: '砂', icon: '⠿' },
-    relic_fragment: { label: '古代遺物片', icon: '⚙' },
+    relic_fragment: { label: '古代遺物片', icon: 'relic' },
     iron_ore: { label: '鉄鉱石', icon: '◆' },
     copper_ore: { label: '銅鉱石', icon: '◆' },
     coal: { label: '石炭', icon: '⬟' },
@@ -56,7 +57,7 @@ export const CELL_MATERIALS = Object.freeze({
     spores: { label: '胞子', icon: '♧' },
     herbs: { label: '薬草', icon: '♣' },
     resin: { label: '樹脂', icon: '●' },
-    salvage: { label: '部品くず', icon: '⚙' },
+    salvage: { label: '部品くず', icon: 'salvage' },
     mining_sample: { label: '採掘標本', icon: '▣' },
     coke: { label: 'コークス', icon: '⬟' },
     vein_mold: { label: '鉱脈型', icon: '⛭' },

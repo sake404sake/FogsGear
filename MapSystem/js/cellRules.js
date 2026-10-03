@@ -5,7 +5,8 @@ export const CELL_DEFINITIONS = Object.freeze({
     FOREST: { label: '森林', color: '#3e6b48', allowed: true, requiredItems: [] },
     MOUNTAIN: { label: '山岳', color: '#746b60', allowed: true, requiredItems: [] },
     SAND: { label: '砂地', color: '#d5bd8a', allowed: true, requiredItems: [] },
-    RUIN: { label: '古代遺跡', color: '#6f2c2c', allowed: true, requiredItems: [] }
+    RUIN: { label: '古代遺跡', color: '#6f2c2c', allowed: true, requiredItems: [] },
+    FOUNDATION: { label: '基礎', color: '#909799', allowed: true, requiredItems: [] }
 });
 
 export function getMosaicColor(baseColor, x, y) {

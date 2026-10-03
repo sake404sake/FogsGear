@@ -1,0 +1,632 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>建築と開拓ツリー案 | Fogs Gear</title>
+<style>
+.illustration-board{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.illustration-card{overflow:hidden;background:linear-gradient(145deg,#273d34,#151d19);border:1px solid #657b6b}.illustration-card svg{display:block;width:100%;height:150px;background:radial-gradient(circle at 50% 20%,rgba(130,200,176,.12),transparent 55%),#18231f}.illustration-card div{padding:10px 12px;border-top:1px solid #52665b}.illustration-card strong{display:block;color:#f0d78f}.illustration-card p{margin:4px 0 0;color:var(--muted);font-size:11px}.rail-layout{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.rail-piece{padding:10px;background:#17221e;border:1px solid rgba(130,189,199,.35)}.rail-piece svg{display:block;width:100%;height:84px;margin-bottom:6px;background:#101815}.rail-piece strong{color:#add9da}.rail-piece p{margin:3px 0 0;color:var(--muted);font-size:11px}@media(max-width:900px){.illustration-board{grid-template-columns:repeat(2,minmax(0,1fr))}.rail-layout{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:560px){.illustration-board,.rail-layout{grid-template-columns:1fr}}
+:root{color-scheme:dark;--bg:#111916;--panel:#1d2924;--panel2:#263a32;--line:#536b60;--gold:#e1bd62;--mint:#82c8b0;--rust:#d28a61;--blue:#82bdc7;--text:#e8e4d6;--muted:#a9b5aa}*{box-sizing:border-box}body{margin:0;color:var(--text);background:radial-gradient(circle at 8% 0%,#294037 0,transparent 38%),linear-gradient(135deg,#101714,#1d211b 55%,#261c16);font:15px/1.55 Georgia,"Yu Mincho",serif}.page{width:min(1500px,100%);margin:auto;padding:28px clamp(14px,3vw,42px) 60px}.eyebrow,.mono{font:11px/1.4 monospace;letter-spacing:.13em;text-transform:uppercase}.eyebrow{margin:0 0 6px;color:var(--mint)}header{display:flex;align-items:end;justify-content:space-between;gap:24px;padding:10px 0 20px;border-bottom:1px solid var(--line)}h1{margin:0;color:#f2d486;font-size:clamp(28px,4vw,45px);font-weight:500}h2{margin:0;color:#f0d78f;font-size:21px;font-weight:500}.lead{max-width:680px;margin:8px 0 0;color:var(--muted)}.stamp{padding:8px 12px;color:#f1ba91;border:1px solid var(--rust);font:12px monospace;white-space:nowrap;transform:rotate(-2deg)}.summary{display:flex;flex-wrap:wrap;gap:8px;margin:18px 0}.summary span{padding:5px 9px;color:#d7dbca;background:#17211d;border:1px solid #506359;font:12px monospace}.summary strong{color:var(--gold)}.section-head{display:flex;align-items:end;justify-content:space-between;gap:16px;margin:34px 0 12px;padding-bottom:9px;border-bottom:1px solid var(--line)}.section-head p{margin:0;color:var(--muted);font-size:13px}.legend{display:flex;flex-wrap:wrap;gap:10px;color:var(--muted);font:11px monospace}.legend span:before{display:inline-block;width:8px;height:8px;margin-right:5px;border-radius:50%;background:var(--dot);content:""}.stage-board{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;overflow-x:auto}.stage{min-width:220px;padding:13px;background:rgba(20,29,25,.82);border:1px solid var(--line);border-top:3px solid var(--stage)}.stage h3{margin:0 0 10px;color:var(--stage);font:12px monospace;letter-spacing:.04em}.stage p{min-height:46px;margin:0;color:var(--muted);font-size:12px}.building-grid{display:grid;gap:7px;margin-top:12px}.building{display:grid;grid-template-columns:38px minmax(0,1fr);gap:8px;align-items:start;padding:8px;background:rgba(8,14,12,.36);border:1px solid rgba(130,200,176,.22)}.building svg{width:34px;height:34px}.building strong{display:block;color:#f2d486;font-size:13px}.building small{display:block;color:var(--muted);font-size:11px;line-height:1.4}.flow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.flow article{position:relative;min-height:116px;padding:12px;background:linear-gradient(145deg,rgba(38,58,50,.9),rgba(19,26,22,.92));border:1px solid var(--line)}.flow article:not(:last-child):after{position:absolute;right:-13px;top:50%;z-index:2;color:var(--gold);content:"→";font-size:22px}.flow b{display:block;margin-bottom:5px;color:var(--gold);font-size:14px}.flow p{margin:0;color:var(--muted);font-size:12px}.tree{display:grid;gap:8px}.tree-row{display:grid;grid-template-columns:minmax(135px,.8fr) 24px minmax(180px,1fr) 24px minmax(180px,1fr);align-items:center;gap:8px}.node{min-width:0;padding:9px 11px;background:#1d2924;border:1px solid #60766a}.node strong{display:block;color:#f0d78f}.node small{display:block;color:var(--muted);font-size:11px}.arrow{color:var(--gold);font-size:22px;text-align:center}.rail-panel{padding:15px;background:linear-gradient(110deg,rgba(130,189,199,.12),rgba(29,36,29,.72));border:1px solid rgba(130,189,199,.42);border-left:3px solid var(--blue)}.rail-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin-top:12px}.rail-card{padding:10px;background:rgba(10,18,17,.46);border:1px solid rgba(130,189,199,.3)}.rail-card strong{color:#add9da}.rail-card p{margin:4px 0 0;color:var(--muted);font-size:12px}.notes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:30px}.note{padding:12px;background:rgba(20,29,25,.7);border:1px solid var(--line);font-size:12px}.note strong{display:block;margin-bottom:5px;color:var(--gold)}footer{margin-top:30px;color:#829187;font:11px monospace}@media(max-width:900px){header{display:grid}.stage-board{grid-template-columns:repeat(4,minmax(230px,1fr))}.flow{grid-template-columns:repeat(2,minmax(0,1fr))}.flow article:nth-child(2):after{display:none}.rail-grid,.notes{grid-template-columns:1fr 1fr}.tree-row{grid-template-columns:minmax(130px,1fr) 20px minmax(160px,1fr)}}@media(max-width:560px){.page{padding:18px 12px 40px}.stamp{justify-self:start}.section-head{display:block}.section-head p{margin-top:5px}.flow,.rail-grid,.notes{grid-template-columns:1fr}.flow article:after{display:none}.tree-row{grid-template-columns:1fr;gap:3px}.arrow{transform:rotate(90deg)}}
+</style>
+<style>.rail-piece svg{width:84px!important;height:84px!important;margin:0 auto 6px!important;aspect-ratio:1}</style>
+<style>.direction-setting{display:flex;align-items:center;justify-content:center;gap:4px;margin-top:8px;padding-top:7px;border-top:1px solid rgba(130,189,199,.25);color:#a9b5aa;font:10px monospace}.direction-setting button{min-width:24px;padding:2px 4px;color:#d9c47a;background:#263a32;border:1px solid #657b6b;font:inherit}.direction-setting button.active{color:#17120f;background:#d1aa59;border-color:#f0d88a}</style>
+<style>.track-demo .track-cell{border:0;box-shadow:inset 0 0 0 1px rgba(211,215,200,.18)}</style>
+<style>.track-demo{display:grid;grid-template-columns:repeat(4,72px);grid-template-rows:repeat(2,72px);gap:0;width:max-content;margin:12px auto;background:#30342d;border:1px solid #657b6b}.track-cell{width:72px;height:72px;background:#3d4038;border:1px solid rgba(211,215,200,.18)}.track-cell svg{display:block;width:100%;height:100%}.track-cell .rotate-90{transform:rotate(90deg)}.track-demo-caption{margin:8px 0 0;color:var(--muted);font-size:12px;text-align:center}.track-demo-legend{display:flex;justify-content:center;gap:14px;margin-top:8px;color:#add9da;font:11px monospace}@media(max-width:560px){.track-demo{grid-template-columns:repeat(4,58px);grid-template-rows:repeat(2,58px)}.track-cell{width:58px;height:58px}}</style>
+<style>.train-sprite-group{margin-top:14px}.train-sprite-group h3{margin:0 0 8px;color:var(--mint);font:12px monospace}.train-sprite-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.train-sprite-tile{min-width:0;padding:6px 4px;text-align:center;background:#17221e;border:1px solid rgba(130,189,199,.35)}.train-sprite-tile span{display:block;margin-bottom:4px;color:var(--muted);font:10px monospace}.train-sprite-tile svg{display:block;width:min(100%,88px);aspect-ratio:1;margin:auto;background:#30342d;border:1px solid rgba(211,215,200,.25)}.train-sprite-note{margin:12px 0 0;color:var(--muted);font-size:12px}@media(max-width:560px){.train-sprite-grid{gap:5px}.train-sprite-tile{padding:5px 2px}.train-sprite-tile span{font-size:9px}}</style>
+<style>.curve-turn-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(180px,.3fr);gap:16px;align-items:center;margin-top:12px}.curve-turn-canvas{display:block;width:100%;height:auto;border:1px solid #657b6b;background:#30342d}.curve-turn-controls{display:grid;gap:8px;min-width:0}.curve-turn-controls input{width:100%;accent-color:#d0a35a}.curve-turn-value{color:#add9da;font:12px monospace}.curve-turn-caption{margin:8px 0 0;color:var(--muted);font-size:12px}@media(max-width:640px){.curve-turn-layout{grid-template-columns:1fr}}</style>
+<style>.curve-turn-play{justify-self:start;min-width:100px;padding:6px 12px;color:#f2d486;background:#263a32;border:1px solid #657b6b;font:12px monospace;cursor:pointer}.curve-turn-play:hover{background:#344b40;border-color:#a7c8b4}.curve-turn-play:focus-visible{outline:2px solid #e1bd62;outline-offset:2px}</style>
+<style>.settlement-preview-layout{display:grid;grid-template-columns:minmax(0,1fr) 230px;gap:14px;align-items:start}.settlement-map-frame{min-width:0;overflow:hidden;border:1px solid #657b6b;background:#101815}.settlement-map{display:block;width:100%;height:auto}.settlement-site-list{display:grid;align-content:start}.settlement-site-list h3{margin:0;padding:0 0 8px;color:var(--mint);font:12px monospace}.settlement-site{display:grid;grid-template-columns:28px minmax(0,1fr);gap:8px;align-items:center;padding:8px 0;border-top:1px solid rgba(130,189,199,.25)}.settlement-site-number{display:grid;place-items:center;width:24px;aspect-ratio:1;color:#18211c;background:var(--site-color);border:1px solid rgba(255,255,255,.3);font:11px monospace}.settlement-site strong{display:block;color:var(--text);font-size:12px;font-weight:500}.settlement-site small{display:block;color:var(--muted);font:10px monospace}.settlement-map-legend{display:flex;flex-wrap:wrap;gap:12px;margin-top:8px;color:var(--muted);font:10px monospace}.settlement-map-legend span{display:flex;align-items:center;gap:5px}.settlement-map-legend i{width:9px;height:9px;background:var(--swatch);border:1px solid rgba(255,255,255,.25)}.settlement-map-note{margin:8px 0 0;color:var(--muted);font-size:12px}@media(max-width:760px){.settlement-preview-layout{grid-template-columns:1fr}.settlement-site-list{grid-template-columns:repeat(2,minmax(0,1fr));column-gap:14px}.settlement-site-list h3{grid-column:1/-1}}@media(max-width:420px){.settlement-site-list{grid-template-columns:1fr}}</style>
+ </head>
+<style>.illustration-card svg{display:block;width:100%;height:150px;background:radial-gradient(circle at 50% 20%,rgba(130,200,176,.12),transparent 55%),#18231f;filter:drop-shadow(0 9px 4px rgba(0,0,0,.5))}</style>
+<body>
+<main class="page">
+<header><div><p class="eyebrow">FOGS GEAR / SETTLEMENT CONCEPT</p><h1>孤島開拓の建築ツリー案</h1><p class="lead">手工具の仮設拠点から、霧を集め、蒸気を配り、線路で資源を運ぶ開拓都市へ。建築物は見た目だけでなく、探索・製作・物流の機能を持たせます。</p></div><div class="stamp">検討用 / ゲーム未反映</div></header>
+<div class="summary"><span><strong>24</strong> 建築案</span><span><strong>4</strong> 開拓段階</span><span><strong>10</strong> 列車上限</span><span><strong>5</strong> 貨車 / 列車</span></div>
+<section aria-labelledby="stage-title"><div class="section-head"><h2 id="stage-title">開拓段階</h2><div class="legend"><span style="--dot:#9dbb8e">仮設</span><span style="--dot:#d2b766">蒸気化</span><span style="--dot:#d39067">物流</span><span style="--dot:#86c5b5">都市</span></div></div><div class="stage-board">
+<article class="stage" style="--stage:#9dbb8e"><h3>01 / 上陸と生存</h3><p>島に文明設備がない状態から、水・燃料・資材を確保する。</p><div class="building-grid"><div class="building"><svg><use href="#i-camp"/></svg><div><strong>開拓本部</strong><small>建築・探索の基点。周囲を拠点範囲として登録。</small></div></div><div class="building"><svg><use href="#i-collector"/></svg><div><strong>霧集水塔</strong><small>濃霧から水を回収し、貯水槽へ送る。</small></div></div><div class="building"><svg><use href="#i-crane"/></svg><div><strong>簡易桟橋</strong><small>輸送船の荷揚げと初期資材の保管を行う。</small></div></div></div></article>
+<article class="stage" style="--stage:#d2b766"><h3>02 / 炉と工房</h3><p>真鍮資材、蒸気、錬金設備を生産し、島内の設備を増やす。</p><div class="building-grid"><div class="building"><svg><use href="#i-furnace"/></svg><div><strong>簡易炉</strong><small>銅鉱石・亜鉛鉱石から真鍮資材を作る。</small></div></div><div class="building"><svg><use href="#i-workshop"/></svg><div><strong>真鍮工房</strong><small>歯車・弁・圧力計などの機械部品を製作。</small></div></div><div class="building"><svg><use href="#i-tower"/></svg><div><strong>蒸気炉塔</strong><small>石炭を蒸気へ変換し、周囲の設備へ配給。</small></div></div></div></article>
+<article class="stage" style="--stage:#d39067"><h3>03 / 線路と物流</h3><p>採掘地・森林・工房を線路で結び、列車を自動運行する。</p><div class="building-grid"><div class="building"><svg><use href="#i-rail"/></svg><div><strong>線路</strong><small>セル中心をつなぐ敷設物。分岐と信号に対応。</small></div></div><div class="building"><svg><use href="#i-station"/></svg><div><strong>貨物駅</strong><small>列車の停車、積み込み、荷下ろしを行う。</small></div></div><div class="building"><svg><use href="#i-train"/></svg><div><strong>蒸気機関車庫</strong><small>最大10台の列車を管理し、路線を割り当てる。</small></div></div></div></article>
+<article class="stage" style="--stage:#86c5b5"><h3>04 / 霧の都市</h3><p>蒸気と錬金術を都市機能へ広げ、未知の島を定住地へ変える。</p><div class="building-grid"><div class="building"><svg><use href="#i-lab"/></svg><div><strong>錬金蒸留塔</strong><small>霧・薬草・水を安定した薬液へ変換。</small></div></div><div class="building"><svg><use href="#i-clock"/></svg><div><strong>霧観測時計塔</strong><small>天候予測、探索範囲、列車運行を支援。</small></div></div><div class="building"><svg><use href="#i-hall"/></svg><div><strong>開拓評議会館</strong><small>島の建築上限と新区域の解禁を管理。</small></div></div></div></article>
+</div></section>
+<section aria-labelledby="flow-title"><div class="section-head"><h2 id="flow-title">建築が増える流れ</h2><p>一つの建築が、次の開拓機能を解禁する想定。</p></div><div class="flow"><article><b>上陸</b><p>開拓本部と簡易桟橋を置き、輸送物資を受け取る。</p></article><article><b>水と燃料</b><p>霧集水塔、炭焼き窯、簡易炉で最低限の循環を作る。</p></article><article><b>蒸気と工房</b><p>真鍮工房と蒸気炉塔で機械部品・設備を増産する。</p></article><article><b>鉄道と都市</b><p>貨物駅と車庫を建て、島内物流と定住区を広げる。</p></article></div></section>
+<section aria-labelledby="tree-title"><div class="section-head"><h2 id="tree-title">建築依存ツリー</h2><p>建築素材と設備解禁の関係を簡略化しています。</p></div><div class="tree"><div class="tree-row"><div class="node"><strong>木材 + 石材</strong><small>探索・採取の初期素材</small></div><div class="arrow">→</div><div class="node"><strong>開拓本部</strong><small>建築範囲と保管庫を解禁</small></div><div class="arrow">→</div><div class="node"><strong>簡易桟橋</strong><small>輸送船と荷揚げを解禁</small></div></div><div class="tree-row"><div class="node"><strong>銅鉱石 + 亜鉛鉱石 + 石炭</strong><small>真鍮資材を製作</small></div><div class="arrow">→</div><div class="node"><strong>簡易炉</strong><small>序盤の製錬設備</small></div><div class="arrow">→</div><div class="node"><strong>真鍮工房</strong><small>歯車・弁・駅部品</small></div></div><div class="tree-row"><div class="node"><strong>鉄板 + 回転軸 + 蒸気弁</strong><small>機械部品</small></div><div class="arrow">→</div><div class="node"><strong>車庫</strong><small>列車を登録・修理</small></div><div class="arrow">→</div><div class="node"><strong>貨物駅</strong><small>自動運行と積み下ろし</small></div></div></div></section>
+<section class="rail-panel" aria-labelledby="rail-title"><h2 id="rail-title">線路・列車物流の案</h2><div class="rail-grid"><div class="rail-card"><strong>列車本体</strong><p>最大10台。駅から駅へ路線を巡回し、線路が途切れると停止。</p></div><div class="rail-card"><strong>貨車</strong><p>1列車につき最大5台。鉱石、木材、燃料、真鍮資材などを積載。</p></div><div class="rail-card"><strong>駅の指示</strong><p>「鉱山で積む → 炉で降ろす → 工房で積む」のように登録。</p></div></div></section>
+<div class="notes"><div class="note"><strong>スチームパンク表現</strong>霧集水管、蒸気配管、真鍮の補強枠、圧力計、煙突を共通意匠にする。</div><div class="note"><strong>負荷対策</strong>建築物は別レイヤーで保存し、画面内だけ描画。列車は経路変更時だけ再探索する。</div><div class="note"><strong>実装範囲</strong>この資料は検討用。ゲーム本体へはまだ反映せず、設備仕様を固めてから実装する。</div></div>
+<footer>REVIEW DRAFT · 独立資料。ゲームデータ・ガイド・建築処理からは参照していません。</footer>
+</main>
+<svg width="0" height="0" aria-hidden="true"><defs>
+<symbol id="i-camp" viewBox="0 0 32 32"><path fill="#bd8e55" d="M3 26 16 7l13 19z"/><path fill="#e1bd62" d="M16 12 7 25h18z"/><path fill="#31483d" d="M14 21h4v5h-4z"/></symbol>
+<symbol id="i-collector" viewBox="0 0 32 32"><path fill="#668f87" stroke="#d6c16f" stroke-width="2" d="M8 8h16v19H8z"/><path fill="none" stroke="#9dd7c2" stroke-width="2" d="M11 13h10M11 18h10M11 23h6"/><path fill="#6b4b32" d="M14 3h4v6h-4z"/></symbol>
+<symbol id="i-crane" viewBox="0 0 32 32"><path fill="none" stroke="#d4a951" stroke-width="3" d="M6 27V6h19M6 11h15l5 7M21 11v9"/><path fill="#8e5d3d" d="M18 20h8v6h-8z"/></symbol>
+<symbol id="i-furnace" viewBox="0 0 32 32"><path fill="#80543b" d="M7 10h18v17H7z"/><path fill="#d18b48" d="M10 19c0-4 6-7 6-11 5 4 7 8 5 11-2 4-9 4-11 0Z"/><path fill="#f2d06b" d="M13 21c0-2 3-4 3-6 3 3 3 5 2 6-1 2-4 2-5 0Z"/></symbol>
+<symbol id="i-simple-furnace-cell" viewBox="0 0 32 32"><path fill="#3c332b" d="M4 8h24v22H4z"/><path fill="#8d5a3e" stroke="#d4a85b" stroke-width="1.5" d="M5 10h22v20H5z"/><path fill="#25241f" d="M10 20h12v10H10z"/><path fill="#d16c42" d="M12 26c0-3 3-4 4-9 4 4 5 7 3 9-2 2-6 2-7 0Z"/><path fill="#f3d06c" d="M15 27c0-2 2-3 2-5 2 2 2 4 0 5z"/><path fill="#606c62" stroke="#d4a85b" stroke-width="1" d="M18 3h8v8h-8z"/><path fill="#9ebbb0" d="M20 1h4v3h-4z"/><path fill="none" stroke="#efd788" stroke-width="1" d="M7 13h18M7 16h18"/></symbol>
+<symbol id="i-gear-generator-cell" viewBox="0 0 32 32"><path fill="#3c332b" d="M4 10h24v20H4z"/><path fill="#79533c" stroke="#d4a85b" stroke-width="1.5" d="M5 11h22v19H5z"/><path fill="#25241f" d="M9 20h8v10H9z"/><path fill="#d16c42" d="M10 26c0-3 3-4 3-8 4 4 4 6 2 8-1 2-4 2-5 0Z"/><path d="m22 5 2 1 2-1 2 3-1 2 1 2-2 2-2-1-2 1-2-3 1-2-1-2z" fill="#d6b45d" stroke="#57452e" stroke-width=".8"/><circle cx="24" cy="10" r="2" fill="#495c53" stroke="#25241f" stroke-width="1"/><path fill="#606c62" stroke="#d4a85b" stroke-width="1" d="M7 5h7v7H7z"/><path fill="#9ebbb0" d="M9 3h3v3H9z"/></symbol>
+<symbol id="i-workshop" viewBox="0 0 32 32"><path fill="#80583e" d="M4 14h24v13H4z"/><path fill="#d3ad5b" d="M8 8h16v6H8z"/><path fill="none" stroke="#82c8b0" stroke-width="2" d="M11 18h10m-7 5h4"/><circle cx="24" cy="9" r="4" fill="#698783" stroke="#e1bd62" stroke-width="2"/></symbol>
+<symbol id="i-tower" viewBox="0 0 32 32"><path fill="#6b7770" d="M9 5h14l-2 22H11z"/><path fill="#d3ad5b" d="M7 27h18v3H7zM12 2h8v4h-8z"/><path fill="none" stroke="#e5d39c" stroke-width="2" d="M13 11h6m-7 6h8m-9 6h10"/></symbol>
+<symbol id="i-rail" viewBox="0 0 32 32"><path fill="none" stroke="#b7c4b6" stroke-width="3" d="M6 4v24M26 4v24"/><path fill="none" stroke="#d09c4c" stroke-width="2" d="M3 8h26M3 15h26M3 22h26"/></symbol>
+<symbol id="i-station" viewBox="0 0 32 32"><path fill="#71503b" d="M4 14h24v14H4z"/><path fill="#d6b45d" d="m3 14 13-9 13 9z"/><path fill="#87bfb0" d="M9 19h5v9H9zm9 0h5v9h-5z"/></symbol>
+<symbol id="i-train" viewBox="0 0 32 32"><path fill="#536c67" stroke="#d4b059" stroke-width="2" d="M6 9h16v15H6z"/><path fill="#bd7049" d="M22 16h6v8h-6z"/><circle cx="11" cy="26" r="3" fill="#26342f" stroke="#d7b55d" stroke-width="2"/><circle cx="23" cy="26" r="3" fill="#26342f" stroke="#d7b55d" stroke-width="2"/><path fill="#d8d09a" d="M10 5h8v4h-8z"/></symbol>
+<symbol id="i-lab" viewBox="0 0 32 32"><path fill="#668f87" d="M12 4h8v9l6 12H6l6-12z"/><path fill="#d6bd68" d="M9 20h14l2 5H7z"/><path fill="#a2d5bd" d="M11 17h10l2 4H9z"/></symbol>
+<symbol id="i-clock" viewBox="0 0 32 32"><path fill="#6c7772" d="M11 3h10v26H11z"/><circle cx="16" cy="12" r="6" fill="#d8b65b" stroke="#584832" stroke-width="2"/><path stroke="#584832" stroke-width="2" d="M16 12V8m0 4 3 2"/><path fill="#d8b65b" d="M8 29h16v2H8z"/></symbol>
+<symbol id="i-hall" viewBox="0 0 32 32"><path fill="#7a583d" d="M4 12h24v17H4z"/><path fill="#d5b15a" d="m3 12 13-8 13 8z"/><path fill="#81b7a8" d="M8 17h4v12H8zm6 0h4v12h-4zm6 0h4v12h-4z"/></symbol>
+<symbol id="i-furnace-plate" viewBox="0 0 96 96"><path fill="#25241f" d="M8 86h80v6H8z"/><path fill="#5f4638" d="M12 43h72v43H12z"/><path fill="#8d5a3e" stroke="#d4a85b" stroke-width="3" d="M18 36h60v50H18z"/><path fill="#4b5b50" d="M25 48h46v33H25z"/><path fill="#3c332b" d="M25 48h46v7H25z"/><path fill="#d16c42" d="M34 73c0-9 10-13 12-28 12 11 17 22 10 29-7 8-19 7-22-1Z"/><path fill="#f3d06c" d="M43 75c0-5 5-8 5-15 7 7 8 13 3 17-3 3-7 2-8-2Z"/><path fill="none" stroke="#efd788" stroke-width="3" d="M18 45h60M31 39V27m34 12V27"/><path fill="#606c62" stroke="#d4a85b" stroke-width="3" d="M34 25h28l-4-12H38z"/><path fill="#9ebbb0" d="M42 9h12v5H42z"/><path fill="none" stroke="#573b2e" stroke-width="2" d="M21 58h5m-5 9h5m45-9h5m-5 9h5"/></symbol>
+<symbol id="i-workshop-plate" viewBox="0 0 96 96"><path fill="#25241f" d="M8 86h80v6H8z"/><path fill="#5a4638" d="M10 45h76v40H10z"/><path fill="#a87443" stroke="#e1bd62" stroke-width="3" d="M7 45h82L48 20z"/><path fill="#6b4635" d="M48 20 89 45H77L48 28 19 45H7z"/><path fill="#314a42" d="M19 54h22v31H19zm36 0h22v31H55z"/><path fill="#d9b65e" d="M28 61h10v8H28zm31 8h12v8H59z"/><circle cx="48" cy="49" r="12" fill="#627d76" stroke="#e1bd62" stroke-width="3"/><circle cx="48" cy="49" r="4" fill="#eac86b"/><path fill="none" stroke="#90c5b2" stroke-width="3" d="M48 37v24M36 49h24"/><path fill="none" stroke="#c88e4e" stroke-width="3" d="M13 86h70"/><path fill="none" stroke="#f0d88a" stroke-width="2" d="M24 56h12m24 0h12"/></symbol>
+<symbol id="i-station-plate" viewBox="0 0 96 96"><path fill="#25241f" d="M5 84h86v8H5z"/><path fill="#5b493b" d="M7 40h82v42H7z"/><path fill="#d1aa59" stroke="#efd889" stroke-width="3" d="m5 40 43-28 43 28z"/><path fill="#87643e" d="M48 12 91 40H78L48 20 18 40H5z"/><path fill="#263d37" d="M17 49h15v33H17zm24 0h15v33H41zm24 0h14v33H65z"/><path fill="none" stroke="#b7d4c1" stroke-width="3" d="M17 88h63M8 84h80"/><path fill="#a56845" d="M36 67h24v15H36z"/><circle cx="48" cy="73" r="4" fill="#e1bd62"/><path fill="none" stroke="#f1d88a" stroke-width="2" d="M12 45h72"/></symbol>
+<symbol id="i-tower-plate" viewBox="0 0 96 96"><path fill="#25241f" d="M16 86h64v6H16z"/><path fill="#52635e" stroke="#d3ad5b" stroke-width="3" d="M27 18h42l-7 68H34z"/><path fill="#364941" d="M34 25h28v12H34zm-2 24h32v13H32z"/><path fill="#7e9c91" d="M34 25h28v5H34zm-2 24h32v5H32z"/><path fill="none" stroke="#e5d59b" stroke-width="3" d="M39 29h18M37 54h22M34 76h28"/><path fill="#6d4c37" d="M42 9h12v9H42z"/><path fill="#d7b45e" d="M36 6h24v5H36z"/><path fill="none" stroke="#b8ded0" stroke-width="3" d="M48 2v5M41 2h14"/><path fill="#d27747" d="M18 84h60v7H18z"/><path fill="#ebc86d" d="M42 28h5v6h-5zm8 23h5v6h-5z"/></symbol>
+<symbol id="i-rail-straight" viewBox="0 0 64 64"><rect width="64" height="64" fill="#3d4038"/><path fill="#746344" d="M16.5 0h15v64h-15zM32.5 0h15v64h-15z"/><path fill="none" stroke="#8f6331" stroke-width="5" d="M12 8h40M12 20h40M12 32h40M12 44h40M12 56h40"/><path fill="none" stroke="#f1ce78" stroke-width="1.5" d="M12 7h40M12 19h40M12 31h40M12 43h40M12 55h40"/><path fill="none" stroke="#3b4542" stroke-width="12" d="M24 0v64M40 0v64"/><path fill="none" stroke="#d3d7c8" stroke-width="6" d="M24 0v64M40 0v64"/><path fill="none" stroke="#a6b1a5" stroke-width="1.2" d="M24 0v64M40 0v64"/><path fill="#292d2b" d="M20.5 0h7v1h-7zM36.5 0h7v1h-7zM20.5 63h7v1h-7zM36.5 63h7v1h-7z"/></symbol>
+<symbol id="i-rail-curve" viewBox="0 0 64 64"><rect width="64" height="64" fill="#3d4038"/><path fill="none" stroke="#746344" stroke-width="15" stroke-linecap="round" d="M24 0C24 22.09 41.91 40 64 40M40 0C40 13.25 50.75 24 64 24"/><path fill="none" stroke="#8f6331" stroke-width="5" d="M13.62 12.87 52.37 2.97M21.83 30.43 54.27 7.02M35.9 43.76 57.52 10.1M53.88 51.01 61.67 11.77"/><path fill="none" stroke="#f1ce78" stroke-width="1.5" d="M13.37 11.9 52.13 2M21.24 29.61 53.68 6.21M35.06 43.22 56.67 9.56M52.9 50.81 60.68 11.58"/><path fill="none" stroke="#3b4542" stroke-width="12" stroke-linecap="round" d="M24 0C24 22.09 41.91 40 64 40M40 0C40 13.25 50.75 24 64 24"/><path fill="none" stroke="#d3d7c8" stroke-width="6" stroke-linecap="round" d="M24 0C24 22.09 41.91 40 64 40M40 0C40 13.25 50.75 24 64 24"/><path fill="none" stroke="#a6b1a5" stroke-width="1.2" stroke-linecap="round" d="M24 0C24 22.09 41.91 40 64 40M40 0C40 13.25 50.75 24 64 24"/><path fill="#292d2b" d="M20.5 0h7v1h-7zM36.5 0h7v1h-7zM63 36.5h1v7h-1zM63 20.5h1v7h-1z"/></symbol>
+<symbol id="i-rail-switch" viewBox="0 0 64 64"><rect width="64" height="64" fill="#3d4038"/><path fill="none" stroke="#746344" stroke-width="15" d="M24 0v64M40 0v64M0 24h64M0 40h64"/><path fill="none" stroke="#8f6331" stroke-width="5" d="M12 8h40M12 20h40M12 44h40M12 56h40M8 12v40M20 12v40M44 12v40M56 12v40"/><path fill="none" stroke="#f1ce78" stroke-width="1.5" d="M12 7h40M12 19h40M12 43h40M12 55h40M7 12v40M19 12v40M43 12v40M55 12v40"/><path fill="none" stroke="#3b4542" stroke-width="12" d="M24 0v64M40 0v64M0 24h64M0 40h64"/><path fill="none" stroke="#d3d7c8" stroke-width="6" d="M24 0v64M40 0v64M0 24h64M0 40h64"/><path fill="none" stroke="#a6b1a5" stroke-width="1.2" d="M24 0v64M40 0v64M0 24h64M0 40h64"/><path fill="#292d2b" d="M20.5 0h7v1h-7zM36.5 0h7v1h-7zM20.5 63h7v1h-7zM36.5 63h7v1h-7zM0 20.5h1v7H0zM0 36.5h1v7H0zM63 20.5h1v7h-1zM63 36.5h1v7h-1z"/><circle cx="32" cy="32" r="7" fill="#d1a153" stroke="#f0d88a" stroke-width="2"/></symbol>
+<symbol id="i-rail-signal" viewBox="0 0 64 64"><rect width="64" height="64" fill="#3d4038"/><path fill="none" stroke="#746344" stroke-width="15" d="M24 0v64M40 0v64"/><path fill="none" stroke="#8f6331" stroke-width="5" d="M12 8h40M12 20h40M12 32h40M12 44h40M12 56h40"/><path fill="none" stroke="#f1ce78" stroke-width="1.5" d="M12 7h40M12 19h40M12 31h40M12 43h40M12 55h40"/><path fill="none" stroke="#3b4542" stroke-width="12" d="M24 0v64M40 0v64"/><path fill="none" stroke="#d3d7c8" stroke-width="6" d="M24 0v64M40 0v64"/><path fill="none" stroke="#a6b1a5" stroke-width="1.2" d="M24 0v64M40 0v64"/><path fill="#292d2b" d="M20.5 0h7v1h-7zM36.5 0h7v1h-7zM20.5 63h7v1h-7zM36.5 63h7v1h-7z"/><path fill="#5d3f32" stroke="#d1a153" stroke-width="3" d="M27 13h18v25H27z"/><circle cx="36" cy="21" r="4" fill="#d16d47"/><circle cx="36" cy="31" r="4" fill="#6fc0a1"/></symbol>
+<symbol id="i-train-locomotive-cell" viewBox="0 0 32 32"><ellipse cx="16" cy="24" rx="10" ry="5" fill="#050806" opacity=".28"/><path d="M9 4h14l3 4v15l-3 5H9l-3-5V8z" fill="#27332e" stroke="#121a16" stroke-width="1.5"/><path d="M10 5h12v13H10z" fill="#994f35"/><path d="M10 5h12v3H10z" fill="#d58a55"/><path d="M20 5h2v13h-2z" fill="#693d2e"/><path d="M9 18h14v7H9z" fill="#536b62" stroke="#d0a35a" stroke-width="1"/><path d="M11 19h10v3H11z" fill="#88aa9a"/><path d="M9 23h14v2H9z" fill="#34463f"/><path d="M12 10h8v2h-8zM12 14h8v1h-8z" fill="#edc36e"/><circle cx="16" cy="5.5" r="2.3" fill="#e9c66f" stroke="#5d3d2d" stroke-width="1"/><path d="M7 10h2v5H7zm16 0h2v5h-2zM7 19h2v4H7zm16 0h2v4h-2z" fill="#b88e50"/><path d="M12 25v2M20 25v2" stroke="#e3c878" stroke-width="1"/></symbol>
+<symbol id="i-train-ore-car-cell" viewBox="0 0 32 32"><ellipse cx="16" cy="23" rx="11" ry="6" fill="#050806" opacity=".28"/><path d="M6 6h20v18l-3 4H9l-3-4z" fill="#283630" stroke="#121a16" stroke-width="1.5"/><path d="M8 7h16v15H8z" fill="#ae7745" stroke="#e0b665" stroke-width="1.5"/><path d="M8 7h4v15H8zM20 7h4v15h-4z" fill="#805437"/><path d="M10 10 13 7l3 3-2 3-4 1zM15 11l4-4 3 4-2 4-4-1zM11 17l3-3 4 3-2 4-4-1zM18 18l3-3 2 4-3 3-3-1z" fill="#858679" stroke="#414840" stroke-width=".7"/><path d="M9 8h14M9 21h14" stroke="#e0b665" stroke-width="1"/><path d="M5 11h2v5H5zm20 0h2v5h-2zM5 19h2v4H5zm20 0h2v4h-2z" fill="#b88e50"/></symbol>
+<symbol id="i-train-crate-car-cell" viewBox="0 0 32 32"><ellipse cx="16" cy="23" rx="11" ry="6" fill="#050806" opacity=".28"/><path d="M6 6h20v18l-3 4H9l-3-4z" fill="#283630" stroke="#121a16" stroke-width="1.5"/><path d="M8 7h16v15H8z" fill="#98633f" stroke="#e0b665" stroke-width="1.5"/><path d="M10 5h6v8h-6z" fill="#bc8050" stroke="#563d2b" stroke-width="1"/><path d="m10 5 2-2h6l-2 2z" fill="#e1b365"/><path d="M17 8h6v9h-6z" fill="#875638" stroke="#563d2b" stroke-width="1"/><path d="m17 8 2-2h6l-2 2z" fill="#c58e53"/><path d="M13 7v5M20 10v5" stroke="#ecc779" stroke-width=".8"/><path d="M9 19h14M9 21h14" stroke="#563d2b" stroke-width="1"/><path d="M5 11h2v5H5zm20 0h2v5h-2zM5 19h2v4H5zm20 0h2v4h-2z" fill="#b88e50"/></symbol>
+<symbol id="i-train-locomotive-side-cell" viewBox="0 0 32 32"><ellipse cx="16" cy="25" rx="11" ry="3.5" fill="#050806" opacity=".28"/><circle cx="8" cy="23.5" r="3.5" fill="#19211e" stroke="#b48a4f" stroke-width="1.5"/><circle cx="24" cy="23.5" r="3.5" fill="#19211e" stroke="#b48a4f" stroke-width="1.5"/><circle cx="8" cy="23.5" r="1.5" fill="#788a7e"/><circle cx="24" cy="23.5" r="1.5" fill="#788a7e"/><path d="M8 23.5h16" stroke="#e3c878" stroke-width="1.2"/><circle cx="8" cy="23.5" r=".8" fill="#edc36e"/><circle cx="24" cy="23.5" r=".8" fill="#edc36e"/><path d="M5 17h22v3H5z" fill="#26342f" stroke="#121a16" stroke-width="1"/><path d="M3.5 8h6.5v10H3.5z" fill="#536b62" stroke="#d0a35a" stroke-width=".9"/><path d="M4.5 10h4.5v5H4.5z" fill="#88aa9a"/><path d="M3.5 8 5 5h6.5L10 8z" fill="#a9b5a0" stroke="#37473f" stroke-width=".7"/><path d="M10 9h11v8H10z" fill="#994f35" stroke="#4c3328" stroke-width=".8"/><path d="M10 9 12 6h11l-2 3z" fill="#d58a55" stroke="#61402d" stroke-width=".7"/><path d="M13 11h6.5M13 15h6.5" stroke="#edc36e" stroke-width=".8"/><path d="M21 9h6v8h-6z" fill="#603d2d" stroke="#d3aa61" stroke-width=".8"/><path d="M21 9 23 6h6L27 9z" fill="#b46f45" stroke="#d3aa61" stroke-width=".6"/><ellipse cx="27" cy="13" rx="1.5" ry="3.5" fill="#35433d" stroke="#d3aa61" stroke-width=".8"/><circle cx="27" cy="13" r=".65" fill="#edc36e"/><path d="M25.5 18.2H29v1.1h-3.5z" fill="#d0a35a"/><circle cx="29" cy="18.75" r=".8" fill="#bd9253" stroke="#563b2b" stroke-width=".4"/><path d="M16 6V4h3v2z" fill="#6f4732" stroke="#d0a35a" stroke-width=".6"/><path d="M15.5 4h4l-.7-1h-2.6z" fill="#d7b866"/></symbol>
+<symbol id="i-train-ore-car-side-cell" viewBox="0 0 32 32"><ellipse cx="16" cy="24" rx="12" ry="4" fill="#050806" opacity=".28"/><circle cx="8" cy="23" r="3.5" fill="#19211e" stroke="#b48a4f" stroke-width="1.5"/><circle cx="24" cy="23" r="3.5" fill="#19211e" stroke="#b48a4f" stroke-width="1.5"/><circle cx="8" cy="23" r="1.5" fill="#788a7e"/><circle cx="24" cy="23" r="1.5" fill="#788a7e"/><path d="M3 17h26v4H3z" fill="#26342f" stroke="#121a16" stroke-width="1"/><path d="M4 10h24v8H4z" fill="#805437" stroke="#563c2a" stroke-width="1"/><path d="M4 9h24v3H4z" fill="#c18b51" stroke="#e0b665" stroke-width=".8"/><path d="M6 10v7M12 10v7M19 10v7M26 10v7" stroke="#543b2b" stroke-width="1"/><path d="m5 9 3-3 4 3M11 9l4-5 4 5M17 9l3-4 4 4M22 9l3-3 3 3" fill="#858679" stroke="#414840" stroke-width=".8"/><path d="M5 11h22" stroke="#e0b665" stroke-width=".7"/></symbol>
+<symbol id="i-train-crate-car-side-cell" viewBox="0 0 32 32"><ellipse cx="16" cy="24" rx="12" ry="4" fill="#050806" opacity=".28"/><circle cx="8" cy="23" r="3.5" fill="#19211e" stroke="#b48a4f" stroke-width="1.5"/><circle cx="24" cy="23" r="3.5" fill="#19211e" stroke="#b48a4f" stroke-width="1.5"/><circle cx="8" cy="23" r="1.5" fill="#788a7e"/><circle cx="24" cy="23" r="1.5" fill="#788a7e"/><path d="M3 17h26v4H3z" fill="#26342f" stroke="#121a16" stroke-width="1"/><path d="M4 11h24v7H4z" fill="#805437" stroke="#563c2a" stroke-width="1"/><path d="M4 10h24v3H4z" fill="#c18b51" stroke="#e0b665" stroke-width=".8"/><path d="M6 11v6M13 11v6M20 11v6M26 11v6" stroke="#543b2b" stroke-width="1"/><path d="M6 9V6h7v7H6z" fill="#bc8050" stroke="#563d2b" stroke-width=".8"/><path d="m6 6 2-2h7l-2 2z" fill="#e1b365" stroke="#563d2b" stroke-width=".6"/><path d="M15 9V5h8v8h-8z" fill="#98633f" stroke="#4f392a" stroke-width=".8"/><path d="m15 5 2-2h8l-2 2z" fill="#d5a45e" stroke="#4f392a" stroke-width=".6"/><path d="M9 7v4M18 7v5" stroke="#ecc779" stroke-width=".7"/></symbol>
+</defs></svg>
+<script>
+const railPanel = document.querySelector('.rail-panel');
+railPanel.insertAdjacentHTML('beforebegin', `<section aria-labelledby="illustration-title"><div class="section-head"><h2 id="illustration-title">建築イラスト案</h2><p>カード用記号ではなく、マップ上で2〜4セルを占有する建築スプライトの方向性。</p></div><div class="illustration-board"><article class="illustration-card"><svg viewBox="0 0 96 96"><use href="#i-furnace-plate"/></svg><div><strong>簡易炉 / 2×2セル</strong><p>炉口、煙突、耐熱レンガ、真鍮の補強枠を見せる。</p></div></article><article class="illustration-card"><svg viewBox="0 0 96 96"><use href="#i-workshop-plate"/></svg><div><strong>真鍮工房 / 3×2セル</strong><p>大きな歯車、作業窓、屋根の蒸気排気を持つ。</p></div></article><article class="illustration-card"><svg viewBox="0 0 96 96"><use href="#i-station-plate"/></svg><div><strong>貨物駅 / 3×2セル</strong><p>ホーム、貨物扉、屋根、線路の接続口を描く。</p></div></article><article class="illustration-card"><svg viewBox="0 0 96 96"><use href="#i-tower-plate"/></svg><div><strong>蒸気炉塔 / 2×3セル</strong><p>縦長の塔として、遠景でも拠点の位置が分かる。</p></div></article></div></section><section aria-labelledby="rail-parts-title"><div class="section-head"><h2 id="rail-parts-title">線路パーツ案</h2><p>線路は設置時に進行方向を選び、曲線は専用パーツで描画する。</p></div><div class="rail-layout"><article class="rail-piece"><svg viewBox="0 0 96 64"><use href="#i-rail-straight"/></svg><strong>直線</strong><p>縦・横・斜めの進行方向を選択。</p></article><article class="rail-piece"><svg viewBox="0 0 96 64"><use href="#i-rail-curve"/></svg><strong>カーブ</strong><p>接続方向から自動判定し、曲線アイコンを表示。</p></article><article class="rail-piece"><svg viewBox="0 0 96 64"><use href="#i-rail-switch"/></svg><strong>分岐</strong><p>列車の進行方向と切替状態を管理。</p></article><article class="rail-piece"><svg viewBox="0 0 96 64"><use href="#i-rail-signal"/></svg><strong>信号</strong><p>列車同士の接近を制御する。</p></article></div></section>`);
+document.querySelectorAll('.rail-piece svg').forEach(svg => svg.setAttribute('viewBox', '0 0 64 64'));
+document.querySelectorAll('symbol[id^="i-rail-"] path[stroke="#8f6331"]').forEach(path => path.setAttribute('stroke', '#6b4932'));
+document.querySelectorAll('symbol[id^="i-rail-"] path[stroke="#f1ce78"]').forEach(path => path.setAttribute('stroke', '#a87945'));
+const switchCard = document.querySelector('.rail-piece:nth-child(3)');
+if (switchCard) {
+	switchCard.querySelector('p').textContent = '十字の4方向を持ち、設定した進行先へ切り替える。';
+	switchCard.insertAdjacentHTML('beforeend', '<div class="direction-setting"><span>進行先</span><button>北</button><button class="active">東</button><button>南</button><button>西</button></div>');
+}
+(() => {
+	document.querySelector('.summary')?.insertAdjacentHTML('beforeend', '<a href="building-object-icons-draft.html" style="padding:5px 9px;color:#e8e4d6;background:#17211d;border:1px solid #82c8b0;font:12px monospace;text-decoration:none">建築・タイルアイコン案 45種 →</a>');
+	const stageFurnace = [...document.querySelectorAll('.stage .building')].find(building => building.querySelector('strong')?.textContent === '簡易炉');
+	if (stageFurnace) {
+		stageFurnace.querySelector('strong').textContent = '歯車生成炉';
+		stageFurnace.querySelector('small').textContent = '歯車素材の焼成と成形を行う。';
+		stageFurnace.querySelector('use').setAttribute('href', '#i-gear-generator-cell');
+		const simpleFurnaceBuilding = document.createElement('div');
+		simpleFurnaceBuilding.className = 'building';
+		simpleFurnaceBuilding.innerHTML = '<svg viewBox="0 0 32 32" aria-hidden="true"><use href="#i-simple-furnace-cell"></use></svg><div><strong>簡易炉</strong><small>開拓初期用の1セル炉。</small></div>';
+		stageFurnace.before(simpleFurnaceBuilding);
+	}
+	const stageIconSymbols = new Map([
+		['簡易炉', 'building-simple-furnace'],
+		['歯車生成炉', 'building-gear-forge'],
+		['真鍮工房', 'building-brass-workshop'],
+		['蒸気炉塔', 'building-steam-tower'],
+		['線路', 'building-rail-track'],
+		['貨物駅', 'building-freight-platform'],
+		['蒸気機関車庫', 'building-steam-locomotive'],
+		['錬金蒸留塔', 'building-alchemical-distillery'],
+		['開拓評議会館', 'building-council-hall']
+	]);
+	document.querySelectorAll('.stage .building').forEach(building => {
+		const symbolId = stageIconSymbols.get(building.querySelector('strong')?.textContent);
+		if (!symbolId) return;
+		const svg = building.querySelector('svg');
+		const use = svg?.querySelector('use');
+		if (!svg || !use) return;
+		svg.setAttribute('viewBox', '0 0 96 96');
+		use.setAttribute('href', `../MapSystem/assets/building-icons.svg?v=2#${symbolId}`);
+		use.setAttribute('x', '0');
+		use.setAttribute('y', '0');
+		use.setAttribute('width', '96');
+		use.setAttribute('height', '96');
+	});
+	const furnaceIllustration = [...document.querySelectorAll('.illustration-card')].find(card => card.querySelector('strong')?.textContent.startsWith('簡易炉 /'));
+	if (furnaceIllustration) {
+		furnaceIllustration.querySelector('strong').textContent = '歯車生成炉 / 2×2セル';
+		furnaceIllustration.querySelector('p').textContent = '歯車素材の焼成と成形を行う。耐熱炉口と真鍮の補強枠を持つ。';
+		furnaceIllustration.insertAdjacentHTML('beforebegin', '<article class="illustration-card"><svg viewBox="0 0 32 32"><use href="#i-simple-furnace-cell"></use></svg><div><strong>簡易炉 / 1×1セル</strong><p>開拓初期に使う小型炉。限られた資材で設置できる。</p></div></article>');
+	}
+	const siteList = document.querySelector('.settlement-site-list') || document.createElement('aside');
+	siteList.insertAdjacentHTML('beforeend', `<div class="settlement-site" style="--site-color:#9dbb8e"><span class="settlement-site-number">01</span><div><strong>開拓本部</strong><small>2×2 セル / 仮設</small></div></div><div class="settlement-site" style="--site-color:#86c5b5"><span class="settlement-site-number">02</span><div><strong>霧集水塔</strong><small>2×3 セル / 仮設</small></div></div><div class="settlement-site" style="--site-color:#d2b766"><span class="settlement-site-number">03</span><div><strong>簡易炉</strong><small>1×1 セル / 仮設</small></div></div><div class="settlement-site" style="--site-color:#d2b766"><span class="settlement-site-number">04</span><div><strong>歯車生成炉</strong><small>2×2 セル / 蒸気化</small></div></div><div class="settlement-site" style="--site-color:#d2b766"><span class="settlement-site-number">05</span><div><strong>真鍮工房</strong><small>3×2 セル / 蒸気化</small></div></div><div class="settlement-site" style="--site-color:#d39067"><span class="settlement-site-number">06</span><div><strong>貨物駅</strong><small>3×2 セル / 物流</small></div></div><div class="settlement-site" style="--site-color:#d39067"><span class="settlement-site-number">07</span><div><strong>簡易桟橋</strong><small>5×1 セル / 海</small></div></div>`);
+	document.querySelector('.settlement-map')?.setAttribute('aria-label', '海岸、草地、森林、山地のマップに開拓本部、霧集水塔、1セル簡易炉、歯車生成炉、真鍮工房、貨物駅、1セル幅の簡易桟橋を配置した図');
+	const mapPreviewMarkup = `<section aria-labelledby="settlement-map-title"><div class="section-head"><h2 id="settlement-map-title">建築物のマップ配置案</h2><p>開拓が進んだ海岸区画の仮配置。1セルは実マップと同じ32px。</p></div><div class="settlement-preview-layout"><div class="settlement-map-frame"><svg class="settlement-map" viewBox="0 0 640 384" role="img" aria-label="海岸、草地、森林、山地のマップに開拓本部、霧集水塔、簡易炉、真鍮工房、貨物駅を配置した図"><g id="settlement-map-terrain"></g><g id="settlement-map-grid"></g><g id="settlement-map-buildings"></g><g id="settlement-map-pier"></g></svg></div><aside class="settlement-site-list"><h3>配置した建築</h3><div class="settlement-site" style="--site-color:#9dbb8e"><span class="settlement-site-number">01</span><div><strong>開拓本部</strong><small>2×2 セル / 仮設</small></div></div><div class="settlement-site" style="--site-color:#86c5b5"><span class="settlement-site-number">02</span><div><strong>霧集水塔</strong><small>2×3 セル / 仮設</small></div></div><div class="settlement-site" style="--site-color:#d2b766"><span class="settlement-site-number">03</span><div><strong>簡易炉</strong><small>2×2 セル / 蒸気化</small></div></div><div class="settlement-site" style="--site-color:#d2b766"><span class="settlement-site-number">04</span><div><strong>真鍮工房</strong><small>3×2 セル / 蒸気化</small></div></div><div class="settlement-site" style="--site-color:#d39067"><span class="settlement-site-number">05</span><div><strong>貨物駅</strong><small>3×2 セル / 物流</small></div></div><div class="settlement-site" style="--site-color:#d39067"><span class="settlement-site-number">06</span><div><strong>簡易桟橋</strong><small>5×2 セル / 海岸</small></div></div></aside></div><div class="settlement-map-legend"><span><i style="--swatch:#1e4d6b"></i>海</span><span><i style="--swatch:#d5bd8a"></i>砂地</span><span><i style="--swatch:#8db87c"></i>草原</span><span><i style="--swatch:#3e6b48"></i>森林</span><span><i style="--swatch:#746b60"></i>山岳</span></div><p class="settlement-map-note">島全体ではなく、探索・測量済みの海岸周辺を切り取った配置例です。建築物はすべてプレイヤーが設置した想定です。</p></section>`;
+	document.querySelector('[aria-labelledby="illustration-title"]')?.insertAdjacentHTML('afterend', mapPreviewMarkup);
+
+	const svgNamespace = 'http://www.w3.org/2000/svg';
+	const finalSiteList = document.querySelector('.settlement-site-list');
+	finalSiteList.innerHTML = `<h3>配置した建築</h3><div class="settlement-site" style="--site-color:#9dbb8e"><span class="settlement-site-number">01</span><div><strong>開拓本部</strong><small>2×2 セル / 仮設</small></div></div><div class="settlement-site" style="--site-color:#86c5b5"><span class="settlement-site-number">02</span><div><strong>霧集水塔</strong><small>2×3 セル / 仮設</small></div></div><div class="settlement-site" style="--site-color:#d2b766"><span class="settlement-site-number">03</span><div><strong>簡易炉</strong><small>1×1 セル / 仮設</small></div></div><div class="settlement-site" style="--site-color:#d2b766"><span class="settlement-site-number">04</span><div><strong>歯車生成炉</strong><small>2×2 セル / 蒸気化</small></div></div><div class="settlement-site" style="--site-color:#d2b766"><span class="settlement-site-number">05</span><div><strong>真鍮工房</strong><small>3×2 セル / 蒸気化</small></div></div><div class="settlement-site" style="--site-color:#d39067"><span class="settlement-site-number">06</span><div><strong>貨物駅</strong><small>3×2 セル / 物流</small></div></div><div class="settlement-site" style="--site-color:#d39067"><span class="settlement-site-number">07</span><div><strong>簡易桟橋</strong><small>5×1 セル / 海</small></div></div>`;
+	document.querySelector('.settlement-map').setAttribute('aria-label', '海岸、草地、森林、山地のマップに開拓本部、霧集水塔、1セル簡易炉、歯車生成炉、真鍮工房、貨物駅、1セル幅の簡易桟橋を配置した図');
+	const tileSize = 32;
+	const mapColumns = 20;
+	const mapRows = 12;
+	const terrainLayer = document.getElementById('settlement-map-terrain');
+	const gridLayer = document.getElementById('settlement-map-grid');
+	const foundationLayer = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+	foundationLayer.setAttribute('id', 'settlement-map-foundations');
+	terrainLayer.ownerSVGElement.insertBefore(foundationLayer, gridLayer);
+	const buildingLayer = document.getElementById('settlement-map-buildings');
+	const pierLayer = document.getElementById('settlement-map-pier');
+	const siteRows = [...document.querySelectorAll('.settlement-site')];
+	const colorSets = {
+		SEA: ['#1e4d6b', '#245675', '#1b4865', '#20516e'],
+		SAND: ['#d5bd8a', '#cbb17c', '#ddc895', '#cfb984'],
+		PLAINS: ['#8db87c', '#83ad73', '#96bd83', '#88b477'],
+		FOREST: ['#3e6b48', '#456f4d', '#386342', '#49744f'],
+		MOUNTAIN: ['#746b60', '#807669', '#6c665d', '#887d70']
+	};
+	const cellIcons = { SEA: 0, PLAINS: 2, FOREST: 3, MOUNTAIN: 4, SAND: 5, FOUNDATION: 24 };
+	const terrainIndex = { SEA: 0, SAND: 1, PLAINS: 2, FOREST: 3, MOUNTAIN: 4 };
+	const placements = [
+		{ number: '01', name: '開拓本部', x: 8, y: 5, width: 2, height: 2, symbol: 'i-camp', color: '#9dbb8e', requiresFoundation: true },
+		{ number: '02', name: '霧集水塔', x: 8, y: 2, width: 2, height: 3, symbol: 'i-tower-plate', color: '#86c5b5', requiresFoundation: true },
+		{ number: '03', name: '簡易炉', x: 10, y: 5, width: 1, height: 1, symbol: 'i-simple-furnace-cell', color: '#d2b766', requiresFoundation: true },
+		{ number: '04', name: '歯車生成炉', x: 9, y: 8, width: 2, height: 2, symbol: 'i-furnace-plate', color: '#d2b766', requiresFoundation: true },
+		{ number: '05', name: '真鍮工房', x: 11, y: 2, width: 3, height: 2, symbol: 'i-workshop-plate', color: '#d2b766', requiresFoundation: true },
+		{ number: '06', name: '貨物駅', x: 11, y: 7, width: 3, height: 2, symbol: 'i-station-plate', color: '#d39067', requiresFoundation: true }
+	];
+
+	function terrainAt(x, y) {
+		const shoreline = y < 7 ? 0 : Math.min(6, 5 + Math.floor((y - 7) / 3));
+		if (x < shoreline) return 'SEA';
+		if (y >= 6 && x < shoreline + 4) return 'SAND';
+		if (x >= 17 + Math.floor(y / 5)) return 'MOUNTAIN';
+		if ((x < 8 && y < 7 && (x + y * 2) % 4 !== 0) || (x < 4 && y < 6)) return 'FOREST';
+		return 'PLAINS';
+	}
+
+	function createSvgElement(name, attributes) {
+		const element = document.createElementNS(svgNamespace, name);
+		Object.entries(attributes).forEach(([key, value]) => element.setAttribute(key, value));
+		return element;
+	}
+	const terrainGrid = Array.from({ length: mapRows }, (_, y) => Array.from({ length: mapColumns }, (_, x) => terrainAt(x, y)));
+	const terrainNames = { SEA: '海', SAND: '砂地', PLAINS: '草原', FOREST: '森林', MOUNTAIN: '山岳' };
+
+	function canPlaceOnUniformTerrain(x, y, width, height) {
+		if (x < 0 || y < 0 || x + width > mapColumns || y + height > mapRows) return null;
+		const terrain = terrainGrid[y][x];
+		for (let row = y; row < y + height; row++) {
+			for (let column = x; column < x + width; column++) {
+				if (terrainGrid[row][column] !== terrain) return null;
+			}
+		}
+		return terrain;
+	}
+
+	for (let y = 0; y < mapRows; y++) {
+		for (let x = 0; x < mapColumns; x++) {
+			const type = terrainGrid[y][x];
+			const palette = colorSets[type];
+			const variation = (x * 7 + y * 11 + x * y) % palette.length;
+			const xPosition = x * tileSize;
+			const yPosition = y * tileSize;
+			terrainLayer.append(createSvgElement('rect', {
+				x: xPosition,
+				y: yPosition,
+				width: tileSize,
+				height: tileSize,
+				fill: palette[variation]
+			}));
+
+			const iconViewport = createSvgElement('svg', {
+				x: xPosition + tileSize * 0.21,
+				y: yPosition + tileSize * 0.21,
+				width: tileSize * 0.58,
+				height: tileSize * 0.58,
+				viewBox: '0 0 96 96'
+			});
+			iconViewport.setAttribute('opacity', '0.28');
+			const atlasIcon = createSvgElement('image', {
+				x: -cellIcons[type] * 96,
+				y: 0,
+				width: 2304,
+				height: 96
+			});
+			atlasIcon.setAttribute('href', '../MapSystem/cell-icons.svg?v=4');
+			iconViewport.append(atlasIcon);
+			terrainLayer.append(iconViewport);
+			gridLayer.append(createSvgElement('rect', {
+				x: xPosition + 0.5,
+				y: yPosition + 0.5,
+				width: tileSize - 1,
+				height: tileSize - 1,
+				fill: 'none',
+				stroke: 'rgba(224, 232, 205, .18)',
+				'stroke-width': 1
+			}));
+		}
+	}
+
+	placements.forEach((placement, index) => {
+		const siteRow = siteRows[index];
+		const terrain = canPlaceOnUniformTerrain(placement.x, placement.y, placement.width, placement.height);
+		if (siteRow) {
+			siteRow.dataset.placementAllowed = String(Boolean(terrain));
+			if (terrain) siteRow.querySelector('small').textContent += placement.requiresFoundation ? ` / 基礎（元地形: ${terrainNames[terrain]}）` : ` / ${terrainNames[terrain]}`;
+		}
+		if (!terrain) {
+			if (siteRow) siteRow.querySelector('small').textContent = 'セル種が混在 / 設置不可';
+			return;
+		}
+		const xPosition = placement.x * tileSize;
+		const yPosition = placement.y * tileSize;
+		const width = placement.width * tileSize;
+		const height = placement.height * tileSize;
+		if (placement.requiresFoundation) {
+			for (let row = placement.y; row < placement.y + placement.height; row++) {
+				for (let column = placement.x; column < placement.x + placement.width; column++) {
+					const foundationX = column * tileSize;
+					const foundationY = row * tileSize;
+					foundationLayer.append(createSvgElement('rect', { x: foundationX, y: foundationY, width: tileSize, height: tileSize, fill: '#909799' }));
+					const foundationIcon = createSvgElement('svg', { x: foundationX + tileSize * 0.21, y: foundationY + tileSize * 0.21, width: tileSize * 0.58, height: tileSize * 0.58, viewBox: '0 0 96 96' });
+					foundationIcon.setAttribute('opacity', '0.38');
+					const foundationAtlasIcon = createSvgElement('image', { x: -cellIcons.FOUNDATION * 96, y: 0, width: 2400, height: 96 });
+					foundationAtlasIcon.setAttribute('href', '../MapSystem/cell-icons.svg?v=4');
+					foundationIcon.append(foundationAtlasIcon);
+					foundationLayer.append(foundationIcon);
+				}
+			}
+			if (siteRow) siteRow.querySelector('small').textContent = `${placement.width}×${placement.height} セル / 基礎（元地形: ${terrainNames[terrain]}）`;
+		}
+		buildingLayer.append(createSvgElement('rect', {
+			x: xPosition + 1,
+			y: yPosition + 1,
+			width: width - 2,
+			height: height - 2,
+			rx: 2,
+			fill: placement.color,
+			'fill-opacity': 0.18,
+			stroke: placement.color,
+			'stroke-width': 1.5,
+			'stroke-dasharray': '4 2'
+		}));
+		buildingLayer.append(createSvgElement('use', {
+			href: `#${placement.symbol}`,
+			x: xPosition + 3,
+			y: yPosition + 3,
+			width: width - 6,
+			height: height - 6,
+			preserveAspectRatio: 'none'
+		}));
+		buildingLayer.append(createSvgElement('circle', {
+			cx: xPosition + 9,
+			cy: yPosition + 9,
+			r: 7,
+			fill: placement.color,
+			stroke: '#18211c',
+			'stroke-width': 1
+		}));
+		const number = createSvgElement('text', {
+			x: xPosition + 9,
+			y: yPosition + 12,
+			'font-size': 7,
+			'font-family': 'monospace',
+			'font-weight': 'bold',
+			'text-anchor': 'middle',
+			fill: '#18211c'
+		});
+		number.textContent = placement.number.slice(1);
+		buildingLayer.append(number);
+	});
+
+	document.querySelector('.settlement-map-legend')?.insertAdjacentHTML('beforeend', '<span><i style="--swatch:#909799"></i>基礎</span>');
+	document.querySelector('.settlement-map-note').textContent += ' 灰色部分は元の地形セルを置き換えた基礎です。';
+	const pierTerrain = canPlaceOnUniformTerrain(0, 8, 5, 1);
+	const pierSiteRow = siteRows[placements.length];
+	if (pierSiteRow) {
+		pierSiteRow.dataset.placementAllowed = String(Boolean(pierTerrain));
+		if (pierTerrain) pierSiteRow.querySelector('small').textContent = `5×1 セル / ${terrainNames[pierTerrain]}`;
+	}
+	if (pierTerrain) {
+	const pierFootprint = createSvgElement('rect', {
+		x: 1,
+		y: 8 * tileSize + 1,
+		width: 5 * tileSize - 2,
+		height: tileSize - 2,
+		fill: '#d39067',
+		'fill-opacity': 0.14,
+		stroke: '#d39067',
+		'stroke-width': 1.5,
+		'stroke-dasharray': '4 2'
+	});
+	pierLayer.append(pierFootprint);
+	const pierTop = 8 * tileSize;
+	pierLayer.append(createSvgElement('rect', { x: 2, y: pierTop + 8, width: 156, height: 16, fill: '#684c34', stroke: '#d1a153', 'stroke-width': 2 }));
+	for (let x = 10; x < 156; x += 12) {
+		pierLayer.append(createSvgElement('path', { d: `M${x} ${pierTop + 9}v14`, stroke: '#c19352', 'stroke-width': 1 }));
+	}
+	for (const y of [pierTop + 8, pierTop + 24]) {
+		pierLayer.append(createSvgElement('path', { d: `M3 ${y}H157`, stroke: '#493827', 'stroke-width': 4 }));
+		pierLayer.append(createSvgElement('path', { d: `M3 ${y}H157`, stroke: '#c19352', 'stroke-width': 1 }));
+	}
+	for (const x of [14, 46, 78, 110, 142]) {
+		pierLayer.append(createSvgElement('path', { d: `M${x} ${pierTop + 24}v7`, stroke: '#493827', 'stroke-width': 4 }));
+	}
+	pierLayer.append(createSvgElement('use', { href: '#i-crane', x: 108, y: pierTop + 1, width: 32, height: 30 }));
+	pierLayer.append(createSvgElement('rect', { x: 58, y: pierTop + 2, width: 16, height: 6, fill: '#ad7446', stroke: '#523b2a', 'stroke-width': 1 }));
+	pierLayer.append(createSvgElement('rect', { x: 75, y: pierTop + 1, width: 12, height: 7, fill: '#c18b51', stroke: '#523b2a', 'stroke-width': 1 }));
+	const pierNumber = createSvgElement('text', { x: 9, y: pierTop + 6, 'font-size': 8, 'font-family': 'monospace', 'font-weight': 'bold', 'text-anchor': 'middle', fill: '#18211c' });
+	pierNumber.textContent = '7';
+	pierLayer.append(createSvgElement('circle', { cx: 9, cy: pierTop + 3, r: 7, fill: '#d39067', stroke: '#18211c', 'stroke-width': 1 }));
+	pierLayer.append(pierNumber);
+	pierLayer.append(createSvgElement('rect', { x: 157, y: pierTop + 8, width: 131, height: 16, fill: '#ad8150', stroke: '#d1a153', 'stroke-width': 1.5 }));
+	for (let x = 165; x < 286; x += 12) {
+		pierLayer.append(createSvgElement('path', { d: `M${x} ${pierTop + 9}v14`, stroke: '#63452f', 'stroke-width': 1 }));
+	}
+	pierLayer.append(createSvgElement('path', { d: `M12 ${pierTop + 16}H281`, fill: 'none', stroke: '#f1d88a', 'stroke-width': 2, 'stroke-dasharray': '6 5', opacity: 0.9 }));
+	} else if (pierSiteRow) {
+		pierSiteRow.dataset.placementAllowed = 'false';
+		pierSiteRow.querySelector('small').textContent = 'セル種が混在 / 設置不可';
+	}
+
+	const blockedX = 3;
+	const blockedY = 4;
+	if (!canPlaceOnUniformTerrain(blockedX, blockedY, 2, 2)) {
+		const x = blockedX * tileSize;
+		const y = blockedY * tileSize;
+		buildingLayer.append(createSvgElement('rect', { x, y, width: tileSize * 2, height: tileSize * 2, fill: '#c84d49', 'fill-opacity': 0.22, stroke: '#ec7770', 'stroke-width': 2, 'stroke-dasharray': '5 3' }));
+		buildingLayer.append(createSvgElement('path', { d: `M${x + 5} ${y + 5}L${x + tileSize * 2 - 5} ${y + tileSize * 2 - 5}M${x + tileSize * 2 - 5} ${y + 5}L${x + 5} ${y + tileSize * 2 - 5}`, stroke: '#f5c1a9', 'stroke-width': 3 }));
+	}
+	document.querySelector('.settlement-map-legend')?.insertAdjacentHTML('beforeend', '<span><i style="--swatch:#c84d49"></i>セル境界をまたぐ配置候補（不可）</span><span><i style="--swatch:#f1d88a"></i>桟橋の歩行面</span>');
+	document.querySelector('.settlement-map-note').textContent += ' 設置条件: 建物の占有セルはすべて同じセル種。赤い×は設置できない例です。桟橋は海セル上の甲板と砂浜へのタラップをつなぎ、甲板セルだけ海の進入不可を上書きして歩行可能にする想定です。';
+})();
+railPanel.insertAdjacentHTML('beforebegin', `<section aria-labelledby="track-demo-title"><div class="section-head"><h2 id="track-demo-title">線路・信号の接続確認</h2><p>すべて1×1セル。カーブから直線へつなぎ、信号を線路上に重ねて分岐へ接続する。</p></div><div class="track-demo"><div class="track-cell"><svg viewBox="0 0 64 64"><use href="#i-rail-straight"/></svg></div><div class="track-cell"></div><div class="track-cell"></div><div class="track-cell"></div><div class="track-cell"><svg viewBox="0 0 64 64"><use href="#i-rail-curve"/></svg></div><div class="track-cell"><svg class="rotate-90" viewBox="0 0 64 64"><use href="#i-rail-straight"/></svg></div><div class="track-cell"><svg class="rotate-90" viewBox="0 0 64 64"><use href="#i-rail-signal"/></svg></div><div class="track-cell"><svg viewBox="0 0 64 64"><use href="#i-rail-switch"/></svg></div></div><p class="track-demo-caption">直線の下端 → カーブの上端 → 直線 → 信号付き直線 → 十字分岐。信号の下にも線路が連続する。</p><div class="track-demo-legend"><span>● レール中心間隔 16px</span><span>● セル境界で接続</span></div></section>`);
+document.querySelector('.rail-layout')?.closest('section')?.insertAdjacentHTML('afterend', `<section aria-labelledby="train-concept-title"><div class="section-head"><h2 id="train-concept-title">列車・貨車デザイン案</h2><p>マップ配置前の車両単体案。プレイヤー表示と同じ斜め俯瞰、左上光源で描く。</p></div><figure class="train-concept-figure"><svg class="train-concept" viewBox="0 0 960 360" role="img" aria-labelledby="train-art-title train-art-desc"><title id="train-art-title">機関車と貨車のデザイン案</title><desc id="train-art-desc">左から蒸気機関車、鉱石を積んだ貨車、木箱を積んだ貨車を斜め上から描いた静止イラスト。</desc><defs><linearGradient id="train-boiler-side" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#b96943"/><stop offset="1" stop-color="#74412f"/></linearGradient><linearGradient id="train-boiler-top" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#df9860"/><stop offset="1" stop-color="#a75e3b"/></linearGradient><linearGradient id="train-metal-side" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#6b8279"/><stop offset="1" stop-color="#354640"/></linearGradient><linearGradient id="train-metal-top" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#a8b5a2"/><stop offset="1" stop-color="#718276"/></linearGradient><linearGradient id="train-wood-side" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#bd8750"/><stop offset="1" stop-color="#765035"/></linearGradient><linearGradient id="train-wood-top" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#e0b56b"/><stop offset="1" stop-color="#a87947"/></linearGradient><filter id="train-shadow" x="-20%" y="-30%" width="140%" height="180%"><feGaussianBlur stdDeviation="7"/></filter></defs><path d="M56 275h848" stroke="#657b6b" stroke-width="1" opacity=".45"/><path d="M76 304h810" stroke="#746344" stroke-width="10" opacity=".8"/><path d="M76 328h810" stroke="#746344" stroke-width="10" opacity=".8"/><g stroke="#3b4542" stroke-width="5" opacity=".8"><path d="M106 293v46M154 293v46M202 293v46M250 293v46M298 293v46M346 293v46M394 293v46M442 293v46M490 293v46M538 293v46M586 293v46M634 293v46M682 293v46M730 293v46M778 293v46M826 293v46M874 293v46"/></g><g fill="#050806" opacity=".45" filter="url(#train-shadow)"><ellipse cx="240" cy="283" rx="174" ry="18"/><ellipse cx="507" cy="283" rx="95" ry="16"/><ellipse cx="754" cy="283" rx="95" ry="16"/></g><g aria-label="蒸気機関車"><path d="M91 250 125 235h237l39 22-21 21H116z" fill="#283630" stroke="#18221e" stroke-width="3"/><path d="M100 250h282v14H111z" fill="#bd9253"/><path d="M121 169h74v78h-74z" fill="url(#train-metal-side)" stroke="#263630" stroke-width="3"/><path d="m121 169 21-16h70l-17 16z" fill="url(#train-metal-top)" stroke="#263630" stroke-width="3"/><path d="M137 183h42v45h-42z" fill="#263c37" stroke="#d0a75c" stroke-width="4"/><path d="M142 188h32v35h-32z" fill="#8ab2a4"/><path d="M108 151h93v12h-93z" fill="#d0a35a" stroke="#594332" stroke-width="3"/><path d="m122 151 13-13h80l-14 13z" fill="#efc976" stroke="#594332" stroke-width="3"/><path d="M181 184h143v61H181z" fill="url(#train-boiler-side)" stroke="#442e25" stroke-width="3"/><path d="m181 184 19-17h142l-18 17z" fill="url(#train-boiler-top)" stroke="#61402d" stroke-width="3"/><path d="M203 196h111" stroke="#edbd67" stroke-width="4"/><path d="M197 205h119" stroke="#603b2b" stroke-width="2"/><circle cx="321" cy="214" r="31" fill="#603d2d" stroke="#d3aa61" stroke-width="5"/><circle cx="321" cy="214" r="22" fill="#35433d" stroke="#8ca195" stroke-width="3"/><circle cx="321" cy="214" r="7" fill="#c88c4d"/><path d="M280 163h21v-18h-21z" fill="#6f4732" stroke="#d0a35a" stroke-width="3"/><path d="m277 145 4-9h19l4 9z" fill="#d7b866" stroke="#67442f" stroke-width="2"/><path d="M229 176v-14h11v14M250 176v-14h11v14" fill="#788a7e" stroke="#3b4b42" stroke-width="3"/><path d="M191 186v54M214 186v54M237 186v54M260 186v54M283 186v54" stroke="#d1a45c" stroke-width="2" opacity=".75"/><g><circle cx="151" cy="266" r="23" fill="#19211e" stroke="#b48a4f" stroke-width="5"/><circle cx="151" cy="266" r="10" fill="#596b62" stroke="#d8bd79" stroke-width="3"/><circle cx="223" cy="266" r="29" fill="#19211e" stroke="#b48a4f" stroke-width="5"/><circle cx="223" cy="266" r="12" fill="#596b62" stroke="#d8bd79" stroke-width="3"/><circle cx="314" cy="266" r="29" fill="#19211e" stroke="#b48a4f" stroke-width="5"/><circle cx="314" cy="266" r="12" fill="#596b62" stroke="#d8bd79" stroke-width="3"/><path d="M151 266h72l91 0" stroke="#d2a65b" stroke-width="5"/><circle cx="223" cy="266" r="5" fill="#e8cb7e"/><circle cx="314" cy="266" r="5" fill="#e8cb7e"/></g></g><g aria-label="鉱石貨車"><path d="M415 246h185l20 20-21 13H431l-21-15z" fill="#293932" stroke="#18221e" stroke-width="3"/><path d="M421 248h177v9H421z" fill="#bd9253"/><path d="M429 194h155v55H429z" fill="url(#train-wood-side)" stroke="#563c2a" stroke-width="3"/><path d="m429 194 19-17h155l-19 17z" fill="url(#train-wood-top)" stroke="#563c2a" stroke-width="3"/><path d="M445 198v48M479 198v48M513 198v48M547 198v48M578 194v55" stroke="#543b2b" stroke-width="4"/><path d="M437 187 455 164l20 15 18-24 20 15 20-15 24 18 15 14z" fill="#77786c" stroke="#343b35" stroke-width="3"/><path d="m455 181 18-12 11 10-15 8zm42-7 17-15 12 13-16 13zm31 2 17-10 14 12-18 9z" fill="#a5a28e"/><g><circle cx="453" cy="266" r="21" fill="#19211e" stroke="#b48a4f" stroke-width="5"/><circle cx="453" cy="266" r="9" fill="#596b62" stroke="#d8bd79" stroke-width="3"/><circle cx="568" cy="266" r="21" fill="#19211e" stroke="#b48a4f" stroke-width="5"/><circle cx="568" cy="266" r="9" fill="#596b62" stroke="#d8bd79" stroke-width="3"/></g><path d="M382 255h38M603 255h31" stroke="#d0a35a" stroke-width="5"/><circle cx="400" cy="255" r="5" fill="#d0a35a"/><circle cx="619" cy="255" r="5" fill="#d0a35a"/></g><g aria-label="木箱貨車"><path d="M641 246h185l20 20-21 13H657l-21-15z" fill="#293932" stroke="#18221e" stroke-width="3"/><path d="M647 248h177v9H647z" fill="#bd9253"/><path d="M655 194h155v55H655z" fill="url(#train-wood-side)" stroke="#563c2a" stroke-width="3"/><path d="m655 194 19-17h155l-19 17z" fill="url(#train-wood-top)" stroke="#563c2a" stroke-width="3"/><path d="M671 198v48M705 198v48M739 198v48M773 198v48M804 194v55" stroke="#543b2b" stroke-width="4"/><path d="m679 178 17-35 43 0 18 35z" fill="#98633f" stroke="#4f392a" stroke-width="3"/><path d="m679 143 16-17 44 0 17 17z" fill="#d5a45e" stroke="#4f392a" stroke-width="3"/><path d="m738 178 17-35 43 0 18 35z" fill="#805437" stroke="#4f392a" stroke-width="3"/><path d="m738 143 17-17 44 0 17 17z" fill="#c78d50" stroke="#4f392a" stroke-width="3"/><path d="M696 132v43M715 132v43M755 132v43M775 132v43" stroke="#e2bb71" stroke-width="2"/><g><circle cx="679" cy="266" r="21" fill="#19211e" stroke="#b48a4f" stroke-width="5"/><circle cx="679" cy="266" r="9" fill="#596b62" stroke="#d8bd79" stroke-width="3"/><circle cx="794" cy="266" r="21" fill="#19211e" stroke="#b48a4f" stroke-width="5"/><circle cx="794" cy="266" r="9" fill="#596b62" stroke="#d8bd79" stroke-width="3"/></g><path d="M620 255h37M829 255h48" stroke="#d0a35a" stroke-width="5"/><circle cx="637" cy="255" r="5" fill="#d0a35a"/><circle cx="866" cy="255" r="5" fill="#d0a35a"/></g><g fill="#e5c778" font-family="Georgia,serif" font-size="15" text-anchor="middle"><text x="238" y="350">蒸気機関車</text><text x="516" y="350">鉱石貨車</text><text x="742" y="350">木箱貨車</text></g></svg><figcaption class="train-concept-caption">車輪・連結器・荷台・積荷を別面で描き分けた静止案。斜め俯瞰の向きと部品形状を確認するためのデザイン資料です。</figcaption></figure><div class="train-design-notes"><div><strong>蒸気機関車</strong><p>真鍮縁のボイラーと前照灯、露出した大径動輪。</p></div><div><strong>鉱石貨車</strong><p>木製荷台へ鉱石を積み、側板は補強梁で分割。</p></div><div><strong>木箱貨車</strong><p>木箱を荷台に固定し、異なる貨物を見分ける。</p></div></div></section>`);
+const oldTrainConcept = document.querySelector('[aria-labelledby="train-concept-title"]');
+oldTrainConcept?.remove();
+const trainSpriteMarkup = `<section aria-labelledby="train-sprite-title"><div class="section-head"><h2 id="train-sprite-title">列車・貨車の1セルデザイン案</h2><p>1セル32px。機関車は進行方向ごと、貨車は車軸方向ごとの図柄。</p></div><div class="train-sprite-group"><h3>蒸気機関車</h3><div class="train-sprite-grid"><article class="train-sprite-tile"><span>上・北</span><svg viewBox="0 0 32 32" role="img" aria-label="上向き機関車"><use href="#i-train-locomotive-cell"/></svg></article><article class="train-sprite-tile"><span>右・東</span><svg viewBox="0 0 32 32" role="img" aria-label="右向き機関車"><use href="#i-train-locomotive-cell" transform="rotate(90 16 16)"/></svg></article><article class="train-sprite-tile"><span>下・南</span><svg viewBox="0 0 32 32" role="img" aria-label="下向き機関車"><use href="#i-train-locomotive-cell" transform="rotate(180 16 16)"/></svg></article><article class="train-sprite-tile"><span>左・西</span><svg viewBox="0 0 32 32" role="img" aria-label="左向き機関車"><use href="#i-train-locomotive-cell" transform="rotate(270 16 16)"/></svg></article></div></div><div class="train-sprite-group"><h3>鉱石貨車</h3><div class="train-sprite-grid"><article class="train-sprite-tile"><span>上・北</span><svg viewBox="0 0 32 32" role="img" aria-label="縦向き鉱石貨車"><use href="#i-train-ore-car-cell"/></svg></article><article class="train-sprite-tile"><span>右・東</span><svg viewBox="0 0 32 32" role="img" aria-label="横向き鉱石貨車"><use href="#i-train-ore-car-cell" transform="rotate(90 16 16)"/></svg></article><article class="train-sprite-tile"><span>下・南</span><svg viewBox="0 0 32 32" role="img" aria-label="縦向き鉱石貨車"><use href="#i-train-ore-car-cell" transform="rotate(180 16 16)"/></svg></article><article class="train-sprite-tile"><span>左・西</span><svg viewBox="0 0 32 32" role="img" aria-label="横向き鉱石貨車"><use href="#i-train-ore-car-cell" transform="rotate(270 16 16)"/></svg></article></div></div><div class="train-sprite-group"><h3>木箱貨車</h3><div class="train-sprite-grid"><article class="train-sprite-tile"><span>上・北</span><svg viewBox="0 0 32 32" role="img" aria-label="縦向き木箱貨車"><use href="#i-train-crate-car-cell"/></svg></article><article class="train-sprite-tile"><span>右・東</span><svg viewBox="0 0 32 32" role="img" aria-label="横向き木箱貨車"><use href="#i-train-crate-car-cell" transform="rotate(90 16 16)"/></svg></article><article class="train-sprite-tile"><span>下・南</span><svg viewBox="0 0 32 32" role="img" aria-label="縦向き木箱貨車"><use href="#i-train-crate-car-cell" transform="rotate(180 16 16)"/></svg></article><article class="train-sprite-tile"><span>左・西</span><svg viewBox="0 0 32 32" role="img" aria-label="横向き木箱貨車"><use href="#i-train-crate-car-cell" transform="rotate(270 16 16)"/></svg></article></div></div><p class="train-sprite-note">各図柄は32×32pxの1セル内に収めています。地面の影、車体側面、上面、金属部品を重ねた静止デザイン案です。マップへの配置・移動アニメーションは含みません。</p></section>`;
+document.querySelector('.rail-layout')?.closest('section')?.insertAdjacentHTML('afterend', trainSpriteMarkup);
+const horizontalSpriteIds = ['i-train-locomotive-side-cell', 'i-train-ore-car-side-cell', 'i-train-crate-car-side-cell'];
+document.querySelectorAll('.train-sprite-group').forEach((group, index) => {
+	const uses = group.querySelectorAll('use');
+	const sideSpriteId = horizontalSpriteIds[index];
+	if (!sideSpriteId || uses.length !== 4) return;
+	uses[1].setAttribute('href', `#${sideSpriteId}`);
+	uses[1].removeAttribute('transform');
+	uses[3].setAttribute('href', `#${sideSpriteId}`);
+	uses[3].setAttribute('transform', 'translate(32 0) scale(-1 1)');
+});
+const curveTurnMarkup = `<section aria-labelledby="curve-turn-title"><div class="section-head"><h2 id="curve-turn-title">カーブ通過の向き補間</h2><p>曲線上の接線に沿って、車両の位置と向きを連続して切り替える確認用プレビュー。</p></div><div class="curve-turn-layout"><svg class="curve-turn-canvas" viewBox="0 0 152 104" role="img" aria-label="上から進入して右へ曲がる線路上を機関車が移動する補間図"><path d="M32 0V32 C32 49.67 46.33 64 64 64H152" fill="none" stroke="#746344" stroke-width="18"/><g fill="none" stroke="#8f6331" stroke-width="4"><path d="M24 8h16M24 20h16M24 32h16M26 39l14-4M30 50l15-6M40 61l12-8M76 56v16M88 56v16M100 56v16M112 56v16M124 56v16"/></g><path d="M28 0V32 C28 52.4 43.6 68 64 68H152M36 0V32 C36 46.4 49.6 60 64 60H152" fill="none" stroke="#3b4542" stroke-width="7"/><path d="M28 0V32 C28 52.4 43.6 68 64 68H152M36 0V32 C36 46.4 49.6 60 64 60H152" fill="none" stroke="#d3d7c8" stroke-width="3.5"/><g id="curve-turn-train" transform="translate(32 16)"><g id="curve-turn-front" transform="rotate(180)" opacity="1"><use href="#i-train-locomotive-cell" x="-14" y="-14" width="28" height="28"/></g><g id="curve-turn-side" transform="rotate(90)" opacity="0"><use href="#i-train-locomotive-side-cell" x="-14" y="-14" width="28" height="28"/></g></g></svg><div class="curve-turn-controls"><label for="curve-turn-progress">カーブ上の位置</label><input id="curve-turn-progress" type="range" min="0" max="1000" value="0" aria-label="カーブ上の機関車位置"><output id="curve-turn-angle" class="curve-turn-value" for="curve-turn-progress">90°</output><button id="curve-turn-play" class="curve-turn-play" type="button" aria-pressed="false">再生</button></div></div><p class="curve-turn-caption">直線進入 → 接線方向で曲線を走行 → 直線退出。車体はセル中心を補間し、前後面から側面へ連続的に切り替わります。</p></section>`;
+document.querySelector('.train-sprite-group')?.closest('section')?.insertAdjacentHTML('afterend', curveTurnMarkup);
+const curveTurnSlider = document.getElementById('curve-turn-progress');
+const curveTurnTrain = document.getElementById('curve-turn-train');
+const curveTurnFront = document.getElementById('curve-turn-front');
+const curveTurnSide = document.getElementById('curve-turn-side');
+const curveTurnAngle = document.getElementById('curve-turn-angle');
+const curveTurnPlay = document.getElementById('curve-turn-play');
+const curveTurnLength = 122;
+function updateCurveTurn() {
+	const distance = Number(curveTurnSlider.value) / 1000 * curveTurnLength;
+	let x = 32;
+	let y = 16;
+	let angle = 90;
+	if (distance <= 16) {
+		y += distance;
+	} else if (distance <= 66) {
+		const t = (distance - 16) / 50;
+		const inverse = 1 - t;
+		const startX = 32;
+		const startY = 32;
+		const control1X = 32;
+		const control1Y = 49.67;
+		const control2X = 46.33;
+		const control2Y = 64;
+		const endX = 64;
+		const endY = 64;
+		x = inverse ** 3 * startX + 3 * inverse ** 2 * t * control1X + 3 * inverse * t ** 2 * control2X + t ** 3 * endX;
+		y = inverse ** 3 * startY + 3 * inverse ** 2 * t * control1Y + 3 * inverse * t ** 2 * control2Y + t ** 3 * endY;
+		const tangentX = 6 * inverse * t * (control2X - control1X) + 3 * t ** 2 * (endX - control2X);
+		const tangentY = 3 * inverse ** 2 * (control1Y - startY) + 6 * inverse * t * (control2Y - control1Y);
+		angle = Math.atan2(tangentY, tangentX) * 180 / Math.PI;
+	} else {
+		x = 64 + distance - 66;
+		y = 64;
+		angle = 0;
+	}
+	const sideBlend = Math.max(0, Math.min(1, (50 - angle) / 5));
+	curveTurnTrain.setAttribute('transform', `translate(${x} ${y})`);
+	curveTurnFront.setAttribute('transform', `rotate(${angle + 90})`);
+	curveTurnSide.setAttribute('transform', `rotate(${angle})`);
+	curveTurnFront.setAttribute('opacity', String(1 - sideBlend));
+	curveTurnSide.setAttribute('opacity', String(sideBlend));
+	curveTurnAngle.value = `${Math.round(angle)}°`;
+}
+curveTurnSlider.addEventListener('input', updateCurveTurn);
+updateCurveTurn();
+let curveTurnFrame = 0;
+let curveTurnPreviousTime = 0;
+let curveTurnPlayDirection = 1;
+function animateCurveTurn(timestamp) {
+	if (!curveTurnPreviousTime) curveTurnPreviousTime = timestamp;
+	const elapsed = timestamp - curveTurnPreviousTime;
+	curveTurnPreviousTime = timestamp;
+	let progress = Number(curveTurnSlider.value) / 1000 + curveTurnPlayDirection * elapsed / 5000;
+	if (progress >= 1) {
+		progress = 1;
+		curveTurnPlayDirection = -1;
+	} else if (progress <= 0) {
+		progress = 0;
+		curveTurnPlayDirection = 1;
+	}
+	curveTurnSlider.value = String(Math.round(progress * 1000));
+	updateCurveTurn();
+	if (curveTurnFrame) curveTurnFrame = requestAnimationFrame(animateCurveTurn);
+}
+curveTurnPlay.addEventListener('click', () => {
+	if (curveTurnFrame) {
+		cancelAnimationFrame(curveTurnFrame);
+		curveTurnFrame = 0;
+		curveTurnPreviousTime = 0;
+		curveTurnPlay.textContent = '再生';
+		curveTurnPlay.setAttribute('aria-pressed', 'false');
+		return;
+	}
+	curveTurnPlayDirection = Number(curveTurnSlider.value) >= 1000 ? -1 : 1;
+	curveTurnPreviousTime = 0;
+	curveTurnPlay.textContent = '一時停止';
+	curveTurnPlay.setAttribute('aria-pressed', 'true');
+	curveTurnFrame = requestAnimationFrame(animateCurveTurn);
+});
+</script>
+<style>.curve-turn-canvas{overflow:visible}.curve-turn-rail-bed{fill:none;stroke:#746344;stroke-width:28;stroke-linecap:round;stroke-linejoin:round}.curve-turn-sleeper{stroke:#8f6331;stroke-width:5;stroke-linecap:round}.curve-turn-rail-shadow{fill:none;stroke:#3b4542;stroke-width:11;stroke-linecap:round;stroke-linejoin:round}.curve-turn-rail-face{fill:none;stroke:#d3d7c8;stroke-width:5;stroke-linecap:round;stroke-linejoin:round}.curve-turn-rail-highlight{fill:none;stroke:#a6b1a5;stroke-width:1.2;stroke-linecap:round;stroke-linejoin:round}.curve-turn-coupler-shadow{fill:none;stroke:#26342f;stroke-width:3.5;stroke-linecap:round}.curve-turn-coupler-metal{fill:none;stroke:#d0a35a;stroke-width:1.8;stroke-linecap:round}.curve-turn-unit{pointer-events:none}</style>
+<script>
+(() => {
+const locomotiveFrontPath = document.querySelector('#i-train-locomotive-cell path');
+locomotiveFrontPath?.setAttribute('d', 'M8 4h16v24H8z');
+
+const previousCurveTurn = document.querySelector('[aria-labelledby="curve-turn-title"]');
+const curveTurnConsistMarkup = `<section aria-labelledby="curve-turn-title"><div class="section-head"><h2 id="curve-turn-title">カーブ通過の向き補間</h2><p>直線と四隅のカーブをつないだ周回線路で、機関車と貨車の姿勢を確認。</p></div><div class="curve-turn-layout"><svg class="curve-turn-canvas" viewBox="0 0 440 340" role="img" aria-label="四角い周回線路を機関車と貨車二両が走るプレビュー"><rect width="440" height="340" fill="#30342d"/><path id="curve-turn-route" d="M100 50H340A40 40 0 0 1 380 90V250A40 40 0 0 1 340 290H100A40 40 0 0 1 60 250V90A40 40 0 0 1 100 50Z" fill="none"/><g id="curve-turn-track"></g><g id="curve-turn-couplers"></g><g id="curve-turn-vehicles"></g></svg><div class="curve-turn-controls"><label for="curve-turn-progress">周回位置</label><input id="curve-turn-progress" type="range" min="0" max="1000" value="0" aria-label="周回線路上の列車位置"><output id="curve-turn-angle" class="curve-turn-value" for="curve-turn-progress">0°</output><button id="curve-turn-play" class="curve-turn-play" type="button" aria-pressed="false">再生</button></div></div><p class="curve-turn-caption">機関車と鉱石・木箱の貨車が連結して走行。各車両は線路上の位置に応じた接線方向へ向きます。</p></section>`;
+previousCurveTurn?.remove();
+document.querySelector('.train-sprite-group')?.closest('section')?.insertAdjacentHTML('afterend', curveTurnConsistMarkup);
+
+const curveTurnRoute = document.getElementById('curve-turn-route');
+const curveTurnTrack = document.getElementById('curve-turn-track');
+const curveTurnCouplers = document.getElementById('curve-turn-couplers');
+const curveTurnVehicles = document.getElementById('curve-turn-vehicles');
+const curveTurnSlider = document.getElementById('curve-turn-progress');
+const curveTurnAngle = document.getElementById('curve-turn-angle');
+const curveTurnPlay = document.getElementById('curve-turn-play');
+const routeLength = curveTurnRoute.getTotalLength();
+const svgNamespace = 'http://www.w3.org/2000/svg';
+
+function routePoint(distance) {
+	const wrappedDistance = ((distance % routeLength) + routeLength) % routeLength;
+	return curveTurnRoute.getPointAtLength(wrappedDistance);
+}
+
+function offsetRoutePath(offset) {
+	const points = [];
+	for (let distance = 0; distance <= routeLength; distance += 2) {
+		const point = routePoint(distance);
+		const before = routePoint(distance - 1);
+		const after = routePoint(distance + 1);
+		const dx = after.x - before.x;
+		const dy = after.y - before.y;
+		const magnitude = Math.hypot(dx, dy) || 1;
+		points.push([point.x - dy / magnitude * offset, point.y + dx / magnitude * offset]);
+	}
+	return `M${points.map(([x, y]) => `${x.toFixed(2)} ${y.toFixed(2)}`).join('L')}Z`;
+}
+
+function addSvgPath(parent, className, d) {
+	const path = document.createElementNS(svgNamespace, 'path');
+	path.setAttribute('class', className);
+	path.setAttribute('d', d);
+	parent.append(path);
+}
+
+addSvgPath(curveTurnTrack, 'curve-turn-rail-bed', curveTurnRoute.getAttribute('d'));
+for (let distance = 8; distance < routeLength; distance += 14) {
+	const point = routePoint(distance);
+	const before = routePoint(distance - 1);
+	const after = routePoint(distance + 1);
+	const dx = after.x - before.x;
+	const dy = after.y - before.y;
+	const magnitude = Math.hypot(dx, dy) || 1;
+	const nx = -dy / magnitude * 17;
+	const ny = dx / magnitude * 17;
+	addSvgPath(curveTurnTrack, 'curve-turn-sleeper', `M${(point.x - nx).toFixed(2)} ${(point.y - ny).toFixed(2)}L${(point.x + nx).toFixed(2)} ${(point.y + ny).toFixed(2)}`);
+}
+for (const offset of [-8, 8]) {
+	const railPath = offsetRoutePath(offset);
+	addSvgPath(curveTurnTrack, 'curve-turn-rail-shadow', railPath);
+	addSvgPath(curveTurnTrack, 'curve-turn-rail-face', railPath);
+	addSvgPath(curveTurnTrack, 'curve-turn-rail-highlight', railPath);
+}
+
+const consist = [
+	{ front: 'i-train-locomotive-cell', side: 'i-train-locomotive-side-cell', gap: 0 },
+	{ front: 'i-train-ore-car-cell', side: 'i-train-ore-car-side-cell', gap: 29 },
+	{ front: 'i-train-crate-car-cell', side: 'i-train-crate-car-side-cell', gap: 58 }
+];
+const vehicleGroups = consist.map(({ front, side }) => {
+	const unit = document.createElementNS(svgNamespace, 'g');
+	unit.setAttribute('class', 'curve-turn-unit');
+	const frontView = document.createElementNS(svgNamespace, 'g');
+	const sideView = document.createElementNS(svgNamespace, 'g');
+	for (const [view, symbol] of [[frontView, front], [sideView, side]]) {
+		const use = document.createElementNS(svgNamespace, 'use');
+		use.setAttribute('href', `#${symbol}`);
+		use.setAttribute('x', '-14');
+		use.setAttribute('y', '-14');
+		use.setAttribute('width', '28');
+		use.setAttribute('height', '28');
+		view.append(use);
+		unit.append(view);
+	}
+	curveTurnVehicles.append(unit);
+	return { unit, frontView, sideView };
+});
+const couplerPaths = Array.from({ length: consist.length - 1 }, () => {
+	const group = document.createElementNS(svgNamespace, 'g');
+	const shadow = document.createElementNS(svgNamespace, 'path');
+	const metal = document.createElementNS(svgNamespace, 'path');
+	shadow.setAttribute('class', 'curve-turn-coupler-shadow');
+	metal.setAttribute('class', 'curve-turn-coupler-metal');
+	group.append(shadow, metal);
+	curveTurnCouplers.append(group);
+	return { shadow, metal };
+});
+
+function updateCurveTurnConsist() {
+	const leadDistance = Number(curveTurnSlider.value) / 1000 * routeLength;
+	for (let index = 0; index < couplerPaths.length; index++) {
+		const startDistance = leadDistance - consist[index].gap - 10;
+		const endDistance = leadDistance - consist[index + 1].gap + 10;
+		const points = [];
+		for (let distance = startDistance; distance >= endDistance; distance -= 2) {
+			const point = routePoint(distance);
+			points.push(`${point.x.toFixed(2)} ${point.y.toFixed(2)}`);
+		}
+		const lastPoint = routePoint(endDistance);
+		points.push(`${lastPoint.x.toFixed(2)} ${lastPoint.y.toFixed(2)}`);
+		const pathData = `M${points.join('L')}`;
+		couplerPaths[index].shadow.setAttribute('d', pathData);
+		couplerPaths[index].metal.setAttribute('d', pathData);
+	}
+	for (let index = 0; index < consist.length; index++) {
+		const { gap } = consist[index];
+		const distance = leadDistance - gap;
+		const point = routePoint(distance);
+		const before = routePoint(distance - 1);
+		const after = routePoint(distance + 1);
+		const angle = Math.atan2(after.y - before.y, after.x - before.x) * 180 / Math.PI;
+		const radians = angle * Math.PI / 180;
+		const horizontal = Math.abs(Math.cos(radians));
+		const vertical = Math.abs(Math.sin(radians));
+		const sideBlend = Math.max(0, Math.min(1, (horizontal - vertical + 0.08) / 0.16));
+		const { unit, frontView, sideView } = vehicleGroups[index];
+		unit.setAttribute('transform', `translate(${point.x.toFixed(2)} ${point.y.toFixed(2)})`);
+		frontView.setAttribute('transform', `rotate(${angle + 90})`);
+		const heading = (angle + 360) % 360;
+		const facesLeft = heading > 90 && heading < 270;
+		const sideAngle = facesLeft ? heading - 180 : angle;
+		sideView.setAttribute('transform', facesLeft ? `rotate(${sideAngle}) scale(-1 1)` : `rotate(${sideAngle})`);
+		frontView.setAttribute('opacity', String(1 - sideBlend));
+		sideView.setAttribute('opacity', String(sideBlend));
+		if (index === 0) curveTurnAngle.value = `${Math.round((angle + 360) % 360) % 360}°`;
+	}
+}
+
+curveTurnSlider.addEventListener('input', updateCurveTurnConsist);
+updateCurveTurnConsist();
+let curveTurnFrame = 0;
+let curveTurnPreviousTime = 0;
+function animateCurveTurnConsist(timestamp) {
+	if (!curveTurnPreviousTime) curveTurnPreviousTime = timestamp;
+	const elapsed = timestamp - curveTurnPreviousTime;
+	curveTurnPreviousTime = timestamp;
+	const progress = (Number(curveTurnSlider.value) / 1000 + elapsed / 14000) % 1;
+	curveTurnSlider.value = String(Math.round(progress * 1000));
+	updateCurveTurnConsist();
+	if (curveTurnFrame) curveTurnFrame = requestAnimationFrame(animateCurveTurnConsist);
+}
+curveTurnPlay.addEventListener('click', () => {
+	if (curveTurnFrame) {
+		cancelAnimationFrame(curveTurnFrame);
+		curveTurnFrame = 0;
+		curveTurnPreviousTime = 0;
+		curveTurnPlay.textContent = '再生';
+		curveTurnPlay.setAttribute('aria-pressed', 'false');
+		return;
+	}
+	curveTurnPreviousTime = 0;
+	curveTurnPlay.textContent = '一時停止';
+	curveTurnPlay.setAttribute('aria-pressed', 'true');
+	curveTurnFrame = requestAnimationFrame(animateCurveTurnConsist);
+});
+})();
+</script>
+</body>
+</html>
