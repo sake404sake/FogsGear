@@ -26,3 +26,39 @@ if (brassStockRecipe) {
 
 export const CRAFTING_ITEM_BY_ID = new Map(CRAFTING_ITEMS.map(item => [item[0], item]));
 export const CRAFTING_RECIPES_BY_OUTPUT = new Map(CRAFTING_RECIPES.map(recipe => [recipe[3], recipe]));
+
+export const HANDCRAFT_STATION = '手鋸台';
+export const CRAFTING_STATION_BUILDING_IDS = Object.freeze({
+    '木工作業台': ['craft-bench'],
+    '炉': ['simple-furnace'],
+    '炭焼き窯': ['charcoal-kiln'],
+    '高温炉': ['boiler-forge'],
+    '旋盤': ['machine-lathe'],
+    '巻線治具': ['machine-lathe'],
+    '細管引き台': ['machine-lathe'],
+    'ガラス炉': ['ceramic-kiln'],
+    '研磨台': ['machine-lathe'],
+    '窯': ['ceramic-kiln'],
+    '堆肥槽': ['alchemical-distillery'],
+    '錬金釜': ['alchemical-distillery'],
+    '培養器': ['alchemical-distillery'],
+    '工作台': ['craft-bench'],
+    '金網織機': ['brass-workshop'],
+    '計器組立台': ['pressure-gauge-tower'],
+    '錬金作業台': ['alchemical-distillery'],
+    '遺物作業台': ['relic-reactor'],
+    '撚り台': ['craft-bench'],
+    '紙漉き台': ['craft-bench'],
+    '塗料釜': ['resin-workshop'],
+    '鍛造炉': ['boiler-forge'],
+    '圧延台': ['brass-workshop'],
+    '細工台': ['machine-lathe'],
+    '積層台': ['brass-workshop'],
+    '粉砕台': ['ore-washer'],
+    'ガラス工房': ['ceramic-kiln'],
+    '成形台': ['resin-workshop'],
+    '鋳造台': ['boiler-forge'],
+    '裁縫台': ['craft-bench'],
+    '機械組立台': ['gear-forge'],
+    '選鉱台': ['ore-washer']
+});

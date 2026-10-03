@@ -56,6 +56,23 @@ const definitions = [
     ['freight-wagon', '木箱貨車', 1, 1, 'freight-wagon', 'rail']
 ];
 
+const BUILDING_UTILITY_CONFIG_BY_ID = Object.freeze({
+    'hand-pump': { ports: [{ resource: 'water', mode: 'output' }], rates: { waterOutputPerSecond: 1 } },
+    'steam-fountain': { ports: [{ resource: 'water', mode: 'input' }] },
+    'fog-cistern': { ports: [{ resource: 'water', mode: 'both' }], storageCapacity: { water: 100 } },
+    'water-tower': { ports: [{ resource: 'water', mode: 'both' }] },
+    'pressure-gauge-tower': { ports: [{ resource: 'steam', mode: 'input' }] },
+    'fog-vent': { ports: [{ resource: 'steam', mode: 'input' }] },
+    'boiler-forge': {
+        ports: [{ resource: 'water', mode: 'input' }, { resource: 'steam', mode: 'output' }],
+        rates: { waterInputPerSecond: 1, coalInputPerSecond: 0.1, steamOutputPerSecond: 1 }
+    },
+    'steam-accumulator': { ports: [{ resource: 'steam', mode: 'both' }], storageCapacity: { steam: 100 } },
+    'steam-tower': { ports: [{ resource: 'steam', mode: 'both' }] },
+    'central-turbine': { ports: [{ resource: 'steam', mode: 'input' }] },
+    'geothermal-collector': { ports: [{ resource: 'steam', mode: 'output' }] }
+});
+
 export const BUILDING_DEFINITIONS = definitions.map(([id, name, width, height, kind, group, brassCost, tileEffects = []]) => {
     const role = group === 'foundation' ? 'foundation'
         : group === 'tile' ? 'decoration'
@@ -72,11 +89,38 @@ export const BUILDING_DEFINITIONS = definitions.map(([id, name, width, height, k
     role,
     blocksConstruction: role === 'structure' || role === 'rail' || role === 'vehicle',
     requiresFoundation: role === 'structure' && width * height >= 9,
+    utilityPorts: (BUILDING_UTILITY_CONFIG_BY_ID[id]?.ports || []).map(port => ({ ...port })),
+    utilityStorageCapacity: { ...(BUILDING_UTILITY_CONFIG_BY_ID[id]?.storageCapacity || {}) },
+    utilityRates: { ...(BUILDING_UTILITY_CONFIG_BY_ID[id]?.rates || {}) },
     tileEffects: tileEffects.map(effect => ({ ...effect }))
     };
 });
 
 export const BUILDING_BY_ID = new Map(BUILDING_DEFINITIONS.map(building => [building.id, building]));
+
+export function normalizeBuildingUtilityState(buildingId, savedState) {
+    const building = BUILDING_BY_ID.get(buildingId);
+    if (!building) return null;
+    const capacities = building.utilityStorageCapacity;
+    const needsCoalProgress = buildingId === 'boiler-forge';
+    if (!Object.keys(capacities).length && !needsCoalProgress) return null;
+    const saved = savedState?.version === 1 && savedState && typeof savedState === 'object' && !Array.isArray(savedState)
+        ? savedState
+        : {};
+    const storedValues = saved.stored && typeof saved.stored === 'object' && !Array.isArray(saved.stored)
+        ? saved.stored
+        : {};
+    const stored = Object.fromEntries(Object.entries(capacities).map(([resource, capacity]) => {
+        const amount = Number(storedValues[resource]);
+        return [resource, Number.isFinite(amount) ? Math.min(capacity, Math.max(0, amount)) : 0];
+    }));
+    const utilityState = { version: 1, stored };
+    if (needsCoalProgress) {
+        const coalBurnRemaining = Number(saved.coalBurnRemaining);
+        utilityState.coalBurnRemaining = Number.isFinite(coalBurnRemaining) ? Math.min(10, Math.max(0, coalBurnRemaining)) : 0;
+    }
+    return utilityState;
+}
 
 export function canPlaceBuildingOnTerrainCell(building, tile) {
     if (!tile) return false;
@@ -216,6 +260,85 @@ export function getTileEffectsUnderFootprint(placedItems, x, y, width, height) {
         definition.tileEffects.forEach(effect => effects.push({ ...effect, tileId: placed.id, x: placed.x, y: placed.y }));
     });
     return effects;
+}
+
+function getBuildingUtilityGraph(placedBuildings) {
+    const utilityBuildings = placedBuildings.flatMap(placed => {
+        const definition = BUILDING_BY_ID.get(placed.id);
+        const ports = definition?.utilityPorts || [];
+        return ports.length && typeof placed.instanceId === 'string' ? [{ placed, definition, ports }] : [];
+    });
+    const utilityBuildingsById = new Map(utilityBuildings.map(building => [building.placed.instanceId, building]));
+    const graph = new Map(utilityBuildings.map(({ placed }) => [placed.instanceId, new Map()]));
+    const canSend = mode => mode !== 'input';
+    const canReceive = mode => mode !== 'output';
+
+    for (let firstIndex = 0; firstIndex < utilityBuildings.length; firstIndex++) {
+        const first = utilityBuildings[firstIndex];
+        for (let secondIndex = firstIndex + 1; secondIndex < utilityBuildings.length; secondIndex++) {
+            const second = utilityBuildings[secondIndex];
+            const horizontalOverlap = Math.max(first.placed.y, second.placed.y)
+                < Math.min(first.placed.y + first.definition.height, second.placed.y + second.definition.height);
+            const verticalOverlap = Math.max(first.placed.x, second.placed.x)
+                < Math.min(first.placed.x + first.definition.width, second.placed.x + second.definition.width);
+            const touchesSide = (first.placed.x + first.definition.width === second.placed.x
+                || second.placed.x + second.definition.width === first.placed.x) && horizontalOverlap;
+            const touchesEnd = (first.placed.y + first.definition.height === second.placed.y
+                || second.placed.y + second.definition.height === first.placed.y) && verticalOverlap;
+            if (!touchesSide && !touchesEnd) continue;
+
+            const connectedResources = new Set();
+            first.ports.forEach(firstPort => second.ports.forEach(secondPort => {
+                if (firstPort.resource !== secondPort.resource) return;
+                const canConnect = canSend(firstPort.mode) && canReceive(secondPort.mode)
+                    || canSend(secondPort.mode) && canReceive(firstPort.mode);
+                if (canConnect) connectedResources.add(firstPort.resource);
+            }));
+            connectedResources.forEach(resource => {
+                for (const [sourceId, targetId] of [[first.placed.instanceId, second.placed.instanceId], [second.placed.instanceId, first.placed.instanceId]]) {
+                    const neighborsByResource = graph.get(sourceId);
+                    if (!neighborsByResource.has(resource)) neighborsByResource.set(resource, new Set());
+                    neighborsByResource.get(resource).add(targetId);
+                }
+            });
+        }
+    }
+    return { utilityBuildingsById, graph };
+}
+
+export function getBuildingUtilityConnections(placedBuildings) {
+    const { graph } = getBuildingUtilityGraph(placedBuildings);
+    return new Map([...graph].map(([instanceId, neighborsByResource]) => [instanceId, new Set(neighborsByResource.keys())]));
+}
+
+export function getBuildingUtilityNetworkComponents(placedBuildings) {
+    const { utilityBuildingsById, graph } = getBuildingUtilityGraph(placedBuildings);
+    const resources = new Set([...graph.values()].flatMap(neighborsByResource => [...neighborsByResource.keys()]));
+    const components = [];
+
+    resources.forEach(resource => {
+        const visited = new Set();
+        graph.forEach((neighborsByResource, instanceId) => {
+            if (visited.has(instanceId) || !neighborsByResource.has(resource)) return;
+            const pending = [instanceId];
+            const componentIds = [];
+            visited.add(instanceId);
+            while (pending.length) {
+                const currentId = pending.pop();
+                componentIds.push(currentId);
+                (graph.get(currentId).get(resource) || []).forEach(neighborId => {
+                    if (visited.has(neighborId)) return;
+                    visited.add(neighborId);
+                    pending.push(neighborId);
+                });
+            }
+            components.push({
+                resource,
+                buildings: componentIds.map(id => utilityBuildingsById.get(id))
+            });
+        });
+    });
+    return components;
 }
 
 function path(ctx, points, fill, stroke = '#26332d', lineWidth = 1) {
@@ -410,62 +533,165 @@ export function drawBuilding(ctx, building, tileSize, { ghost = false, valid = t
         ctx.rotate(((Number(building.rotation) || 0) % 4) * Math.PI / 2);
         ctx.translate(-centerX, -(y + height / 2));
         const railWidth = Math.max(2, Math.min(width, height) * .1);
+        const trackBedWidth = Math.min(10, Math.min(width, height) * .3125);
+        const sleeperThickness = Math.max(2.5, railWidth * .95);
+        const drawTrackBed = drawPath => {
+            ctx.beginPath();
+            drawPath();
+            ctx.strokeStyle = '#51483a';
+            ctx.lineWidth = trackBedWidth + 1.5;
+            ctx.lineCap = 'butt';
+            ctx.stroke();
+            ctx.strokeStyle = '#78694e';
+            ctx.lineWidth = trackBedWidth;
+            ctx.stroke();
+            ctx.strokeStyle = 'rgba(205, 181, 137, .72)';
+            ctx.lineWidth = Math.max(.7, trackBedWidth * .07);
+            ctx.stroke();
+        };
         const drawRail = drawPath => {
             ctx.beginPath();
             drawPath();
-            ctx.strokeStyle = '#394440';
-            ctx.lineWidth = railWidth * 2.4;
+            ctx.strokeStyle = '#303632';
+            ctx.lineWidth = railWidth * 1.8;
             ctx.lineCap = 'round';
             ctx.stroke();
-            ctx.strokeStyle = '#d3d7c8';
-            ctx.lineWidth = railWidth;
+            ctx.strokeStyle = '#7b8580';
+            ctx.lineWidth = railWidth * 1.35;
             ctx.stroke();
-            ctx.strokeStyle = '#9eab9f';
-            ctx.lineWidth = Math.max(1, railWidth * .2);
+            ctx.strokeStyle = '#d2d6cb';
+            ctx.lineWidth = railWidth * .78;
             ctx.stroke();
+            ctx.strokeStyle = '#f4efd9';
+            ctx.lineWidth = Math.max(.65, railWidth * .12);
+            ctx.stroke();
+            ctx.strokeStyle = 'rgba(54, 64, 58, .72)';
+            ctx.lineWidth = Math.max(.55, railWidth * .09);
+            ctx.stroke();
+        };
+        const drawSleeper = (sleeperX, sleeperY, length, angle) => {
+            ctx.save();
+            ctx.translate(sleeperX, sleeperY);
+            ctx.rotate(angle);
+            const halfLength = length / 2;
+            const halfThickness = sleeperThickness / 2;
+            ctx.fillStyle = 'rgba(34, 29, 22, .48)';
+            ctx.fillRect(-halfLength + 1, -halfThickness + 1, length, sleeperThickness);
+            const grain = ctx.createLinearGradient(0, -halfThickness, 0, halfThickness);
+            grain.addColorStop(0, '#c9a471');
+            grain.addColorStop(.2, '#9a754d');
+            grain.addColorStop(.72, '#79583a');
+            grain.addColorStop(1, '#59402e');
+            ctx.fillStyle = grain;
+            ctx.fillRect(-halfLength, -halfThickness, length, sleeperThickness);
+            ctx.strokeStyle = 'rgba(231, 200, 151, .76)';
+            ctx.lineWidth = .7;
+            ctx.beginPath();
+            ctx.moveTo(-halfLength + 1, -halfThickness + .5);
+            ctx.lineTo(halfLength - 1, -halfThickness + .5);
+            ctx.stroke();
+            ctx.strokeStyle = 'rgba(55, 39, 28, .8)';
+            ctx.lineWidth = .55;
+            ctx.beginPath();
+            ctx.moveTo(-halfLength * .55, 0);
+            ctx.lineTo(halfLength * .45, 0);
+            ctx.stroke();
+            ctx.restore();
+        };
+        const drawTiePlate = (plateX, plateY, horizontalRail, angle = 0) => {
+            ctx.save();
+            ctx.translate(plateX, plateY);
+            ctx.rotate(angle);
+            const plateWidth = railWidth * 1.45;
+            const plateHeight = railWidth * 1.3;
+            ctx.fillStyle = '#45463f';
+            ctx.fillRect(-plateWidth / 2, -plateHeight / 2, plateWidth, plateHeight);
+            ctx.fillStyle = '#a7a18d';
+            ctx.fillRect(-plateWidth * .36, -plateHeight * .32, plateWidth * .72, plateHeight * .42);
+            for (const direction of [-1, 1]) {
+                const boltX = horizontalRail ? 0 : direction * plateWidth * .34;
+                const boltY = horizontalRail ? direction * plateHeight * .34 : 0;
+                ctx.beginPath();
+                ctx.arc(boltX, boltY, Math.max(.4, railWidth * .1), 0, Math.PI * 2);
+                ctx.fillStyle = '#e8d8b7';
+                ctx.fill();
+            }
+            ctx.restore();
         };
         const drawHorizontalTrack = () => {
-            for (let index = 1; index <= 4; index++) {
-                const sleeperX = x + width * index / 5;
-                ctx.fillStyle = '#9a6c3d';
-                ctx.fillRect(sleeperX - railWidth * .55, y + height * .12, railWidth * 1.1, height * .76);
-                ctx.fillStyle = '#d2aa60';
-                ctx.fillRect(sleeperX - railWidth * .55, y + height * .12, railWidth * 1.1, Math.max(1, railWidth * .16));
+            const railYs = [y + height * .3125, y + height * .6875];
+            railYs.forEach(railY => drawTrackBed(() => { ctx.moveTo(x, railY); ctx.lineTo(x + width, railY); }));
+            for (let sleeperX = x + 8; sleeperX <= x + width - 8; sleeperX += 12) {
+                drawSleeper(sleeperX, y + height / 2, height * .875, Math.PI / 2);
+                railYs.forEach(railY => drawTiePlate(sleeperX, railY, true));
             }
-            for (const railY of [y + height * .32, y + height * .68]) {
+            railYs.forEach(railY => {
                 drawRail(() => { ctx.moveTo(x, railY); ctx.lineTo(x + width, railY); });
-            }
+            });
         };
         const drawVerticalTrack = () => {
-            for (let index = 1; index <= 4; index++) {
-                const sleeperY = y + height * index / 5;
-                ctx.fillStyle = '#9a6c3d';
-                ctx.fillRect(x + width * .12, sleeperY - railWidth * .55, width * .76, railWidth * 1.1);
-                ctx.fillStyle = '#d2aa60';
-                ctx.fillRect(x + width * .12, sleeperY - railWidth * .55, Math.max(1, railWidth * .16), railWidth * 1.1);
+            const railXs = [x + width * .3125, x + width * .6875];
+            railXs.forEach(railX => drawTrackBed(() => { ctx.moveTo(railX, y); ctx.lineTo(railX, y + height); }));
+            for (let sleeperY = y + 8; sleeperY <= y + height - 8; sleeperY += 12) {
+                drawSleeper(x + width / 2, sleeperY, width * .875, 0);
+                railXs.forEach(railX => drawTiePlate(railX, sleeperY, false));
             }
-            for (const railX of [x + width * .32, x + width * .68]) {
+            railXs.forEach(railX => {
                 drawRail(() => { ctx.moveTo(railX, y); ctx.lineTo(railX, y + height); });
-            }
+            });
         };
         if (building.kind === 'rail-curve') {
-            const curve = (startX, startY, control1X, control1Y, control2X, control2Y, endX, endY) => {
-                ctx.moveTo(startX, startY);
-                ctx.bezierCurveTo(control1X, control1Y, control2X, control2Y, endX, endY);
+            const curves = [
+                [
+                    { x: x + width * .3125, y },
+                    { x: x + width * .3125, y: y + height * .5 },
+                    { x: x + width * .5, y: y + height * .6875 },
+                    { x: x + width, y: y + height * .6875 }
+                ],
+                [
+                    { x: x + width * .6875, y },
+                    { x: x + width * .6875, y: y + height * .3 },
+                    { x: x + width * .88, y: y + height * .3125 },
+                    { x: x + width, y: y + height * .3125 }
+                ]
+            ];
+            const drawCurvePath = points => {
+                ctx.moveTo(points[0].x, points[0].y);
+                ctx.bezierCurveTo(points[1].x, points[1].y, points[2].x, points[2].y, points[3].x, points[3].y);
             };
-            for (let index = 1; index <= 4; index++) {
-                const progress = index / 5;
-                const centerX = x + width * (.2 + .2 * progress + .6 * progress * progress);
-                const centerY = y + height * (.15 + .7 * progress);
-                ctx.fillStyle = '#9a6c3d';
-                ctx.save();
-                ctx.translate(centerX, centerY);
-                ctx.rotate(-Math.PI / 4 + progress * Math.PI / 4);
-                ctx.fillRect(-railWidth * .55, -height * .12, railWidth * 1.1, height * .24);
-                ctx.restore();
+            curves.forEach(points => drawTrackBed(() => drawCurvePath(points)));
+            const getCurvePoint = (points, progress) => {
+                const inverse = 1 - progress;
+                return {
+                    x: inverse ** 3 * points[0].x + 3 * inverse ** 2 * progress * points[1].x + 3 * inverse * progress ** 2 * points[2].x + progress ** 3 * points[3].x,
+                    y: inverse ** 3 * points[0].y + 3 * inverse ** 2 * progress * points[1].y + 3 * inverse * progress ** 2 * points[2].y + progress ** 3 * points[3].y
+                };
+            };
+            const getCurveTangent = (points, progress) => {
+                const inverse = 1 - progress;
+                return {
+                    x: 3 * inverse ** 2 * (points[1].x - points[0].x) + 6 * inverse * progress * (points[2].x - points[1].x) + 3 * progress ** 2 * (points[3].x - points[2].x),
+                    y: 3 * inverse ** 2 * (points[1].y - points[0].y) + 6 * inverse * progress * (points[2].y - points[1].y) + 3 * progress ** 2 * (points[3].y - points[2].y)
+                };
+            };
+            for (const progress of [.25, .5, .75]) {
+                const firstRailPoint = getCurvePoint(curves[0], progress);
+                const secondRailPoint = getCurvePoint(curves[1], progress);
+                const firstTangent = getCurveTangent(curves[0], progress);
+                const secondTangent = getCurveTangent(curves[1], progress);
+                const centerX = (firstRailPoint.x + secondRailPoint.x) / 2;
+                const centerY = (firstRailPoint.y + secondRailPoint.y) / 2;
+                const railAngle = Math.atan2(firstTangent.y + secondTangent.y, firstTangent.x + secondTangent.x);
+                const sleeperAngle = railAngle + Math.PI / 2;
+                const halfGauge = Math.min(width, height) * .1875;
+                const sleeperLength = Math.min(Math.min(width, height) * .875, halfGauge * 2 + 16);
+                drawSleeper(centerX, centerY, sleeperLength, sleeperAngle);
+                const normalX = Math.cos(sleeperAngle) * halfGauge;
+                const normalY = Math.sin(sleeperAngle) * halfGauge;
+                drawTiePlate(centerX - normalX, centerY - normalY, true, railAngle);
+                drawTiePlate(centerX + normalX, centerY + normalY, true, railAngle);
             }
-            drawRail(() => curve(x + width * .32, y, x + width * .32, y + height * .48, x + width * .5, y + height * .68, x + width, y + height * .68));
-            drawRail(() => curve(x + width * .68, y, x + width * .68, y + height * .3, x + width * .78, y + height * .32, x + width, y + height * .32));
+            curves.forEach(points => drawRail(() => drawCurvePath(points)));
         } else if (building.kind === 'rail-switch') {
             drawHorizontalTrack();
             drawVerticalTrack();
@@ -493,9 +719,9 @@ export function drawBuilding(ctx, building, tileSize, { ghost = false, valid = t
             ctx.stroke();
             ctx.restore();
         } else {
-            drawHorizontalTrack();
+            drawVerticalTrack();
             if (building.kind === 'rail-signal') {
-                const postX = x + width * .2;
+                const postX = x + width * .12;
                 ctx.strokeStyle = '#825938';
                 ctx.lineWidth = railWidth * .8;
                 ctx.beginPath();

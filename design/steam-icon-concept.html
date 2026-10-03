@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>蒸気アイコン案 | Fogs Gear</title>
+<style>
+:root{color-scheme:dark;--bg:#111916;--panel:#1d2924;--line:#536b60;--gold:#e1bd62;--mint:#82c8b0;--text:#e8e4d6;--muted:#a9b5aa}*{box-sizing:border-box}body{margin:0;color:var(--text);background:radial-gradient(circle at 12% 0%,#294037 0,transparent 38%),linear-gradient(135deg,#101714,#1d211b 55%,#261c16);font:15px/1.6 Georgia,"Yu Mincho",serif}.page{width:min(1080px,100%);margin:auto;padding:32px clamp(16px,4vw,48px) 56px}.eyebrow,.mono{font:11px/1.4 monospace;letter-spacing:.13em;text-transform:uppercase}.eyebrow{margin:0 0 8px;color:var(--mint)}h1{margin:0;color:#f2d486;font-size:clamp(30px,5vw,48px);font-weight:500}.lead{max-width:650px;margin:10px 0 0;color:var(--muted)}.hero{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(220px,.75fr);gap:14px;margin-top:28px}.panel{padding:clamp(18px,4vw,32px);background:linear-gradient(145deg,rgba(38,58,50,.9),rgba(19,26,22,.94));border:1px solid var(--line)}.hero-art{display:grid;place-items:center;min-height:310px;background:radial-gradient(circle at 50% 45%,rgba(130,200,176,.15),transparent 48%),#17211d}.hero-art svg{width:min(220px,70%);height:auto;filter:drop-shadow(0 14px 20px rgba(0,0,0,.3))}.panel h2{margin:0;color:#f0d78f;font-size:19px;font-weight:500}.panel p{margin:8px 0 0;color:var(--muted)}.micro-wrap{display:grid;place-items:center;min-height:146px;margin:18px 0 8px;background:#30342d;border:1px solid rgba(211,215,200,.2)}.micro-wrap svg{width:32px;height:32px}.size-label{color:var(--mint)!important;font:11px monospace!important;letter-spacing:.08em}.details{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:14px}.detail{padding:15px 16px;background:rgba(20,29,25,.76);border:1px solid rgba(83,107,96,.8)}.detail strong{display:block;margin-bottom:4px;color:var(--gold);font-size:14px}.detail p{margin:0;color:var(--muted);font-size:13px}.icon{display:block;overflow:visible}.icon .cloud{fill:#e8f4df;stroke:#173b36;stroke-width:3.2;stroke-linecap:round;stroke-linejoin:round}.icon .jet-rays{fill:none;stroke:url(#plume-gradient);stroke-width:1.35;stroke-linecap:round;stroke-linejoin:round}.icon .jet-core{fill:none;stroke:url(#plume-gradient);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.micro-wrap .jet-rays{stroke-width:2.2}.micro-wrap .jet-core{stroke-width:3}@media(max-width:680px){.hero{grid-template-columns:1fr}.hero-art{min-height:250px}.hero-art svg{width:170px}.details{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<main class="page">
+  <header>
+    <p class="eyebrow">FOGS GEAR / ICON CONCEPT</p>
+    <h1>一点から、斜め上へ噴き上がる。</h1>
+    <p class="lead">左右対称の扇ではなく、長さと角度の違う直線を右上へ勢いよく放射。雲に近づくほど明るく濃くなるグラデーションで、噴流を雲につなげます。</p>
+  </header>
+
+  <section class="hero" aria-label="蒸気アイコン案のプレビュー">
+    <div class="panel hero-art">
+      <svg class="icon" viewBox="0 0 64 64" role="img" aria-labelledby="steam-title steam-desc">
+        <title id="steam-title">蒸気</title>
+        <desc id="steam-desc">下の一点から長さと角度の違う蒸気線が斜め上へ噴き上がり、雲へ溶け込むアイコン</desc>
+        <defs>
+          <linearGradient id="plume-gradient" x1="32" y1="61" x2="32" y2="25" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stop-color="#65d9ce" stop-opacity=".25"/>
+            <stop offset=".3" stop-color="#65d9ce" stop-opacity=".38"/>
+            <stop offset=".68" stop-color="#91ded2" stop-opacity=".72"/>
+            <stop offset=".9" stop-color="#d3eee1" stop-opacity=".95"/>
+            <stop offset="1" stop-color="#e8f4df"/>
+          </linearGradient>
+        </defs>
+        <path class="cloud" d="M24 37c-4 5-12 4-14-2-6 0-9-5-7-10-2-7 2-13 8-14 2-7 9-9 15-6 5-6 15-6 20 0 7-2 13 3 12 10 6 4 6 12 0 16-1 7-8 10-14 7-4 4-10 4-14 0-2 1-4 0-6-1Z"/>
+        <path class="jet-rays" d="M24 60 13 38M24 60 16 29M24 60 21 35M24 60 24 23M24 60 29 31M24 60 34 16M24 60 38 28M24 60 44 20M24 60 49 31M24 60 55 24"/>
+        <path class="jet-core" d="M24 60 29 31M24 60 34 16"/>
+      </svg>
+    </div>
+
+    <aside class="panel">
+      <h2>32pxサイズでの見え方</h2>
+      <div class="micro-wrap">
+        <svg class="icon" viewBox="0 0 64 64" role="img" aria-label="32ピクセルの蒸気アイコン">
+          <defs>
+            <linearGradient id="plume-gradient-small" x1="32" y1="61" x2="32" y2="25" gradientUnits="userSpaceOnUse">
+              <stop offset="0" stop-color="#65d9ce" stop-opacity=".14"/>
+              <stop offset=".3" stop-color="#65d9ce" stop-opacity=".42"/>
+              <stop offset=".68" stop-color="#91ded2" stop-opacity=".78"/>
+              <stop offset=".9" stop-color="#d3eee1" stop-opacity=".98"/>
+              <stop offset="1" stop-color="#e8f4df"/>
+            </linearGradient>
+          </defs>
+          <path class="cloud" d="M24 37c-4 5-12 4-14-2-6 0-9-5-7-10-2-7 2-13 8-14 2-7 9-9 15-6 5-6 15-6 20 0 7-2 13 3 12 10 6 4 6 12 0 16-1 7-8 10-14 7-4 4-10 4-14 0-2 1-4 0-6-1Z"/>
+          <path class="jet-rays" d="M24 60 13 38M24 60 16 29M24 60 21 35M24 60 24 23M24 60 29 31M24 60 34 16M24 60 38 28M24 60 44 20M24 60 49 31M24 60 55 24" style="stroke:url(#plume-gradient-small)"/>
+          <path class="jet-core" d="M24 60 29 31M24 60 34 16" style="stroke:url(#plume-gradient-small)"/>
+        </svg>
+      </div>
+      <p class="size-label">32 × 32 PX / 1:1</p>
+      <p>複数の直線が一点から放射し、色が雲へ溶けていく様子を確認できます。</p>
+    </aside>
+  </section>
+
+  <section class="details" aria-label="デザインの意図">
+    <article class="detail">
+      <strong>勢い</strong>
+      <p>長短をつけた線の束を右上へ傾け、噴き出す方向と加速感を出しました。</p>
+    </article>
+    <article class="detail">
+      <strong>わかりやすさ</strong>
+      <p>大きい図では噴出口を淡く保ち、小サイズでは線幅と始点の濃さを上げて見やすくします。</p>
+    </article>
+    <article class="detail">
+      <strong>縮小への強さ</strong>
+      <p>小さい表示では中心の線を太くし、勢いの軸が消えないようにしています。</p>
+    </article>
+  </section>
+</main>
+</body>
+</html>

@@ -9,9 +9,9 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="icon" href="../MainSystem/icons/app-icon.jpg" type="image/jpeg">
-    <link rel="stylesheet" href="css/style.css?v=565">
-    <link rel="stylesheet" href="css/style.css?v=565">
-    <script type="module" src="js/main.js?v=609"></script>
+    <link rel="stylesheet" href="css/style.css?v=571">
+    <link rel="stylesheet" href="css/style.css?v=571">
+    <script type="module" src="js/main.js?v=633"></script>
 </head>
 <body>
     <div id="loadingOverlay" class="loading-overlay" role="status" aria-live="polite">
@@ -47,15 +47,25 @@
                     <button class="inventory-view-tab" type="button" data-inventory-view="buildings" aria-selected="false">建築</button>
                 </div>
                 <section id="inventory-items-view" class="inventory-view">
+                    <label class="inventory-search"><span>検索</span><input id="inventory-item-search" type="search" autocomplete="off" aria-label="所持品を検索"></label>
                     <div id="inventory-item-list" class="inventory-item-grid" aria-live="polite"></div>
                 </section>
                 <section id="inventory-crafting-view" class="inventory-view" hidden>
+                    <label class="inventory-search"><span>検索</span><input id="crafting-recipe-search" type="search" autocomplete="off" aria-label="合成レシピを検索"></label>
                     <label class="crafting-filter-row">合成系統<select id="crafting-family-filter">
                         <option value="all">すべて</option><option value="forest">森林加工</option><option value="smelting">製錬・合金</option><option value="ceramic">ガラス・陶材</option><option value="bio">菌糸・薬草</option><option value="machine">機械・遺物</option>
                     </select></label>
                     <div id="crafting-recipe-list" class="crafting-recipe-list" aria-live="polite"></div>
                 </section>
                 <section id="inventory-building-view" class="inventory-view" hidden>
+                    <div class="building-placement-mode" role="group" aria-label="配置方法">
+                        <span>配置方法</span>
+                        <div class="building-placement-mode-options">
+                            <button class="active" type="button" data-building-placement-mode="single" aria-pressed="true">単発</button>
+                            <button type="button" data-building-placement-mode="continuous" aria-pressed="false">連続</button>
+                        </div>
+                    </div>
+                    <label class="inventory-search"><span>検索</span><input id="building-item-search" type="search" autocomplete="off" aria-label="建築物を検索"></label>
                     <div id="building-item-list" class="inventory-item-grid building-item-grid" aria-live="polite"></div>
                 </section>
             </section>
@@ -81,17 +91,29 @@
             <div class="inventory-modal-kicker">BUILDING CONTROL</div>
             <h2 id="building-menu-title">建築物</h2>
             <p id="building-menu-details"></p>
+            <button id="building-menu-rotate-rail" class="inventory-modal-secondary" type="button" data-action="rotate-selected-rail" aria-label="配置済み線路の向きを90度回転" hidden>↻ 線路を90度回転</button>
             <section id="vehicle-menu-controls" hidden>
                 <p id="vehicle-status" role="status"></p>
                 <label>移動制御スクロール<select id="vehicle-movement-scroll"><option value="">未割当</option></select></label>
                 <p id="vehicle-resource-settings"></p>
             </section>
             <div class="inventory-modal-actions">
+                <button id="building-menu-craft" class="saved-scroll-use" type="button" data-action="open-building-crafting" hidden>製作</button>
                 <button id="building-menu-start-vehicle" class="saved-scroll-use" type="button" data-action="toggle-building-vehicle" hidden>起動</button>
                 <button id="building-menu-demolish" class="inventory-modal-secondary" type="button" data-action="demolish-building">解体</button>
                 <button class="inventory-modal-secondary" type="button" data-action="close-building-menu">閉じる</button>
             </div>
         </div>
+    </div>
+    <div id="building-crafting-modal" class="inventory-modal" hidden role="dialog" aria-modal="true" aria-labelledby="building-crafting-title">
+        <section class="inventory-modal-panel building-crafting-panel">
+            <button class="inventory-modal-close" type="button" data-action="close-building-crafting" aria-label="製作メニューを閉じる">×</button>
+            <div class="inventory-modal-kicker">WORKSHOP / CRAFTING</div>
+            <h2 id="building-crafting-title">設備で製作</h2>
+            <label class="inventory-search"><span>検索</span><input id="building-crafting-search" type="search" autocomplete="off" aria-label="この設備のレシピを検索"></label>
+            <div id="building-crafting-list" class="crafting-recipe-list" aria-live="polite"></div>
+            <div class="inventory-modal-actions"><button class="inventory-modal-secondary" type="button" data-action="close-building-crafting">閉じる</button></div>
+        </section>
     </div>
     <div id="inventory-item-modal" class="inventory-modal" hidden role="dialog" aria-modal="true" aria-labelledby="inventory-modal-title">
         <div class="inventory-modal-panel">
@@ -103,6 +125,7 @@
             <div id="inventory-modal-meta" class="inventory-modal-meta"></div>
             <div class="inventory-modal-actions">
                 <button id="inventory-modal-use" class="saved-scroll-use" type="button" data-action="use-scroll-from-modal" hidden>使用</button>
+                <button id="inventory-modal-place-building" class="saved-scroll-use" type="button" data-action="place-building-from-inventory" hidden>設置</button>
                 <button id="inventory-modal-edit" class="inventory-scroll-button" type="button" data-action="open-gear-editor" hidden>ギア編集</button>
                 <button class="inventory-modal-secondary" type="button" data-action="close-inventory-modal">閉じる</button>
             </div>
@@ -132,7 +155,6 @@
                 <span id="building-placement-direction">東向き</span>
                 <button id="building-placement-rotate" class="btn btn-visibility" type="button" data-action="rotate-building-placement" aria-label="線路の向きを90度回転">↻ 回転</button>
             </div>
-            <label class="building-placement-continuous"><input id="building-placement-continuous" type="checkbox">続けて配置</label>
             <div class="building-placement-actions">
                 <button id="building-placement-confirm" class="btn btn-action" type="button" data-action="confirm-building-placement">ここに配置</button>
                 <button class="btn btn-visibility" type="button" data-action="cancel-building-placement">キャンセル</button>
@@ -200,6 +222,6 @@
         </div>
     </div>
 
-    <script type="module" src="js/main.js?v=609"></script>
+    <script type="module" src="js/main.js?v=632"></script>
 </body>
 </html>

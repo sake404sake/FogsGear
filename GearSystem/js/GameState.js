@@ -2,10 +2,25 @@ import { GearNetwork } from './GearSystem.js?v=network-8';
 import { ACTIVE_SCROLL_TARGETS_KEY, CELL_MATERIALS, TERRAIN_TRANSFORM_RECIPES, WORLD_CELL_TYPES } from '../../MapSystem/js/worldCells.js?v=3';
 
 const ACTIVE_SCROLL_SYNC_STATE_KEY = 'fogsgear_active_scroll_sync_state';
-const INITIAL_MATERIAL_INVENTORY = Object.freeze({ 'iron-screw': 12, 'pressure-gauge': 1, paper_scroll: 10, cloth_scroll: 10, scroll_book: 1 });
+const INITIAL_MATERIAL_INVENTORY = Object.freeze({ paper_scroll: 10, cloth_scroll: 10, scroll_book: 1 });
+const MATERIAL_INVENTORY_VERSION = 2;
+const LEGACY_INITIAL_MATERIAL_INVENTORY = Object.freeze({ 'iron-screw': 12, 'pressure-gauge': 1 });
 
-function restoreMaterialInventory(value) {
-    const inventory = { ...INITIAL_MATERIAL_INVENTORY, ...(value && typeof value === 'object' && !Array.isArray(value) ? value : {}) };
+function removeLegacyInitialMaterials(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return value;
+    const inventory = { ...value };
+    Object.entries(LEGACY_INITIAL_MATERIAL_INVENTORY).forEach(([itemId, initialAmount]) => {
+        const amount = Number(inventory[itemId]);
+        if (!Number.isFinite(amount)) return;
+        if (amount <= initialAmount) delete inventory[itemId];
+        else inventory[itemId] = amount - initialAmount;
+    });
+    return inventory;
+}
+
+function restoreMaterialInventory(value, version = MATERIAL_INVENTORY_VERSION) {
+    const inventoryData = Number(version) < MATERIAL_INVENTORY_VERSION ? removeLegacyInitialMaterials(value) : value;
+    const inventory = { ...INITIAL_MATERIAL_INVENTORY, ...(inventoryData && typeof inventoryData === 'object' && !Array.isArray(inventoryData) ? inventoryData : {}) };
     if (Number(inventory.old_screw) > 0) inventory['iron-screw'] = (Number(inventory['iron-screw']) || 0) + Number(inventory.old_screw);
     delete inventory.old_screw;
     delete inventory.brass_gear;
@@ -27,6 +42,7 @@ export class GameState {
         this.brass = 300;
         this.creativeMode = false;
         this.creativeSnapshot = null;
+        this.materialInventoryVersion = MATERIAL_INVENTORY_VERSION;
         this.materialInventory = { ...INITIAL_MATERIAL_INVENTORY };
         this.craftingJobs = [];
         this.productionRate = 0;
@@ -364,6 +380,7 @@ export class GameState {
             autoStoppedBySteam: this.autoStoppedBySteam,
             creativeMode: this.creativeMode,
             creativeSnapshot: this.creativeSnapshot,
+            materialInventoryVersion: MATERIAL_INVENTORY_VERSION,
             materialInventory: this.materialInventory,
             craftingJobs: this.craftingJobs,
             waterGenerationRate: this.waterGenerationRate,
@@ -395,7 +412,8 @@ export class GameState {
         this.water = data.water ?? 200;
         this.fog = data.fog ?? 0;
         this.brass = data.brass;
-        this.materialInventory = restoreMaterialInventory(data.materialInventory);
+        this.materialInventoryVersion = MATERIAL_INVENTORY_VERSION;
+        this.materialInventory = restoreMaterialInventory(data.materialInventory, data.materialInventoryVersion);
         const editorRuntime = this.isEditorRuntimeContext();
         const savedManualStop = data.userStoppedMainGear === true;
         const savedMainGearRunning = data.mainGearRunning ?? true;
@@ -480,6 +498,7 @@ export class GameState {
         this.water = 200;
         this.fog = 0;
         this.brass = 300;
+        this.materialInventoryVersion = MATERIAL_INVENTORY_VERSION;
         this.materialInventory = { ...INITIAL_MATERIAL_INVENTORY };
         this.craftingJobs = [];
         this.mainGearRunning = true;
@@ -508,6 +527,7 @@ export class GameState {
             autoStoppedBySteam: this.autoStoppedBySteam,
             creativeMode: this.creativeMode,
             creativeSnapshot: this.creativeSnapshot,
+            materialInventoryVersion: MATERIAL_INVENTORY_VERSION,
             materialInventory: this.materialInventory,
             craftingJobs: this.craftingJobs,
             waterGenerationRate: this.waterGenerationRate,
@@ -662,16 +682,20 @@ export class GameState {
     loadGameData(createGear) {
         // 保存データを読み込み、渡された生成関数で各ギアを独立した実体として復元する。
         this.createGear = createGear;
+        let initialInventoryMigrated = false;
         const saved = localStorage.getItem('fog_thermo_save');
         if (saved) {
             try {
                 const data = JSON.parse(saved);
+                const inventoryVersion = Number(data.materialInventoryVersion) || 1;
+                initialInventoryMigrated = inventoryVersion < MATERIAL_INVENTORY_VERSION;
                 this.steamPower = Number.isFinite(data.steamPower) ? data.steamPower : 100;
                 this.power = Number.isFinite(data.power) ? data.power : 0;
                 this.water = data.water ?? 200;
                 this.fog = data.fog ?? data.gasMetal ?? 0;
                 this.brass = data.brass ?? 300;
-                this.materialInventory = restoreMaterialInventory(data.materialInventory);
+                this.materialInventoryVersion = MATERIAL_INVENTORY_VERSION;
+                this.materialInventory = restoreMaterialInventory(data.materialInventory, inventoryVersion);
                 const editorRuntime = this.isEditorRuntimeContext();
                 const savedManualStop = data.userStoppedMainGear === true;
                 const savedMainGearRunning = data.mainGearRunning ?? true;
@@ -697,7 +721,10 @@ export class GameState {
                 }
                 this.undoStack = data.undoStack || [];
                 this.redoStack = data.redoStack || [];
-                if (this.placedGears.length > 0) return;
+                if (this.placedGears.length > 0) {
+                    if (initialInventoryMigrated) this.saveGameData();
+                    return;
+                }
             } catch (error) {
                 console.error('セーブデータの読み込みに失敗しました', error);
             }
@@ -709,6 +736,7 @@ export class GameState {
         const runtimeBelts = this.getRuntimeBelts();
         const runtimeNetwork = this.runtimeNetwork || this.network;
         if (runtimeNetwork) runtimeNetwork.rebuild(runtimeGears, runtimeBelts).updateRotation();
+        if (initialInventoryMigrated) this.saveGameData();
     }
 
     getGearProcessInfo(gear) {

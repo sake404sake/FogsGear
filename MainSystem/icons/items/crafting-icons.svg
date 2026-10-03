@@ -135,5 +135,18 @@
   <symbol id="i-scroll_book" viewBox="0 0 64 64"><path fill="#7c523b" stroke="#e0bd61" stroke-width="3" d="M11 13c9-4 17-2 21 3 4-5 12-7 21-3v40c-9-4-17-2-21 3-4-5-12-7-21-3z" /><path fill="#d8c488" d="M32 18v33c-4-5-10-6-16-4V19c6-2 12-1 16 4Zm0 0v33c4-5 10-6 16-4V19c-6-2-12-1-16 4Z" /><path fill="none" stroke="#8d6945" stroke-width="2" d="M20 27h7m17 0h-7M20 35h7m17 0h-7" /></symbol>
   <symbol id="i-fog" viewBox="0 0 64 64"><path fill="none" stroke="#9bc8bd" stroke-width="5" stroke-linecap="round" d="M10 23h29c8 0 8 12 0 12H21c-8 0-8 12 0 12h33" /><path fill="none" stroke="#d7e5c5" stroke-width="4" stroke-linecap="round" d="M13 49h18M20 15h28" /></symbol>
   <symbol id="i-power" viewBox="0 0 64 64"><path fill="#d5ad4f" stroke="#6f5429" stroke-width="3" d="m37 5-23 31h14l-2 23 24-35H36z" /></symbol>
-  <symbol id="i-steam_power" viewBox="0 0 64 64"><path fill="none" stroke="#d4c59d" stroke-width="5" stroke-linecap="round" d="M20 51c-8-8-2-15 4-20 7-7 1-13-3-18m20 38c-8-8-2-15 4-20 7-7 1-13-3-18" /><path fill="#d2a94e" d="M13 53h38v6H13z" /></symbol>
+  <symbol id="i-steam_power" viewBox="0 0 64 64">
+    <defs>
+      <linearGradient id="steam-plume-gradient" x1="24" y1="60" x2="34" y2="16" gradientUnits="userSpaceOnUse">
+        <stop offset="0" stop-color="#65d9ce" stop-opacity=".14"/>
+        <stop offset=".3" stop-color="#65d9ce" stop-opacity=".42"/>
+        <stop offset=".68" stop-color="#91ded2" stop-opacity=".78"/>
+        <stop offset=".9" stop-color="#d3eee1" stop-opacity=".98"/>
+        <stop offset="1" stop-color="#e8f4df"/>
+      </linearGradient>
+    </defs>
+    <path fill="none" stroke="url(#steam-plume-gradient)" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round" d="M24 60 13 38M24 60 16 29M24 60 21 35M24 60 24 23M24 60 29 31M24 60 34 16M24 60 38 28M24 60 44 20M24 60 49 31M24 60 55 24"/>
+    <path fill="none" stroke="url(#steam-plume-gradient)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" d="M24 60 29 31M24 60 34 16"/>
+    <path fill="#e8f4df" stroke="#173b36" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" d="M24 37c-4 5-12 4-14-2-6 0-9-5-7-10-2-7 2-13 8-14 2-7 9-9 15-6 5-6 15-6 20 0 7-2 13 3 12 10 6 4 6 12 0 16-1 7-8 10-14 7-4 4-10 4-14 0-2 1-4 0-6-1Z"/>
+  </symbol>
 </svg>
