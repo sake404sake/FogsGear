@@ -9,8 +9,8 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="icon" href="../MainSystem/icons/app-icon.jpg" type="image/jpeg">
-    <link rel="stylesheet" href="css/style.css?v=577">
-    <link rel="stylesheet" href="css/style.css?v=577">
+    <link rel="stylesheet" href="css/style.css?v=578">
+    <link rel="stylesheet" href="css/style.css?v=578">
 </head>
 <body>
     <div id="loadingOverlay" class="loading-overlay" role="status" aria-live="polite">
@@ -176,6 +176,10 @@
                 <button class="btn btn-action movement-button movement-right" id="move-right" aria-label="右へ移動">▶</button>
                 <button class="btn btn-action movement-button movement-down" id="move-down" aria-label="下へ移動">▼</button>
             </div>
+            <div class="movement-history-controls" aria-label="建築履歴">
+                <button class="btn btn-visibility" type="button" data-action="undo-building" aria-label="建築を元に戻す" disabled>Undo</button>
+                <button class="btn btn-visibility" type="button" data-action="redo-building" aria-label="建築をやり直す" disabled>Redo</button>
+            </div>
         </div>
 
         <div class="control-group">
@@ -198,18 +202,21 @@
                     </section>
                     <section class="main-page gear-preview-page" aria-label="保存ギアプレビューページ">
                         <iframe src="../GearSystem/scroll-library.html?embed=1&hideMapBack=1&v=17" title="保存スクロールのギアプレビュー"></iframe>
-                    </section>
-                    <section class="main-page engine-dashboard-page" aria-label="動力ダッシュボードページ">
-                        <div class="dashboard main-engine-dashboard">
-                            <div class="dashboard-title-row"><div class="dashboard-title">LIVE ENGINE DASHBOARD</div><span id="main-creative-mode-indicator" class="creative-mode-indicator" hidden>CREATIVE MODE: ON</span></div>
-                            <div class="dashboard-resource-table">
-                                <div class="dashboard-resource-row dashboard-resource-header"><span>資源</span><span>保有量</span><span>生成 / 回収</span><span>消費</span></div>
-                                <div class="dashboard-resource-row" data-generated-resource="water" hidden><span>水</span><strong id="main-engine-water">0</strong><span id="main-water-generation">0 /秒</span><span id="main-water-consumption">0 /秒</span></div>
-                                <div class="dashboard-resource-row" data-generated-resource="fog" hidden><span>霧</span><strong id="main-engine-fog">0</strong><span id="main-fog-generation">0 /秒</span><span id="main-fog-consumption">0 /秒</span></div>
-                                <div class="dashboard-resource-row" data-generated-resource="power" hidden><span>動力</span><strong id="main-engine-power">0</strong><span id="main-power-generation">0 /秒</span><span id="main-power-consumption">0 /秒</span></div>
-                                <div class="dashboard-resource-row" data-generated-resource="steam" hidden><span>スチーム</span><strong id="main-engine-steam">0</strong><span id="main-steam-generation">0 /秒</span><span id="main-steam-consumption">0 /秒</span></div>
-                            </div>
-                        </div>
+                        <details class="engine-dashboard-disclosure">
+                            <summary class="dashboard-toggle">動力ダッシュボード <span>+</span></summary>
+                            <section class="engine-dashboard-page" aria-label="動力ダッシュボード">
+                                <div class="dashboard main-engine-dashboard">
+                                    <div class="dashboard-title-row"><div class="dashboard-title">LIVE ENGINE DASHBOARD</div><span id="main-creative-mode-indicator" class="creative-mode-indicator" hidden>CREATIVE MODE: ON</span></div>
+                                    <div class="dashboard-resource-table">
+                                        <div class="dashboard-resource-row dashboard-resource-header"><span>資源</span><span>保有量</span><span>生成 / 回収</span><span>消費</span></div>
+                                        <div class="dashboard-resource-row" data-generated-resource="water" hidden><span>水</span><strong id="main-engine-water">0</strong><span id="main-water-generation">0 /秒</span><span id="main-water-consumption">0 /秒</span></div>
+                                        <div class="dashboard-resource-row" data-generated-resource="fog" hidden><span>霧</span><strong id="main-engine-fog">0</strong><span id="main-fog-generation">0 /秒</span><span id="main-fog-consumption">0 /秒</span></div>
+                                        <div class="dashboard-resource-row" data-generated-resource="power" hidden><span>動力</span><strong id="main-engine-power">0</strong><span id="main-power-generation">0 /秒</span><span id="main-power-consumption">0 /秒</span></div>
+                                        <div class="dashboard-resource-row" data-generated-resource="steam" hidden><span>スチーム</span><strong id="main-engine-steam">0</strong><span id="main-steam-generation">0 /秒</span><span id="main-steam-consumption">0 /秒</span></div>
+                                    </div>
+                                </div>
+                            </section>
+                        </details>
                     </section>
                 </div>
             </div>
@@ -218,10 +225,9 @@
         <div class="main-page-dots" aria-label="メイン画面ページ選択">
             <button class="main-page-dot active" type="button" data-main-page="0" aria-label="操作ページ" aria-current="page"></button>
             <button class="main-page-dot" type="button" data-main-page="1" aria-label="保存ギアプレビューページ"></button>
-            <button class="main-page-dot" type="button" data-main-page="2" aria-label="動力ダッシュボードページ"></button>
         </div>
     </div>
 
-    <script type="module" src="js/main.js?v=646"></script>
+    <script type="module" src="js/main.js?v=647"></script>
 </body>
 </html>

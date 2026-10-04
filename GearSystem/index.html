@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
     <title>Fogs Gear</title>
-    <link rel="stylesheet" href="css/style.css?v=gear-layout-18">
+    <link rel="stylesheet" href="css/style.css?v=gear-layout-19">
 </head>
 <body>
     <div id="loadingOverlay" class="loading-overlay" role="status" aria-live="polite">
@@ -39,13 +39,6 @@
             </table>
         </section>
         <div class="control-group">
-            <span class="group-label">— Item Selector —</span>
-            <div class="button-row item-selector-row">
-                <button class="btn btn-item" data-item="BELT">ベルト</button>
-                <button class="btn btn-item btn-item-gear" type="button" data-action="toggle-gear-size-popup" data-item="GEAR" aria-expanded="false" aria-controls="gear-size-popup">ギア</button>
-            </div>
-        </div>
-        <div class="control-group">
             <span class="group-label">— Scroll Save —</span>
             <div class="button-row scroll-save-row">
                 <input id="named-scroll-name" type="text" maxlength="32" placeholder="保存名を入力" aria-label="保存名" />
@@ -64,6 +57,13 @@
                 <button class="btn btn-layer active" id="btn-layer-0" data-layer="0">1段目 (金)</button>
                 <button class="btn btn-layer" id="btn-layer-1" data-layer="1">2段目 (銀)</button>
                 <button class="btn btn-layer" id="btn-layer-2" data-layer="2">3段目 (銅)</button>
+            </div>
+        </div>
+        <div class="control-group">
+            <span class="group-label">— Item Selector —</span>
+            <div class="button-row item-selector-row">
+                <button class="btn btn-item" data-item="BELT">ベルト</button>
+                <button class="btn btn-item btn-item-gear" type="button" data-action="toggle-gear-size-popup" data-item="GEAR" aria-expanded="false" aria-controls="gear-size-popup">ギア</button>
             </div>
         </div>
     </div>

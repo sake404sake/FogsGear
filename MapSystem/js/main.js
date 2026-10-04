@@ -59,6 +59,9 @@ let selectedBuildingInstanceId = null;
 let activeCraftingBuildingInstanceId = null;
 let buildingPressCandidate = null;
 let buildingPressTimer = null;
+const buildingUndoHistory = [];
+const buildingRedoHistory = [];
+const BUILDING_HISTORY_LIMIT = 100;
 try {
     const savedItems = JSON.parse(localStorage.getItem(INVENTORY_ITEMS_KEY) || '[]');
     if (Array.isArray(savedItems)) state.inventoryItems = new Set(savedItems.filter(item => typeof item === 'string'));
@@ -1148,6 +1151,99 @@ function saveBuildings() {
     } catch (error) {
         showAppNotice('建築物を保存できませんでした。');
     }
+}
+
+function captureBuildingHistoryState() {
+    return {
+        buildings: JSON.parse(JSON.stringify(state.buildings)),
+        brass: Number(engineRuntimeState.brass) || 0,
+        materialInventory: { ...engineRuntimeState.materialInventory }
+    };
+}
+
+function updateBuildingHistoryButtons() {
+    const undoButton = document.querySelector('[data-action="undo-building"]');
+    const redoButton = document.querySelector('[data-action="redo-building"]');
+    if (undoButton) undoButton.disabled = buildingUndoHistory.length === 0;
+    if (redoButton) redoButton.disabled = buildingRedoHistory.length === 0;
+}
+
+function recordBuildingHistory(before, after = captureBuildingHistoryState()) {
+    const beforeById = new Map(before.buildings.map((building, index) => [building.instanceId, { building, index }]));
+    const afterById = new Map(after.buildings.map((building, index) => [building.instanceId, { building, index }]));
+    const changedIds = [...new Set([...beforeById.keys(), ...afterById.keys()])]
+        .filter(instanceId => JSON.stringify(beforeById.get(instanceId)?.building) !== JSON.stringify(afterById.get(instanceId)?.building));
+    if (!changedIds.length) return;
+
+    const inventoryDeltas = {};
+    for (const itemId of new Set([...Object.keys(before.materialInventory), ...Object.keys(after.materialInventory)])) {
+        const delta = (Number(after.materialInventory[itemId]) || 0) - (Number(before.materialInventory[itemId]) || 0);
+        if (delta) inventoryDeltas[itemId] = delta;
+    }
+    buildingUndoHistory.push({
+        changes: changedIds.map(instanceId => ({
+            before: beforeById.get(instanceId) || null,
+            after: afterById.get(instanceId) || null
+        })),
+        brassDelta: after.brass - before.brass,
+        inventoryDeltas
+    });
+    if (buildingUndoHistory.length > BUILDING_HISTORY_LIMIT) buildingUndoHistory.shift();
+    buildingRedoHistory.length = 0;
+    updateBuildingHistoryButtons();
+}
+
+function applyBuildingHistory(direction) {
+    const undoing = direction === 'undo';
+    const source = undoing ? buildingUndoHistory : buildingRedoHistory;
+    const destination = undoing ? buildingRedoHistory : buildingUndoHistory;
+    const entry = source[source.length - 1];
+    if (!entry) return;
+
+    const resourceDirection = undoing ? -1 : 1;
+    const nextBrass = (Number(engineRuntimeState.brass) || 0) + entry.brassDelta * resourceDirection;
+    const nextInventory = new Map(Object.entries(entry.inventoryDeltas).map(([itemId, delta]) => [
+        itemId,
+        (Number(engineRuntimeState.materialInventory[itemId]) || 0) + delta * resourceDirection
+    ]));
+    if (nextBrass < 0 || [...nextInventory.values()].some(count => count < 0)) {
+        showAppNotice('必要な素材が足りないため、この操作を戻せません。');
+        return;
+    }
+
+    const targetSide = undoing ? 'before' : 'after';
+    const affectedIds = new Set(entry.changes.flatMap(change => [
+        change.before?.building.instanceId,
+        change.after?.building.instanceId
+    ]).filter(Boolean));
+    state.buildings = state.buildings.filter(building => !affectedIds.has(building.instanceId));
+    entry.changes
+        .map(change => change[targetSide])
+        .filter(Boolean)
+        .sort((left, right) => left.index - right.index)
+        .forEach(({ building, index }) => {
+            state.buildings.splice(Math.min(index, state.buildings.length), 0, JSON.parse(JSON.stringify(building)));
+        });
+
+    engineRuntimeState.brass = nextBrass;
+    nextInventory.forEach((count, itemId) => {
+        engineRuntimeState.materialInventory[itemId] = count;
+    });
+    if (state.buildings.some(building => building.instanceId === selectedBuildingInstanceId)) {
+        openBuildingMenu(selectedBuildingInstanceId);
+    } else if (selectedBuildingInstanceId) {
+        closeBuildingMenu();
+    }
+    source.pop();
+    destination.push(entry);
+    engineRuntimeState.saveGameData();
+    engineRuntimeState.notify();
+    saveBuildings();
+    buildingRenderSignature = '';
+    renderCellMaterials();
+    updateBuildingHistoryButtons();
+    scheduleDraw();
+    showAppNotice(undoing ? '建築を元に戻しました。' : '建築をやり直しました。');
 }
 
 function loadBuildings() {
@@ -2646,7 +2742,9 @@ function rotateBuildingPlacement() {
 function rotateSelectedRail() {
     const placed = state.buildings.find(building => building.instanceId === selectedBuildingInstanceId);
     if (!placed || BUILDING_BY_ID.get(placed.id)?.role !== 'rail') return;
+    const historyBefore = captureBuildingHistoryState();
     placed.rotation = ((Number(placed.rotation) || 0) + 1) % 4;
+    recordBuildingHistory(historyBefore);
     saveBuildings();
     buildingRenderSignature = '';
     openBuildingMenu(placed.instanceId);
@@ -2697,6 +2795,7 @@ function placeBuildingAt(placement) {
 function commitBuildingPlacementCells(cells, orientRailsFromStroke = false) {
     const building = BUILDING_BY_ID.get(activeBuildingPlacement?.buildingId);
     if (!building) return { placedCount: 0, issue: '建築データがありません' };
+    const historyBefore = captureBuildingHistoryState();
     let placedCount = 0;
     let issue = '';
     const visited = new Set();
@@ -2717,6 +2816,7 @@ function commitBuildingPlacementCells(cells, orientRailsFromStroke = false) {
         placedCount++;
     }
     if (placedCount) {
+        recordBuildingHistory(historyBefore);
         engineRuntimeState.saveGameData();
         engineRuntimeState.notify();
         saveBuildings();
@@ -2765,8 +2865,10 @@ function demolishSelectedBuilding() {
     const placed = state.buildings[index];
     const definition = BUILDING_BY_ID.get(placed?.id);
     if (!definition) return closeBuildingMenu();
+    const historyBefore = captureBuildingHistoryState();
     state.buildings.splice(index, 1);
     engineRuntimeState.brass += Math.floor(definition.brassCost / 2);
+    recordBuildingHistory(historyBefore);
     engineRuntimeState.saveGameData();
     engineRuntimeState.notify();
     saveBuildings();
@@ -3290,6 +3392,14 @@ document.addEventListener('click', (event) => {
         startBuildingPlacement(button.dataset.buildingId);
         return;
     }
+    if (button.dataset.action === 'undo-building') {
+        applyBuildingHistory('undo');
+        return;
+    }
+    if (button.dataset.action === 'redo-building') {
+        applyBuildingHistory('redo');
+        return;
+    }
     if (button.dataset.action === 'craft-building-kit') {
         const quantity = button.closest('.building-item-card')?.querySelector('.building-quantity-input')?.value;
         craftBuildingKit(button.dataset.buildingId, quantity);
@@ -3773,8 +3883,9 @@ function syncMainPageViewportHeight() {
 }
 
 function setMainPage(page) {
-    currentMainPage = Math.max(0, Math.min(2, page));
-    if (mainPageTrack) mainPageTrack.style.transform = `translateX(-${currentMainPage * 33.3333}%)`;
+    const lastPage = Math.max(0, mainPageDots.length - 1);
+    currentMainPage = Math.max(0, Math.min(lastPage, page));
+    if (mainPageTrack) mainPageTrack.style.transform = `translateX(-${currentMainPage * 50}%)`;
     mainPageDots.forEach((dot, index) => {
         const active = index === currentMainPage;
         dot.classList.toggle('active', active);

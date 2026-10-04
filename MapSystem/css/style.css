@@ -522,15 +522,22 @@ h1 {
 
 .main-control-pager { display: flex; align-items: stretch; gap: 4px; width: 100%; min-width: 0; }
 .main-page-viewport { min-width: 0; flex: 1; overflow: auto; touch-action: pan-y; scrollbar-gutter: stable; overscroll-behavior: contain; }
-.main-page-track { display: flex; width: 300%; transition: transform 220ms ease; will-change: transform; }
-.main-page { width: 33.3333%; min-width: 33.3333%; box-sizing: border-box; padding: 0 4px; overflow-y: auto; overflow-x: hidden; }
+.main-page-track { display: flex; width: 200%; transition: transform 220ms ease; will-change: transform; }
+.main-page { width: 50%; min-width: 50%; box-sizing: border-box; padding: 0 4px; overflow-y: auto; overflow-x: hidden; }
 .main-page-arrow { flex: 0 0 28px; align-self: center; height: 74px; padding: 0; color: #a7f0d9; background: rgba(98, 194, 170, 0.08); border: 1px solid rgba(98, 194, 170, 0.3); border-radius: 4px; font-size: 2rem; line-height: 1; cursor: pointer; }
 .main-page-arrow:hover { color: #f7d77d; background: rgba(98, 194, 170, 0.18); border-color: #c69a52; }
 .main-page-dots { display: flex; justify-content: center; gap: 8px; margin: 8px 0 4px; }
 .main-page-dot { width: 8px; height: 8px; padding: 0; background: #4a3b2c; border: 1px solid #8b6b3f; border-radius: 50%; cursor: pointer; }
 .main-page-dot.active { background: #f3c653; border-color: #ffe69b; box-shadow: 0 0 7px rgba(243, 198, 83, 0.55); }
-.gear-preview-page { padding: 0; }
-.gear-preview-page iframe { display: block; width: 100%; height: min(70vh, 620px); min-height: 520px; border: 0; background: var(--bg-deep); }
+.gear-preview-page { display: flex; flex-direction: column; gap: 8px; padding: 0; overflow-y: auto; }
+.gear-preview-page iframe { display: block; width: 100%; height: min(70vh, 620px); min-height: 520px; flex: 0 0 auto; border: 0; background: var(--bg-deep); }
+.gear-preview-page .engine-dashboard-disclosure { flex: 0 0 auto; width: min(100%, 650px); margin: 0 auto 8px; }
+.gear-preview-page .engine-dashboard-disclosure > summary { box-sizing: border-box; width: 100%; margin: 0; list-style: none; }
+.gear-preview-page .engine-dashboard-disclosure > summary::-webkit-details-marker { display: none; }
+.gear-preview-page .engine-dashboard-disclosure > summary span { display: inline-block; transition: transform 160ms ease; }
+.gear-preview-page .engine-dashboard-disclosure[open] > summary span { transform: rotate(45deg); }
+.gear-preview-page .engine-dashboard-page { display: block; min-height: 0; padding: 12px 8px; overflow: visible; }
+.gear-preview-page .engine-dashboard-page .main-engine-dashboard { width: 100%; }
 .engine-dashboard-page { display: flex; align-items: center; justify-content: center; min-height: 520px; padding: 28px 12px; box-sizing: border-box; overflow-y: auto; background: linear-gradient(145deg, rgba(98, 194, 170, 0.08), rgba(18, 14, 12, 0.92)); border: 1px solid rgba(98, 194, 170, 0.24); }
 .engine-dashboard-page .main-engine-dashboard { width: min(100%, 650px); max-height: none; margin: 0 auto; box-sizing: border-box; }
 .engine-dashboard-page .dashboard-resource-table { display: grid; grid-template-columns: 1fr; gap: 0; font-size: 0.68rem; }
@@ -555,6 +562,9 @@ h1 {
     gap: 10px;
     place-items: center;
 }
+.movement-history-controls { display: flex; justify-content: space-between; width: min(100%, 200px); margin: 4px auto 0; }
+.movement-history-controls .btn { min-width: 72px; }
+.movement-history-controls .btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
 .movement-button {
     min-width: 0;
@@ -897,14 +907,8 @@ canvas.engine-runtime-canvas { display: none; }
         max-height: none;
         overflow: hidden;
     }
-    .main-page {
-        width: 33.3333%;
-        min-width: 33.3333%;
-        flex: 0 0 33.3333%;
-    }
-    .main-page-track {
-        width: 300%;
-    }
+    .main-page { width: 50%; min-width: 50%; flex: 0 0 50%; }
+    .main-page-track { width: 200%; }
     .main-page:first-child .movement-pad {
         margin: 0 auto;
     }
@@ -941,6 +945,7 @@ canvas.engine-runtime-canvas { display: none; }
     .movement-button { width: 44px; height: 36px; font-size: 0.82rem; }
     .movement-joystick { width: 38px; height: 38px; }
     .movement-joystick-knob { width: 18px; height: 18px; }
+    .movement-history-controls { width: min(100%, 250px, 34dvh); }
     .main-page-viewport { height: auto; }
     .main-page-dots { gap: 8px; margin: 4px 0 0; }
     .main-page-dot { width: 9px; height: 9px; }
@@ -948,6 +953,7 @@ canvas.engine-runtime-canvas { display: none; }
 }
 
 @media (max-width: 620px) and (max-aspect-ratio: 1 / 1) {
+    body:has(#gameCanvas) > .panel:last-of-type .movement-history-controls { width: min(100%, 320px, 34dvh); }
     body:has(#gameCanvas) #canvas-container { height: clamp(130px, 34dvh, 320px); }
     body:has(#gameCanvas) > .panel:last-of-type .main-page-viewport { scrollbar-gutter: auto; }
     body:has(#gameCanvas) > .panel:last-of-type .main-page:first-child {
@@ -1165,9 +1171,10 @@ canvas.engine-runtime-canvas { display: none; }
         margin: 0;
         border: 0;
     }
+    body:has(#gameCanvas) > .panel:last-of-type .gear-preview-page { overflow-y: auto; }
     body:has(#gameCanvas) > .panel:last-of-type .gear-preview-page iframe {
-        height: 100%;
-        min-height: 0;
+        height: min(62dvh, 620px);
+        min-height: 360px;
     }
     body:has(#gameCanvas) > .panel:last-of-type .engine-dashboard-page {
         min-height: 0;
