@@ -355,8 +355,9 @@ h1 {
 .inventory-search input { min-width: 0; width: 100%; min-height: 34px; box-sizing: border-box; padding: 6px 9px; color: var(--text-main); background: #1c1511; border: 1px solid var(--border-sub); }
 .inventory-search input:focus-visible { outline: 2px solid #62c2aa; outline-offset: 1px; }
 .inventory-item-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); grid-auto-rows: max-content; align-content: start; gap: 6px; max-height: 42vh; overflow-y: auto; }
-.building-item-grid { max-height: 50vh; }
-.building-item-card { grid-template-columns: 42px minmax(0, 1fr); min-height: 58px; border: 1px solid rgba(198, 154, 82, 0.3); }
+.building-item-grid { grid-template-columns: minmax(0, 1fr); max-height: 50vh; }
+.inventory-item-card.building-item-card { grid-template-columns: 42px minmax(0, 1fr); min-height: 58px; border: 1px solid rgba(198, 154, 82, 0.3); }
+.building-item-card > * { min-width: 0; }
 .building-item-icon { display: grid; place-items: center; width: 36px; height: 36px; overflow: hidden; color: #e5c25d; background: linear-gradient(145deg, #61756a, #26372f); border: 1px solid #a27c42; }
 .building-item-icon-svg { display: block; width: 100%; height: 100%; }
 .building-item-copy { display: grid; min-width: 0; gap: 3px; }
@@ -530,7 +531,7 @@ h1 {
 .main-page-dot { width: 8px; height: 8px; padding: 0; background: #4a3b2c; border: 1px solid #8b6b3f; border-radius: 50%; cursor: pointer; }
 .main-page-dot.active { background: #f3c653; border-color: #ffe69b; box-shadow: 0 0 7px rgba(243, 198, 83, 0.55); }
 .gear-preview-page { display: flex; flex-direction: column; gap: 8px; padding: 0; overflow-y: auto; }
-.gear-preview-page iframe { display: block; width: 100%; height: min(70vh, 620px); min-height: 520px; flex: 0 0 auto; border: 0; background: var(--bg-deep); }
+.gear-preview-page iframe { display: block; width: 100%; height: min(70vh, 620px); min-height: 520px; flex: 0 0 auto; border: 0; background: var(--bg-deep); touch-action: pan-y; }
 .gear-preview-page .engine-dashboard-disclosure { flex: 0 0 auto; width: min(100%, 650px); margin: 0 auto 8px; }
 .gear-preview-page .engine-dashboard-disclosure > summary { box-sizing: border-box; width: 100%; margin: 0; list-style: none; }
 .gear-preview-page .engine-dashboard-disclosure > summary::-webkit-details-marker { display: none; }
@@ -1142,6 +1143,9 @@ canvas.engine-runtime-canvas { display: none; }
         overflow-x: hidden;
         scrollbar-gutter: auto;
     }
+    body:has(#gameCanvas) > .panel:last-of-type .main-page-viewport.gear-preview-active {
+        overflow: hidden;
+    }
     body:has(#gameCanvas) > .panel:last-of-type .main-page-dots {
         flex: 0 0 auto;
         margin-top: 6px;
@@ -1171,10 +1175,11 @@ canvas.engine-runtime-canvas { display: none; }
         margin: 0;
         border: 0;
     }
-    body:has(#gameCanvas) > .panel:last-of-type .gear-preview-page { overflow-y: auto; }
+    body:has(#gameCanvas) > .panel:last-of-type .gear-preview-page { overflow: hidden; }
     body:has(#gameCanvas) > .panel:last-of-type .gear-preview-page iframe {
-        height: min(62dvh, 620px);
-        min-height: 360px;
+        height: 100%;
+        min-height: 0;
+        flex: 1 1 auto;
     }
     body:has(#gameCanvas) > .panel:last-of-type .engine-dashboard-page {
         min-height: 0;

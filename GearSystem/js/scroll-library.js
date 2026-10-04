@@ -29,6 +29,24 @@ const isEmbedded = new URLSearchParams(window.location.search).get('embed') === 
 const hideMapBack = new URLSearchParams(window.location.search).get('hideMapBack') === '1';
 if (isEmbedded) document.body.classList.add('embedded-library');
 if (isEmbedded && hideMapBack) document.body.classList.add('hide-embedded-map-back');
+window.addEventListener('message', event => {
+    if (!isEmbedded || event.source !== window.parent || event.data?.type !== 'fogsgear:engine-dashboard') return;
+    const { values, rates, generationRates, creativeMode } = event.data;
+    if (!values || !rates || !generationRates) return;
+    Object.entries(values).forEach(([id, value]) => {
+        const element = document.getElementById(id);
+        if (element) element.textContent = String(value);
+    });
+    Object.entries(rates).forEach(([id, value]) => {
+        const element = document.getElementById(id);
+        if (element) element.textContent = String(value);
+    });
+    document.querySelectorAll('[data-generated-resource]').forEach(row => {
+        row.hidden = !(Number(generationRates[row.dataset.generatedResource]) > 0);
+    });
+    const creativeIndicator = document.getElementById('main-creative-mode-indicator');
+    if (creativeIndicator) creativeIndicator.hidden = !creativeMode;
+});
 document.querySelectorAll('.back-to-map').forEach(link => {
     link.addEventListener('click', event => {
         if (!isEmbedded) return;

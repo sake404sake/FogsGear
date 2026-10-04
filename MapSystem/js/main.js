@@ -5,7 +5,7 @@ import { CELL_DEFINITIONS, canEnterCell, getCellEntryRule, getMosaicColor } from
 import { drawCellIcon, loadCellIconAtlas } from './cellIconRenderer.js?v=4';
 import { ACTIVE_SCROLL_TARGETS_KEY, CELL_MATERIALS, TERRAIN_TRANSFORM_RECIPES, WORLD_CELL_TYPES, applyCellChanges, chooseEraCellType, getCellCollectionPowerCost, getCellDrops, readCellChanges, saveCellChange } from './worldCells.js?v=4';
 import { CRAFTING_ITEMS, CRAFTING_ITEM_BY_ID, CRAFTING_RATE_MULTIPLIER, CRAFTING_RECIPES, CRAFTING_STATION_BUILDING_IDS, HANDCRAFT_STATION } from './craftingData.js?v=5';
-import { BUILDING_BY_ID, BUILDING_DEFINITIONS, canPlaceBuildingOnTerrainCell, drawBuilding, getRailAutoRotation, getRailConnections, getTileEffectsUnderFootprint, getVehicleRailRotation, loadBuildingIconImages, normalizeBuildingUtilityState } from './buildingData.js?v=24';
+import { BUILDING_BY_ID, BUILDING_DEFINITIONS, canPlaceBuildingOnTerrainCell, drawBuilding, getRailAutoRotation, getRailConnections, getTileEffectsUnderFootprint, getVehicleRailRotation, loadBuildingIconImages, normalizeBuildingUtilityState } from './buildingData.js?v=25';
 import { getBuildingUtilityStatus, simulateBuildingUtilityNetworks } from './buildingUtilityNetworks.js?v=4';
 import { buildTerritoryBorderSegments } from './territoryBorders.js?v=35';
 import { directionToVehicleRotation, findNextRailStep, getTrackDirection, getVehicleRenderState, STATION_CONTROL_DEFAULTS, VEHICLE_DEFAULTS } from './railwayRuntime.js?v=8';
@@ -935,8 +935,7 @@ function getMaximumCraftCount(inputs, creative = Boolean(engineRuntimeState?.cre
 }
 
 function getBuildingMaterialCosts(building) {
-    if (building.role !== 'rail') return [];
-    return [['wood', building.brassCost]];
+    return building.materialCosts || [];
 }
 
 function sortCraftingRecipesByAvailability(recipes) {
@@ -1007,8 +1006,9 @@ function renderBuildingInventory() {
     const constructionJobs = (engineRuntimeState.craftingJobs || [])
         .filter(job => BUILDING_BY_ID.has(job.outputItem))
         .map(job => [job.jobId, job.recipeKey, Number(job.completesAt)]);
-    const wood = getCraftingItemCount('wood');
-    const signature = `${brass}:${wood}:${creative}:${hasConstructionStation}:${search}:${JSON.stringify(buildingKitCounts)}:${JSON.stringify(constructionJobs)}`;
+    const buildingMaterialCounts = BUILDING_DEFINITIONS.flatMap(building =>
+        getBuildingMaterialCosts(building).map(([itemId]) => [itemId, getCraftingItemCount(itemId)]));
+    const signature = `${brass}:${creative}:${hasConstructionStation}:${search}:${JSON.stringify(buildingKitCounts)}:${JSON.stringify(buildingMaterialCounts)}:${JSON.stringify(constructionJobs)}`;
     if (signature === buildingRenderSignature) return;
     buildingRenderSignature = signature;
     list.replaceChildren();
@@ -1044,10 +1044,11 @@ function renderBuildingInventory() {
         cost.className = `building-item-meta ${affordable ? 'is-affordable' : 'is-unaffordable'}`;
         const placementRule = building.requiresFoundation ? ' / 基礎必須' : building.role === 'vehicle' ? ' / 線路必須' : '';
         const missingBrass = !creative && brass < building.brassCost;
-        const missingMaterials = !creative && materialCosts.some(([itemId, amount]) => getCraftingItemCount(itemId) < amount);
-        const missingCost = missingBrass && missingMaterials ? '真鍮・木材不足'
-            : missingMaterials ? '木材不足'
-                : missingBrass ? '真鍮不足' : '';
+        const missingMaterialNames = creative ? [] : materialCosts
+            .filter(([itemId, amount]) => getCraftingItemCount(itemId) < amount)
+            .map(([itemId]) => getCraftingItemName(itemId));
+        const missingCostParts = [...(missingBrass ? ['真鍮'] : []), ...missingMaterialNames];
+        const missingCost = missingCostParts.length ? `${missingCostParts.join('・')}不足` : '';
         const status = activeJobs.length
             ? `製作中 ${activeJobs.length}個 / `
             : !stationAvailable ? '作業台以上の設備が必要'
@@ -1105,11 +1106,12 @@ function craftBuildingKit(buildingId, requestedCount) {
     ));
     const quantity = Math.floor(Number(requestedCount));
     if (!Number.isFinite(quantity) || quantity < 1 || quantity > maxCraftCount) {
-        const missingMaterials = materialCosts.some(([itemId, amount]) => getCraftingItemCount(itemId) < amount);
         const missingBrass = getCraftingItemCount('brass-stock') < building.brassCost;
-        const missingCost = missingBrass && missingMaterials ? '真鍮と木材'
-            : missingMaterials ? '木材' : '真鍮';
-        showAppNotice(maxCraftCount > 0 ? `作成数は1〜${maxCraftCount}個で指定してください。` : `建築キットの作成に必要な${missingCost}が足りません。`);
+        const missingMaterials = materialCosts
+            .filter(([itemId, amount]) => getCraftingItemCount(itemId) < amount)
+            .map(([itemId]) => getCraftingItemName(itemId));
+        const missingCost = [...(missingBrass ? ['真鍮'] : []), ...missingMaterials].join('・');
+        showAppNotice(maxCraftCount > 0 ? `作成数は1〜${maxCraftCount}個で指定してください。` : `建築キットの作成に必要な${missingCost || '素材'}が足りません。`);
         return;
     }
     if (!creative && getCraftingItemCount('brass-stock') < building.brassCost * quantity) {
@@ -3166,19 +3168,16 @@ function updateEngineDashboard() {
         const [threshold, suffix] = unit;
         return `${(number / threshold).toFixed(2).replace(/\.00$/, '').replace(/(\.[0-9])0$/, '$1')}${suffix}`;
     };
-    const integerValues = new Set(['main-engine-brass', 'main-engine-steam']);
     const values = {
         'main-engine-steam': save.steamPower,
         'main-engine-water': save.water,
         'main-engine-fog': save.fog,
         'main-engine-power': save.power
     };
-    Object.entries(values).forEach(([id, value]) => {
-        const element = document.getElementById(id);
-        if (element) element.textContent = integerValues.has(id) ? String(Math.floor(Number(value) || 0)) : formatCompact(value);
-    });
-    const creativeIndicator = document.getElementById('main-creative-mode-indicator');
-    if (creativeIndicator) creativeIndicator.hidden = !save.creativeMode;
+    const displayValues = Object.fromEntries(Object.entries(values).map(([id, value]) => [
+        id,
+        id === 'main-engine-steam' ? String(Math.floor(Number(value) || 0)) : formatCompact(value)
+    ]));
     const rates = {
         'main-water-generation': save.waterGenerationRate,
         'main-water-consumption': save.waterConsumptionRate,
@@ -3189,20 +3188,20 @@ function updateEngineDashboard() {
         'main-steam-generation': save.steamGenerationRate,
         'main-steam-consumption': save.steamConsumptionRate
     };
-    Object.entries(rates).forEach(([id, value]) => {
-        const element = document.getElementById(id);
-        if (!element) return;
-        element.textContent = `${formatCompact(value)} /秒`;
-    });
     const generationRates = {
         water: save.waterGenerationRate,
         fog: save.fogRecoveryRate,
         power: save.powerGenerationRate,
         steam: save.steamGenerationRate
     };
-    document.querySelectorAll('[data-generated-resource]').forEach(row => {
-        row.hidden = !(Number(generationRates[row.dataset.generatedResource]) > 0);
-    });
+    const previewFrame = document.querySelector('.gear-preview-page iframe');
+    previewFrame?.contentWindow?.postMessage({
+        type: 'fogsgear:engine-dashboard',
+        values: displayValues,
+        rates: Object.fromEntries(Object.entries(rates).map(([id, value]) => [id, `${formatCompact(value)} /秒`])),
+        generationRates,
+        creativeMode: Boolean(save.creativeMode)
+    }, '*');
     renderCellMaterials();
 }
 
@@ -3885,6 +3884,7 @@ function syncMainPageViewportHeight() {
 function setMainPage(page) {
     const lastPage = Math.max(0, mainPageDots.length - 1);
     currentMainPage = Math.max(0, Math.min(lastPage, page));
+    mainPageViewport?.classList.toggle('gear-preview-active', currentMainPage === 1);
     if (mainPageTrack) mainPageTrack.style.transform = `translateX(-${currentMainPage * 50}%)`;
     mainPageDots.forEach((dot, index) => {
         const active = index === currentMainPage;
@@ -3942,6 +3942,7 @@ const bindGearPreviewSwipe = () => {
 };
 
 gearPreviewIframe?.addEventListener('load', bindGearPreviewSwipe);
+gearPreviewIframe?.addEventListener('load', updateEngineDashboard);
 bindGearPreviewSwipe();
 mainPageViewport?.addEventListener('wheel', event => {
     if (Math.abs(event.deltaX) > Math.abs(event.deltaY) && Math.abs(event.deltaX) > 20) {
