@@ -28,6 +28,21 @@ export const CRAFTING_ITEM_BY_ID = new Map(CRAFTING_ITEMS.map(item => [item[0], 
 export const CRAFTING_RECIPES_BY_OUTPUT = new Map(CRAFTING_RECIPES.map(recipe => [recipe[3], recipe]));
 
 export const HANDCRAFT_STATION = '手作業';
+const HANDCRAFT_RECIPE_NOTES = new Map([
+    ['sealed-board', '製材板に樹脂を手で塗り込み、防水仕上げにする。'],
+    ['pumice-powder', '軽石を手作業で細かく砕き、粉にする。'],
+    ['charcoal-filter', '木炭と軽石粉を手で混ぜ、多孔質の濾材にする。']
+]);
+HANDCRAFT_RECIPE_NOTES.forEach((note, outputItem) => {
+    const item = CRAFTING_ITEMS.find(([id]) => id === outputItem);
+    if (item) item[3] = HANDCRAFT_STATION;
+    const recipe = CRAFTING_RECIPES.find(([, , , output]) => output === outputItem);
+    if (recipe) {
+        recipe[4] = HANDCRAFT_STATION;
+        recipe[5] = note;
+    }
+});
+
 export const CRAFTING_STATION_BUILDING_IDS = Object.freeze({
     '木工作業台': ['craft-bench'],
     '炉': ['simple-furnace'],

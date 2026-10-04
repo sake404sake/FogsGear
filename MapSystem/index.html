@@ -43,7 +43,7 @@
                 <div class="dashboard-popup-head"><div class="dashboard-title">INVENTORY & CRAFTING</div><button class="dashboard-popup-close" type="button" data-action="toggle-inventory" aria-label="インベントリを閉じる">×</button></div>
                 <div class="inventory-view-tabs" role="tablist" aria-label="インベントリ表示">
                     <button class="inventory-view-tab active" type="button" data-inventory-view="items" aria-selected="true">所持品</button>
-                    <button class="inventory-view-tab" type="button" data-inventory-view="crafting" aria-selected="false">合成</button>
+                    <button class="inventory-view-tab" type="button" data-inventory-view="crafting" aria-selected="false">加工・合成</button>
                     <button class="inventory-view-tab" type="button" data-inventory-view="buildings" aria-selected="false">建築</button>
                 </div>
                 <section id="inventory-items-view" class="inventory-view">
@@ -51,8 +51,8 @@
                     <div id="inventory-item-list" class="inventory-item-grid" aria-live="polite"></div>
                 </section>
                 <section id="inventory-crafting-view" class="inventory-view" hidden>
-                    <label class="inventory-search"><span>検索</span><input id="crafting-recipe-search" type="search" autocomplete="off" aria-label="合成レシピを検索"></label>
-                    <label class="crafting-filter-row">合成系統<select id="crafting-family-filter">
+                    <label class="inventory-search"><span>検索</span><input id="crafting-recipe-search" type="search" autocomplete="off" aria-label="加工・合成レシピを検索"></label>
+                    <label class="crafting-filter-row">レシピ系統<select id="crafting-family-filter">
                         <option value="all">すべて</option><option value="forest">森林加工</option><option value="smelting">製錬・合金</option><option value="ceramic">ガラス・陶材</option><option value="bio">菌糸・薬草</option><option value="machine">機械・遺物</option>
                     </select></label>
                     <div id="crafting-recipe-list" class="crafting-recipe-list" aria-live="polite"></div>
@@ -222,6 +222,6 @@
         </div>
     </div>
 
-    <script type="module" src="js/main.js?v=642"></script>
+    <script type="module" src="js/main.js?v=644"></script>
 </body>
 </html>

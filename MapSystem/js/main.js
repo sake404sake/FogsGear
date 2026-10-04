@@ -4,7 +4,7 @@ import { SkinRenderer } from './skinRenderer.js?v=2';
 import { CELL_DEFINITIONS, canEnterCell, getCellEntryRule, getMosaicColor } from './cellRules.js';
 import { drawCellIcon, loadCellIconAtlas } from './cellIconRenderer.js?v=4';
 import { ACTIVE_SCROLL_TARGETS_KEY, CELL_MATERIALS, TERRAIN_TRANSFORM_RECIPES, WORLD_CELL_TYPES, applyCellChanges, chooseEraCellType, getCellCollectionPowerCost, getCellDrops, readCellChanges, saveCellChange } from './worldCells.js?v=4';
-import { CRAFTING_ITEMS, CRAFTING_ITEM_BY_ID, CRAFTING_RATE_MULTIPLIER, CRAFTING_RECIPES, CRAFTING_STATION_BUILDING_IDS, HANDCRAFT_STATION } from './craftingData.js?v=4';
+import { CRAFTING_ITEMS, CRAFTING_ITEM_BY_ID, CRAFTING_RATE_MULTIPLIER, CRAFTING_RECIPES, CRAFTING_STATION_BUILDING_IDS, HANDCRAFT_STATION } from './craftingData.js?v=5';
 import { BUILDING_BY_ID, BUILDING_DEFINITIONS, canPlaceBuildingOnTerrainCell, drawBuilding, getRailAutoRotation, getRailConnections, getTileEffectsUnderFootprint, getVehicleRailRotation, loadBuildingIconImages, normalizeBuildingUtilityState } from './buildingData.js?v=23';
 import { getBuildingUtilityStatus, simulateBuildingUtilityNetworks } from './buildingUtilityNetworks.js?v=4';
 import { buildTerritoryBorderSegments } from './territoryBorders.js?v=35';
@@ -1257,8 +1257,8 @@ function renderCellMaterials() {
         const empty = document.createElement('p');
         empty.className = 'inventory-empty';
         empty.textContent = recipeSearch || selectedFamily !== 'all'
-            ? '条件に一致する手作業の合成素材はありません'
-            : '手作業で作れる合成素材はありません';
+            ? '条件に一致する手作業の加工・合成レシピはありません'
+            : '手作業で作れる加工・合成レシピはありません';
         recipeList.appendChild(empty);
         return;
     }
@@ -1391,11 +1391,11 @@ function craftRecipe(recipeIndex, buildingInstanceId = '', requestedCount) {
     const maxCraftCount = getMaximumCraftCount(recipe[2], creative);
     const quantity = Math.floor(Number(requestedCount));
     if (!Number.isFinite(quantity) || quantity < 1 || quantity > maxCraftCount) {
-        showAppNotice(maxCraftCount > 0 ? `作成回数は1〜${maxCraftCount}回で指定してください。` : '合成に必要な素材が足りません。');
+        showAppNotice(maxCraftCount > 0 ? `作成回数は1〜${maxCraftCount}回で指定してください。` : '製作に必要な素材が足りません。');
         return;
     }
     if (!creative && recipe[2].some(([itemId, amount]) => getCraftingItemCount(itemId) < amount * quantity)) {
-        showAppNotice('合成に必要な素材が足りません。');
+        showAppNotice('製作に必要な素材が足りません。');
         return;
     }
     const recipeKey = `${recipe[0]}:${recipe[1]}`;
