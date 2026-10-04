@@ -340,9 +340,9 @@ h1 {
 }
 
 .dashboard-title { margin-bottom: 6px; color: #a7f0d9; font: 0.65rem monospace; letter-spacing: 2px; }
-.dashboard-resource-table { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; font-size: 0.75rem; }
+.dashboard-resource-table { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; font-size: clamp(0.5rem, 1.8cqi, 0.75rem); container-type: inline-size; }
 .dashboard-resource-row { display: flex; justify-content: space-between; align-items: center; gap: 6px; border: 1px solid rgba(98, 194, 170, 0.14); padding: 4px 6px; min-width: 0; }
-.dashboard-resource-row span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dashboard-resource-row span { min-width: 0; overflow-wrap: anywhere; white-space: normal; }
 .dashboard-resource-row strong { color: #d9fff2; }
 .dashboard-resource-row[hidden] { display: none !important; }
 .inventory-item-card { width: 100%; color: var(--text-main); background: rgba(98, 194, 170, 0.05); font: inherit; text-align: left; cursor: pointer; }
@@ -549,18 +549,19 @@ h1 {
 .engine-dashboard-page { display: flex; align-items: center; justify-content: center; min-height: 520px; padding: 28px 12px; box-sizing: border-box; overflow-y: auto; background: linear-gradient(145deg, rgba(98, 194, 170, 0.08), rgba(18, 14, 12, 0.92)); border: 1px solid rgba(98, 194, 170, 0.24); }
 .engine-dashboard-page .main-engine-dashboard { width: min(100%, 650px); max-height: none; margin: 0 auto; box-sizing: border-box; }
 .engine-dashboard-page .dashboard-resource-table { display: grid; grid-template-columns: 1fr; gap: 0; font-size: 0.68rem; }
-.engine-dashboard-page .dashboard-resource-row { display: grid; grid-template-columns: 1.1fr repeat(3, 1fr); gap: 8px; align-items: center; min-height: 28px; padding: 0; border: 0; border-bottom: 1px solid rgba(98, 194, 170, 0.14); }
+.engine-dashboard-page .dashboard-resource-row { display: grid; grid-template-columns: minmax(0, 1.1fr) repeat(3, minmax(0, 1fr)); gap: 8px; align-items: center; min-height: 28px; padding: 0; border: 0; border-bottom: 1px solid rgba(98, 194, 170, 0.14); font-size: clamp(0.48rem, 1.4cqi, 0.68rem); }
+.engine-dashboard-page .dashboard-resource-row > * { min-width: 0; overflow-wrap: anywhere; }
 .engine-dashboard-page .dashboard-resource-row > *:not(:first-child) { text-align: right; }
 .engine-dashboard-page .dashboard-resource-row > span:first-child { color: var(--text-muted); }
-.engine-dashboard-page .dashboard-resource-row strong { color: #d9fff2; font: bold 0.95rem monospace; }
+.engine-dashboard-page .dashboard-resource-row strong { color: #d9fff2; font: bold clamp(0.55rem, 1.9cqi, 0.95rem) monospace; }
 .engine-dashboard-page .dashboard-resource-row > span:not(:first-child) { color: #8edbc6; font-family: monospace; }
 .engine-dashboard-page .dashboard-resource-header { min-height: 22px; color: #a7f0d9; border-bottom-color: rgba(98, 194, 170, 0.45); }
 .engine-dashboard-page .dashboard-resource-header > span { color: #a7f0d9 !important; font-size: 0.65rem; }
 @media (max-width: 620px) {
     .engine-dashboard-page { min-height: 460px; padding: 20px 6px; align-items: flex-start; }
-    .engine-dashboard-page .dashboard-resource-row { grid-template-columns: 0.9fr 0.9fr 1.25fr 1.1fr; gap: 4px; font-size: 0.6rem; }
-    .engine-dashboard-page .dashboard-resource-row strong { font-size: 0.82rem; }
-    .engine-dashboard-page .dashboard-resource-header > span { font-size: 0.56rem; }
+    .engine-dashboard-page .dashboard-resource-row { grid-template-columns: minmax(0, 0.9fr) minmax(0, 0.9fr) minmax(0, 1.25fr) minmax(0, 1.1fr); gap: 4px; font-size: clamp(0.48rem, 1.4cqi, 0.6rem); }
+    .engine-dashboard-page .dashboard-resource-row strong { font-size: clamp(0.55rem, 1.5cqi, 0.82rem); }
+    .engine-dashboard-page .dashboard-resource-header > span { font-size: clamp(0.48rem, 1.1cqi, 0.56rem); }
 }
 
 .movement-pad {
@@ -1336,7 +1337,7 @@ canvas.engine-runtime-canvas { display: none; }
         justify-content: space-between;
         gap: 6px;
         min-width: 0;
-        white-space: nowrap;
+        white-space: normal;
         line-height: 1.1;
         text-align: left;
     }
@@ -1357,8 +1358,8 @@ canvas.engine-runtime-canvas { display: none; }
         align-items: center;
         justify-content: space-between;
         gap: 6px;
-        min-width: 7.5em;
-        white-space: nowrap;
+        min-width: 0;
+        white-space: normal;
         line-height: 1.1;
         text-align: right;
     }

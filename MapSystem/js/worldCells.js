@@ -5,9 +5,9 @@ export const WORLD_CELL_TYPES = Object.freeze({
     FOREST: { label: '森林', color: '#3e6b48', category: 'initial', collect: 'wood' },
     MOUNTAIN: { label: '山岳', color: '#746b60', category: 'initial', collect: 'stone' },
     SAND: { label: '砂地', color: '#d5bd8a', category: 'initial', collect: 'sand' },
-    RUIN: { label: '古代遺跡', color: '#6f2c2c', category: 'initial', collect: 'relic_fragment' },
-    IRON_VEIN: { label: '鉄鉱脈', color: '#59625f', category: 'direct', collect: 'iron_ore' },
-    COPPER_VEIN: { label: '銅鉱脈', color: '#80533d', category: 'direct', collect: 'copper_ore' },
+    RUIN: { label: '古代遺跡', color: '#6f2c2c', category: 'initial', collect: 'relic-fragment' },
+    IRON_VEIN: { label: '鉄鉱脈', color: '#59625f', category: 'direct', collect: 'iron-ore' },
+    COPPER_VEIN: { label: '銅鉱脈', color: '#80533d', category: 'direct', collect: 'copper-ore' },
     COAL_SEAM: { label: '石炭層', color: '#414644', category: 'direct', collect: 'coal' },
     SULFUR_DEPOSIT: { label: '硫黄鉱床', color: '#776c36', category: 'direct', collect: 'sulfur' },
     CLAY_BED: { label: '粘土層', color: '#865e51', category: 'direct', collect: 'clay' },
@@ -15,24 +15,24 @@ export const WORLD_CELL_TYPES = Object.freeze({
     PEAT_BOG: { label: '泥炭地', color: '#584d38', category: 'direct', collect: 'peat' },
     SALT_MARSH: { label: '塩沼', color: '#63776e', category: 'direct', collect: 'salt' },
     OIL_SEEP: { label: '油浸地', color: '#42483e', category: 'direct', collect: 'tar' },
-    TIN_VEIN: { label: '錫鉱脈', color: '#6b7770', category: 'item', collect: 'tin_ore' },
-    ZINC_VEIN: { label: '亜鉛鉱脈', color: '#536b62', category: 'item', collect: 'zinc_ore' },
-    CRYSTAL_VEIN: { label: '水晶脈', color: '#397783', category: 'item', collect: 'crystal_shard' },
+    TIN_VEIN: { label: '錫鉱脈', color: '#6b7770', category: 'item', collect: 'tin-ore' },
+    ZINC_VEIN: { label: '亜鉛鉱脈', color: '#536b62', category: 'item', collect: 'zinc-ore' },
+    CRYSTAL_VEIN: { label: '水晶脈', color: '#397783', category: 'item', collect: 'crystal-shard' },
     MYCELIUM: { label: '菌糸群落', color: '#756c5c', category: 'item', collect: 'spores' },
     HERB_FIELD: { label: '薬草地', color: '#5f824f', category: 'item', collect: 'herbs' },
     RESIN_FOREST: { label: '樹脂林', color: '#3e674a', category: 'item', collect: 'resin' },
     MACHINE_WRECK: { label: '機械の残骸', color: '#545d59', category: 'event', collect: 'salvage' },
-    AIRSHIP_WRECK: { label: '飛行船の墜落跡', color: '#625949', category: 'event', collect: 'navigation_crystal' },
+    AIRSHIP_WRECK: { label: '飛行船の墜落跡', color: '#625949', category: 'event', collect: 'navigation-crystal' },
     FOUNDATION: { label: '基礎', color: '#909799', category: 'constructed', collect: null }
 });
 
 export const TERRAIN_TRANSFORM_RECIPES = Object.freeze({
     TIN_VEIN: { mining_sample: 1, coke: 1 },
-    ZINC_VEIN: { tin_ore: 1, sulfur: 1, vein_mold: 1 },
-    CRYSTAL_VEIN: { navigation_crystal: 1, salt: 1, limestone: 1 },
+    ZINC_VEIN: { 'tin-ore': 1, sulfur: 1, vein_mold: 1 },
+    CRYSTAL_VEIN: { 'navigation-crystal': 1, salt: 1, limestone: 1 },
     MYCELIUM: { preserved_spores: 1, peat: 1 },
-    HERB_FIELD: { ancient_seed: 1, mycelium_compost: 1 },
-    RESIN_FOREST: { forest_seed: 1, mycelium_compost: 1 }
+    HERB_FIELD: { ancient_seed: 1, compost: 1 },
+    RESIN_FOREST: { forest_seed: 1, compost: 1 }
 });
 
 export const CELL_MATERIALS = Object.freeze({
@@ -41,9 +41,9 @@ export const CELL_MATERIALS = Object.freeze({
     wood: { label: '木材', icon: 'wood' },
     stone: { label: '石材', icon: '◈' },
     sand: { label: '砂', icon: '⠿' },
-    relic_fragment: { label: '古代遺物片', icon: 'relic' },
-    iron_ore: { label: '鉄鉱石', icon: '◆' },
-    copper_ore: { label: '銅鉱石', icon: '◆' },
+    'relic-fragment': { label: '古代遺物片', icon: 'relic' },
+    'iron-ore': { label: '鉄鉱石', icon: '◆' },
+    'copper-ore': { label: '銅鉱石', icon: '◆' },
     coal: { label: '石炭', icon: '⬟' },
     sulfur: { label: '硫黄', icon: '✦' },
     clay: { label: '粘土', icon: '●' },
@@ -51,9 +51,9 @@ export const CELL_MATERIALS = Object.freeze({
     peat: { label: '泥炭', icon: '▰' },
     salt: { label: '塩', icon: '◇' },
     tar: { label: 'タール', icon: '⬭' },
-    tin_ore: { label: '錫鉱石', icon: '◆' },
-    zinc_ore: { label: '亜鉛鉱石', icon: '◆' },
-    crystal_shard: { label: '水晶片', icon: '♦' },
+    'tin-ore': { label: '錫鉱石', icon: '◆' },
+    'zinc-ore': { label: '亜鉛鉱石', icon: '◆' },
+    'crystal-shard': { label: '水晶片', icon: '♦' },
     spores: { label: '胞子', icon: '♧' },
     herbs: { label: '薬草', icon: '♣' },
     resin: { label: '樹脂', icon: '●' },
@@ -61,9 +61,9 @@ export const CELL_MATERIALS = Object.freeze({
     mining_sample: { label: '採掘標本', icon: '▣' },
     coke: { label: 'コークス', icon: '⬟' },
     vein_mold: { label: '鉱脈型', icon: '⛭' },
-    navigation_crystal: { label: '航法結晶片', icon: '◈' },
+    'navigation-crystal': { label: '航法結晶片', icon: '◈' },
     preserved_spores: { label: '保存胞子', icon: '⚗' },
-    mycelium_compost: { label: '菌糸堆肥', icon: '▰' },
+    compost: { label: '菌糸堆肥', icon: '▰' },
     forest_seed: { label: '森林の種', icon: '♧' },
     ancient_seed: { label: '古種', icon: '❖' }
 });
@@ -75,28 +75,26 @@ export const COLLECTION_POWER_COSTS = Object.freeze({
     forest_seed: 15,
     stone: 6,
     sand: 1,
-    relic_fragment: 24,
-    iron_ore: 12,
-    copper_ore: 10,
+    'relic-fragment': 24,
+    'iron-ore': 12,
+    'copper-ore': 10,
     coal: 6,
-    coke: 24,
     sulfur: 12,
     clay: 3,
     limestone: 4,
     peat: 3,
     salt: 6,
     tar: 24,
-    tin_ore: 32,
-    zinc_ore: 48,
-    crystal_shard: 64,
+    'tin-ore': 32,
+    'zinc-ore': 48,
+    'crystal-shard': 64,
     spores: 10,
-    mycelium_compost: 28,
     herbs: 20,
     resin: 24,
     salvage: 32,
     mining_sample: 64,
     vein_mold: 96,
-    navigation_crystal: 80,
+    'navigation-crystal': 80,
     preserved_spores: 64,
     ancient_seed: 96
 });
@@ -158,14 +156,14 @@ export function chooseEraCellType(seed, x, y, count, initialType, currentType) {
 }
 
 export function getCellDrops(type, collectionCount = 0) {
-    if (type === 'COAL_SEAM') return [collectionCount % 3 === 2 ? 'coke' : 'coal'];
+    if (type === 'COAL_SEAM') return ['coal'];
     if (type === 'FOREST') return [collectionCount % 5 === 4 ? 'forest_seed' : 'wood'];
-    if (type === 'MYCELIUM') return [collectionCount % 2 ? 'mycelium_compost' : 'spores'];
+    if (type === 'MYCELIUM') return ['spores'];
     if (type === 'MACHINE_WRECK') {
         return [['salvage', 'mining_sample', 'vein_mold'][collectionCount % 3]];
     }
     if (type === 'AIRSHIP_WRECK') {
-        return [['navigation_crystal', 'preserved_spores', 'ancient_seed'][collectionCount % 3]];
+        return [['navigation-crystal', 'preserved_spores', 'ancient_seed'][collectionCount % 3]];
     }
     const material = WORLD_CELL_TYPES[type]?.collect;
     return material ? [material] : [];

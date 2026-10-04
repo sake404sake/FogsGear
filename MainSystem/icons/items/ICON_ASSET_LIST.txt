@@ -6,7 +6,7 @@ FogsGear アイコン素材一覧
 未作成の間は、画面側で定義した代替記号が表示されます。
 
 crafting-icons.svg は合成アイテムIDごとの <symbol> をまとめた共通スプライトです。
-アイテムIDをSVG symbol IDとして使用し、MapSystemの所持品・合成画面から表示します。
+合成アイテムは `i-<アイテムID>` のsymbolを使います。セル素材などID表記が異なる資源は、MapSystem側のアイコン対応表で既存symbolへ解決します（例: `iron_ore` → `i-iron`、`navigation_crystal` → `i-device`）。
 合成ギアを独立アイテムとして扱わず、ギア設置資材は真鍮資材へ統合します。
 
 アイコンの用途

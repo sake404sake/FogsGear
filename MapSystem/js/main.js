@@ -3,9 +3,9 @@ import { MapGenerator, BIOME_COLORS, loadMapSnapshot, saveMapSnapshot } from './
 import { SkinRenderer } from './skinRenderer.js?v=3';
 import { CELL_DEFINITIONS, canEnterCell, getCellEntryRule, getMosaicColor } from './cellRules.js';
 import { drawCellIcon, loadCellIconAtlas } from './cellIconRenderer.js?v=4';
-import { ACTIVE_SCROLL_TARGETS_KEY, CELL_MATERIALS, TERRAIN_TRANSFORM_RECIPES, WORLD_CELL_TYPES, applyCellChanges, chooseEraCellType, getCellCollectionPowerCost, getCellDrops, readCellChanges, saveCellChange } from './worldCells.js?v=4';
+import { ACTIVE_SCROLL_TARGETS_KEY, CELL_MATERIALS, TERRAIN_TRANSFORM_RECIPES, WORLD_CELL_TYPES, applyCellChanges, chooseEraCellType, getCellCollectionPowerCost, getCellDrops, readCellChanges, saveCellChange } from './worldCells.js?v=6';
 import { CRAFTING_ITEMS, CRAFTING_ITEM_BY_ID, CRAFTING_RATE_MULTIPLIER, CRAFTING_RECIPES, CRAFTING_STATION_BUILDING_IDS, HANDCRAFT_STATION } from './craftingData.js?v=5';
-import { BUILDING_BY_ID, BUILDING_DEFINITIONS, canPlaceBuildingOnTerrainCell, drawBuilding, getRailAutoRotation, getRailConnections, getTileEffectsUnderFootprint, getVehicleRailRotation, loadBuildingIconImages, normalizeBuildingUtilityState } from './buildingData.js?v=25';
+import { BUILDING_BY_ID, BUILDING_DEFINITIONS, canPlaceBuildingOnTerrainCell, drawBuilding, getRailAutoRotation, getRailConnections, getTileEffectsUnderFootprint, getVehicleRailRotation, loadBuildingIconImages, normalizeBuildingUtilityState } from './buildingData.js?v=26';
 import { getBuildingUtilityStatus, simulateBuildingUtilityNetworks } from './buildingUtilityNetworks.js?v=4';
 import { buildTerritoryBorderSegments } from './territoryBorders.js?v=35';
 import { directionToVehicleRotation, findNextRailStep, getTrackDirection, getVehicleRenderState, STATION_CONTROL_DEFAULTS, VEHICLE_DEFAULTS } from './railwayRuntime.js?v=8';
@@ -141,6 +141,26 @@ const INVENTORY_ITEM_DEFINITIONS = {
     steam_power: { name: 'スチーム', description: 'ギアの作動負荷を支える蒸気資源です。', iconId: 'steam_power', image: null, meta: '保有資源' }
 };
 
+const CRAFTING_ICON_IDS = Object.freeze({
+    stone: 'i-stone',
+    sand: 'i-sand',
+    relic_fragment: 'i-relic',
+    iron_ore: 'i-iron',
+    copper_ore: 'i-copper',
+    tar: 'i-oil',
+    'crystal-shard': 'i-crystal',
+    tin_ore: 'i-tin',
+    zinc_ore: 'i-zinc',
+    crystal_shard: 'i-crystal',
+    mining_sample: 'i-mining-sample',
+    vein_mold: 'i-vein-mold',
+    navigation_crystal: 'i-device',
+    preserved_spores: 'i-spore-vial',
+    compost: 'i-compost',
+    forest_seed: 'i-forest-seed',
+    ancient_seed: 'i-seedcase'
+});
+
 function openInventoryItem(itemKey, scroll = null) {
     const craftingItem = CRAFTING_ITEM_BY_ID.get(itemKey);
     const building = BUILDING_BY_ID.get(itemKey);
@@ -188,7 +208,8 @@ function createCraftingIcon(itemId) {
     const use = document.createElementNS(svgNamespace, 'use');
     svg.setAttribute('viewBox', '0 0 64 64');
     svg.setAttribute('aria-hidden', 'true');
-    use.setAttribute('href', `../MainSystem/icons/items/crafting-icons.svg?v=7#i-${itemId}`);
+    const iconId = CRAFTING_ICON_IDS[itemId] || `i-${itemId.replaceAll('_', '-')}`;
+    use.setAttribute('href', `../MainSystem/icons/items/crafting-icons.svg?v=9#${iconId}`);
     svg.appendChild(use);
     return svg;
 }
@@ -925,6 +946,26 @@ function getCraftingItemCount(itemId) {
     const resourceKey = { water: 'water', fog: 'fog', power: 'power', steam_power: 'steamPower' }[itemId];
     if (resourceKey) return Math.max(0, Number(engineRuntimeState?.[resourceKey]) || 0);
     return Math.max(0, Number(engineRuntimeState?.materialInventory?.[itemId]) || 0);
+}
+
+function migrateLegacyMaterialIds() {
+    const legacyIds = {
+        relic_fragment: 'relic-fragment',
+        iron_ore: 'iron-ore',
+        copper_ore: 'copper-ore',
+        tin_ore: 'tin-ore',
+        zinc_ore: 'zinc-ore',
+        crystal_shard: 'crystal-shard',
+        navigation_crystal: 'navigation-crystal',
+        mycelium_compost: 'compost'
+    };
+    const inventory = engineRuntimeState.materialInventory;
+    Object.entries(legacyIds).forEach(([legacyId, itemId]) => {
+        const count = Number(inventory[legacyId]);
+        if (!(count > 0)) return;
+        inventory[itemId] = (Number(inventory[itemId]) || 0) + count;
+        delete inventory[legacyId];
+    });
 }
 
 function getMaximumCraftCount(inputs, creative = Boolean(engineRuntimeState?.creativeMode)) {
@@ -3754,6 +3795,7 @@ window.addEventListener('storage', (event) => {
 window.addEventListener('fogsgear:scroll-targets-changed', event => refreshActiveScrollTargets(event.detail));
 
 const engineRuntimeState = new EngineGameState();
+migrateLegacyMaterialIds();
 new EngineGearManager(engineRuntimeState);
 engineRuntimeState.worldCellHandler = handleWorldCellOperation;
 engineRuntimeState.subscribe(() => {

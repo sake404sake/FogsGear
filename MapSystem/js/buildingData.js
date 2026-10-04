@@ -59,7 +59,7 @@ const definitions = [
 export const BUILDING_MATERIAL_COSTS_BY_ID = Object.freeze({
     'foundation-cell': [['limestone', 2], ['clay', 1]],
     'brick-tile': [['clay', 2], ['limestone', 1]],
-    'concrete-tile': [['limestone', 2], ['iron_ore', 1]],
+    'concrete-tile': [['limestone', 2], ['iron-ore', 1]],
     'grate-tile': [['iron-plate', 2], ['steel-ingot', 1]],
     'wood-tile': [['sealed-board', 2], ['resin-lacquer', 1]],
     'stone-tile': [['pumice', 2], ['clay', 1]],
@@ -101,7 +101,7 @@ export const BUILDING_MATERIAL_COSTS_BY_ID = Object.freeze({
     'airship-workshop': [['sealed-board', 12], ['lumber', 10], ['rope', 8], ['brass-sheet', 6], ['survey-kit', 1]],
     'settler-lodge': [['lumber', 20], ['sealed-board', 10], ['glass-blank', 6], ['herb-extract', 3], ['rivet', 12]],
     'council-hall': [['steel-ingot', 48], ['lumber', 30], ['sealed-board', 20], ['glass-blank', 16], ['iron-plate', 24]],
-    'relic-reactor': [['relic_fragment', 12], ['relic-core', 3], ['navigation_crystal', 6], ['steel-ingot', 20], ['brass-sheet', 12]],
+    'relic-reactor': [['relic-fragment', 12], ['relic-core', 3], ['navigation-crystal', 6], ['steel-ingot', 20], ['brass-sheet', 12]],
     'airship-dockyard': [['steel-ingot', 72], ['lumber', 48], ['sealed-board', 32], ['axle', 16], ['rope', 20]],
     'filter-tower': [['steel-ingot', 56], ['filter-cartridge', 20], ['ceramic-barrier', 16], ['copper-capillary', 12], ['brass-sheet', 10]],
     'walking-city-frame': [['steel-ingot', 80], ['iron-plate', 48], ['axle', 24], ['steel-spring', 24], ['bronze-bearing', 20]],
