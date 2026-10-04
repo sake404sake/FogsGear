@@ -4,12 +4,12 @@ import { SkinRenderer } from './skinRenderer.js?v=2';
 import { CELL_DEFINITIONS, canEnterCell, getCellEntryRule, getMosaicColor } from './cellRules.js';
 import { drawCellIcon, loadCellIconAtlas } from './cellIconRenderer.js?v=4';
 import { ACTIVE_SCROLL_TARGETS_KEY, CELL_MATERIALS, TERRAIN_TRANSFORM_RECIPES, WORLD_CELL_TYPES, applyCellChanges, chooseEraCellType, getCellCollectionPowerCost, getCellDrops, readCellChanges, saveCellChange } from './worldCells.js?v=4';
-import { CRAFTING_ITEMS, CRAFTING_ITEM_BY_ID, CRAFTING_RATE_MULTIPLIER, CRAFTING_RECIPES, CRAFTING_STATION_BUILDING_IDS, HANDCRAFT_STATION } from './craftingData.js?v=3';
+import { CRAFTING_ITEMS, CRAFTING_ITEM_BY_ID, CRAFTING_RATE_MULTIPLIER, CRAFTING_RECIPES, CRAFTING_STATION_BUILDING_IDS, HANDCRAFT_STATION } from './craftingData.js?v=4';
 import { BUILDING_BY_ID, BUILDING_DEFINITIONS, canPlaceBuildingOnTerrainCell, drawBuilding, getRailAutoRotation, getRailConnections, getTileEffectsUnderFootprint, getVehicleRailRotation, loadBuildingIconImages, normalizeBuildingUtilityState } from './buildingData.js?v=23';
 import { getBuildingUtilityStatus, simulateBuildingUtilityNetworks } from './buildingUtilityNetworks.js?v=4';
 import { buildTerritoryBorderSegments } from './territoryBorders.js?v=35';
 import { directionToVehicleRotation, findNextRailStep, getTrackDirection, getVehicleRenderState, STATION_CONTROL_DEFAULTS, VEHICLE_DEFAULTS } from './railwayRuntime.js?v=8';
-import { GameState as EngineGameState } from '../../GearSystem/js/GameState.js?v=runtime-28';
+import { GameState as EngineGameState } from '../../GearSystem/js/GameState.js?v=runtime-29';
 import { GearManager as EngineGearManager } from '../../GearSystem/js/GearManager.js?v=runtime-5';
 
 const canvas = document.getElementById('gameCanvas');
@@ -129,6 +129,7 @@ let inventoryRenderSignature = '';
 let craftingRenderSignature = '';
 let buildingRenderSignature = '';
 let buildingCraftingRenderSignature = '';
+const craftingNotificationCards = new Map();
 
 const INVENTORY_ITEM_DEFINITIONS = {
     paper_scroll: { name: 'スクロール（紙）', description: '新しいギア設計を記録する紙の巻物。ギア編集画面で設計を作成できます。', iconId: 'paper_scroll', image: null, meta: '未使用・新規設計用' },
@@ -651,6 +652,7 @@ async function init() {
     cellIconPromise.then(atlas => {
         if (!atlas) return;
         cellIconAtlas = atlas;
+        renderCellLegend();
         scheduleDraw();
     });
     const placedBuildingIds = [...new Set(state.buildings.map(placed => placed.id))];
@@ -922,6 +924,18 @@ function getCraftingItemCount(itemId) {
     return Math.max(0, Number(engineRuntimeState?.materialInventory?.[itemId]) || 0);
 }
 
+function getMaximumCraftCount(inputs, creative = Boolean(engineRuntimeState?.creativeMode)) {
+    if (creative) return 99;
+    if (!inputs.length) return 0;
+    return Math.max(0, Math.min(...inputs.map(([itemId, amount]) =>
+        Math.floor(getCraftingItemCount(itemId) / Math.max(1, Number(amount) || 1)))));
+}
+
+function sortCraftingRecipesByAvailability(recipes) {
+    return [...recipes].sort((first, second) =>
+        Number(getMaximumCraftCount(second.recipe[2]) > 0) - Number(getMaximumCraftCount(first.recipe[2]) > 0));
+}
+
 function getCraftingItemName(itemId) {
     return CRAFTING_ITEM_BY_ID.get(itemId)?.[1] || CELL_MATERIALS[itemId]?.label || INVENTORY_ITEM_DEFINITIONS[itemId]?.name
         || BUILDING_BY_ID.get(itemId)?.name
@@ -984,7 +998,7 @@ function renderBuildingInventory() {
     const buildingKitCounts = BUILDING_DEFINITIONS.map(building => [building.id, getCraftingItemCount(building.id)]);
     const constructionJobs = (engineRuntimeState.craftingJobs || [])
         .filter(job => BUILDING_BY_ID.has(job.outputItem))
-        .map(job => [job.recipeKey, Math.max(0, Math.ceil((Number(job.completesAt) - Date.now()) / 1000))]);
+        .map(job => [job.jobId, job.recipeKey, Number(job.completesAt)]);
     const signature = `${brass}:${creative}:${hasConstructionStation}:${search}:${JSON.stringify(buildingKitCounts)}:${JSON.stringify(constructionJobs)}`;
     if (signature === buildingRenderSignature) return;
     buildingRenderSignature = signature;
@@ -998,16 +1012,13 @@ function renderBuildingInventory() {
     }
     visibleBuildings.forEach(building => {
         const ownedCount = getCraftingItemCount(building.id);
-        const activeJob = (engineRuntimeState.craftingJobs || []).find(job => job.recipeKey === `building:${building.id}`);
+        const activeJobs = (engineRuntimeState.craftingJobs || []).filter(job => job.recipeKey === `building:${building.id}`);
         const requiresStation = isLargeBuilding(building) && building.id !== 'craft-bench';
         const stationAvailable = !requiresStation || hasConstructionStation;
-        const affordable = creative || brass >= building.brassCost;
-        const button = document.createElement('button');
-        button.type = 'button';
-        button.className = `inventory-item-card building-item-card is-${building.role}`;
-        button.dataset.action = 'craft-building-kit';
-        button.dataset.buildingId = building.id;
-        button.disabled = Boolean(activeJob) || !stationAvailable || !affordable;
+        const maxCraftCount = creative ? 99 : Math.floor(brass / Math.max(1, building.brassCost));
+        const affordable = maxCraftCount > 0;
+        const card = document.createElement('div');
+        card.className = `inventory-item-card building-item-card is-${building.role}`;
         const icon = document.createElement('span');
         icon.className = 'building-item-icon';
         icon.appendChild(createBuildingSvgIcon(building.id));
@@ -1019,19 +1030,47 @@ function renderBuildingInventory() {
         const cost = document.createElement('small');
         cost.className = `building-item-meta ${affordable ? 'is-affordable' : 'is-unaffordable'}`;
         const placementRule = building.requiresFoundation ? ' / 基礎必須' : building.role === 'vehicle' ? ' / 線路必須' : '';
-        const status = activeJob
-            ? `製作中 ${Math.max(0, Math.ceil((Number(activeJob.completesAt) - Date.now()) / 1000))}秒`
+        const status = activeJobs.length
+            ? `製作中 ${activeJobs.length}個 / `
             : !stationAvailable ? '作業台以上の設備が必要'
             : !affordable ? '真鍮不足'
             : `作成${ownedCount ? ` / 所持 ${ownedCount}` : ''}`;
-        cost.textContent = `${building.width}×${building.height} / 真鍮 ${building.brassCost}${placementRule} / ${status}`;
+        cost.append(`${building.width}×${building.height} / 真鍮 ${building.brassCost}${placementRule} / ${status}`);
+        if (activeJobs.length) {
+            const countdown = document.createElement('span');
+            countdown.className = 'building-item-countdown';
+            countdown.dataset.completesAt = String(activeJobs[0].completesAt);
+            countdown.textContent = `${Math.max(0, Math.ceil((Number(activeJobs[0].completesAt) - Date.now()) / 1000))}秒`;
+            cost.appendChild(countdown);
+        }
         copy.append(name, cost);
-        button.append(icon, copy);
-        list.appendChild(button);
+        const quantityLabel = document.createElement('label');
+        quantityLabel.className = 'building-item-quantity';
+        quantityLabel.append('作成数');
+        const quantityMax = document.createElement('small');
+        quantityMax.textContent = `最大 ${maxCraftCount}`;
+        const quantityInput = document.createElement('input');
+        quantityInput.className = 'building-quantity-input';
+        quantityInput.type = 'number';
+        quantityInput.min = '1';
+        quantityInput.max = String(maxCraftCount);
+        quantityInput.value = affordable ? '1' : '0';
+        quantityInput.disabled = !affordable;
+        quantityInput.setAttribute('aria-label', `${building.name}の作成数`);
+        quantityLabel.append(quantityMax, quantityInput);
+        const createButton = document.createElement('button');
+        createButton.type = 'button';
+        createButton.className = 'building-item-create';
+        createButton.dataset.action = 'craft-building-kit';
+        createButton.dataset.buildingId = building.id;
+        createButton.textContent = '建築キットを作成';
+        createButton.disabled = !stationAvailable || !affordable;
+        card.append(icon, copy, quantityLabel, createButton);
+        list.appendChild(card);
     });
 }
 
-function craftBuildingKit(buildingId) {
+function craftBuildingKit(buildingId, requestedCount) {
     const building = BUILDING_BY_ID.get(buildingId);
     if (!building || !engineRuntimeState) return;
     const requiresStation = isLargeBuilding(building) && building.id !== 'craft-bench';
@@ -1039,27 +1078,39 @@ function craftBuildingKit(buildingId) {
         showAppNotice('2×2以上の建築には作業台以上の設備が必要です。');
         return;
     }
-    if ((engineRuntimeState.craftingJobs || []).some(job => job.recipeKey === `building:${building.id}`)) return;
-    if (!engineRuntimeState.creativeMode && Number(engineRuntimeState.brass) < building.brassCost) {
+    const creative = Boolean(engineRuntimeState.creativeMode);
+    const maxCraftCount = creative ? 99 : Math.floor(getCraftingItemCount('brass-stock') / Math.max(1, building.brassCost));
+    const quantity = Math.floor(Number(requestedCount));
+    if (!Number.isFinite(quantity) || quantity < 1 || quantity > maxCraftCount) {
+        showAppNotice(maxCraftCount > 0 ? `作成数は1〜${maxCraftCount}個で指定してください。` : '建築キットの作成に必要な真鍮が足りません。');
+        return;
+    }
+    if (!creative && getCraftingItemCount('brass-stock') < building.brassCost * quantity) {
         showAppNotice('建築キットの作成に必要な真鍮が足りません。');
         return;
     }
-    if (!engineRuntimeState.creativeMode) engineRuntimeState.brass = Math.max(0, Number(engineRuntimeState.brass) - building.brassCost);
+    if (!creative) engineRuntimeState.brass = Math.max(0, Number(engineRuntimeState.brass) - building.brassCost * quantity);
     const startedAt = Date.now();
-    engineRuntimeState.craftingJobs.push({
-        jobId: `building:${building.id}:${startedAt}:${Math.random().toString(36).slice(2)}`,
-        recipeKey: `building:${building.id}`,
-        outputItem: building.id,
-        outputAmount: 1,
-        startedAt,
-        completesAt: startedAt + Math.max(4, building.brassCost * 4) * 1000
-    });
+    const batchGroupId = `building:${building.id}:${startedAt}:${Math.random().toString(36).slice(2)}`;
+    const duration = Math.max(4, building.brassCost * 4) * 1000;
+    for (let index = 0; index < quantity; index++) {
+        engineRuntimeState.craftingJobs.push({
+            jobId: `${batchGroupId}:${index + 1}`,
+            batchGroupId,
+            batchIndex: index + 1,
+            batchCount: quantity,
+            recipeKey: `building:${building.id}`,
+            outputItem: building.id,
+            outputAmount: 1,
+            startedAt,
+            completesAt: startedAt + duration
+        });
+    }
     engineRuntimeState.saveGameData();
     engineRuntimeState.notify();
     updateEngineDashboard();
     buildingRenderSignature = '';
     renderBuildingInventory();
-    showAppNotice(`${building.name}の建築キット作成を開始しました。`);
 }
 
 function saveBuildings() {
@@ -1187,7 +1238,7 @@ function renderCellMaterials() {
     if (!recipeList || document.getElementById('inventory-crafting-view')?.hidden) return;
     const selectedFamily = document.getElementById('crafting-family-filter')?.value || 'all';
     const recipeSearch = normalizeInventorySearch(document.getElementById('crafting-recipe-search')?.value);
-    const visibleRecipes = CRAFTING_RECIPES.map((recipe, index) => ({ recipe, index }))
+    const visibleRecipes = sortCraftingRecipesByAvailability(CRAFTING_RECIPES.map((recipe, index) => ({ recipe, index }))
         .filter(({ recipe }) => {
             if (recipe[4] !== HANDCRAFT_STATION) return false;
             if (selectedFamily !== 'all' && recipe[0] !== selectedFamily) return false;
@@ -1195,9 +1246,9 @@ function renderCellMaterials() {
             const [family, title, inputs, output, station, note] = recipe;
             const searchableText = [family, title, station, note, getCraftingItemName(output), ...inputs.map(([itemId]) => getCraftingItemName(itemId))].join(' ');
             return normalizeInventorySearch(searchableText).includes(recipeSearch);
-        });
+        }));
     const now = Date.now();
-    const jobSignature = JSON.stringify((engineRuntimeState.craftingJobs || []).map(job => [job.recipeKey, Math.max(0, Math.ceil((Number(job.completesAt) - now) / 1000))]));
+    const jobSignature = JSON.stringify((engineRuntimeState.craftingJobs || []).map(job => [job.jobId, job.recipeKey, Number(job.completesAt)]));
     const craftingSignature = `${selectedFamily}:${recipeSearch}:${JSON.stringify(orderedIds.map(id => [id, getCraftingItemCount(id)]))}:${jobSignature}`;
     if (craftingSignature === craftingRenderSignature) return;
     craftingRenderSignature = craftingSignature;
@@ -1205,7 +1256,9 @@ function renderCellMaterials() {
     if (!visibleRecipes.length) {
         const empty = document.createElement('p');
         empty.className = 'inventory-empty';
-        empty.textContent = '該当する合成レシピはありません';
+        empty.textContent = recipeSearch || selectedFamily !== 'all'
+            ? '条件に一致する手作業の合成素材はありません'
+            : '手作業で作れる合成素材はありません';
         recipeList.appendChild(empty);
         return;
     }
@@ -1215,13 +1268,15 @@ function renderCellMaterials() {
 function createCraftingRecipeCard(recipe, index, now, buildingInstanceId = '') {
     const [family, title, inputs, output, station, note, batch = 1, duration = 0] = recipe;
     const recipeKey = `${family}:${title}`;
-    const activeJob = (engineRuntimeState.craftingJobs || []).find(job => job.recipeKey === recipeKey);
+    const activeJobs = (engineRuntimeState.craftingJobs || []).filter(job => job.recipeKey === recipeKey);
+    const maxCraftCount = getMaximumCraftCount(inputs);
+    const defaultCraftCount = maxCraftCount > 0 ? 1 : 0;
     const card = document.createElement('article');
-    card.className = 'crafting-recipe-card';
+    card.className = `crafting-recipe-card${maxCraftCount > 0 ? '' : ' is-unavailable'}`;
     const heading = document.createElement('div');
     heading.className = 'crafting-recipe-title';
     const titleText = document.createElement('strong');
-    titleText.textContent = title;
+    titleText.textContent = title === '木材を板に挽く' ? '製材板に加工' : title;
     const groupText = document.createElement('small');
     groupText.textContent = family;
     heading.append(titleText, groupText);
@@ -1240,7 +1295,7 @@ function createCraftingRecipeCard(recipe, index, now, buildingInstanceId = '') {
     outputName.textContent = getCraftingItemName(output);
     const outputCount = document.createElement('span');
     outputCount.className = 'crafting-output-count';
-    outputCount.textContent = `×${batch}`;
+    outputCount.textContent = `×${batch * defaultCraftCount}`;
     outputMain.append(outputIcon, outputName, outputCount);
     outputBlock.append(outputCaption, outputMain);
 
@@ -1256,17 +1311,44 @@ function createCraftingRecipeCard(recipe, index, now, buildingInstanceId = '') {
     const footer = document.createElement('div');
     footer.className = 'crafting-recipe-footer';
     const stationLabel = document.createElement('span');
-    stationLabel.textContent = activeJob
-        ? `${station} / 残り${Math.max(0, Math.ceil((Number(activeJob.completesAt) - now) / 1000))}秒`
+    stationLabel.textContent = activeJobs.length
+        ? `${station} / 進行中 ${activeJobs.length}回`
         : `${station} / ${Math.max(1, Math.round(duration / CRAFTING_RATE_MULTIPLIER))}秒`;
+    if (activeJobs.length) {
+        const countdown = document.createElement('span');
+        countdown.className = 'crafting-countdown';
+        countdown.dataset.completesAt = String(activeJobs[0].completesAt);
+        countdown.textContent = `${Math.max(0, Math.ceil((Number(activeJobs[0].completesAt) - now) / 1000))}秒`;
+        stationLabel.appendChild(countdown);
+    }
+    const quantityLabel = document.createElement('label');
+    quantityLabel.className = 'crafting-quantity-control';
+    quantityLabel.append('作成回数');
+    const quantityInput = document.createElement('input');
+    quantityInput.className = 'crafting-quantity-input';
+    quantityInput.type = 'number';
+    quantityInput.min = '1';
+    quantityInput.max = String(maxCraftCount);
+    quantityInput.value = String(defaultCraftCount);
+    quantityInput.disabled = maxCraftCount === 0;
+    quantityInput.setAttribute('aria-label', `${getCraftingItemName(output)}の作成回数`);
+    quantityLabel.appendChild(quantityInput);
+    const quantityMax = document.createElement('small');
+    quantityMax.textContent = `最大 ${maxCraftCount}回`;
+    quantityLabel.appendChild(quantityMax);
     const craftButton = document.createElement('button');
     craftButton.type = 'button';
     craftButton.dataset.action = 'craft-recipe';
     craftButton.dataset.recipeIndex = String(index);
     if (buildingInstanceId) craftButton.dataset.buildingInstanceId = buildingInstanceId;
-    craftButton.textContent = activeJob ? '製作中' : `製作 ×${batch}`;
-    craftButton.disabled = Boolean(activeJob) || inputs.some(([itemId, amount]) => getCraftingItemCount(itemId) < amount);
-    footer.append(stationLabel, craftButton);
+    craftButton.textContent = `製作 ×${batch * defaultCraftCount}`;
+    craftButton.disabled = maxCraftCount === 0;
+    quantityInput.addEventListener('input', () => {
+        const selectedCount = Math.max(1, Math.min(maxCraftCount, Math.floor(Number(quantityInput.value) || 1)));
+        outputCount.textContent = `×${batch * selectedCount}`;
+        craftButton.textContent = `製作 ×${batch * selectedCount}`;
+    });
+    footer.append(stationLabel, quantityLabel, craftButton);
     const noteElement = document.createElement('p');
     noteElement.className = 'crafting-recipe-note';
     noteElement.textContent = note;
@@ -1276,7 +1358,9 @@ function createCraftingRecipeCard(recipe, index, now, buildingInstanceId = '') {
 
 function createCraftingChip(itemId, amount) {
     const chip = document.createElement('span');
-    chip.className = 'crafting-item-chip';
+    const available = getCraftingItemCount(itemId);
+    chip.className = `crafting-item-chip${available < amount ? ' is-missing' : ''}`;
+    chip.setAttribute('aria-label', `${getCraftingItemName(itemId)}: 所持 ${formatInventoryCount(itemId, available)} / 必要 ${amount}`);
     const icon = document.createElement('span');
     icon.className = 'crafting-item-icon';
     icon.appendChild(createInventoryIcon(itemId));
@@ -1296,7 +1380,7 @@ function canCraftRecipeAtBuilding(recipe, buildingInstanceId) {
     return state.buildings.some(building => building.instanceId === buildingInstanceId && buildingIds.includes(building.id));
 }
 
-function craftRecipe(recipeIndex, buildingInstanceId = '') {
+function craftRecipe(recipeIndex, buildingInstanceId = '', requestedCount) {
     const recipe = CRAFTING_RECIPES[recipeIndex];
     const creative = Boolean(engineRuntimeState?.creativeMode);
     const isHandcraft = recipe?.[4] === HANDCRAFT_STATION;
@@ -1304,32 +1388,44 @@ function craftRecipe(recipeIndex, buildingInstanceId = '') {
         showAppNotice('このレシピに対応する製作設備が必要です。');
         return;
     }
-    if (!creative && recipe[2].some(([itemId, amount]) => getCraftingItemCount(itemId) < amount)) {
+    const maxCraftCount = getMaximumCraftCount(recipe[2], creative);
+    const quantity = Math.floor(Number(requestedCount));
+    if (!Number.isFinite(quantity) || quantity < 1 || quantity > maxCraftCount) {
+        showAppNotice(maxCraftCount > 0 ? `作成回数は1〜${maxCraftCount}回で指定してください。` : '合成に必要な素材が足りません。');
+        return;
+    }
+    if (!creative && recipe[2].some(([itemId, amount]) => getCraftingItemCount(itemId) < amount * quantity)) {
         showAppNotice('合成に必要な素材が足りません。');
         return;
     }
     const recipeKey = `${recipe[0]}:${recipe[1]}`;
-    if (engineRuntimeState.craftingJobs.some(job => job.recipeKey === recipeKey)) return;
     engineRuntimeState.saveState();
     if (!creative) recipe[2].forEach(([itemId, amount]) => {
-        if (itemId === 'brass-stock') engineRuntimeState.brass -= amount;
+        const totalAmount = amount * quantity;
+        if (itemId === 'brass-stock') engineRuntimeState.brass -= totalAmount;
         else if (['water', 'fog', 'power', 'steam_power'].includes(itemId)) {
             const resourceKey = { water: 'water', fog: 'fog', power: 'power', steam_power: 'steamPower' }[itemId];
-            engineRuntimeState[resourceKey] = Math.max(0, Number(engineRuntimeState[resourceKey]) - amount);
+            engineRuntimeState[resourceKey] = Math.max(0, Number(engineRuntimeState[resourceKey]) - totalAmount);
         }
-        else engineRuntimeState.materialInventory[itemId] = Math.max(0, getCraftingItemCount(itemId) - amount);
+        else engineRuntimeState.materialInventory[itemId] = Math.max(0, getCraftingItemCount(itemId) - totalAmount);
     });
     const outputAmount = Number(recipe[6]) || 1;
     const duration = Math.max(1000, Math.round((Number(recipe[7]) || 90) / CRAFTING_RATE_MULTIPLIER * 1000));
     const startedAt = Date.now();
-    engineRuntimeState.craftingJobs.push({
-        jobId: `${recipeKey}:${startedAt}:${Math.random().toString(36).slice(2)}`,
-        recipeKey,
-        outputItem: recipe[3],
-        outputAmount,
-        startedAt,
-        completesAt: startedAt + duration
-    });
+    const batchGroupId = `${recipeKey}:${startedAt}:${Math.random().toString(36).slice(2)}`;
+    for (let index = 0; index < quantity; index++) {
+        engineRuntimeState.craftingJobs.push({
+            jobId: `${batchGroupId}:${index + 1}`,
+            batchGroupId,
+            batchIndex: index + 1,
+            batchCount: quantity,
+            recipeKey,
+            outputItem: recipe[3],
+            outputAmount,
+            startedAt,
+            completesAt: startedAt + duration
+        });
+    }
     engineRuntimeState.saveGameData();
     engineRuntimeState.notify();
     updateEngineDashboard();
@@ -1362,10 +1458,11 @@ function renderBuildingCrafting() {
     });
     const jobSignature = JSON.stringify(recipes.map(({ recipe }) => {
         const recipeKey = `${recipe[0]}:${recipe[1]}`;
-        const activeJob = (engineRuntimeState.craftingJobs || []).find(job => job.recipeKey === recipeKey);
-        const remaining = activeJob ? Math.max(0, Math.ceil((Number(activeJob.completesAt) - Date.now()) / 1000)) : 0;
+        const activeJobs = (engineRuntimeState.craftingJobs || [])
+            .filter(job => job.recipeKey === recipeKey)
+            .map(job => [job.jobId, Number(job.completesAt)]);
         const availableInputs = recipe[2].map(([itemId]) => getCraftingItemCount(itemId));
-        return [recipeKey, remaining, availableInputs];
+        return [recipeKey, activeJobs, availableInputs];
     }));
     const signature = `${placed.instanceId}:${search}:${jobSignature}`;
     if (signature === buildingCraftingRenderSignature) return;
@@ -1379,7 +1476,86 @@ function renderBuildingCrafting() {
         return;
     }
     const now = Date.now();
-    recipes.forEach(({ recipe, index }) => list.appendChild(createCraftingRecipeCard(recipe, index, now, placed.instanceId)));
+    sortCraftingRecipesByAvailability(recipes)
+        .forEach(({ recipe, index }) => list.appendChild(createCraftingRecipeCard(recipe, index, now, placed.instanceId)));
+}
+
+function updateCraftingCountdowns() {
+    document.querySelectorAll('.crafting-countdown, .building-item-countdown').forEach(countdown => {
+        const remaining = Math.max(0, Math.ceil((Number(countdown.dataset.completesAt) - Date.now()) / 1000));
+        countdown.textContent = `${remaining}秒`;
+    });
+    syncCraftingNotifications();
+}
+
+function createCraftingNotification(job) {
+    const card = document.createElement('article');
+    card.className = 'crafting-progress-card';
+    card.dataset.jobId = job.jobId;
+    const icon = document.createElement('span');
+    icon.className = 'crafting-progress-icon';
+    icon.appendChild(createInventoryIcon(job.outputItem));
+    const copy = document.createElement('span');
+    copy.className = 'crafting-progress-copy';
+    const title = document.createElement('strong');
+    title.className = 'crafting-progress-title';
+    const meta = document.createElement('span');
+    meta.className = 'crafting-progress-meta';
+    const batch = document.createElement('span');
+    batch.className = 'crafting-progress-batch';
+    const remaining = document.createElement('span');
+    remaining.className = 'crafting-progress-remaining';
+    const track = document.createElement('span');
+    track.className = 'crafting-progress-track';
+    track.setAttribute('role', 'progressbar');
+    track.setAttribute('aria-valuemin', '0');
+    track.setAttribute('aria-valuemax', '100');
+    const fill = document.createElement('span');
+    fill.className = 'crafting-progress-fill';
+    track.appendChild(fill);
+    meta.append(batch, remaining);
+    copy.append(title, meta, track);
+    card.append(icon, copy);
+    document.getElementById('crafting-notifications')?.appendChild(card);
+    return { card, title, batch, remaining, track };
+}
+
+function syncCraftingNotifications() {
+    const container = document.getElementById('crafting-notifications');
+    if (!container || !engineRuntimeState) return;
+    const jobs = engineRuntimeState.craftingJobs || [];
+    const activeIds = new Set(jobs.map(job => job.jobId));
+    for (const [jobId, entry] of craftingNotificationCards) {
+        if (activeIds.has(jobId)) continue;
+        entry.card.remove();
+        craftingNotificationCards.delete(jobId);
+    }
+    const now = Date.now();
+    jobs.forEach(job => {
+        let entry = craftingNotificationCards.get(job.jobId);
+        if (!entry) {
+            entry = createCraftingNotification(job);
+            craftingNotificationCards.set(job.jobId, entry);
+        }
+        const outputName = getCraftingItemName(job.outputItem);
+        const outputAmount = Math.max(1, Math.floor(Number(job.outputAmount) || 1));
+        const batchIndex = Math.max(1, Math.floor(Number(job.batchIndex) || 1));
+        const batchCount = Math.max(batchIndex, Math.floor(Number(job.batchCount) || 1));
+        const startedAt = Number(job.startedAt);
+        const completesAt = Number(job.completesAt);
+        const start = Number.isFinite(startedAt) ? startedAt : now;
+        const duration = Math.max(1, completesAt - start);
+        const progress = Math.max(0, Math.min(100, ((now - start) / duration) * 100));
+        const secondsLeft = Math.max(0, Math.ceil((completesAt - now) / 1000));
+        entry.title.textContent = `${outputName}${outputAmount > 1 ? ` ×${outputAmount}` : ''}`;
+        const batchLabel = batchCount > 1 ? `作成中 ${batchIndex}/${batchCount}` : '作成中';
+        const remainingLabel = `残り ${secondsLeft}秒`;
+        if (entry.batch.textContent !== batchLabel) entry.batch.textContent = batchLabel;
+        if (entry.remaining.textContent !== remainingLabel) entry.remaining.textContent = remainingLabel;
+        entry.track.setAttribute('aria-label', `${outputName}の作成進行状況`);
+        entry.track.setAttribute('aria-valuenow', String(Math.round(progress)));
+        entry.track.firstElementChild.style.setProperty('--crafting-progress', `${progress}%`);
+    });
 }
 
 function openBuildingCrafting() {
@@ -3083,7 +3259,8 @@ document.addEventListener('click', (event) => {
         return;
     }
     if (button.dataset.action === 'craft-building-kit') {
-        craftBuildingKit(button.dataset.buildingId);
+        const quantity = button.closest('.building-item-card')?.querySelector('.building-quantity-input')?.value;
+        craftBuildingKit(button.dataset.buildingId, quantity);
         return;
     }
     if (button.dataset.action === 'place-building-from-inventory') {
@@ -3129,7 +3306,8 @@ document.addEventListener('click', (event) => {
         return;
     }
     if (button.dataset.action === 'craft-recipe') {
-        craftRecipe(Number(button.dataset.recipeIndex), button.dataset.buildingInstanceId || '');
+        const quantity = button.closest('.crafting-recipe-card')?.querySelector('.crafting-quantity-input')?.value;
+        craftRecipe(Number(button.dataset.recipeIndex), button.dataset.buildingInstanceId || '', quantity);
         return;
     }
     if (button.dataset.action === 'export-save') {
@@ -3372,7 +3550,9 @@ engineRuntimeState.subscribe(() => {
         else renderCellMaterials();
     }
     if (!document.getElementById('building-crafting-modal')?.hidden) renderBuildingCrafting();
+    updateCraftingCountdowns();
 });
+syncCraftingNotifications();
 window.setInterval(() => engineRuntimeState.tick(), 16);
 window.setInterval(updateBuildingUtilityNetworks, 1000);
 

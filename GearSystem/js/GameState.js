@@ -3,7 +3,7 @@ import { ACTIVE_SCROLL_TARGETS_KEY, CELL_MATERIALS, TERRAIN_TRANSFORM_RECIPES, W
 
 const ACTIVE_SCROLL_SYNC_STATE_KEY = 'fogsgear_active_scroll_sync_state';
 const INITIAL_MATERIAL_INVENTORY = Object.freeze({ paper_scroll: 10, cloth_scroll: 10, scroll_book: 1 });
-const MATERIAL_INVENTORY_VERSION = 2;
+const MATERIAL_INVENTORY_VERSION = 4;
 const LEGACY_INITIAL_MATERIAL_INVENTORY = Object.freeze({ 'iron-screw': 12, 'pressure-gauge': 1 });
 
 function removeLegacyInitialMaterials(value) {
@@ -21,6 +21,9 @@ function removeLegacyInitialMaterials(value) {
 function restoreMaterialInventory(value, version = MATERIAL_INVENTORY_VERSION) {
     const inventoryData = Number(version) < MATERIAL_INVENTORY_VERSION ? removeLegacyInitialMaterials(value) : value;
     const inventory = { ...INITIAL_MATERIAL_INVENTORY, ...(inventoryData && typeof inventoryData === 'object' && !Array.isArray(inventoryData) ? inventoryData : {}) };
+    if (Number(version) === 3) {
+        inventory.wood = Math.max(0, (Number(inventoryData?.wood) || 0) - 10);
+    }
     if (Number(inventory.old_screw) > 0) inventory['iron-screw'] = (Number(inventory['iron-screw']) || 0) + Number(inventory.old_screw);
     delete inventory.old_screw;
     delete inventory.brass_gear;
