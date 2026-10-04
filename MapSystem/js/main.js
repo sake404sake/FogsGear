@@ -1005,7 +1005,7 @@ function renderBuildingInventory() {
     const buildingKitCounts = BUILDING_DEFINITIONS.map(building => [building.id, getCraftingItemCount(building.id)]);
     const constructionJobs = (engineRuntimeState.craftingJobs || [])
         .filter(job => BUILDING_BY_ID.has(job.outputItem))
-        .map(job => [job.jobId, job.recipeKey, Number(job.completesAt)]);
+        .map(job => [job.jobId, job.recipeKey, Number(job.startedAt), Number(job.completesAt)]);
     const buildingMaterialCounts = BUILDING_DEFINITIONS.flatMap(building =>
         getBuildingMaterialCosts(building).map(([itemId]) => [itemId, getCraftingItemCount(itemId)]));
     const signature = `${brass}:${creative}:${hasConstructionStation}:${search}:${JSON.stringify(buildingKitCounts)}:${JSON.stringify(buildingMaterialCounts)}:${JSON.stringify(constructionJobs)}`;
@@ -1021,7 +1021,9 @@ function renderBuildingInventory() {
     }
     visibleBuildings.forEach(building => {
         const ownedCount = getCraftingItemCount(building.id);
-        const activeJobs = (engineRuntimeState.craftingJobs || []).filter(job => job.recipeKey === `building:${building.id}`);
+        const activeJobs = (engineRuntimeState.craftingJobs || [])
+            .filter(job => job.recipeKey === `building:${building.id}`)
+            .sort((first, second) => Number(first.startedAt) - Number(second.startedAt));
         const requiresStation = isLargeBuilding(building) && building.id !== 'craft-bench';
         const stationAvailable = !requiresStation || hasConstructionStation;
         const materialCosts = getBuildingMaterialCosts(building);
@@ -1041,7 +1043,9 @@ function renderBuildingInventory() {
         name.className = 'building-item-name';
         name.textContent = building.name;
         const cost = document.createElement('small');
-        cost.className = `building-item-meta ${affordable ? 'is-affordable' : 'is-unaffordable'}`;
+        const queueCount = activeJobs.length;
+        const canCraftNow = stationAvailable && affordable;
+        cost.className = `building-item-meta ${canCraftNow ? 'is-affordable' : 'is-unaffordable'}`;
         const placementRule = building.requiresFoundation ? ' / 基礎必須' : building.role === 'vehicle' ? ' / 線路必須' : '';
         const missingBrass = !creative && brass < building.brassCost;
         const missingMaterialNames = creative ? [] : materialCosts
@@ -1049,13 +1053,28 @@ function renderBuildingInventory() {
             .map(([itemId]) => getCraftingItemName(itemId));
         const missingCostParts = [...(missingBrass ? ['真鍮'] : []), ...missingMaterialNames];
         const missingCost = missingCostParts.length ? `${missingCostParts.join('・')}不足` : '';
-        const status = activeJobs.length
-            ? `製作中 ${activeJobs.length}個 / `
+        const status = queueCount
+            ? `キュー ${queueCount}個`
             : !stationAvailable ? '作業台以上の設備が必要'
-            : !affordable ? missingCost
-            : `作成${ownedCount ? ` / 所持 ${ownedCount}` : ''}`;
-        const materialCostLabel = materialCosts.map(([itemId, amount]) => `${getCraftingItemName(itemId)} ${amount}`).join(' / ');
-        cost.append(`${building.width}×${building.height} / 真鍮 ${building.brassCost}${materialCostLabel ? ` / ${materialCostLabel}` : ''}${placementRule} / ${status}`);
+            : !affordable ? missingCost || '素材不足'
+            : `作成可能${ownedCount ? ` / 所持 ${ownedCount}` : ''}`;
+        cost.textContent = `${building.width}×${building.height}${placementRule} / ${status}`;
+        const materials = document.createElement('span');
+        materials.className = 'building-item-materials';
+        const materialEntries = [
+            ['brass-stock', building.brassCost],
+            ...materialCosts
+        ];
+        materialEntries.forEach(([itemId, amount]) => {
+            const available = itemId === 'brass-stock' ? brass : getCraftingItemCount(itemId);
+            const material = document.createElement('span');
+            material.className = `building-item-material${creative || available >= amount ? ' is-sufficient' : ' is-missing'}`;
+            material.textContent = `${getCraftingItemName(itemId)} ${creative ? '不要' : `${available}/${amount}`}`;
+            material.setAttribute('aria-label', creative
+                ? `${getCraftingItemName(itemId)}: クリエイティブモードでは不要`
+                : `${getCraftingItemName(itemId)}: 所持 ${available} / 必要 ${amount}`);
+            materials.appendChild(material);
+        });
         if (activeJobs.length) {
             const countdown = document.createElement('span');
             countdown.className = 'building-item-countdown';
@@ -1063,7 +1082,7 @@ function renderBuildingInventory() {
             countdown.textContent = `${Math.max(0, Math.ceil((Number(activeJobs[0].completesAt) - Date.now()) / 1000))}秒`;
             cost.appendChild(countdown);
         }
-        copy.append(name, cost);
+        copy.append(name, cost, materials);
         const quantityLabel = document.createElement('label');
         quantityLabel.className = 'building-item-quantity';
         quantityLabel.append('作成数');
@@ -1085,6 +1104,7 @@ function renderBuildingInventory() {
         createButton.dataset.buildingId = building.id;
         createButton.textContent = '建築キットを作成';
         createButton.disabled = !stationAvailable || !affordable;
+        card.classList.add(canCraftNow ? 'is-craftable' : 'is-not-craftable');
         card.append(icon, copy, quantityLabel, createButton);
         list.appendChild(card);
     });
@@ -1124,10 +1144,16 @@ function craftBuildingKit(buildingId, requestedCount) {
             engineRuntimeState.materialInventory[itemId] = Math.max(0, getCraftingItemCount(itemId) - amount * quantity);
         });
     }
-    const startedAt = Date.now();
-    const batchGroupId = `building:${building.id}:${startedAt}:${Math.random().toString(36).slice(2)}`;
+    const now = Date.now();
+    const buildingQueue = (engineRuntimeState.craftingJobs || [])
+        .filter(job => String(job.recipeKey).startsWith('building:'))
+        .sort((first, second) => Number(first.completesAt) - Number(second.completesAt));
+    let nextStartAt = Math.max(now, ...buildingQueue.map(job => Number(job.completesAt) || now));
+    const batchGroupId = `building:${building.id}:${now}:${Math.random().toString(36).slice(2)}`;
     const duration = Math.max(4, building.brassCost * 4) * 1000;
     for (let index = 0; index < quantity; index++) {
+        const startedAt = nextStartAt;
+        const completesAt = startedAt + duration;
         engineRuntimeState.craftingJobs.push({
             jobId: `${batchGroupId}:${index + 1}`,
             batchGroupId,
@@ -1137,8 +1163,9 @@ function craftBuildingKit(buildingId, requestedCount) {
             outputItem: building.id,
             outputAmount: 1,
             startedAt,
-            completesAt: startedAt + duration
+            completesAt
         });
+        nextStartAt = completesAt;
     }
     engineRuntimeState.saveGameData();
     engineRuntimeState.notify();
@@ -1375,7 +1402,8 @@ function renderCellMaterials() {
             return normalizeInventorySearch(searchableText).includes(recipeSearch);
         }));
     const now = Date.now();
-    const jobSignature = JSON.stringify((engineRuntimeState.craftingJobs || []).map(job => [job.jobId, job.recipeKey, Number(job.completesAt)]));
+    const jobSignature = JSON.stringify((engineRuntimeState.craftingJobs || [])
+        .map(job => [job.jobId, job.recipeKey, Number(job.startedAt), Number(job.completesAt)]));
     const craftingSignature = `${selectedFamily}:${recipeSearch}:${JSON.stringify(orderedIds.map(id => [id, getCraftingItemCount(id)]))}:${jobSignature}`;
     if (craftingSignature === craftingRenderSignature) return;
     craftingRenderSignature = craftingSignature;
@@ -1658,6 +1686,12 @@ function syncCraftingNotifications() {
         craftingNotificationCards.delete(jobId);
     }
     const now = Date.now();
+    const buildingQueuePositions = new Map(jobs
+        .filter(job => String(job.recipeKey).startsWith('building:'))
+        .slice()
+        .sort((first, second) => Number(first.startedAt) - Number(second.startedAt)
+            || Number(first.completesAt) - Number(second.completesAt))
+        .map((job, index) => [job.jobId, index + 1]));
     jobs.forEach(job => {
         let entry = craftingNotificationCards.get(job.jobId);
         if (!entry) {
@@ -1674,9 +1708,16 @@ function syncCraftingNotifications() {
         const duration = Math.max(1, completesAt - start);
         const progress = Math.max(0, Math.min(100, ((now - start) / duration) * 100));
         const secondsLeft = Math.max(0, Math.ceil((completesAt - now) / 1000));
+        const queued = String(job.recipeKey).startsWith('building:') && now < start;
+        const queuePosition = buildingQueuePositions.get(job.jobId);
         entry.title.textContent = `${outputName}${outputAmount > 1 ? ` ×${outputAmount}` : ''}`;
-        const batchLabel = batchCount > 1 ? `作成中 ${batchIndex}/${batchCount}` : '作成中';
-        const remainingLabel = `残り ${secondsLeft}秒`;
+        const batchLabel = queued
+            ? `キュー ${queuePosition}番目`
+            : batchCount > 1 ? `作成中 ${batchIndex}/${batchCount}` : '作成中';
+        const remainingLabel = queued
+            ? `着手まで ${Math.max(0, Math.ceil((start - now) / 1000))}秒`
+            : `残り ${secondsLeft}秒`;
+        entry.card.toggleAttribute('data-queued', queued);
         if (entry.batch.textContent !== batchLabel) entry.batch.textContent = batchLabel;
         if (entry.remaining.textContent !== remainingLabel) entry.remaining.textContent = remainingLabel;
         entry.track.setAttribute('aria-label', `${outputName}の作成進行状況`);

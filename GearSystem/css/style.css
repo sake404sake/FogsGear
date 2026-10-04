@@ -632,7 +632,7 @@ canvas {
     border-radius: 6px;
 }
 .embedded-library .scroll-empty[hidden] { display: none; }
-.embedded-library .scroll-detail-heading { position: absolute; z-index: 2; top: 8px; left: 14px; right: 14px; pointer-events: none; }
+.embedded-library .scroll-detail-heading { position: relative; z-index: 2; top: auto; right: auto; left: auto; margin: 0 2px 8px; pointer-events: auto; }
 .embedded-library .scroll-detail-heading h2 { margin: 0; font-size: 1.1rem; text-shadow: 0 0 8px rgba(243, 198, 83, 0.45), 0 2px 5px #000; }
 .embedded-library .scroll-detail-heading #scroll-toggle { pointer-events: auto; }
 .embedded-library .scroll-preview-frame { height: calc(100vh - 62px); border: 0; }
@@ -656,7 +656,7 @@ canvas {
     .embedded-library .scroll-detail-panel { width: 100%; height: auto; min-height: 0; padding: 4px; }
     .embedded-library .scroll-preview-frame { height: min(62dvh, 430px); min-height: 180px; }
     .embedded-library .scroll-empty { height: auto; min-height: clamp(72px, calc(100dvh - 210px), 210px); }
-    .embedded-library .scroll-detail-heading { top: 4px; left: 6px; right: 6px; }
+    .embedded-library .scroll-detail-heading { top: auto; right: auto; left: auto; margin: 0 2px 6px; }
     .embedded-library .scroll-detail-heading h2,
     .embedded-library.scroll-is-running .scroll-detail-heading h2 {
         display: none;

@@ -56,6 +56,7 @@ body {
 .app-notice[hidden] { display: none; }
 .crafting-notifications { position: fixed; z-index: 1190; left: max(12px, env(safe-area-inset-left)); bottom: max(12px, env(safe-area-inset-bottom)); display: grid; gap: 7px; width: min(330px, calc(100vw - 24px)); max-height: min(55vh, 420px); overflow-y: auto; pointer-events: none; }
 .crafting-progress-card { display: grid; grid-template-columns: 38px minmax(0, 1fr); align-items: center; gap: 9px; padding: 9px 11px; color: #e7fff7; background: rgba(23, 32, 29, .96); border: 1px solid rgba(98, 194, 170, .78); box-shadow: 0 4px 16px rgba(0, 0, 0, .5); animation: crafting-toast-in .18s ease-out both; }
+.crafting-progress-card[data-queued] { border-color: rgba(98, 194, 170, .35); }
 .crafting-progress-icon { display: grid; place-items: center; width: 36px; height: 36px; color: #f1d17c; background: rgba(7, 13, 10, .56); border: 1px solid rgba(225, 189, 98, .45); }
 .crafting-progress-icon svg { display: block; width: 100%; height: 100%; }
 .crafting-progress-copy { display: grid; min-width: 0; gap: 5px; }
@@ -356,7 +357,7 @@ h1 {
 .inventory-search input:focus-visible { outline: 2px solid #62c2aa; outline-offset: 1px; }
 .inventory-item-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); grid-auto-rows: max-content; align-content: start; gap: 6px; max-height: 42vh; overflow-y: auto; }
 .building-item-grid { grid-template-columns: minmax(0, 1fr); max-height: 50vh; }
-.inventory-item-card.building-item-card { grid-template-columns: 42px minmax(0, 1fr); min-height: 58px; border: 1px solid rgba(198, 154, 82, 0.3); }
+.inventory-item-card.building-item-card { display: grid; width: 100%; box-sizing: border-box; grid-template-columns: 42px minmax(0, 1fr); min-height: 58px; border: 1px solid rgba(198, 154, 82, 0.3); }
 .building-item-card > * { min-width: 0; }
 .building-item-icon { display: grid; place-items: center; width: 36px; height: 36px; overflow: hidden; color: #e5c25d; background: linear-gradient(145deg, #61756a, #26372f); border: 1px solid #a27c42; }
 .building-item-icon-svg { display: block; width: 100%; height: 100%; }
@@ -365,6 +366,12 @@ h1 {
 .building-item-meta { color: var(--text-muted); font: 0.58rem/1.25 monospace; }
 .building-item-meta.is-affordable { color: #8edbc6; }
 .building-item-meta.is-unaffordable { color: #e49a79; }
+.building-item-materials { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; }
+.building-item-material { max-width: 100%; box-sizing: border-box; padding: 2px 4px; color: #8edbc6; background: rgba(98, 194, 170, .06); border: 1px solid rgba(98, 194, 170, .24); font: .57rem/1.2 monospace; overflow-wrap: anywhere; }
+.building-item-material.is-missing { color: #f0a18a; background: rgba(228, 100, 75, .08); border-color: rgba(228, 154, 121, .4); }
+.building-item-card.is-craftable { border-color: rgba(98, 194, 170, .52); }
+.building-item-card.is-not-craftable { border-color: rgba(228, 154, 121, .32); }
+.building-item-card .building-item-create { width: 100%; box-sizing: border-box; }
 .building-item-card.is-foundation .building-item-icon { background: linear-gradient(145deg, #7a8581, #3e4844); }
 .building-item-card.is-decoration .building-item-icon { background: linear-gradient(145deg, #876b43, #47392b); }
 .building-item-card.is-rail .building-item-icon { color: #d8d2bf; background: linear-gradient(145deg, #656c68, #343936); }
