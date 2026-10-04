@@ -180,12 +180,13 @@ const VEHICLE_SIDE_ICON_IDS = Object.freeze({
     'ore-wagon': 'vehicle-ore-wagon-side',
     'freight-wagon': 'vehicle-freight-wagon-side'
 });
-let buildingIconLoadPromise = null;
+const buildingIconLoadPromises = new Map();
+let buildingIconSpritePromise = null;
+let vehicleSideIconSpritePromise = null;
 
-export function loadBuildingIconImages(buildingIds = BUILDING_DEFINITIONS.map(building => building.id)) {
-    if (buildingIconLoadPromise) return buildingIconLoadPromise;
-    const requestedBuildingIds = new Set(buildingIds);
-    buildingIconLoadPromise = (async () => {
+function loadBuildingIconSprite() {
+    if (!buildingIconSpritePromise) {
+        buildingIconSpritePromise = (async () => {
         const response = await fetch(new URL('../assets/building-icons.svg', import.meta.url));
         if (!response.ok) throw new Error(`Building icon sprite failed: ${response.status}`);
         const sprite = new DOMParser().parseFromString(await response.text(), 'image/svg+xml');
@@ -195,60 +196,75 @@ export function loadBuildingIconImages(buildingIds = BUILDING_DEFINITIONS.map(bu
             .filter(symbol => !symbol.id?.startsWith('building-'))
             .map(symbol => symbol.outerHTML)
             .join('');
-        const decodeInBatches = async (items, loadItem, batchSize = 4) => {
-            for (let index = 0; index < items.length; index += batchSize) {
-                await Promise.all(items.slice(index, index + batchSize).map(loadItem));
-                if (index + batchSize >= items.length) continue;
-                await new Promise(resolve => {
-                    if (window.requestIdleCallback) window.requestIdleCallback(() => resolve(), { timeout: 250 });
-                    else requestAnimationFrame(() => window.setTimeout(resolve, 0));
-                });
-            }
-        };
-        const requestedBuildings = BUILDING_DEFINITIONS.filter(building => requestedBuildingIds.has(building.id));
-        await decodeInBatches(requestedBuildings, async building => {
-            const symbol = sprite.getElementById(`building-${building.id}`);
-            if (!symbol) return;
-            const svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="${symbol.getAttribute('viewBox')}" preserveAspectRatio="none"><defs>${sharedSymbols}</defs>${symbol.innerHTML}</svg>`;
-            const objectUrl = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
-            const image = new Image();
-            image.src = objectUrl;
-            try {
-                await image.decode();
-                buildingIconImages.set(building.id, image);
-            } finally {
-                URL.revokeObjectURL(objectUrl);
-            }
+        return { sprite, sharedSymbols };
+        })().catch(error => {
+            buildingIconSpritePromise = null;
+            throw error;
         });
-        const requestedVehicleIcons = Object.entries(VEHICLE_SIDE_ICON_IDS)
-            .filter(([buildingId]) => requestedBuildingIds.has(buildingId));
-        if (requestedVehicleIcons.length) {
-            try {
-                const sideResponse = await fetch(new URL('../assets/vehicle-side-icons.svg', import.meta.url));
-                if (!sideResponse.ok) throw new Error(`Vehicle side icon sprite failed: ${sideResponse.status}`);
-                const sideSprite = new DOMParser().parseFromString(await sideResponse.text(), 'image/svg+xml');
-                if (sideSprite.querySelector('parsererror')) throw new Error('Vehicle side icon sprite is invalid SVG.');
-                await decodeInBatches(requestedVehicleIcons, async ([buildingId, symbolId]) => {
-                const symbol = sideSprite.getElementById(symbolId);
-                if (!symbol) return;
-                const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${symbol.getAttribute('viewBox')}">${symbol.innerHTML}</svg>`;
-                const objectUrl = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
-                const image = new Image();
-                image.src = objectUrl;
-                try {
-                    await image.decode();
-                    vehicleSideIconImages.set(buildingId, image);
-                } finally {
-                    URL.revokeObjectURL(objectUrl);
-                }
-                }, 2);
-            } catch (error) {
-                console.warn('Vehicle side icon atlas failed to load; using front icons for all directions.');
+    }
+    return buildingIconSpritePromise;
+}
+
+function loadVehicleSideIconSprite() {
+    if (!vehicleSideIconSpritePromise) {
+        vehicleSideIconSpritePromise = (async () => {
+            const response = await fetch(new URL('../assets/vehicle-side-icons.svg', import.meta.url));
+            if (!response.ok) throw new Error(`Vehicle side icon sprite failed: ${response.status}`);
+            const sprite = new DOMParser().parseFromString(await response.text(), 'image/svg+xml');
+            if (sprite.querySelector('parsererror')) throw new Error('Vehicle side icon sprite is invalid SVG.');
+            return sprite;
+        })().catch(error => {
+            vehicleSideIconSpritePromise = null;
+            throw error;
+        });
+    }
+    return vehicleSideIconSpritePromise;
+}
+
+async function loadIconImage(svg) {
+    const objectUrl = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
+    const image = new Image();
+    image.src = objectUrl;
+    try {
+        await image.decode();
+        return image;
+    } finally {
+        URL.revokeObjectURL(objectUrl);
+    }
+}
+
+export function loadBuildingIconImages(buildingIds = BUILDING_DEFINITIONS.map(building => building.id)) {
+    const requestedBuildings = BUILDING_DEFINITIONS.filter(building => buildingIds.includes(building.id));
+    const pending = requestedBuildings.map(building => {
+        if (buildingIconImages.has(building.id)) return Promise.resolve();
+        const existing = buildingIconLoadPromises.get(building.id);
+        if (existing) return existing;
+
+        const promise = (async () => {
+            const { sprite, sharedSymbols } = await loadBuildingIconSprite();
+            const symbol = sprite.getElementById(`building-${building.id}`);
+            if (symbol) {
+                const svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="${symbol.getAttribute('viewBox')}" preserveAspectRatio="none"><defs>${sharedSymbols}</defs>${symbol.innerHTML}</svg>`;
+                buildingIconImages.set(building.id, await loadIconImage(svg));
             }
-        }
-        return buildingIconImages.size + vehicleSideIconImages.size;
-    })();
-    return buildingIconLoadPromise;
+            const sideSymbolId = VEHICLE_SIDE_ICON_IDS[building.id];
+            if (sideSymbolId) {
+                try {
+                    const sideSprite = await loadVehicleSideIconSprite();
+                    const sideSymbol = sideSprite.getElementById(sideSymbolId);
+                    if (sideSymbol) {
+                        const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${sideSymbol.getAttribute('viewBox')}">${sideSymbol.innerHTML}</svg>`;
+                        vehicleSideIconImages.set(building.id, await loadIconImage(svg));
+                    }
+                } catch (error) {
+                    console.warn('Vehicle side icon atlas failed to load; using front icons for all directions.', error);
+                }
+            }
+        })().finally(() => buildingIconLoadPromises.delete(building.id));
+        buildingIconLoadPromises.set(building.id, promise);
+        return promise;
+    });
+    return Promise.all(pending).then(() => buildingIconImages.size + vehicleSideIconImages.size);
 }
 
 export function getTileEffectsUnderFootprint(placedItems, x, y, width, height) {

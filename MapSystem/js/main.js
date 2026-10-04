@@ -1,11 +1,11 @@
 // js/main.js - Steampunk Explorer Game Logic
 import { MapGenerator, BIOME_COLORS, loadMapSnapshot, saveMapSnapshot } from './mapGenerator.js?v=89';
-import { SkinRenderer } from './skinRenderer.js?v=2';
+import { SkinRenderer } from './skinRenderer.js?v=3';
 import { CELL_DEFINITIONS, canEnterCell, getCellEntryRule, getMosaicColor } from './cellRules.js';
 import { drawCellIcon, loadCellIconAtlas } from './cellIconRenderer.js?v=4';
 import { ACTIVE_SCROLL_TARGETS_KEY, CELL_MATERIALS, TERRAIN_TRANSFORM_RECIPES, WORLD_CELL_TYPES, applyCellChanges, chooseEraCellType, getCellCollectionPowerCost, getCellDrops, readCellChanges, saveCellChange } from './worldCells.js?v=4';
 import { CRAFTING_ITEMS, CRAFTING_ITEM_BY_ID, CRAFTING_RATE_MULTIPLIER, CRAFTING_RECIPES, CRAFTING_STATION_BUILDING_IDS, HANDCRAFT_STATION } from './craftingData.js?v=5';
-import { BUILDING_BY_ID, BUILDING_DEFINITIONS, canPlaceBuildingOnTerrainCell, drawBuilding, getRailAutoRotation, getRailConnections, getTileEffectsUnderFootprint, getVehicleRailRotation, loadBuildingIconImages, normalizeBuildingUtilityState } from './buildingData.js?v=23';
+import { BUILDING_BY_ID, BUILDING_DEFINITIONS, canPlaceBuildingOnTerrainCell, drawBuilding, getRailAutoRotation, getRailConnections, getTileEffectsUnderFootprint, getVehicleRailRotation, loadBuildingIconImages, normalizeBuildingUtilityState } from './buildingData.js?v=24';
 import { getBuildingUtilityStatus, simulateBuildingUtilityNetworks } from './buildingUtilityNetworks.js?v=4';
 import { buildTerritoryBorderSegments } from './territoryBorders.js?v=35';
 import { directionToVehicleRotation, findNextRailStep, getTrackDirection, getVehicleRenderState, STATION_CONTROL_DEFAULTS, VEHICLE_DEFAULTS } from './railwayRuntime.js?v=8';
@@ -931,6 +931,11 @@ function getMaximumCraftCount(inputs, creative = Boolean(engineRuntimeState?.cre
         Math.floor(getCraftingItemCount(itemId) / Math.max(1, Number(amount) || 1)))));
 }
 
+function getBuildingMaterialCosts(building) {
+    if (building.role !== 'rail') return [];
+    return [['wood', building.brassCost]];
+}
+
 function sortCraftingRecipesByAvailability(recipes) {
     return [...recipes].sort((first, second) =>
         Number(getMaximumCraftCount(second.recipe[2]) > 0) - Number(getMaximumCraftCount(first.recipe[2]) > 0));
@@ -999,7 +1004,8 @@ function renderBuildingInventory() {
     const constructionJobs = (engineRuntimeState.craftingJobs || [])
         .filter(job => BUILDING_BY_ID.has(job.outputItem))
         .map(job => [job.jobId, job.recipeKey, Number(job.completesAt)]);
-    const signature = `${brass}:${creative}:${hasConstructionStation}:${search}:${JSON.stringify(buildingKitCounts)}:${JSON.stringify(constructionJobs)}`;
+    const wood = getCraftingItemCount('wood');
+    const signature = `${brass}:${wood}:${creative}:${hasConstructionStation}:${search}:${JSON.stringify(buildingKitCounts)}:${JSON.stringify(constructionJobs)}`;
     if (signature === buildingRenderSignature) return;
     buildingRenderSignature = signature;
     list.replaceChildren();
@@ -1015,7 +1021,11 @@ function renderBuildingInventory() {
         const activeJobs = (engineRuntimeState.craftingJobs || []).filter(job => job.recipeKey === `building:${building.id}`);
         const requiresStation = isLargeBuilding(building) && building.id !== 'craft-bench';
         const stationAvailable = !requiresStation || hasConstructionStation;
-        const maxCraftCount = creative ? 99 : Math.floor(brass / Math.max(1, building.brassCost));
+        const materialCosts = getBuildingMaterialCosts(building);
+        const maxCraftCount = creative ? 99 : Math.max(0, Math.min(
+            Math.floor(brass / Math.max(1, building.brassCost)),
+            ...materialCosts.map(([itemId, amount]) => Math.floor(getCraftingItemCount(itemId) / amount))
+        ));
         const affordable = maxCraftCount > 0;
         const card = document.createElement('div');
         card.className = `inventory-item-card building-item-card is-${building.role}`;
@@ -1030,12 +1040,18 @@ function renderBuildingInventory() {
         const cost = document.createElement('small');
         cost.className = `building-item-meta ${affordable ? 'is-affordable' : 'is-unaffordable'}`;
         const placementRule = building.requiresFoundation ? ' / 基礎必須' : building.role === 'vehicle' ? ' / 線路必須' : '';
+        const missingBrass = !creative && brass < building.brassCost;
+        const missingMaterials = !creative && materialCosts.some(([itemId, amount]) => getCraftingItemCount(itemId) < amount);
+        const missingCost = missingBrass && missingMaterials ? '真鍮・木材不足'
+            : missingMaterials ? '木材不足'
+                : missingBrass ? '真鍮不足' : '';
         const status = activeJobs.length
             ? `製作中 ${activeJobs.length}個 / `
             : !stationAvailable ? '作業台以上の設備が必要'
-            : !affordable ? '真鍮不足'
+            : !affordable ? missingCost
             : `作成${ownedCount ? ` / 所持 ${ownedCount}` : ''}`;
-        cost.append(`${building.width}×${building.height} / 真鍮 ${building.brassCost}${placementRule} / ${status}`);
+        const materialCostLabel = materialCosts.map(([itemId, amount]) => `${getCraftingItemName(itemId)} ${amount}`).join(' / ');
+        cost.append(`${building.width}×${building.height} / 真鍮 ${building.brassCost}${materialCostLabel ? ` / ${materialCostLabel}` : ''}${placementRule} / ${status}`);
         if (activeJobs.length) {
             const countdown = document.createElement('span');
             countdown.className = 'building-item-countdown';
@@ -1079,17 +1095,30 @@ function craftBuildingKit(buildingId, requestedCount) {
         return;
     }
     const creative = Boolean(engineRuntimeState.creativeMode);
-    const maxCraftCount = creative ? 99 : Math.floor(getCraftingItemCount('brass-stock') / Math.max(1, building.brassCost));
+    const materialCosts = getBuildingMaterialCosts(building);
+    const maxCraftCount = creative ? 99 : Math.max(0, Math.min(
+        Math.floor(getCraftingItemCount('brass-stock') / Math.max(1, building.brassCost)),
+        ...materialCosts.map(([itemId, amount]) => Math.floor(getCraftingItemCount(itemId) / amount))
+    ));
     const quantity = Math.floor(Number(requestedCount));
     if (!Number.isFinite(quantity) || quantity < 1 || quantity > maxCraftCount) {
-        showAppNotice(maxCraftCount > 0 ? `作成数は1〜${maxCraftCount}個で指定してください。` : '建築キットの作成に必要な真鍮が足りません。');
+        const missingMaterials = materialCosts.some(([itemId, amount]) => getCraftingItemCount(itemId) < amount);
+        const missingBrass = getCraftingItemCount('brass-stock') < building.brassCost;
+        const missingCost = missingBrass && missingMaterials ? '真鍮と木材'
+            : missingMaterials ? '木材' : '真鍮';
+        showAppNotice(maxCraftCount > 0 ? `作成数は1〜${maxCraftCount}個で指定してください。` : `建築キットの作成に必要な${missingCost}が足りません。`);
         return;
     }
     if (!creative && getCraftingItemCount('brass-stock') < building.brassCost * quantity) {
         showAppNotice('建築キットの作成に必要な真鍮が足りません。');
         return;
     }
-    if (!creative) engineRuntimeState.brass = Math.max(0, Number(engineRuntimeState.brass) - building.brassCost * quantity);
+    if (!creative) {
+        engineRuntimeState.brass = Math.max(0, Number(engineRuntimeState.brass) - building.brassCost * quantity);
+        materialCosts.forEach(([itemId, amount]) => {
+            engineRuntimeState.materialInventory[itemId] = Math.max(0, getCraftingItemCount(itemId) - amount * quantity);
+        });
+    }
     const startedAt = Date.now();
     const batchGroupId = `building:${building.id}:${startedAt}:${Math.random().toString(36).slice(2)}`;
     const duration = Math.max(4, building.brassCost * 4) * 1000;
@@ -2568,6 +2597,9 @@ function startBuildingPlacement(buildingId, fromInventory = false) {
     const building = BUILDING_BY_ID.get(buildingId);
     if (!building) return;
     if (fromInventory && getCraftingItemCount(buildingId) <= 0) return;
+    loadBuildingIconImages([buildingId]).then(scheduleDraw).catch(error => {
+        console.warn(`Building icon failed to load for ${buildingId}.`, error);
+    });
     closeInventoryItem();
     closeBuildingMenu();
     const inventoryPanel = document.getElementById('inventory-panel');
@@ -3457,6 +3489,17 @@ window.addEventListener('message', event => {
         document.querySelector('iframe[title="保存スクロールのギアプレビュー"]')
     ].find(frame => frame && event.source === frame.contentWindow);
     if (appPageFrame && event.source === appPageFrame.contentWindow) {
+        if (event.data?.type === 'fogsgear:skin-updated'
+            && typeof event.data.url === 'string'
+            && typeof event.data.sourceType === 'string') {
+            applySelectedSkinSource(event.data.url, event.data.sourceType, String(event.data.name || ''))
+                .then(scheduleDraw)
+                .catch(error => {
+                    console.warn('Skin load failed; using fallback.', error);
+                    showAppNotice('スキン画像を読み込めませんでした。');
+                });
+            return;
+        }
         if (event.data?.type === 'fogsgear:close-page') {
             appPageFrame.parentElement.remove();
             appPageFrame = null;

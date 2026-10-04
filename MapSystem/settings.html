@@ -4,9 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Steampunk Explorer - Settings</title>
-    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/style.css?v=577">
 </head>
-<body>
+<body class="settings-page">
     <div id="loadingOverlay" class="loading-overlay" role="status" aria-live="polite">
         <div class="loading-panel"><div class="loading-spinner"></div><div>設定画面を読み込んでいます...</div></div>
     </div>
@@ -33,8 +33,8 @@
             <label for="skinUrl">スキン</label>
             <div class="setting-control skin-setting-control">
                 <input id="skinUrl" type="text" placeholder="Skin URL">
-                <button class="btn btn-action" id="applySkin" type="button">Apply</button>
                 <label class="btn btn-action" for="skinFile">ファイル選択</label>
+                <button class="btn btn-action" id="applySkin" type="button">Apply</button>
                 <input id="skinFile" type="file" accept="image/*" hidden>
             </div>
             <p class="skin-help">URLを使う場合は入力して Apply、画像を使う場合はファイル選択から画像を選びます。</p>
@@ -100,6 +100,14 @@
             localStorage.setItem('steampunk_explorer_skin_name', selectedName);
             skinUrlInput.value = url;
             skinName.textContent = `選択中: ${selectedName}`;
+            if (window.parent !== window) {
+                window.parent.postMessage({
+                    type: 'fogsgear:skin-updated',
+                    url,
+                    sourceType: type,
+                    name: selectedName
+                }, window.location.origin === 'null' ? '*' : window.location.origin);
+            }
         };
         const storedSkin = getStoredSkin();
         skinUrlInput.value = storedSkin.url;

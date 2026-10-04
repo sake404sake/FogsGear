@@ -8,16 +8,14 @@ export class SkinRenderer {
     }
 
     loadSkin(url) {
+        this.isLoaded = false;
         return new Promise((resolve, reject) => {
             this.skinImage.crossOrigin = "anonymous";
             this.skinImage.onload = () => {
                 this.isLoaded = true;
                 resolve();
             };
-            this.skinImage.onerror = (e) => {
-                // CORSなどの理由で失敗した場合でもフォールバックで動くように
-                resolve();
-            };
+            this.skinImage.onerror = () => reject(new Error('スキン画像を読み込めませんでした'));
             this.skinImage.src = url;
         });
     }
@@ -176,4 +174,3 @@ export class SkinRenderer {
         }
     }
 }
-

@@ -829,6 +829,16 @@ canvas.engine-runtime-canvas { display: none; }
         flex-direction: column;
         gap: 0;
     }
+    body.settings-page {
+        height: auto;
+        min-height: 100dvh;
+        overflow-x: hidden;
+        overflow-y: auto;
+    }
+    body.settings-page .settings-panel {
+        flex: 0 0 auto;
+        margin-bottom: max(20px, env(safe-area-inset-bottom));
+    }
     .panel {
         width: 100%;
         max-width: none;
@@ -851,6 +861,18 @@ canvas.engine-runtime-canvas { display: none; }
     .settings-form { gap: 10px; margin: 18px auto; }
     .setting-control { grid-template-columns: minmax(0, 1fr); }
     .setting-control .btn { width: 100%; }
+    .skin-setting-control { grid-template-columns: minmax(0, 1fr) auto auto; }
+    .skin-setting-control .btn { width: auto; white-space: nowrap; }
+    .skin-setting-control label.btn {
+        box-sizing: border-box;
+        display: inline-flex;
+        min-height: 40px;
+        padding: 5px 8px;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.7rem;
+        line-height: 1.2;
+    }
     .setting-control output { width: 100%; }
     .settings-actions { flex-direction: column; }
     .settings-actions .btn { width: 100%; }
