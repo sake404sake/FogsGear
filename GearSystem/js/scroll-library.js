@@ -44,6 +44,26 @@ window.addEventListener('message', event => {
     document.querySelectorAll('[data-generated-resource]').forEach(row => {
         row.hidden = !(Number(generationRates[row.dataset.generatedResource]) > 0);
     });
+    const resourceTable = document.querySelector('.dashboard-resource-table');
+    if (resourceTable && Array.isArray(event.data.collectedMaterials)) {
+        resourceTable.querySelectorAll('[data-collected-material]').forEach(row => row.remove());
+        event.data.collectedMaterials.forEach(material => {
+            if (typeof material?.itemId !== 'string' || typeof material?.name !== 'string') return;
+            const row = document.createElement('div');
+            row.className = 'dashboard-resource-row';
+            row.dataset.collectedMaterial = material.itemId;
+            const name = document.createElement('span');
+            name.textContent = material.name;
+            const amount = document.createElement('strong');
+            amount.textContent = String(material.amount);
+            const rate = document.createElement('span');
+            rate.textContent = `${material.rate} /秒`;
+            const consumption = document.createElement('span');
+            consumption.textContent = '—';
+            row.append(name, amount, rate, consumption);
+            resourceTable.appendChild(row);
+        });
+    }
     const creativeIndicator = document.getElementById('main-creative-mode-indicator');
     if (creativeIndicator) creativeIndicator.hidden = !creativeMode;
 });

@@ -967,7 +967,7 @@ export class GameState {
         this.waterRecoveryRate = (hasActiveProcess || ambientWaterRecovery) && elapsed > 0 ? 1 : 0;
         this.water += elapsed * this.waterRecoveryRate;
         this.productionRate = 0;
-        const gearRate = gear => gear.teeth * Math.abs(gear.angularVelocity || 0) * 0.012 / Math.max(elapsed, 1 / 240) / (Math.PI * 2);
+        const gearRate = gear => gear.teeth * Math.abs(gear.angularVelocity || 0) * 0.012 * 60 / (Math.PI * 2);
         this.powerGenerationRate = activeGears
             .filter(gear => !gear.isCore && gear.designType === 'INDUSTRIAL' && gear.processMode === 'POWER_STORAGE')
             .reduce((sum, gear) => sum + gear.teeth * Math.abs(gear.angularVelocity || 0) * 0.012 * 60 / (Math.PI * 2), 0);

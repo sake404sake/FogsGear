@@ -644,7 +644,7 @@ canvas {
 .embedded-library .scroll-actions { pointer-events: auto; }
 .embedded-library .scroll-actions .btn { padding: 6px 10px; font-size: 0.7rem; }
 .embedded-library .scroll-list-panel { position: relative; box-sizing: border-box; max-height: none; touch-action: pan-y; transition: opacity 180ms ease; }
-.embedded-library.scroll-list-hidden .scroll-list-panel { transform: translateX(-105%); opacity: 0; pointer-events: none; }
+.embedded-library.scroll-list-hidden .scroll-list-panel { display: none; }
 .embedded-library.scroll-is-running .scroll-detail-heading h2 { display: inline-block; }
 .embedded-library .scroll-preview-frame { height: min(62dvh, 430px); min-height: 180px; background: transparent; border: 0; box-shadow: none; }
 .embedded-library .scroll-detail-footer { bottom: 12px; }

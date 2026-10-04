@@ -9,7 +9,7 @@ import { BUILDING_BY_ID, BUILDING_DEFINITIONS, canPlaceBuildingOnTerrainCell, dr
 import { getBuildingUtilityStatus, simulateBuildingUtilityNetworks } from './buildingUtilityNetworks.js?v=4';
 import { buildTerritoryBorderSegments } from './territoryBorders.js?v=35';
 import { directionToVehicleRotation, findNextRailStep, getTrackDirection, getVehicleRenderState, STATION_CONTROL_DEFAULTS, VEHICLE_DEFAULTS } from './railwayRuntime.js?v=8';
-import { GameState as EngineGameState } from '../../GearSystem/js/GameState.js?v=runtime-29';
+import { GameState as EngineGameState } from '../../GearSystem/js/GameState.js?v=runtime-30';
 import { GearManager as EngineGearManager } from '../../GearSystem/js/GearManager.js?v=runtime-5';
 
 const canvas = document.getElementById('gameCanvas');
@@ -3235,12 +3235,34 @@ function updateEngineDashboard() {
         power: save.powerGenerationRate,
         steam: save.steamGenerationRate
     };
+    const collectedMaterialRates = new Map();
+    if (save.mainGearRunning && (save.creativeMode || save.steamPower > 0) && state.map.length) {
+        save.getActiveScrollRuntimes(performance.now()).forEach(runtime => {
+            const tile = state.map[runtime.target.y]?.[runtime.target.x];
+            if (!tile) return;
+            const collectionCount = Number(tile.collectionCount) || 0;
+            const drops = getCellDrops(tile.type, collectionCount);
+            if (!drops.length || save.power < getCellCollectionPowerCost(tile.type, collectionCount)) return;
+            runtime.gears.forEach(gear => {
+                if (!gear.powered || gear.isDeadlocked || gear.processMode !== 'RESOURCE_COLLECTION') return;
+                const rotationRate = Math.abs(gear.angularVelocity || 0) * 0.012 * 60 / (Math.PI * 2);
+                drops.forEach(itemId => collectedMaterialRates.set(itemId, (collectedMaterialRates.get(itemId) || 0) + rotationRate));
+            });
+        });
+    }
+    const collectedMaterials = [...collectedMaterialRates].map(([itemId, rate]) => ({
+        itemId,
+        name: getCraftingItemName(itemId),
+        amount: getCraftingItemCount(itemId),
+        rate: formatCompact(rate)
+    }));
     const previewFrame = document.querySelector('.gear-preview-page iframe');
     previewFrame?.contentWindow?.postMessage({
         type: 'fogsgear:engine-dashboard',
         values: displayValues,
         rates: Object.fromEntries(Object.entries(rates).map(([id, value]) => [id, `${formatCompact(value)} /秒`])),
         generationRates,
+        collectedMaterials,
         creativeMode: Boolean(save.creativeMode)
     }, '*');
     renderCellMaterials();
@@ -3731,8 +3753,6 @@ window.addEventListener('storage', (event) => {
 
 window.addEventListener('fogsgear:scroll-targets-changed', event => refreshActiveScrollTargets(event.detail));
 
-window.setInterval(updateEngineDashboard, 250);
-
 const engineRuntimeState = new EngineGameState();
 new EngineGearManager(engineRuntimeState);
 engineRuntimeState.worldCellHandler = handleWorldCellOperation;
@@ -3744,8 +3764,10 @@ engineRuntimeState.subscribe(() => {
     }
     if (!document.getElementById('building-crafting-modal')?.hidden) renderBuildingCrafting();
     updateCraftingCountdowns();
+    updateEngineDashboard();
 });
 syncCraftingNotifications();
+updateEngineDashboard();
 window.setInterval(() => engineRuntimeState.tick(), 16);
 window.setInterval(updateBuildingUtilityNetworks, 1000);
 
