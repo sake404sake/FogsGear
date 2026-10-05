@@ -132,6 +132,7 @@ let inventoryRenderSignature = '';
 let craftingRenderSignature = '';
 let buildingRenderSignature = '';
 let buildingCraftingRenderSignature = '';
+const craftingQuantitySelections = new Map();
 const craftingNotificationCards = new Map();
 
 const INVENTORY_ITEM_DEFINITIONS = {
@@ -998,6 +999,54 @@ function getMaximumCraftCount(inputs, creative = Boolean(engineRuntimeState?.cre
         Math.floor(getCraftingItemCount(itemId) / Math.max(1, Number(amount) || 1)))));
 }
 
+function createCraftQuantityControl(label, selectionKey, maxCount, defaultCount, outputBatch = 1, disabled = false) {
+    const control = document.createElement('div');
+    control.className = 'crafting-quantity-control';
+    const caption = document.createElement('span');
+    caption.className = 'crafting-quantity-label';
+    caption.textContent = label;
+    const toggle = document.createElement('div');
+    toggle.className = 'crafting-quantity-toggle';
+    toggle.setAttribute('role', 'group');
+    toggle.setAttribute('aria-label', label);
+    toggle.dataset.selectionKey = selectionKey;
+    toggle.dataset.outputBatch = String(outputBatch);
+    const rememberedCount = craftingQuantitySelections.get(selectionKey);
+    const selectedCount = maxCount > 0
+        ? Math.min(maxCount, Math.max(1, rememberedCount || defaultCount))
+        : 0;
+    control.dataset.selectedCount = String(selectedCount);
+    if (maxCount > 0) craftingQuantitySelections.set(selectionKey, selectedCount);
+
+    const options = maxCount > 0
+        ? [
+            { count: 1, label: '1' },
+            { count: 5, label: '5' },
+            { count: 10, label: '10' }
+        ].filter(option => option.count <= maxCount)
+        : [{ count: 0, label: '0' }];
+    if (maxCount > 0 && !options.some(option => option.count === maxCount)) {
+        options.push({ count: maxCount, label: '最大' });
+    }
+    options.forEach(option => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'crafting-quantity-option';
+        button.dataset.action = 'select-craft-quantity';
+        button.dataset.quantity = String(option.count);
+        button.textContent = option.label;
+        button.setAttribute('aria-label', option.label === '最大'
+            ? `最大 ${maxCount}個`
+            : `${option.count}個`);
+        const selected = option.count === selectedCount;
+        button.setAttribute('aria-pressed', String(selected));
+        button.disabled = disabled || maxCount === 0;
+        toggle.appendChild(button);
+    });
+    control.append(caption, toggle);
+    return control;
+}
+
 function getBuildingMaterialCosts(building) {
     return building.materialCosts || [];
 }
@@ -1240,37 +1289,27 @@ function renderBuildingInventory() {
             countdown.textContent = `${Math.max(0, Math.ceil((Number(activeJobs[0].completesAt) - Date.now()) / 1000))}秒`;
             cost.appendChild(countdown);
         }
-        const quantityLabel = document.createElement('label');
-        quantityLabel.className = 'crafting-quantity-control';
-        quantityLabel.append('作成数');
-        const quantityMax = document.createElement('small');
-        quantityMax.textContent = `最大 ${maxCraftCount}`;
-        const quantityInput = document.createElement('input');
-        quantityInput.className = 'crafting-quantity-input building-quantity-input';
-        quantityInput.type = 'number';
-        quantityInput.min = '1';
-        quantityInput.max = String(maxCraftCount);
-        quantityInput.value = affordable ? '1' : '0';
-        quantityInput.disabled = !affordable;
-        quantityInput.setAttribute('aria-label', `${building.name}の作成数`);
-        quantityLabel.appendChild(quantityInput);
-        quantityLabel.appendChild(quantityMax);
+        const quantityControl = createCraftQuantityControl(
+            `${building.name}の作成数`,
+            `building:${building.id}`,
+            maxCraftCount,
+            affordable ? 1 : 0,
+            1,
+            !canCraftNow
+        );
+        const selectedCount = Number(quantityControl.dataset.selectedCount) || 0;
+        outputCount.textContent = `×${selectedCount}`;
         const createButton = document.createElement('button');
         createButton.type = 'button';
         createButton.className = 'building-item-create';
         createButton.dataset.action = 'craft-building-kit';
         createButton.dataset.buildingId = building.id;
-        createButton.textContent = `製作 ×${affordable ? 1 : 0}`;
+        createButton.textContent = `製作 ×${selectedCount}`;
         createButton.disabled = !stationAvailable || !affordable;
-        quantityInput.addEventListener('input', () => {
-            const selectedCount = Math.max(1, Math.min(maxCraftCount, Math.floor(Number(quantityInput.value) || 1)));
-            outputCount.textContent = `×${selectedCount}`;
-            createButton.textContent = `製作 ×${selectedCount}`;
-        });
         const note = document.createElement('p');
         note.className = 'crafting-recipe-note';
         note.textContent = `所持キット: ${ownedCount}`;
-        footer.append(cost, quantityLabel, createButton);
+        footer.append(cost, quantityControl, createButton);
         card.append(heading, outputBlock, materialsBlock, footer, note);
         list.appendChild(card);
     });
@@ -1573,7 +1612,11 @@ function renderCellMaterials() {
     const now = Date.now();
     const jobSignature = JSON.stringify((engineRuntimeState.craftingJobs || [])
         .map(job => [job.jobId, job.recipeKey, Number(job.startedAt), Number(job.completesAt)]));
-    const craftingSignature = `${selectedFamily}:${recipeSearch}:${JSON.stringify(orderedIds.map(id => [id, getCraftingItemCount(id)]))}:${jobSignature}`;
+    const recipeMaterialSignature = JSON.stringify(visibleRecipes.map(({ recipe, index }) => [
+        index,
+        recipe[2].map(([itemId]) => [itemId, getCraftingItemCount(itemId)])
+    ]));
+    const craftingSignature = `${Boolean(engineRuntimeState.creativeMode)}:${selectedFamily}:${recipeSearch}:${recipeMaterialSignature}:${jobSignature}`;
     if (craftingSignature === craftingRenderSignature) return;
     craftingRenderSignature = craftingSignature;
     recipeList.replaceChildren();
@@ -1645,34 +1688,24 @@ function createCraftingRecipeCard(recipe, index, now, buildingInstanceId = '') {
         countdown.textContent = `${Math.max(0, Math.ceil((Number(activeJobs[0].completesAt) - now) / 1000))}秒`;
         stationLabel.appendChild(countdown);
     }
-    const quantityLabel = document.createElement('label');
-    quantityLabel.className = 'crafting-quantity-control';
-    quantityLabel.append('作成回数');
-    const quantityInput = document.createElement('input');
-    quantityInput.className = 'crafting-quantity-input';
-    quantityInput.type = 'number';
-    quantityInput.min = '1';
-    quantityInput.max = String(maxCraftCount);
-    quantityInput.value = String(defaultCraftCount);
-    quantityInput.disabled = maxCraftCount === 0;
-    quantityInput.setAttribute('aria-label', `${getCraftingItemName(output)}の作成回数`);
-    quantityLabel.appendChild(quantityInput);
-    const quantityMax = document.createElement('small');
-    quantityMax.textContent = `最大 ${maxCraftCount}回`;
-    quantityLabel.appendChild(quantityMax);
+    const quantityControl = createCraftQuantityControl(
+        `${getCraftingItemName(output)}の作成回数`,
+        `recipe:${recipeKey}:${buildingInstanceId || 'handcraft'}`,
+        maxCraftCount,
+        defaultCraftCount,
+        batch,
+        maxCraftCount === 0
+    );
+    const selectedCount = Number(quantityControl.dataset.selectedCount) || 0;
+    outputCount.textContent = `×${batch * selectedCount}`;
     const craftButton = document.createElement('button');
     craftButton.type = 'button';
     craftButton.dataset.action = 'craft-recipe';
     craftButton.dataset.recipeIndex = String(index);
     if (buildingInstanceId) craftButton.dataset.buildingInstanceId = buildingInstanceId;
-    craftButton.textContent = `製作 ×${batch * defaultCraftCount}`;
+    craftButton.textContent = `製作 ×${batch * selectedCount}`;
     craftButton.disabled = maxCraftCount === 0;
-    quantityInput.addEventListener('input', () => {
-        const selectedCount = Math.max(1, Math.min(maxCraftCount, Math.floor(Number(quantityInput.value) || 1)));
-        outputCount.textContent = `×${batch * selectedCount}`;
-        craftButton.textContent = `製作 ×${batch * selectedCount}`;
-    });
-    footer.append(stationLabel, quantityLabel, craftButton);
+    footer.append(stationLabel, quantityControl, craftButton);
     const noteElement = document.createElement('p');
     noteElement.className = 'crafting-recipe-note';
     noteElement.textContent = note;
@@ -3816,8 +3849,25 @@ document.addEventListener('click', (event) => {
         applyBuildingHistory('redo');
         return;
     }
+    if (button.dataset.action === 'select-craft-quantity') {
+        const toggle = button.closest('.crafting-quantity-toggle');
+        const card = button.closest('.crafting-recipe-card');
+        if (!toggle || !card || button.disabled) return;
+        toggle.querySelectorAll('.crafting-quantity-option').forEach(option => {
+            const selected = option === button;
+            option.setAttribute('aria-pressed', String(selected));
+        });
+        const quantity = Number(button.dataset.quantity) || 0;
+        if (quantity > 0) craftingQuantitySelections.set(toggle.dataset.selectionKey, quantity);
+        const outputCount = quantity * (Number(toggle.dataset.outputBatch) || 1);
+        const outputCountLabel = card.querySelector('.crafting-output-count');
+        const craftButton = card.querySelector('[data-action="craft-recipe"], [data-action="craft-building-kit"]');
+        if (outputCountLabel) outputCountLabel.textContent = `×${outputCount}`;
+        if (craftButton) craftButton.textContent = `製作 ×${outputCount}`;
+        return;
+    }
     if (button.dataset.action === 'craft-building-kit') {
-        const quantity = button.closest('.building-item-card')?.querySelector('.building-quantity-input')?.value;
+        const quantity = button.closest('.building-item-card')?.querySelector('.crafting-quantity-option[aria-pressed="true"]')?.dataset.quantity;
         craftBuildingKit(button.dataset.buildingId, quantity);
         return;
     }
@@ -3869,7 +3919,7 @@ document.addEventListener('click', (event) => {
         return;
     }
     if (button.dataset.action === 'craft-recipe') {
-        const quantity = button.closest('.crafting-recipe-card')?.querySelector('.crafting-quantity-input')?.value;
+        const quantity = button.closest('.crafting-recipe-card')?.querySelector('.crafting-quantity-option[aria-pressed="true"]')?.dataset.quantity;
         craftRecipe(Number(button.dataset.recipeIndex), button.dataset.buildingInstanceId || '', quantity);
         return;
     }
