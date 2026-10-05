@@ -55,7 +55,7 @@ body {
 .app-notice { position: fixed; z-index: 1200; top: max(14px, env(safe-area-inset-top)); left: 50%; width: min(520px, calc(100vw - 28px)); box-sizing: border-box; padding: 12px 16px; transform: translateX(-50%); color: #e7fff7; background: rgba(23, 45, 39, 0.96); border: 1px solid #62c2aa; box-shadow: 0 6px 22px rgba(0, 0, 0, 0.55), 0 0 14px rgba(98, 194, 170, 0.28); text-align: center; }
 .app-notice[hidden] { display: none; }
 .crafting-notifications { position: fixed; z-index: 1190; left: max(12px, env(safe-area-inset-left)); bottom: max(12px, env(safe-area-inset-bottom)); display: grid; gap: 7px; width: min(330px, calc(100vw - 24px)); max-height: min(55vh, 420px); overflow-y: auto; pointer-events: none; }
-.crafting-progress-card { display: grid; grid-template-columns: 38px minmax(0, 1fr); align-items: center; gap: 9px; padding: 9px 11px; color: #e7fff7; background: rgba(23, 32, 29, .96); border: 1px solid rgba(98, 194, 170, .78); box-shadow: 0 4px 16px rgba(0, 0, 0, .5); animation: crafting-toast-in .18s ease-out both; }
+.crafting-progress-card { display: grid; grid-template-columns: 38px minmax(0, 1fr) 28px; align-items: center; gap: 9px; padding: 9px 11px; color: #e7fff7; background: rgba(23, 32, 29, .96); border: 1px solid rgba(98, 194, 170, .78); box-shadow: 0 4px 16px rgba(0, 0, 0, .5); animation: crafting-toast-in .18s ease-out both; pointer-events: auto; touch-action: pan-y; }
 .crafting-progress-card[data-queued] { border-color: rgba(98, 194, 170, .35); }
 .crafting-progress-icon { display: grid; place-items: center; width: 36px; height: 36px; color: #f1d17c; background: rgba(7, 13, 10, .56); border: 1px solid rgba(225, 189, 98, .45); }
 .crafting-progress-icon svg { display: block; width: 100%; height: 100%; }
@@ -64,6 +64,8 @@ body {
 .crafting-progress-meta { display: flex; justify-content: space-between; gap: 8px; color: #a9d8c9; font: .62rem/1.2 monospace; }
 .crafting-progress-track { display: block; height: 5px; overflow: hidden; background: rgba(0, 0, 0, .45); border: 1px solid rgba(98, 194, 170, .35); }
 .crafting-progress-fill { display: block; width: var(--crafting-progress, 0%); height: 100%; background: linear-gradient(90deg, #62c2aa, #f0d17c); transition: width .12s linear; }
+.crafting-progress-cancel { display: grid; place-items: center; width: 28px; height: 28px; padding: 0; color: #ffd3bd; background: rgba(113, 46, 31, .62); border: 1px solid rgba(255, 154, 120, .55); border-radius: 3px; font: 700 1.1rem/1 monospace; cursor: pointer; }
+.crafting-progress-cancel:hover, .crafting-progress-cancel:focus-visible { color: #fff; background: rgba(156, 57, 34, .9); outline: 1px solid #ffd3bd; }
 .building-item-card { position: relative; }
 .building-item-create { min-width: 110px !important; min-height: 30px !important; color: #fff1b1 !important; background: rgba(98, 194, 170, .12) !important; border: 1px solid rgba(98, 194, 170, .55) !important; cursor: pointer; }
 .building-item-create:disabled { opacity: .45; cursor: not-allowed; }
@@ -358,6 +360,17 @@ h1 {
 .inventory-search input { min-width: 0; width: 100%; min-height: 34px; box-sizing: border-box; padding: 6px 9px; color: var(--text-main); background: #1c1511; border: 1px solid var(--border-sub); }
 .inventory-search input:focus-visible { outline: 2px solid #62c2aa; outline-offset: 1px; }
 .inventory-item-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); grid-auto-rows: max-content; align-content: start; gap: 6px; max-height: 42vh; overflow-y: auto; }
+#inventory-panel #inventory-item-list { display: flex; flex-direction: column; align-items: stretch; gap: 7px; }
+.inventory-category { flex: 0 0 auto; min-width: 0; border: 1px solid rgba(198, 154, 82, .3); background: rgba(18, 14, 12, .35); }
+.inventory-category-heading { display: flex; justify-content: space-between; align-items: center; gap: 8px; min-height: 36px; padding: 6px 10px; color: #e8d39e; background: rgba(198, 154, 82, .08); cursor: pointer; list-style: none; }
+.inventory-category-heading::-webkit-details-marker { display: none; }
+.inventory-category-heading::before { content: '▸'; color: #62c2aa; transition: transform .12s ease; }
+.inventory-category[open] > .inventory-category-heading::before { transform: rotate(90deg); }
+.inventory-category-heading span { flex: 1; }
+.inventory-category-heading strong { min-width: 22px; padding: 2px 5px; color: #f7d77d; background: rgba(0, 0, 0, .25); border: 1px solid rgba(198, 154, 82, .3); border-radius: 10px; font: 700 .62rem monospace; text-align: center; }
+.inventory-category.is-important { border-color: rgba(243, 198, 83, .72); box-shadow: inset 3px 0 #f3c653; }
+.inventory-category.is-important > .inventory-category-heading { color: #fff1b1; background: linear-gradient(90deg, rgba(243, 198, 83, .17), rgba(98, 194, 170, .06)); font-weight: 700; }
+.inventory-category-items { display: grid; grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); grid-auto-rows: max-content; align-content: start; gap: 6px; padding: 6px; border-top: 1px solid rgba(198, 154, 82, .18); }
 .building-item-grid { grid-template-columns: minmax(0, 1fr); max-height: 50vh; }
 .inventory-item-card.building-item-card { display: grid; width: 100%; box-sizing: border-box; grid-template-columns: 42px minmax(0, 1fr); min-height: 58px; border: 1px solid rgba(198, 154, 82, 0.3); }
 .building-item-card > * { min-width: 0; }

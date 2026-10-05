@@ -48,6 +48,7 @@ export class GameState {
         this.materialInventoryVersion = MATERIAL_INVENTORY_VERSION;
         this.materialInventory = { ...INITIAL_MATERIAL_INVENTORY };
         this.craftingJobs = [];
+        this.craftingParallelSlots = 1;
         this.productionRate = 0;
         this.rotationProgress = new Map();
         this.controlStates = new Map();
@@ -386,6 +387,7 @@ export class GameState {
             materialInventoryVersion: MATERIAL_INVENTORY_VERSION,
             materialInventory: this.materialInventory,
             craftingJobs: this.craftingJobs,
+            craftingParallelSlots: this.craftingParallelSlots,
             waterGenerationRate: this.waterGenerationRate,
             waterConsumptionRate: this.waterConsumptionRate,
             fogRecoveryRate: this.fogRecoveryRate,
@@ -417,6 +419,7 @@ export class GameState {
         this.brass = data.brass;
         this.materialInventoryVersion = MATERIAL_INVENTORY_VERSION;
         this.materialInventory = restoreMaterialInventory(data.materialInventory, data.materialInventoryVersion);
+        this.craftingParallelSlots = Math.max(1, Math.floor(Number(data.craftingParallelSlots) || 1));
         const editorRuntime = this.isEditorRuntimeContext();
         const savedManualStop = data.userStoppedMainGear === true;
         const savedMainGearRunning = data.mainGearRunning ?? true;
@@ -431,6 +434,7 @@ export class GameState {
         this.craftingJobs = Array.isArray(data.craftingJobs) ? data.craftingJobs.filter(job =>
             job && typeof job.recipeKey === 'string' && typeof job.outputItem === 'string'
             && Number.isFinite(Number(job.outputAmount)) && Number.isFinite(Number(job.completesAt))) : [];
+        this.normalizeCraftingQueue();
         const gears = data.gears || data.placedGears || [];
         this.placedGears = this.createGear
             ? gears.map(gear => this.createGear(gear))
@@ -533,6 +537,7 @@ export class GameState {
             materialInventoryVersion: MATERIAL_INVENTORY_VERSION,
             materialInventory: this.materialInventory,
             craftingJobs: this.craftingJobs,
+            craftingParallelSlots: this.craftingParallelSlots,
             waterGenerationRate: this.waterGenerationRate,
             waterConsumptionRate: this.waterConsumptionRate,
             fogRecoveryRate: this.fogRecoveryRate,
@@ -686,6 +691,7 @@ export class GameState {
         // 保存データを読み込み、渡された生成関数で各ギアを独立した実体として復元する。
         this.createGear = createGear;
         let initialInventoryMigrated = false;
+        let craftingQueueNormalized = false;
         const saved = localStorage.getItem('fog_thermo_save');
         if (saved) {
             try {
@@ -710,9 +716,11 @@ export class GameState {
                 this.lastExternalSaveAt = Number(data.updatedAt) || 0;
                 this.creativeMode = data.creativeMode ?? false;
                 this.creativeSnapshot = data.creativeSnapshot ?? null;
+                this.craftingParallelSlots = Math.max(1, Math.floor(Number(data.craftingParallelSlots) || 1));
                 this.craftingJobs = Array.isArray(data.craftingJobs) ? data.craftingJobs.filter(job =>
                     job && typeof job.recipeKey === 'string' && typeof job.outputItem === 'string'
                     && Number.isFinite(Number(job.outputAmount)) && Number.isFinite(Number(job.completesAt))) : [];
+                craftingQueueNormalized = this.normalizeCraftingQueue();
                 this.belts = Array.isArray(data.belts) ? data.belts.filter(belt => Array.isArray(belt?.gearIds) && belt.gearIds.length >= 2) : [];
                 this.placedGears = (data.gears || data.placedGears || []).map(createGear);
                 if (this.placedGears.length > 0 && !this.placedGears.some(gear => gear.isCore)) {
@@ -725,7 +733,7 @@ export class GameState {
                 this.undoStack = data.undoStack || [];
                 this.redoStack = data.redoStack || [];
                 if (this.placedGears.length > 0) {
-                    if (initialInventoryMigrated) this.saveGameData();
+                    if (initialInventoryMigrated || craftingQueueNormalized) this.saveGameData();
                     return;
                 }
             } catch (error) {
@@ -926,6 +934,83 @@ export class GameState {
         });
         this.saveGameData();
         this.notify();
+    }
+
+    cancelCraftingJob(jobId, refundItems = [], now = Date.now()) {
+        const jobIndex = this.craftingJobs.findIndex(job => job.jobId === jobId);
+        if (jobIndex < 0) return false;
+        if (Number(this.craftingJobs[jobIndex].completesAt) <= now) {
+            this.completeCraftingJobs(now);
+            return false;
+        }
+
+        const [cancelledJob] = this.craftingJobs.splice(jobIndex, 1);
+        refundItems.forEach(([itemId, rawAmount]) => {
+            const amount = Math.max(0, Number(rawAmount) || 0);
+            if (!amount) return;
+            if (itemId === 'brass-stock') this.brass += amount;
+            else if (itemId === 'water') this.water += amount;
+            else if (itemId === 'fog') this.fog += amount;
+            else if (itemId === 'power') this.power += amount;
+            else if (itemId === 'steam_power') this.steamPower += amount;
+            else this.materialInventory[itemId] = (Number(this.materialInventory[itemId]) || 0) + amount;
+        });
+
+        this.scheduleCraftingJobs([], now);
+        this.saveGameData();
+        this.notify();
+        return cancelledJob;
+    }
+
+    scheduleCraftingJobs(newJobs = [], now = Date.now()) {
+        const parallelSlots = Math.max(1, Math.floor(Number(this.craftingParallelSlots) || 1));
+        const activeJobs = this.craftingJobs
+            .filter(job => Number(job.startedAt) <= now && Number(job.completesAt) > now)
+            .sort((first, second) => Number(first.startedAt) - Number(second.startedAt)
+                || Number(first.completesAt) - Number(second.completesAt))
+            .slice(0, parallelSlots);
+        const activeSet = new Set(activeJobs);
+        const slotAvailability = Array(parallelSlots).fill(now);
+        activeJobs.forEach((job, index) => {
+            slotAvailability[index] = Number(job.completesAt);
+        });
+        const pendingJobs = [
+            ...this.craftingJobs.filter(job => !activeSet.has(job)),
+            ...newJobs
+        ];
+        pendingJobs.forEach(job => {
+            let slot = 0;
+            for (let index = 1; index < slotAvailability.length; index++) {
+                if (slotAvailability[index] < slotAvailability[slot]) slot = index;
+            }
+            const duration = Math.max(1, Number(job.completesAt) - Number(job.startedAt));
+            job.startedAt = Math.max(now, slotAvailability[slot]);
+            job.completesAt = job.startedAt + duration;
+            slotAvailability[slot] = job.completesAt;
+        });
+        this.craftingJobs = [...activeJobs, ...pendingJobs]
+            .sort((first, second) => Number(first.startedAt) - Number(second.startedAt)
+                || Number(first.completesAt) - Number(second.completesAt));
+        return newJobs;
+    }
+
+    setCraftingParallelSlots(slots) {
+        const nextSlots = Math.max(1, Math.floor(Number(slots) || 1));
+        if (nextSlots === this.craftingParallelSlots) return false;
+        this.craftingParallelSlots = nextSlots;
+        this.scheduleCraftingJobs();
+        this.saveGameData();
+        this.notify();
+        return true;
+    }
+
+    normalizeCraftingQueue(now = Date.now()) {
+        const before = this.craftingJobs.map(job => [job.jobId, job.startedAt, job.completesAt]);
+        this.scheduleCraftingJobs([], now);
+        return this.craftingJobs.some((job, index) =>
+            job.jobId !== before[index]?.[0]
+            || Number(job.startedAt) !== Number(before[index]?.[1])
+            || Number(job.completesAt) !== Number(before[index]?.[2]));
     }
 
     tick() {
