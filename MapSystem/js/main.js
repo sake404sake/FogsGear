@@ -9,7 +9,7 @@ import { BUILDING_BY_ID, BUILDING_DEFINITIONS, canPlaceBuildingOnTerrainCell, dr
 import { getBuildingUtilityStatus, simulateBuildingUtilityNetworks } from './buildingUtilityNetworks.js?v=4';
 import { buildTerritoryBorderSegments } from './territoryBorders.js?v=35';
 import { directionToVehicleRotation, findNextRailStep, getTrackDirection, getVehicleRenderState, STATION_CONTROL_DEFAULTS, VEHICLE_DEFAULTS } from './railwayRuntime.js?v=8';
-import { GameState as EngineGameState } from '../../GearSystem/js/GameState.js?v=runtime-32';
+import { GameState as EngineGameState } from '../../GearSystem/js/GameState.js?v=runtime-33';
 import { GearManager as EngineGearManager } from '../../GearSystem/js/GearManager.js?v=runtime-5';
 
 const canvas = document.getElementById('gameCanvas');
@@ -1316,10 +1316,7 @@ function craftBuildingKit(buildingId, requestedCount) {
         });
     }
     const now = Date.now();
-    const buildingQueue = (engineRuntimeState.craftingJobs || [])
-        .filter(job => String(job.recipeKey).startsWith('building:'))
-        .sort((first, second) => Number(first.completesAt) - Number(second.completesAt));
-    let nextStartAt = Math.max(now, ...buildingQueue.map(job => Number(job.completesAt) || now));
+    let nextStartAt = getCraftingQueueNextStartAt(now);
     const batchGroupId = `building:${building.id}:${now}:${Math.random().toString(36).slice(2)}`;
     const duration = Math.max(4, building.brassCost * 4) * 1000;
     for (let index = 0; index < quantity; index++) {
@@ -1713,19 +1710,23 @@ function createRecipeDetailSection(title) {
     return section;
 }
 
-function appendRecipeDetailMaterial(container, itemId, amount) {
+function appendRecipeDetailLink(container, itemId, label, amount) {
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'recipe-detail-material';
     button.dataset.action = 'show-recipe-detail';
     button.dataset.itemKey = itemId;
-    button.append(document.createTextNode(getCraftingItemName(itemId)));
+    button.append(document.createTextNode(label || getCraftingItemName(itemId)));
     if (amount !== undefined) {
         const quantity = document.createElement('strong');
         quantity.textContent = `×${amount}`;
         button.appendChild(quantity);
     }
     container.appendChild(button);
+}
+
+function appendRecipeDetailMaterial(container, itemId, amount) {
+    appendRecipeDetailLink(container, itemId, '', amount);
 }
 
 function showRecipeDetail(itemId, pushHistory = true) {
@@ -1811,10 +1812,7 @@ function showRecipeDetail(itemId, pushHistory = true) {
         const list = document.createElement('div');
         list.className = 'recipe-detail-row';
         recipeUses.forEach((recipe) => {
-            const use = document.createElement('span');
-            use.className = 'recipe-detail-material';
-            use.textContent = `加工: ${recipe[1]}`;
-            list.appendChild(use);
+            appendRecipeDetailLink(list, recipe[3], `加工: ${recipe[1]}`);
         });
         transformUses.forEach(([type]) => {
             const use = document.createElement('span');
@@ -1823,10 +1821,8 @@ function showRecipeDetail(itemId, pushHistory = true) {
             list.appendChild(use);
         });
         uses.forEach((candidate) => {
-            const use = document.createElement('span');
-            use.className = 'recipe-detail-material';
-            use.textContent = `${candidate.name} ×${candidate.materialCosts.find(([id]) => id === currentItemId)[1]}`;
-            list.appendChild(use);
+            const amount = candidate.materialCosts.find(([id]) => id === currentItemId)[1];
+            appendRecipeDetailLink(list, candidate.id, candidate.name, amount);
         });
         section.appendChild(list);
         content.appendChild(section);
@@ -1897,9 +1893,12 @@ function craftRecipe(recipeIndex, buildingInstanceId = '', requestedCount) {
     });
     const outputAmount = Number(recipe[6]) || 1;
     const duration = Math.max(1000, Math.round((Number(recipe[7]) || 90) / CRAFTING_RATE_MULTIPLIER * 1000));
-    const startedAt = Date.now();
+    const now = Date.now();
+    const startedAt = getCraftingQueueNextStartAt(now);
     const batchGroupId = `${recipeKey}:${startedAt}:${Math.random().toString(36).slice(2)}`;
+    let nextStartAt = startedAt;
     for (let index = 0; index < quantity; index++) {
+        const completesAt = nextStartAt + duration;
         engineRuntimeState.craftingJobs.push({
             jobId: `${batchGroupId}:${index + 1}`,
             batchGroupId,
@@ -1908,15 +1907,22 @@ function craftRecipe(recipeIndex, buildingInstanceId = '', requestedCount) {
             recipeKey,
             outputItem: recipe[3],
             outputAmount,
-            startedAt,
-            completesAt: startedAt + duration
+            startedAt: nextStartAt,
+            completesAt
         });
+        nextStartAt = completesAt;
     }
     engineRuntimeState.saveGameData();
     engineRuntimeState.notify();
     updateEngineDashboard();
     if (!document.getElementById('building-crafting-modal')?.hidden) renderBuildingCrafting();
     showAppNotice(`${getCraftingItemName(recipe[3])}の製作を開始しました。`);
+}
+
+function getCraftingQueueNextStartAt(now = Date.now()) {
+    return Math.max(now, ...(engineRuntimeState?.craftingJobs || [])
+        .map(job => Number(job.completesAt))
+        .filter(Number.isFinite));
 }
 
 function closeBuildingCrafting() {
@@ -2017,8 +2023,7 @@ function syncCraftingNotifications() {
         craftingNotificationCards.delete(jobId);
     }
     const now = Date.now();
-    const buildingQueuePositions = new Map(jobs
-        .filter(job => String(job.recipeKey).startsWith('building:'))
+    const queuePositions = new Map(jobs
         .slice()
         .sort((first, second) => Number(first.startedAt) - Number(second.startedAt)
             || Number(first.completesAt) - Number(second.completesAt))
@@ -2039,8 +2044,8 @@ function syncCraftingNotifications() {
         const duration = Math.max(1, completesAt - start);
         const progress = Math.max(0, Math.min(100, ((now - start) / duration) * 100));
         const secondsLeft = Math.max(0, Math.ceil((completesAt - now) / 1000));
-        const queued = String(job.recipeKey).startsWith('building:') && now < start;
-        const queuePosition = buildingQueuePositions.get(job.jobId);
+        const queued = now < start;
+        const queuePosition = queuePositions.get(job.jobId);
         entry.title.textContent = `${outputName}${outputAmount > 1 ? ` ×${outputAmount}` : ''}`;
         const batchLabel = queued
             ? `キュー ${queuePosition}番目`
@@ -3308,6 +3313,14 @@ function setupControls() {
         scheduleDraw();
     });
 
+    document.addEventListener('contextmenu', event => {
+        if (!(event.target instanceof Element)) return;
+        if (event.target.closest('input, textarea, select, [contenteditable="true"]')) return;
+        if (event.target.closest('#gameCanvas, #building-menu-modal, #building-placement-controls')) {
+            event.preventDefault();
+        }
+    }, true);
+
     canvas.addEventListener('selectstart', event => event.preventDefault());
 
     canvas.addEventListener('wheel', (e) => {
@@ -3583,7 +3596,8 @@ function updateEngineDashboard() {
             runtime.gears.forEach(gear => {
                 if (!gear.powered || gear.isDeadlocked || gear.processMode !== 'RESOURCE_COLLECTION') return;
                 const rotationRate = Math.abs(gear.angularVelocity || 0) * 0.012 * 60 / (Math.PI * 2);
-                drops.forEach(itemId => collectedMaterialRates.set(itemId, (collectedMaterialRates.get(itemId) || 0) + rotationRate));
+                const collectionRate = rotationRate * Math.max(1, Number(gear.teeth) || 1);
+                drops.forEach(itemId => collectedMaterialRates.set(itemId, (collectedMaterialRates.get(itemId) || 0) + collectionRate));
             });
         });
     }

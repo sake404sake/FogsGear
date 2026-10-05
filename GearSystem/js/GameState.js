@@ -794,33 +794,38 @@ export class GameState {
         const progress = (this.rotationProgress.get(progressKey) || 0) + Math.abs(rotationDelta);
         const completedRotations = Math.floor(progress / (Math.PI * 2));
         this.rotationProgress.set(progressKey, progress % (Math.PI * 2));
+        const operationsPerRotation = gear.processMode === 'RESOURCE_COLLECTION'
+            ? Math.max(1, Math.floor(Number(gear.teeth) || 1))
+            : 1;
         for (let rotation = 0; rotation < completedRotations; rotation++) {
-            const detail = {
-                scrollId: scrollRuntime.scrollId,
-                target: { ...scrollRuntime.target },
-                mode: gear.processMode,
-                terrainTargetType: gear.terrainTargetType,
-                materials: this.materialInventory,
-                power: this.power
-            };
-            const result = this.worldCellHandler(detail);
-            if (!result?.success) continue;
-            Object.entries(result.consumedItems || {}).forEach(([item, amount]) => {
-                this.materialInventory[item] = Math.max(0, (Number(this.materialInventory[item]) || 0) - amount);
-            });
-            const consumedPower = Math.max(0, Number(result.consumedPower) || 0);
-            this.power = Math.max(0, this.power - consumedPower);
-            this.powerConsumedThisTick += consumedPower;
-            Object.entries(result.producedItems || {}).forEach(([item, amount]) => {
-                this.materialInventory[item] = (Number(this.materialInventory[item]) || 0) + amount;
-            });
-            if (result.target) {
-                Object.assign(scrollRuntime.target, result.target);
-                let targets = {};
-                try { targets = JSON.parse(localStorage.getItem(ACTIVE_SCROLL_TARGETS_KEY) || '{}'); } catch (error) {}
-                targets[scrollRuntime.scrollId] = { ...scrollRuntime.target };
-                localStorage.setItem(ACTIVE_SCROLL_TARGETS_KEY, JSON.stringify(targets));
-                window.dispatchEvent(new CustomEvent('fogsgear:scroll-targets-changed', { detail: targets }));
+            for (let operation = 0; operation < operationsPerRotation; operation++) {
+                const detail = {
+                    scrollId: scrollRuntime.scrollId,
+                    target: { ...scrollRuntime.target },
+                    mode: gear.processMode,
+                    terrainTargetType: gear.terrainTargetType,
+                    materials: this.materialInventory,
+                    power: this.power
+                };
+                const result = this.worldCellHandler(detail);
+                if (!result?.success) continue;
+                Object.entries(result.consumedItems || {}).forEach(([item, amount]) => {
+                    this.materialInventory[item] = Math.max(0, (Number(this.materialInventory[item]) || 0) - amount);
+                });
+                const consumedPower = Math.max(0, Number(result.consumedPower) || 0);
+                this.power = Math.max(0, this.power - consumedPower);
+                this.powerConsumedThisTick += consumedPower;
+                Object.entries(result.producedItems || {}).forEach(([item, amount]) => {
+                    this.materialInventory[item] = (Number(this.materialInventory[item]) || 0) + amount;
+                });
+                if (result.target) {
+                    Object.assign(scrollRuntime.target, result.target);
+                    let targets = {};
+                    try { targets = JSON.parse(localStorage.getItem(ACTIVE_SCROLL_TARGETS_KEY) || '{}'); } catch (error) {}
+                    targets[scrollRuntime.scrollId] = { ...scrollRuntime.target };
+                    localStorage.setItem(ACTIVE_SCROLL_TARGETS_KEY, JSON.stringify(targets));
+                    window.dispatchEvent(new CustomEvent('fogsgear:scroll-targets-changed', { detail: targets }));
+                }
             }
         }
     }

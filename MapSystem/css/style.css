@@ -478,6 +478,7 @@ h1 {
 .inventory-modal { position: fixed; inset: 0; z-index: 1100; display: grid; place-items: center; padding: 18px; background: rgba(8, 7, 6, 0.58); }
 .inventory-modal[hidden] { display: none; }
 .inventory-modal-panel { position: relative; width: min(100%, 360px); box-sizing: border-box; padding: 28px 24px 20px; color: var(--text-main); background: linear-gradient(145deg, #30251d, #17120f); border: 1px solid var(--border-gold); border-radius: 8px; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.72), inset 0 0 20px rgba(243, 198, 83, 0.06); text-align: center; }
+.building-menu-panel { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
 .inventory-modal-panel.recipe-detail-panel { display: flex; flex-direction: column; width: min(620px, calc(100vw - 24px)); max-height: min(84dvh, 720px); text-align: left; }
 .recipe-detail-panel h2 { padding-right: 32px; }
 .recipe-detail-content { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
@@ -1334,6 +1335,41 @@ canvas.engine-runtime-canvas { display: none; }
         position: relative;
         z-index: 1;
     }
+}
+
+@media (max-width: 620px) and (max-aspect-ratio: 1 / 1) {
+    :fullscreen body:has(#gameCanvas) > .panel:last-of-type {
+        flex: 1 1 0;
+        min-height: 0;
+        overflow-x: hidden;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        padding-bottom: max(10px, env(safe-area-inset-bottom));
+    }
+    :fullscreen body:has(#gameCanvas) > .panel:last-of-type .main-control-pager {
+        flex: 0 0 auto;
+        height: auto;
+        min-height: max-content;
+    }
+    :fullscreen body:has(#gameCanvas) > .panel:last-of-type .main-page-viewport {
+        flex: 0 0 auto;
+        height: auto;
+        overflow: visible;
+    }
+    :fullscreen body:has(#gameCanvas) > .panel:last-of-type .main-page-track,
+    :fullscreen body:has(#gameCanvas) > .panel:last-of-type .main-page {
+        height: auto;
+        min-height: 0;
+    }
+    :fullscreen body:has(#gameCanvas) > .panel:last-of-type .main-page {
+        overflow: visible;
+    }
+}
+
+canvas#gameCanvas {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
 }
 
 @media (min-width: 1001px) and (min-aspect-ratio: 1/1) {
