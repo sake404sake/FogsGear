@@ -2,14 +2,14 @@
 import { MapGenerator, BIOME_COLORS, loadMapSnapshot, saveMapSnapshot } from './mapGenerator.js?v=89';
 import { SkinRenderer } from './skinRenderer.js?v=3';
 import { CELL_DEFINITIONS, canEnterCell, getCellEntryRule, getMosaicColor } from './cellRules.js';
-import { drawCellIcon, loadCellIconAtlas } from './cellIconRenderer.js?v=4';
-import { ACTIVE_SCROLL_TARGETS_KEY, CELL_MATERIALS, TERRAIN_TRANSFORM_RECIPES, WORLD_CELL_TYPES, applyCellChanges, chooseEraCellType, getCellCollectionPowerCost, getCellDrops, readCellChanges, saveCellChange } from './worldCells.js?v=6';
-import { CRAFTING_ITEMS, CRAFTING_ITEM_BY_ID, CRAFTING_RATE_MULTIPLIER, CRAFTING_RECIPES, CRAFTING_STATION_BUILDING_IDS, HANDCRAFT_STATION } from './craftingData.js?v=5';
-import { BUILDING_BY_ID, BUILDING_DEFINITIONS, canPlaceBuildingOnTerrainCell, drawBuilding, getRailAutoRotation, getRailConnections, getTileEffectsUnderFootprint, getVehicleRailRotation, loadBuildingIconImages, normalizeBuildingUtilityState } from './buildingData.js?v=26';
+import { drawCellIcon, loadCellIconAtlas } from './cellIconRenderer.js?v=5';
+import { ACTIVE_SCROLL_TARGETS_KEY, CELL_MATERIALS, TERRAIN_TRANSFORM_RECIPES, WORLD_CELL_TYPES, applyCellChanges, chooseEraCellType, getCellCollectionPowerCost, getCellDrops, readCellChanges, saveCellChange } from './worldCells.js?v=8';
+import { CRAFTING_ITEMS, CRAFTING_ITEM_BY_ID, CRAFTING_RATE_MULTIPLIER, CRAFTING_RECIPES, CRAFTING_STATION_BUILDING_IDS, DEFERRED_CRAFTING_ITEM_IDS, HANDCRAFT_STATION } from './craftingData.js?v=13';
+import { BUILDING_BY_ID, BUILDING_DEFINITIONS, canPlaceBuildingOnTerrainCell, drawBuilding, getRailAutoRotation, getRailConnections, getTileEffectsUnderFootprint, getVehicleRailRotation, loadBuildingIconImages, normalizeBuildingUtilityState } from './buildingData.js?v=30';
 import { getBuildingUtilityStatus, simulateBuildingUtilityNetworks } from './buildingUtilityNetworks.js?v=4';
 import { buildTerritoryBorderSegments } from './territoryBorders.js?v=35';
 import { directionToVehicleRotation, findNextRailStep, getTrackDirection, getVehicleRenderState, STATION_CONTROL_DEFAULTS, VEHICLE_DEFAULTS } from './railwayRuntime.js?v=8';
-import { GameState as EngineGameState } from '../../GearSystem/js/GameState.js?v=runtime-30';
+import { GameState as EngineGameState } from '../../GearSystem/js/GameState.js?v=runtime-32';
 import { GearManager as EngineGearManager } from '../../GearSystem/js/GearManager.js?v=runtime-5';
 
 const canvas = document.getElementById('gameCanvas');
@@ -149,30 +149,50 @@ const CRAFTING_ICON_IDS = Object.freeze({
     copper_ore: 'i-copper',
     tar: 'i-oil',
     'crystal-shard': 'i-crystal',
+    fiber: 'i-fiber',
+    reed: 'i-reed',
+    ash: 'i-ash',
+    magnetite: 'i-magnetite',
+    mica: 'i-mica',
+    obsidian: 'i-obsidian',
+    pumice: 'i-pumice',
+    seaweed: 'i-seaweed',
     tin_ore: 'i-tin',
     zinc_ore: 'i-zinc',
     crystal_shard: 'i-crystal',
     mining_sample: 'i-mining-sample',
     vein_mold: 'i-vein-mold',
     navigation_crystal: 'i-device',
+    'preserved-spores': 'i-spore-vial',
     preserved_spores: 'i-spore-vial',
     compost: 'i-compost',
     forest_seed: 'i-forest-seed',
-    ancient_seed: 'i-seedcase'
+    ancient_seed: 'i-seedcase',
+    'climate-control-core': 'i-crystal',
+    'closed-loop-unit': 'i-filter-cartridge',
+    'ecosystem-starter': 'i-compost',
+    paper_scroll: 'i-paper_scroll',
+    cloth_scroll: 'i-cloth_scroll',
+    scroll_book: 'i-scroll_book',
+    steam_power: 'i-steam_power'
 });
+const recipeDetailHistory = [];
 
 function openInventoryItem(itemKey, scroll = null) {
     const craftingItem = CRAFTING_ITEM_BY_ID.get(itemKey);
     const building = BUILDING_BY_ID.get(itemKey);
+    const cellMaterial = CELL_MATERIALS[itemKey];
     const definition = craftingItem
         ? { name: craftingItem[1], description: craftingItem[4], meta: `${craftingItem[2]} / ${craftingItem[3]}`, iconId: itemKey }
         : building
-            ? { name: building.name, description: '作成済みの建築キットです。設置位置を選んでマップに配置できます。', meta: `建築キット / ${building.width}×${building.height}`, iconId: itemKey }
-            : INVENTORY_ITEM_DEFINITIONS[itemKey] || INVENTORY_ITEM_DEFINITIONS.paper_scroll;
+            ? { name: building.name, description: building.description || '作成済みの建築キットです。設置位置を選んでマップに配置できます。', meta: `建築キット / ${building.width}×${building.height}`, iconId: itemKey }
+            : INVENTORY_ITEM_DEFINITIONS[itemKey] || (cellMaterial
+                ? { name: cellMaterial.label, description: 'セルから採取できる資材です。', meta: 'セル資源', iconId: itemKey }
+                : { name: itemKey, description: '詳細情報が登録されていないアイテムです。', meta: '未登録アイテム', iconId: itemKey });
     const modal = document.getElementById('inventory-item-modal');
     const icon = document.getElementById('inventory-modal-icon');
     const useButton = document.getElementById('inventory-modal-use');
-    const placeBuildingButton = document.getElementById('inventory-modal-place-building');
+    const placementModes = document.getElementById('inventory-modal-placement-modes');
     const editButton = document.getElementById('inventory-modal-edit');
     if (!modal || !icon) return;
     icon.replaceChildren();
@@ -191,9 +211,11 @@ function openInventoryItem(itemKey, scroll = null) {
     document.getElementById('inventory-modal-meta').textContent = definition.meta;
     useButton.hidden = !scroll;
     useButton.dataset.scrollId = scroll?.id || '';
-    if (placeBuildingButton) {
-        placeBuildingButton.hidden = !building || getCraftingItemCount(itemKey) <= 0;
-        placeBuildingButton.dataset.buildingId = building?.id || '';
+    if (placementModes) {
+        placementModes.hidden = !building || getCraftingItemCount(itemKey) <= 0;
+        placementModes.querySelectorAll('[data-action="place-building-from-inventory"]').forEach(button => {
+            button.dataset.buildingId = building?.id || '';
+        });
     }
     if (editButton) {
         editButton.hidden = !['paper_scroll', 'cloth_scroll'].includes(itemKey);
@@ -956,6 +978,7 @@ function migrateLegacyMaterialIds() {
         tin_ore: 'tin-ore',
         zinc_ore: 'zinc-ore',
         crystal_shard: 'crystal-shard',
+        preserved_spores: 'preserved-spores',
         navigation_crystal: 'navigation-crystal',
         mycelium_compost: 'compost'
     };
@@ -1004,6 +1027,76 @@ function hasBuildingConstructionStation() {
     return state.buildings.some(building => isBuildingConstructionStation(building.id));
 }
 
+function getMissingBuildingRequirements(building) {
+    if (engineRuntimeState?.creativeMode) return [];
+    const existingBuildingIds = new Set(state.buildings.map(placed => placed.id));
+    return (building.requiredBuildings || []).filter(requiredId => !existingBuildingIds.has(requiredId));
+}
+
+function getStorageMaterialCount(storage, itemId) {
+    return Math.max(0, Number(storage.storedMaterials?.[itemId]) || 0);
+}
+
+function getStorageUsedCapacity(storage) {
+    return Object.values(storage.storedMaterials || {}).reduce((total, amount) => total + Math.max(0, Number(amount) || 0), 0);
+}
+
+function renderBuildingStorage(placed, definition) {
+    const section = document.getElementById('building-storage-controls');
+    const itemSelect = document.getElementById('building-storage-item');
+    if (!section || !itemSelect) return;
+    const capacity = Number(definition.storageCapacity) || 0;
+    section.hidden = capacity <= 0;
+    if (capacity <= 0) return;
+    if (!isRecord(placed.storedMaterials)) placed.storedMaterials = {};
+    const currentItem = itemSelect.value;
+    itemSelect.replaceChildren(...CRAFTING_ITEMS.map(([id, name]) => new Option(name, id)));
+    if (CRAFTING_ITEMS.some(([id]) => id === currentItem)) itemSelect.value = currentItem;
+    const used = getStorageUsedCapacity(placed);
+    document.getElementById('building-storage-status').textContent = `保管量 ${used} / ${capacity}　選択中: ${getStorageMaterialCount(placed, itemSelect.value)}`;
+}
+
+function transferBuildingStorage(direction) {
+    const placed = state.buildings.find(building => building.instanceId === selectedBuildingInstanceId);
+    const definition = BUILDING_BY_ID.get(placed?.id);
+    const itemId = document.getElementById('building-storage-item')?.value;
+    const amount = Math.floor(Number(document.getElementById('building-storage-amount')?.value));
+    if (!placed || !definition?.storageCapacity || !CRAFTING_ITEM_BY_ID.has(itemId) || !Number.isFinite(amount) || amount < 1) {
+        showAppNotice('資材と数量を正しく指定してください。');
+        return;
+    }
+    if (!isRecord(placed.storedMaterials)) placed.storedMaterials = {};
+    const inventoryCount = itemId === 'brass-stock' ? Number(engineRuntimeState.brass) || 0 : getCraftingItemCount(itemId);
+    const storedCount = getStorageMaterialCount(placed, itemId);
+    const before = captureBuildingHistoryState();
+    if (direction === 'deposit') {
+        const capacityLeft = Math.floor(definition.storageCapacity - getStorageUsedCapacity(placed));
+        const moved = Math.min(amount, capacityLeft, inventoryCount);
+        if (moved < 1) {
+            showAppNotice(capacityLeft < 1 ? 'ストレージに空きがありません。' : '所持資材がありません。');
+            return;
+        }
+        placed.storedMaterials[itemId] = storedCount + moved;
+        if (itemId === 'brass-stock') engineRuntimeState.brass -= moved;
+        else engineRuntimeState.materialInventory[itemId] = inventoryCount - moved;
+    } else {
+        const moved = Math.min(amount, storedCount);
+        if (moved < 1) {
+            showAppNotice('ストレージに選択した資材がありません。');
+            return;
+        }
+        placed.storedMaterials[itemId] = storedCount - moved;
+        if (itemId === 'brass-stock') engineRuntimeState.brass += moved;
+        else engineRuntimeState.materialInventory[itemId] = inventoryCount + moved;
+    }
+    recordBuildingHistory(before);
+    saveBuildings();
+    engineRuntimeState.saveGameData();
+    engineRuntimeState.notify();
+    renderBuildingStorage(placed, definition);
+    showAppNotice(direction === 'deposit' ? '資材をストレージに預けました。' : '資材をストレージから取り出しました。');
+}
+
 function formatInventoryCount(itemId, count) {
     const amount = Number(count) || 0;
     if (!['water', 'fog', 'power', 'steam_power'].includes(itemId)) return String(Math.floor(amount));
@@ -1049,7 +1142,8 @@ function renderBuildingInventory() {
         .map(job => [job.jobId, job.recipeKey, Number(job.startedAt), Number(job.completesAt)]);
     const buildingMaterialCounts = BUILDING_DEFINITIONS.flatMap(building =>
         getBuildingMaterialCosts(building).map(([itemId]) => [itemId, getCraftingItemCount(itemId)]));
-    const signature = `${brass}:${creative}:${hasConstructionStation}:${search}:${JSON.stringify(buildingKitCounts)}:${JSON.stringify(buildingMaterialCounts)}:${JSON.stringify(constructionJobs)}`;
+    const requirementSignature = JSON.stringify(BUILDING_DEFINITIONS.map(building => [building.id, getMissingBuildingRequirements(building)]));
+    const signature = `${brass}:${creative}:${hasConstructionStation}:${search}:${JSON.stringify(buildingKitCounts)}:${JSON.stringify(buildingMaterialCounts)}:${JSON.stringify(constructionJobs)}:${requirementSignature}`;
     if (signature === buildingRenderSignature) return;
     buildingRenderSignature = signature;
     list.replaceChildren();
@@ -1068,54 +1162,77 @@ function renderBuildingInventory() {
         const requiresStation = isLargeBuilding(building) && building.id !== 'craft-bench';
         const stationAvailable = !requiresStation || hasConstructionStation;
         const materialCosts = getBuildingMaterialCosts(building);
-        const maxCraftCount = creative ? 99 : Math.max(0, Math.min(
+        const missingRequirements = getMissingBuildingRequirements(building);
+        const affordableCount = creative ? 99 : Math.max(0, Math.min(
             Math.floor(brass / Math.max(1, building.brassCost)),
             ...materialCosts.map(([itemId, amount]) => Math.floor(getCraftingItemCount(itemId) / amount))
         ));
+        const maxCraftCount = missingRequirements.length && !creative ? 0 : affordableCount;
         const affordable = maxCraftCount > 0;
-        const card = document.createElement('div');
-        card.className = `inventory-item-card building-item-card is-${building.role}`;
-        const icon = document.createElement('span');
-        icon.className = 'building-item-icon';
-        icon.appendChild(createBuildingSvgIcon(building.id));
-        const copy = document.createElement('span');
-        copy.className = 'building-item-copy';
-        const name = document.createElement('strong');
-        name.className = 'building-item-name';
-        name.textContent = building.name;
-        const cost = document.createElement('small');
-        const queueCount = activeJobs.length;
         const canCraftNow = stationAvailable && affordable;
-        cost.className = `building-item-meta ${canCraftNow ? 'is-affordable' : 'is-unaffordable'}`;
-        const placementRule = building.requiresFoundation ? ' / 基礎必須' : building.role === 'vehicle' ? ' / 線路必須' : '';
         const missingBrass = !creative && brass < building.brassCost;
         const missingMaterialNames = creative ? [] : materialCosts
             .filter(([itemId, amount]) => getCraftingItemCount(itemId) < amount)
             .map(([itemId]) => getCraftingItemName(itemId));
-        const missingCostParts = [...(missingBrass ? ['真鍮'] : []), ...missingMaterialNames];
+        const missingRequirementNames = missingRequirements.map(id => BUILDING_BY_ID.get(id)?.name || id);
+        const missingCostParts = [...(missingBrass ? ['真鍮'] : []), ...missingMaterialNames, ...missingRequirementNames];
         const missingCost = missingCostParts.length ? `${missingCostParts.join('・')}不足` : '';
-        const status = queueCount
-            ? `キュー ${queueCount}個`
-            : !stationAvailable ? '作業台以上の設備が必要'
-            : !affordable ? missingCost || '素材不足'
-            : `作成可能${ownedCount ? ` / 所持 ${ownedCount}` : ''}`;
-        cost.textContent = `${building.width}×${building.height}${placementRule} / ${status}`;
-        const materials = document.createElement('span');
-        materials.className = 'building-item-materials';
+        const card = document.createElement('article');
+        card.className = `crafting-recipe-card building-item-card is-${building.role} ${canCraftNow ? 'is-craftable' : 'is-not-craftable is-unavailable'}`;
+        const heading = document.createElement('div');
+        heading.className = 'crafting-recipe-title';
+        heading.dataset.unavailableLabel = !stationAvailable ? '作業台以上の設備が必要' : missingRequirements.length ? `前提設備: ${missingRequirementNames.join('・')}` : missingCost || '素材不足';
+        const title = document.createElement('strong');
+        title.textContent = `${building.name}を製作する`;
+        const category = document.createElement('small');
+        category.textContent = '建築キット';
+        heading.append(title, category);
+
+        const outputBlock = document.createElement('div');
+        outputBlock.className = 'crafting-recipe-output';
+        const outputCaption = document.createElement('span');
+        outputCaption.className = 'crafting-output-caption';
+        outputCaption.textContent = '建築物';
+        const outputMain = document.createElement('div');
+        outputMain.className = 'crafting-output-main';
+        const icon = document.createElement('span');
+        icon.className = `crafting-output-icon building-item-icon is-${building.role}`;
+        icon.appendChild(createBuildingSvgIcon(building.id));
+        const outputName = document.createElement('strong');
+        outputName.className = 'crafting-output-name';
+        outputName.textContent = building.name;
+        const outputCount = document.createElement('span');
+        outputCount.className = 'crafting-output-count';
+        outputCount.textContent = `×${affordable ? 1 : 0}`;
+        outputMain.append(icon, outputName, outputCount);
+        outputBlock.append(outputCaption, outputMain);
+
+        const materialsBlock = document.createElement('div');
+        materialsBlock.className = 'crafting-recipe-materials';
+        const materialsCaption = document.createElement('span');
+        materialsCaption.className = 'crafting-materials-caption';
+        materialsCaption.textContent = '必要素材';
+        const materials = document.createElement('div');
+        materials.className = 'crafting-materials-list';
         const materialEntries = [
             ['brass-stock', building.brassCost],
             ...materialCosts
         ];
-        materialEntries.forEach(([itemId, amount]) => {
-            const available = itemId === 'brass-stock' ? brass : getCraftingItemCount(itemId);
-            const material = document.createElement('span');
-            material.className = `building-item-material${creative || available >= amount ? ' is-sufficient' : ' is-missing'}`;
-            material.textContent = `${getCraftingItemName(itemId)} ${creative ? '不要' : `${available}/${amount}`}`;
-            material.setAttribute('aria-label', creative
-                ? `${getCraftingItemName(itemId)}: クリエイティブモードでは不要`
-                : `${getCraftingItemName(itemId)}: 所持 ${available} / 必要 ${amount}`);
-            materials.appendChild(material);
-        });
+        materialEntries.forEach(([itemId, amount]) => materials.appendChild(createCraftingChip(itemId, amount)));
+        materialsBlock.append(materialsCaption, materials);
+
+        const footer = document.createElement('div');
+        footer.className = 'crafting-recipe-footer';
+        const cost = document.createElement('span');
+        const queueCount = activeJobs.length;
+        const placementRule = building.requiresFoundation ? ' / 基礎必須' : building.role === 'vehicle' ? ' / 線路必須' : '';
+        const status = queueCount
+            ? `キュー ${queueCount}個`
+            : !stationAvailable ? '作業台以上の設備が必要'
+            : missingRequirements.length ? `前提設備が必要: ${missingRequirementNames.join('・')}`
+            : !affordable ? missingCost || '素材不足'
+            : `作成可能${ownedCount ? ` / 所持 ${ownedCount}` : ''}`;
+        cost.textContent = `建築サイズ ${building.width}×${building.height}${placementRule} / ${status}`;
         if (activeJobs.length) {
             const countdown = document.createElement('span');
             countdown.className = 'building-item-countdown';
@@ -1123,30 +1240,38 @@ function renderBuildingInventory() {
             countdown.textContent = `${Math.max(0, Math.ceil((Number(activeJobs[0].completesAt) - Date.now()) / 1000))}秒`;
             cost.appendChild(countdown);
         }
-        copy.append(name, cost, materials);
         const quantityLabel = document.createElement('label');
-        quantityLabel.className = 'building-item-quantity';
+        quantityLabel.className = 'crafting-quantity-control';
         quantityLabel.append('作成数');
         const quantityMax = document.createElement('small');
         quantityMax.textContent = `最大 ${maxCraftCount}`;
         const quantityInput = document.createElement('input');
-        quantityInput.className = 'building-quantity-input';
+        quantityInput.className = 'crafting-quantity-input building-quantity-input';
         quantityInput.type = 'number';
         quantityInput.min = '1';
         quantityInput.max = String(maxCraftCount);
         quantityInput.value = affordable ? '1' : '0';
         quantityInput.disabled = !affordable;
         quantityInput.setAttribute('aria-label', `${building.name}の作成数`);
-        quantityLabel.append(quantityMax, quantityInput);
+        quantityLabel.appendChild(quantityInput);
+        quantityLabel.appendChild(quantityMax);
         const createButton = document.createElement('button');
         createButton.type = 'button';
         createButton.className = 'building-item-create';
         createButton.dataset.action = 'craft-building-kit';
         createButton.dataset.buildingId = building.id;
-        createButton.textContent = '建築キットを作成';
+        createButton.textContent = `製作 ×${affordable ? 1 : 0}`;
         createButton.disabled = !stationAvailable || !affordable;
-        card.classList.add(canCraftNow ? 'is-craftable' : 'is-not-craftable');
-        card.append(icon, copy, quantityLabel, createButton);
+        quantityInput.addEventListener('input', () => {
+            const selectedCount = Math.max(1, Math.min(maxCraftCount, Math.floor(Number(quantityInput.value) || 1)));
+            outputCount.textContent = `×${selectedCount}`;
+            createButton.textContent = `製作 ×${selectedCount}`;
+        });
+        const note = document.createElement('p');
+        note.className = 'crafting-recipe-note';
+        note.textContent = `所持キット: ${ownedCount}`;
+        footer.append(cost, quantityLabel, createButton);
+        card.append(heading, outputBlock, materialsBlock, footer, note);
         list.appendChild(card);
     });
 }
@@ -1157,6 +1282,11 @@ function craftBuildingKit(buildingId, requestedCount) {
     const requiresStation = isLargeBuilding(building) && building.id !== 'craft-bench';
     if (requiresStation && !hasBuildingConstructionStation()) {
         showAppNotice('2×2以上の建築には作業台以上の設備が必要です。');
+        return;
+    }
+    const missingRequirements = getMissingBuildingRequirements(building);
+    if (missingRequirements.length) {
+        showAppNotice(`建設条件を満たしていません。必要設備: ${missingRequirements.map(id => BUILDING_BY_ID.get(id)?.name || id).join('・')}`);
         return;
     }
     const creative = Boolean(engineRuntimeState.creativeMode);
@@ -1388,6 +1518,7 @@ function renderCellMaterials() {
     const inventoryList = document.getElementById('inventory-item-list');
     const inventoryIds = new Set(Object.entries(engineRuntimeState.materialInventory || {})
         .filter(([, count]) => Number(count) > 0)
+        .filter(([itemId]) => !DEFERRED_CRAFTING_ITEM_IDS.has(itemId))
         .map(([item]) => item));
     if (engineRuntimeState.brass > 0) inventoryIds.add('brass-stock');
     ['water', 'fog', 'power', 'steam_power'].forEach(itemId => {
@@ -1553,7 +1684,10 @@ function createCraftingRecipeCard(recipe, index, now, buildingInstanceId = '') {
 }
 
 function createCraftingChip(itemId, amount) {
-    const chip = document.createElement('span');
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.dataset.action = 'show-recipe-detail';
+    chip.dataset.itemKey = itemId;
     const available = getCraftingItemCount(itemId);
     chip.className = `crafting-item-chip${available < amount ? ' is-missing' : ''}`;
     chip.setAttribute('aria-label', `${getCraftingItemName(itemId)}: 所持 ${formatInventoryCount(itemId, available)} / 必要 ${amount}`);
@@ -1568,6 +1702,162 @@ function createCraftingChip(itemId, amount) {
     quantity.textContent = `×${amount}`;
     chip.append(icon, label, quantity);
     return chip;
+}
+
+function createRecipeDetailSection(title) {
+    const section = document.createElement('section');
+    section.className = 'recipe-detail-section';
+    const heading = document.createElement('h3');
+    heading.textContent = title;
+    section.appendChild(heading);
+    return section;
+}
+
+function appendRecipeDetailMaterial(container, itemId, amount) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'recipe-detail-material';
+    button.dataset.action = 'show-recipe-detail';
+    button.dataset.itemKey = itemId;
+    button.append(document.createTextNode(getCraftingItemName(itemId)));
+    if (amount !== undefined) {
+        const quantity = document.createElement('strong');
+        quantity.textContent = `×${amount}`;
+        button.appendChild(quantity);
+    }
+    container.appendChild(button);
+}
+
+function showRecipeDetail(itemId, pushHistory = true) {
+    if (pushHistory) recipeDetailHistory.push(itemId);
+    const currentItemId = recipeDetailHistory.at(-1);
+    if (!currentItemId) return;
+    const item = CRAFTING_ITEM_BY_ID.get(currentItemId);
+    const building = BUILDING_BY_ID.get(currentItemId);
+    const name = getCraftingItemName(currentItemId);
+    document.getElementById('recipe-detail-title').textContent = `${name}の製作方法・用途`;
+    document.getElementById('recipe-detail-back').hidden = recipeDetailHistory.length < 2;
+    const content = document.getElementById('recipe-detail-content');
+    content.replaceChildren();
+
+    const sources = Object.entries(WORLD_CELL_TYPES).flatMap(([type, definition]) => {
+        const collectionCount = Array.from({ length: 5 }, (_, count) => count)
+            .find((count) => getCellDrops(type, count).includes(currentItemId));
+        return definition.collect === currentItemId || collectionCount !== undefined
+            ? [{ type, definition, collectionCount: collectionCount ?? 0 }]
+            : [];
+    });
+    if (sources.length) {
+        const section = createRecipeDetailSection('採集できるセル');
+        const list = document.createElement('div');
+        list.className = 'recipe-detail-row';
+        sources.forEach(({ type, definition, collectionCount }) => {
+            const source = document.createElement('span');
+            source.className = 'recipe-detail-material';
+            source.textContent = `${definition.label} / ${getCellCollectionPowerCost(type, collectionCount)} 動力`;
+            list.appendChild(source);
+        });
+        section.appendChild(list);
+        content.appendChild(section);
+    }
+
+    const recipes = CRAFTING_RECIPES.filter((recipe) => recipe[3] === currentItemId);
+    recipes.forEach((recipe) => {
+        const section = createRecipeDetailSection(recipe[1]);
+        const station = document.createElement('p');
+        const stationBuildings = (CRAFTING_STATION_BUILDING_IDS[recipe[4]] || [])
+            .map((buildingId) => BUILDING_BY_ID.get(buildingId)?.name)
+            .filter((buildingName) => buildingName && buildingName !== recipe[4]);
+        station.textContent = `製作場所: ${recipe[4]}${stationBuildings.length ? `（${stationBuildings.join('・')}）` : ''}`;
+        section.appendChild(station);
+        const materials = document.createElement('div');
+        materials.className = 'recipe-detail-row';
+        recipe[2].forEach(([materialId, amount]) => appendRecipeDetailMaterial(materials, materialId, amount));
+        section.appendChild(materials);
+        if (recipe[5]) {
+            const note = document.createElement('p');
+            note.textContent = recipe[5];
+            section.appendChild(note);
+        }
+        content.appendChild(section);
+    });
+
+    if (building) {
+        const section = createRecipeDetailSection('建築キットの作成素材');
+        const station = document.createElement('p');
+        station.textContent = building.width >= 2 && building.height >= 2
+            ? '作成場所: インベントリの「建築」タブ（作業台以上の設備が必要）'
+            : '作成場所: インベントリの「建築」タブ';
+        section.appendChild(station);
+        const materials = document.createElement('div');
+        materials.className = 'recipe-detail-row';
+        appendRecipeDetailMaterial(materials, 'brass-stock', building.brassCost);
+        (building.materialCosts || []).forEach(([materialId, amount]) => appendRecipeDetailMaterial(materials, materialId, amount));
+        section.appendChild(materials);
+        content.appendChild(section);
+    }
+
+    const recipeUses = CRAFTING_RECIPES.filter((recipe) =>
+        recipe[2].some(([materialId]) => materialId === currentItemId)
+    );
+    const transformUses = Object.entries(TERRAIN_TRANSFORM_RECIPES).filter(([, inputs]) =>
+        Object.prototype.hasOwnProperty.call(inputs, currentItemId)
+    );
+    const uses = BUILDING_DEFINITIONS.filter((candidate) =>
+        (candidate.materialCosts || []).some(([materialId]) => materialId === currentItemId)
+    );
+    if (recipeUses.length || transformUses.length || uses.length) {
+        const section = createRecipeDetailSection('後続工程・建築での用途');
+        const list = document.createElement('div');
+        list.className = 'recipe-detail-row';
+        recipeUses.forEach((recipe) => {
+            const use = document.createElement('span');
+            use.className = 'recipe-detail-material';
+            use.textContent = `加工: ${recipe[1]}`;
+            list.appendChild(use);
+        });
+        transformUses.forEach(([type]) => {
+            const use = document.createElement('span');
+            use.className = 'recipe-detail-material';
+            use.textContent = `地形変成: ${WORLD_CELL_TYPES[type]?.label || type}`;
+            list.appendChild(use);
+        });
+        uses.forEach((candidate) => {
+            const use = document.createElement('span');
+            use.className = 'recipe-detail-material';
+            use.textContent = `${candidate.name} ×${candidate.materialCosts.find(([id]) => id === currentItemId)[1]}`;
+            list.appendChild(use);
+        });
+        section.appendChild(list);
+        content.appendChild(section);
+    }
+
+    const hasUse = recipeUses.length > 0 || transformUses.length > 0 || uses.length > 0;
+    if (recipes.length && !hasUse) {
+        const note = document.createElement('p');
+        note.className = 'recipe-detail-empty';
+        note.textContent = 'この製品は作成できますが、現行の加工・建築・地形変成で使う先がありません。';
+        content.appendChild(note);
+    } else if (!sources.length && !recipes.length && !building && !hasUse) {
+        const note = document.createElement('p');
+        note.className = 'recipe-detail-empty';
+        note.textContent = item
+            ? 'この素材は現在の採集・加工・建築データに用途が登録されていません。'
+            : 'このアイテムは現在のレシピ・建築データに登録されていません。';
+        content.appendChild(note);
+    }
+    document.getElementById('recipe-detail-modal').hidden = false;
+}
+
+function closeRecipeDetail() {
+    document.getElementById('recipe-detail-modal').hidden = true;
+    recipeDetailHistory.length = 0;
+}
+
+function goBackRecipeDetail() {
+    if (recipeDetailHistory.length < 2) return;
+    recipeDetailHistory.pop();
+    showRecipeDetail(recipeDetailHistory.at(-1), false);
 }
 
 function canCraftRecipeAtBuilding(recipe, buildingInstanceId) {
@@ -2600,10 +2890,13 @@ function updateBuildingMenuDetails(placed, definition) {
         .join(' / ');
     const operationStatus = buildingUtilityOperationStatuses.get(placed.instanceId);
     const utilityNote = utilitySummary ? ` / ${utilitySummary}${operationStatus ? ` / ${operationStatus}` : ''}` : '';
+    const storageNote = definition.storageCapacity
+        ? ` / 資材保管 ${getStorageUsedCapacity(placed)} / ${definition.storageCapacity}`
+        : '';
     const vehicleNote = definition.role === 'vehicle' ? ' / 線路配置済みの車両' : '';
     const foundationNote = definition.requiresFoundation ? ' / 基礎上に建設' : '';
     const railOrientation = definition.role === 'rail' ? ` / 向き ${getBuildingRotationLabel(definition, placed.rotation || 0)}` : '';
-    document.getElementById('building-menu-details').textContent = `${definition.width}×${definition.height}セル / 座標 (${placed.x}, ${placed.y}) / 建設真鍮 ${definition.brassCost}${railOrientation}${foundationNote}${vehicleNote}${effectSummary}${utilityNote}`;
+    document.getElementById('building-menu-details').textContent = `${definition.width}×${definition.height}セル / 座標 (${placed.x}, ${placed.y}) / 建設真鍮 ${definition.brassCost}${railOrientation}${foundationNote}${vehicleNote}${effectSummary}${utilityNote}${storageNote}`;
 }
 
 function openBuildingMenu(instanceId) {
@@ -2614,6 +2907,7 @@ function openBuildingMenu(instanceId) {
     document.getElementById('building-menu-title').textContent = definition.name;
     renderVehicleMenu(placed, definition);
     updateBuildingMenuDetails(placed, definition);
+    renderBuildingStorage(placed, definition);
     const rotateRail = document.getElementById('building-menu-rotate-rail');
     if (rotateRail) rotateRail.hidden = definition.role !== 'rail';
     const craftButton = document.getElementById('building-menu-craft');
@@ -3013,6 +3307,8 @@ function setupControls() {
         resize();
         scheduleDraw();
     });
+
+    canvas.addEventListener('selectstart', event => event.preventDefault());
 
     canvas.addEventListener('wheel', (e) => {
         e.preventDefault();
@@ -3453,7 +3749,7 @@ function openGuideModal() {
 
     const frame = document.createElement('iframe');
     frame.title = 'ガイド';
-    frame.src = 'cell-atlas.html?modal=1&guide=2';
+    frame.src = 'cell-atlas.html?modal=1&guide=7';
     frame.loading = 'lazy';
     frame.setAttribute('allowfullscreen', 'false');
 
@@ -3468,13 +3764,16 @@ function openGuideModal() {
 document.addEventListener('click', (event) => {
     const button = event.target.closest('button');
     if (!button) return;
-    if (button.dataset.buildingPlacementMode) {
-        buildingPlacementMode = button.dataset.buildingPlacementMode === 'continuous' ? 'continuous' : 'single';
-        document.querySelectorAll('[data-building-placement-mode]').forEach(modeButton => {
-            const selected = modeButton.dataset.buildingPlacementMode === buildingPlacementMode;
-            modeButton.classList.toggle('active', selected);
-            modeButton.setAttribute('aria-pressed', String(selected));
-        });
+    if (button.dataset.action === 'show-recipe-detail') {
+        showRecipeDetail(button.dataset.itemKey);
+        return;
+    }
+    if (button.dataset.action === 'recipe-detail-back') {
+        goBackRecipeDetail();
+        return;
+    }
+    if (button.dataset.action === 'close-recipe-detail') {
+        closeRecipeDetail();
         return;
     }
     if (button.dataset.inventoryView) {
@@ -3510,6 +3809,7 @@ document.addEventListener('click', (event) => {
     }
     if (button.dataset.action === 'place-building-from-inventory') {
         const buildingId = button.dataset.buildingId;
+        buildingPlacementMode = button.dataset.placementMode === 'continuous' ? 'continuous' : 'single';
         closeInventoryItem();
         startBuildingPlacement(buildingId, true);
         return;
@@ -3532,6 +3832,10 @@ document.addEventListener('click', (event) => {
     }
     if (button.dataset.action === 'close-building-menu') {
         closeBuildingMenu();
+        return;
+    }
+    if (button.dataset.action === 'building-storage-transfer') {
+        transferBuildingStorage(button.dataset.direction);
         return;
     }
     if (button.dataset.action === 'open-building-crafting') {
@@ -3740,12 +4044,24 @@ document.getElementById('inventory-item-modal')?.addEventListener('click', (even
     if (event.target.id === 'inventory-item-modal') closeInventoryItem();
 });
 
+document.getElementById('recipe-detail-modal')?.addEventListener('click', (event) => {
+    if (event.target.id === 'recipe-detail-modal') closeRecipeDetail();
+});
+
 document.getElementById('building-menu-modal')?.addEventListener('click', event => {
     if (event.target.id === 'building-menu-modal') closeBuildingMenu();
+});
+document.getElementById('building-storage-item')?.addEventListener('change', () => {
+    const placed = state.buildings.find(building => building.instanceId === selectedBuildingInstanceId);
+    const definition = BUILDING_BY_ID.get(placed?.id);
+    if (placed && definition) renderBuildingStorage(placed, definition);
 });
 
 document.addEventListener('pointerup', (event) => {
     const target = event.target;
+    const recipeDetailModal = document.getElementById('recipe-detail-modal');
+    if (recipeDetailModal && !recipeDetailModal.hidden) return;
+
     const itemModal = document.getElementById('inventory-item-modal');
     if (itemModal && !itemModal.hidden) {
         if (target === itemModal) closeInventoryItem();
@@ -3766,6 +4082,12 @@ document.addEventListener('pointerup', (event) => {
 
 window.addEventListener('keydown', (event) => {
     if (event.key !== 'Escape') return;
+    const recipeDetailModal = document.getElementById('recipe-detail-modal');
+    if (recipeDetailModal && !recipeDetailModal.hidden) {
+        closeRecipeDetail();
+        event.preventDefault();
+        return;
+    }
     closeBuildingCrafting();
     if (activeBuildingPlacement) cancelBuildingPlacement();
     closeBuildingMenu();

@@ -8,11 +8,25 @@ export const CRAFTING_ITEMS = [
     ["ash", "炉灰", "raw", "焚き跡", "耐熱陶材の釉薬・調整材。"], ["magnetite", "磁鉄鉱", "raw", "山地", "羅針盤の磁針と方位機構に使う。"], ["mica", "雲母片", "raw", "岩場", "耐熱積層材、坩堝の補強材。"], ["obsidian", "黒曜石", "raw", "火山岩地", "土壌採取錐の鋭い刃先。"], ["pumice", "軽石", "raw", "火山岩地", "研磨材、霧濾過の多孔質材。"], ["seaweed", "海藻", "raw", "海岸", "縄・面具の繊維、保存材。"], ["charcoal", "木炭", "processed", "炭焼き窯", "燃料、吸着濾材、塗料の顔料。"], ["rope", "麻縄", "processed", "手作業", "巻上げ機、野営器具の結束。"], ["reed-paper", "葦紙", "processed", "手作業", "記録紙、面具の交換濾過層。"], ["resin-lacquer", "樹脂塗料", "processed", "塗料釜", "防水・耐薬液の表面封止。"],
     ["iron-plate", "鉄板", "processed", "鍛造炉", "筐体、刃物、機械の骨格。"], ["brass-sheet", "真鍮板", "processed", "圧延台", "計器盤、ランタン、装飾筐体。"], ["bronze-strip", "青銅細条", "processed", "細工台", "金網、軸受、耐食金具の素材。"], ["mica-laminate", "雲母積層材", "processed", "積層台", "熱を遮る内張り・坩堝補強。"], ["pumice-powder", "軽石粉", "processed", "粉砕台", "研磨、濾過筒の多孔質充填材。"], ["glass-vial", "薬液瓶", "processed", "ガラス工房", "抽出液や揮発薬液の保管。"], ["ceramic-crucible", "耐熱坩堝", "processed", "窯", "少量の鉱石・薬剤を加熱する器。"], ["charcoal-filter", "活性炭層", "processed", "炭焼き窯", "臭気・油分・錬金残滓の吸着。"], ["rivet", "金属鋲", "part", "旋盤", "板材や筐体の固定。"], ["hinge", "蝶番", "part", "細工台", "箱・扉・点検蓋の可動継手。"],
     ["axle", "回転軸", "part", "旋盤", "歯車や巻上げ機の回転伝達。"], ["bronze-bearing", "青銅軸受", "part", "旋盤", "軸の摩耗を抑える耐食支持部。"], ["steam-nozzle", "蒸気ノズル", "part", "細工台", "蒸気を絞り、噴流や加熱を調整。"], ["resin-gasket", "樹脂パッキン", "part", "成形台", "蒸気・薬液配管の漏れ止め。"], ["pressure-diaphragm", "圧力膜", "part", "成形台", "圧力差を機械的な動きへ変換。"], ["filter-cartridge", "濾過筒", "part", "細工台", "濾材を交換できる筒形容器。"], ["crank-handle", "手回し柄", "part", "木工作業台", "人力でポンプや巻上げ機を動かす。"], ["burner-cup", "燃焼皿", "part", "鋳造台", "油・固形燃料を安全に燃やす。"], ["hand-lamp", "燃料ランタン", "finished", "計器組立台", "樹脂油を燃やす携帯照明。"], ["fog-mask", "霧よけ面具", "finished", "裁縫台", "胞子・灰を含む濃霧から呼吸を守る。"],
-    ["field-still", "携帯蒸留器", "finished", "錬金作業台", "野営地で水・薬草液を蒸留する。"], ["steam-pump", "蒸気ポンプ", "finished", "機械組立台", "水や薬液を低地から汲み上げる。"], ["survey-kit", "測量道具一式", "finished", "計器組立台", "羅針盤・記録紙・縄で地形を記録。"], ["soil-auger", "土壌採取錐", "finished", "工作台", "地面の下層から試料を採る。"], ["steam-winch", "蒸気巻上げ機", "finished", "機械組立台", "重量物や荷を斜面から引き上げる。"], ["field-sieve", "野外選鉱ふるい", "finished", "木工作業台", "砂礫から鉱片・結晶片を選り分ける。"], ["herb-press", "薬草圧搾器", "finished", "錬金作業台", "薬草や海藻から液を搾り取る。"], ["seed-vault", "耐霧種子箱", "finished", "木工作業台", "種子を湿気・濃霧・害虫から保管。"], ["copper-concentrate", "銅精鉱", "processed", "選鉱台", "銅鉱石を洗い、製錬前に脈石を分ける。"], ["zinc-concentrate", "亜鉛精鉱", "processed", "選鉱台", "序盤の真鍮生産に使う亜鉛鉱石の濃縮物。"]
+    ["field-still", "携帯蒸留器", "finished", "錬金作業台", "野営地で水・薬草液を蒸留する。"], ["steam-pump", "蒸気ポンプ", "finished", "機械組立台", "水や薬液を低地から汲み上げる。"], ["survey-kit", "測量道具一式", "finished", "計器組立台", "羅針盤・記録紙・縄で地形を記録。"], ["soil-auger", "土壌採取錐", "finished", "工作台", "地面の下層から試料を採る。"], ["steam-winch", "蒸気巻上げ機", "finished", "機械組立台", "重量物や荷を斜面から引き上げる。"], ["field-sieve", "野外選鉱ふるい", "finished", "木工作業台", "砂礫から鉱片・結晶片を選り分ける。"], ["herb-press", "薬草圧搾器", "finished", "錬金作業台", "薬草や海藻から液を搾り取る。"], ["seed-vault", "耐霧種子箱", "finished", "木工作業台", "種子を湿気・濃霧・害虫から保管。"], ["copper-concentrate", "銅精鉱", "processed", "選鉱台", "銅鉱石を洗い、製錬前に脈石を分ける。"], ["zinc-concentrate", "亜鉛精鉱", "processed", "選鉱台", "序盤の真鍮生産に使う亜鉛鉱石の濃縮物。"],
+    ["grain", "穀物", "raw", "草原", "草原セルから採取する資源。現行の加工レシピでは未使用。"],
+    ["stone", "石材", "raw", "山岳", "山岳セルから採取する資源。現行の加工レシピでは未使用。"],
+    ["tar", "タール", "raw", "油浸地", "油浸地セルから採取する資源。現行の加工レシピでは未使用。"],
+    ["crystal-shard", "水晶片", "raw", "水晶脈", "水晶脈セルから採取する資源。航法結晶片とは別素材。"],
+    ["mining_sample", "採掘標本", "raw", "機械の残骸", "残骸から回収し、錫鉱脈への地形変成に使う。"],
+    ["vein_mold", "鉱脈型", "raw", "機械の残骸", "残骸から回収し、亜鉛鉱脈への地形変成に使う。"],
+    ["forest_seed", "森林の種", "raw", "森林", "森林セルの採取5回ごとに入手し、樹脂林への地形変成に使う。"],
+    ["ancient_seed", "古種", "raw", "飛行船の墜落跡", "墜落跡から回収し、薬草地への地形変成に使う。"],
+    ["climate-control-core", "気候制御核", "finished", "階差演算台", "遺物の情報を解析し、ドームの気候制御を担う中核部品。"],
+    ["closed-loop-unit", "閉鎖循環ユニット", "finished", "浄化設備", "水と空気を循環・浄化し、ドーム内環境を維持する装置。"],
+    ["ecosystem-starter", "生態系スターター", "finished", "培養設備", "保存胞子・堆肥・抽出液から生態系の初期培地を準備する。"]
 ];
 
 export const CRAFTING_RECIPES = [
-    ["forest", "木材を板に挽く", [["wood", 10], ["water", 5]], "lumber", "手鋸台", "初期の工作材を確保する。", 2, 40], ["forest", "板を防水する", [["lumber", 5], ["resin", 5]], "sealed-board", "木工作業台", "霧・湿地で使う構造材。", 1, 35], ["smelting", "鉄を製錬する", [["iron-ore", 10], ["coal", 5]], "iron-ingot", "炉", "ねじや鋼材の基礎。", 2, 75], ["smelting", "銅精鉱を製錬する", [["copper-concentrate", 5], ["coal", 5]], "copper-ingot", "炉", "合金や導管の基礎。", 2, 70], ["smelting", "亜鉛精鉱を製錬する", [["zinc-concentrate", 5], ["coal", 5]], "zinc-ingot", "炉", "真鍮の副成分。", 2, 70], ["smelting", "錫を製錬する", [["tin-ore", 10], ["coal", 5]], "tin-ingot", "炉", "青銅の副成分。", 2, 70], ["smelting", "コークスを焼く", [["coal", 10], ["peat", 5]], "coke", "炭焼き窯", "高温炉の燃料を作る。", 3, 80], ["smelting", "銅と亜鉛から真鍮資材を配合する", [["copper-ingot", 10], ["zinc-ingot", 5], ["coal", 5]], "brass-stock", "炉", "加工しやすい機械合金。", 1, 80], ["smelting", "青銅を配合する", [["copper-ingot", 10], ["tin-ingot", 5]], "bronze-ingot", "炉", "耐食性のある機械合金。", 1, 80], ["smelting", "鋼を鍛える", [["iron-ingot", 10], ["coke", 5], ["limestone", 5]], "steel-ingot", "高温炉", "ばね・耐圧部品向け。", 1, 110], ["smelting", "鉄ねじを切る", [["iron-ingot", 5]], "iron-screw", "旋盤", "筐体や固定具に使う。", 4, 45], ["smelting", "鋼ばねを巻く", [["steel-ingot", 5], ["iron-screw", 5]], "steel-spring", "巻線治具", "弁や圧力機構に使う。", 1, 90], ["smelting", "銅毛細管を引く", [["copper-ingot", 5]], "copper-capillary", "細管引き台", "圧力や蒸気、薬液を導く。", 3, 60], ["ceramic", "ガラス素地を溶かす", [["sand", 10], ["limestone", 5], ["coke", 5]], "glass-blank", "ガラス炉", "光学部品の素材。", 2, 80], ["ceramic", "レンズを研磨する", [["glass-blank", 5], ["sand", 5], ["water", 5]], "glass-lens", "研磨台", "計器の目盛りを読む。", 1, 65], ["ceramic", "陶器素体を焼く", [["clay", 10], ["limestone", 5], ["water", 5]], "ceramic-body", "窯", "薬液容器や耐熱部材の基材。", 2, 80], ["ceramic", "耐熱隔離環を焼く", [["ceramic-body", 5], ["salt", 5]], "ceramic-barrier", "窯", "熱・腐食性薬液・濃霧から金属部を隔てる。", 1, 80], ["bio", "菌糸堆肥を作る", [["spores", 5], ["peat", 5], ["water", 5]], "compost", "堆肥槽", "薬草・樹脂林の育成を補助。", 2, 50], ["bio", "薬草を抽出する", [["herbs", 10], ["water", 5], ["salt", 5]], "herb-extract", "錬金釜", "薬品や培養液の基材。", 2, 70], ["bio", "胞子を保存する", [["spores", 10], ["salt", 5], ["sulfur", 5]], "preserved-spores", "培養器", "長期保存と機能フィルターに使う。", 2, 75], ["machine", "耐圧筐体を組む", [["brass-stock", 10], ["iron-screw", 20], ["ceramic-barrier", 10]], "pressure-case", "工作台", "内張りが熱と薬液から金属殻を守る。", 1, 80], ["machine", "細目金網を編む", [["bronze-ingot", 10], ["iron-screw", 10]], "filter-mesh", "金網織機", "青銅を細線に引き、霧の捕集層を編む。", 1, 80], ["machine", "圧力計を組む", [["pressure-case", 10], ["glass-lens", 10], ["copper-capillary", 10]], "pressure-gauge", "計器組立台", "導管に伝わる圧力を文字盤へ伝える。", 1, 90], ["machine", "蒸気調整弁を組む", [["pressure-case", 10], ["brass-stock", 10], ["steel-spring", 10]], "steam-valve", "計器組立台", "流量と過圧を調整する。", 1, 90], ["machine", "霧濾過器を組む", [["filter-mesh", 10], ["preserved-spores", 10], ["glass-blank", 10]], "fog-filter", "錬金作業台", "霧の不純物を除き安定化する。", 1, 95], ["machine", "測量羅針盤を組む", [["brass-stock", 10], ["navigation-crystal", 10], ["magnetite", 10], ["glass-lens", 10]], "survey-compass", "計器組立台", "磁鉄の針と航法結晶の共振で未知地域の方位を取る。", 1, 90], ["machine", "蒸気式錬金蒸留器を組む", [["ceramic-barrier", 10], ["copper-capillary", 10], ["brass-stock", 10]], "steam-alembic", "錬金作業台", "蒸気圧で加熱し、抽出液や薬液を蒸留する。", 1, 120], ["machine", "遺物共振核を再構成する", [["relic-fragment", 100], ["salvage", 10], ["navigation-crystal", 10]], "relic-core", "遺物作業台", "古代装置の起動核。", 1, 150], ["machine", "遺物探知器を組む", [["pressure-gauge", 10], ["relic-core", 10], ["steel-spring", 10]], "relic-detector", "遺物作業台", "共振の揺れを機械式指針で示す。", 1, 140],
+    ["forest", "木材を板に挽く", [["wood", 10], ["water", 5]], "lumber", "木工作業台", "初期の工作材を確保する。", 2, 40], ["forest", "板を防水する", [["lumber", 5], ["resin", 5]], "sealed-board", "木工作業台", "霧・湿地で使う構造材。", 1, 35], ["smelting", "鉄を製錬する", [["iron-ore", 10], ["coal", 5]], "iron-ingot", "炉", "ねじや鋼材の基礎。", 2, 75], ["smelting", "銅精鉱を製錬する", [["copper-concentrate", 5], ["coal", 5]], "copper-ingot", "炉", "合金や導管の基礎。", 2, 70],     ["smelting", "亜鉛精鉱を製錬する", [["zinc-concentrate", 5], ["coal", 5]], "zinc-ingot", "炉", "真鍮の副成分。", 2, 70],
+    ["terraforming", "気候制御核を組み立てる", [["relic-core", 1], ["navigation-crystal", 3], ["crystal-shard", 5], ["glass-lens", 2], ["pressure-diaphragm", 2]], "climate-control-core", "階差演算台", "古代遺物の情報を気候制御用の計算機構へ変換する。", 1, 180],
+    ["terraforming", "閉鎖循環ユニットを組み立てる", [["filter-cartridge", 4], ["ceramic-barrier", 3], ["copper-capillary", 4], ["pressure-case", 2], ["resin-gasket", 4]], "closed-loop-unit", "浄化設備", "濾過・耐熱・導管部品をまとめ、ドームの循環系を構成する。", 1, 180],
+    ["terraforming", "生態系スターターを培養する", [["preserved-spores", 3], ["compost", 3], ["herb-extract", 2], ["glass-vial", 2], ["grain", 5]], "ecosystem-starter", "培養設備", "植生を定着させるための初期培地を準備する。", 1, 150], ["smelting", "錫を製錬する", [["tin-ore", 10], ["coal", 5]], "tin-ingot", "炉", "青銅の副成分。", 2, 70], ["smelting", "コークスを焼く", [["coal", 10], ["peat", 5]], "coke", "炭焼き窯", "高温炉の燃料を作る。", 3, 80], ["smelting", "銅と亜鉛から真鍮資材を配合する", [["copper-ingot", 10], ["zinc-ingot", 5], ["coal", 5]], "brass-stock", "炉", "加工しやすい機械合金。", 1, 80], ["smelting", "青銅を配合する", [["copper-ingot", 10], ["tin-ingot", 5]], "bronze-ingot", "炉", "耐食性のある機械合金。", 1, 80], ["smelting", "鋼を鍛える", [["iron-ingot", 10], ["coke", 5], ["limestone", 5]], "steel-ingot", "高温炉", "ばね・耐圧部品向け。", 1, 110], ["smelting", "鉄ねじを切る", [["iron-ingot", 5]], "iron-screw", "旋盤", "筐体や固定具に使う。", 4, 45], ["smelting", "鋼ばねを巻く", [["steel-ingot", 5], ["iron-screw", 5]], "steel-spring", "巻線治具", "弁や圧力機構に使う。", 1, 90], ["smelting", "銅毛細管を引く", [["copper-ingot", 5]], "copper-capillary", "細管引き台", "圧力や蒸気、薬液を導く。", 3, 60], ["ceramic", "ガラス素地を溶かす", [["sand", 10], ["limestone", 5], ["coke", 5]], "glass-blank", "ガラス炉", "光学部品の素材。", 2, 80], ["ceramic", "レンズを研磨する", [["glass-blank", 5], ["sand", 5], ["water", 5]], "glass-lens", "研磨台", "計器の目盛りを読む。", 1, 65], ["ceramic", "陶器素体を焼く", [["clay", 10], ["limestone", 5], ["water", 5]], "ceramic-body", "窯", "薬液容器や耐熱部材の基材。", 2, 80], ["ceramic", "耐熱隔離環を焼く", [["ceramic-body", 5], ["salt", 5]], "ceramic-barrier", "窯", "熱・腐食性薬液・濃霧から金属部を隔てる。", 1, 80], ["bio", "菌糸堆肥を作る", [["spores", 5], ["peat", 5], ["water", 5]], "compost", "堆肥槽", "薬草・樹脂林の育成を補助。", 2, 50], ["bio", "薬草を抽出する", [["herbs", 10], ["water", 5], ["salt", 5]], "herb-extract", "錬金釜", "薬品や培養液の基材。", 2, 70], ["bio", "胞子を保存する", [["spores", 10], ["salt", 5], ["sulfur", 5]], "preserved-spores", "培養器", "長期保存と機能フィルターに使う。", 2, 75], ["machine", "耐圧筐体を組む", [["brass-stock", 10], ["iron-screw", 20], ["ceramic-barrier", 10]], "pressure-case", "工作台", "内張りが熱と薬液から金属殻を守る。", 1, 80], ["machine", "細目金網を編む", [["bronze-ingot", 10], ["iron-screw", 10]], "filter-mesh", "金網織機", "青銅を細線に引き、霧の捕集層を編む。", 1, 80], ["machine", "圧力計を組む", [["pressure-case", 10], ["glass-lens", 10], ["copper-capillary", 10]], "pressure-gauge", "計器組立台", "導管に伝わる圧力を文字盤へ伝える。", 1, 90], ["machine", "蒸気調整弁を組む", [["pressure-case", 10], ["brass-stock", 10], ["steel-spring", 10]], "steam-valve", "計器組立台", "流量と過圧を調整する。", 1, 90], ["machine", "霧濾過器を組む", [["filter-mesh", 10], ["preserved-spores", 10], ["glass-blank", 10]], "fog-filter", "錬金作業台", "霧の不純物を除き安定化する。", 1, 95], ["machine", "測量羅針盤を組む", [["brass-stock", 10], ["navigation-crystal", 10], ["magnetite", 10], ["glass-lens", 10]], "survey-compass", "計器組立台", "磁鉄の針と航法結晶の共振で未知地域の方位を取る。", 1, 90], ["machine", "蒸気式錬金蒸留器を組む", [["ceramic-barrier", 10], ["copper-capillary", 10], ["brass-stock", 10]], "steam-alembic", "錬金作業台", "蒸気圧で加熱し、抽出液や薬液を蒸留する。", 1, 120], ["machine", "遺物共振核を再構成する", [["relic-fragment", 100], ["salvage", 10], ["navigation-crystal", 10]], "relic-core", "遺物作業台", "古代装置の起動核。", 1, 150], ["machine", "遺物探知器を組む", [["pressure-gauge", 10], ["relic-core", 10], ["steel-spring", 10]], "relic-detector", "遺物作業台", "共振の揺れを機械式指針で示す。", 1, 140],
     ["forest", "木炭を焼く", [["wood", 10], ["peat", 5]], "charcoal", "炭焼き窯", "低酸素で焼き、燃料と吸着材を得る。", 3, 50], ["forest", "麻縄を撚る", [["fiber", 15], ["resin", 5]], "rope", "手作業", "繊維束を手で撚り、樹脂で端を留める。", 2, 35], ["forest", "葦紙を漉く", [["reed", 15], ["water", 5]], "reed-paper", "手作業", "葦の繊維を手で漉き、薄い紙にする。", 3, 45], ["forest", "樹脂塗料を煮る", [["resin", 10], ["charcoal", 5]], "resin-lacquer", "塗料釜", "防水と耐薬液の封止に使う。", 2, 55], ["smelting", "鉄板を鍛つ", [["iron-ingot", 10], ["coke", 5]], "iron-plate", "鍛造炉", "板状に伸ばし筐体や刃先へ。", 2, 70], ["smelting", "真鍮板を圧延する", [["brass-stock", 5]], "brass-sheet", "圧延台", "薄板にして計器盤や容器を作る。", 2, 55], ["smelting", "青銅細条を引く", [["bronze-ingot", 5]], "bronze-strip", "細工台", "金網や軸受の原料にする。", 3, 65], ["ceramic", "雲母積層材を固める", [["mica", 15], ["resin", 5]], "mica-laminate", "積層台", "薄片を重ねて耐熱内張りにする。", 2, 55], ["ceramic", "軽石粉を挽く", [["pumice", 10]], "pumice-powder", "粉砕台", "研磨と多孔質濾材に使う。", 3, 35], ["ceramic", "薬液瓶を吹く", [["glass-blank", 5]], "glass-vial", "ガラス工房", "少量の揮発薬液を密封する。", 3, 75], ["ceramic", "耐熱坩堝を焼く", [["clay", 10], ["mica-laminate", 5], ["ash", 5]], "ceramic-crucible", "窯", "炉灰釉で熱割れと薬液侵食を抑える。", 1, 90], ["ceramic", "活性炭層を作る", [["charcoal", 10], ["pumice-powder", 5]], "charcoal-filter", "炭焼き窯", "多孔質材へ炭を定着させる。", 2, 55], ["smelting", "金属鋲を打つ", [["iron-ingot", 5]], "rivet", "旋盤", "板金を固定する鋲をまとめて作る。", 8, 50], ["smelting", "蝶番を組む", [["iron-plate", 5], ["rivet", 10]], "hinge", "細工台", "点検蓋や容器扉の継手。", 2, 60], ["smelting", "鋼軸を削る", [["steel-ingot", 5]], "axle", "旋盤", "歯車と巻胴を支える回転軸。", 1, 75], ["smelting", "青銅軸受を鋳る", [["bronze-strip", 5], ["resin-lacquer", 5]], "bronze-bearing", "旋盤", "潤滑性のある耐食軸受を作る。", 2, 65], ["smelting", "蒸気ノズルを削る", [["brass-sheet", 5], ["iron-screw", 5]], "steam-nozzle", "細工台", "蒸気の噴出量を絞る。", 2, 60], ["forest", "樹脂パッキンを成形する", [["resin-lacquer", 5], ["fiber", 5]], "resin-gasket", "成形台", "継ぎ目からの蒸気漏れを防ぐ。", 4, 45], ["forest", "圧力膜を張る", [["sealed-board", 5], ["resin-lacquer", 5]], "pressure-diaphragm", "成形台", "圧力差を受けて機械部を押す膜。", 2, 55], ["machine", "濾過筒を作る", [["filter-mesh", 10], ["charcoal-filter", 10], ["iron-screw", 20]], "filter-cartridge", "細工台", "濾材を交換できる筒にまとめる。", 1, 70], ["forest", "手回し柄を組む", [["wood", 5], ["iron-plate", 5], ["rivet", 10]], "crank-handle", "木工作業台", "人力回転の握りと腕を作る。", 1, 50], ["ceramic", "燃焼皿を鋳る", [["bronze-strip", 5], ["clay", 5]], "burner-cup", "鋳造台", "携帯燃料を受ける耐熱皿。", 1, 65], ["machine", "燃料ランタンを組む", [["brass-sheet", 10], ["glass-vial", 10], ["burner-cup", 10], ["resin-gasket", 10]], "hand-lamp", "計器組立台", "樹脂油を燃やす携帯照明。", 1, 95], ["machine", "霧よけ面具を縫う", [["reed-paper", 20], ["fiber", 20], ["filter-cartridge", 10], ["seaweed", 10]], "fog-mask", "裁縫台", "濾過筒を交換できる布面具。", 1, 90], ["machine", "携帯蒸留器を組む", [["ceramic-crucible", 10], ["copper-capillary", 10], ["steam-nozzle", 10], ["ceramic-barrier", 10]], "field-still", "錬金作業台", "蒸気熱で水や薬草液を蒸留する。", 1, 130], ["machine", "蒸気ポンプを組む", [["pressure-case", 10], ["steam-valve", 10], ["axle", 10], ["resin-gasket", 20]], "steam-pump", "機械組立台", "弁と膜の往復で液体を送る。", 1, 125], ["machine", "測量道具を束ねる", [["survey-compass", 10], ["reed-paper", 20], ["rope", 10]], "survey-kit", "計器組立台", "方位・距離・観察記録をまとめる。", 1, 75], ["machine", "土壌採取錐を組む", [["iron-plate", 10], ["axle", 10], ["crank-handle", 10], ["obsidian", 10]], "soil-auger", "工作台", "黒曜石刃で硬い地層に穴を開ける。", 1, 105], ["machine", "蒸気巻上げ機を組む", [["brass-stock", 20], ["axle", 10], ["rope", 100], ["steam-valve", 10]], "steam-winch", "機械組立台", "蒸気駆動で荷を引き上げる。", 1, 140], ["forest", "野外選鉱ふるいを作る", [["bronze-strip", 5], ["lumber", 5], ["rivet", 20]], "field-sieve", "木工作業台", "砂礫から鉱片を選り分ける。", 1, 80], ["machine", "薬草圧搾器を組む", [["brass-stock", 10], ["sealed-board", 10], ["bronze-bearing", 10], ["pressure-diaphragm", 10]], "herb-press", "錬金作業台", "歯車と膜で植物液を搾り取る。", 1, 110], ["forest", "耐霧種子箱を組む", [["brass-sheet", 5], ["sealed-board", 5], ["resin-gasket", 10], ["mica-laminate", 5]], "seed-vault", "木工作業台", "乾燥・遮霧して種子を保管する。", 1, 105], ["forest", "木炭をまとめ焼きする", [["wood", 20], ["peat", 10]], "charcoal", "炭焼き窯", "時間をかけて燃料を多く得る。", 8, 115], ["forest", "海藻縄を撚る", [["seaweed", 20], ["resin", 5]], "rope", "撚り台", "海岸素材から耐湿縄を作る代替法。", 2, 60], ["ceramic", "雲母窓を積層する", [["mica", 10], ["glass-blank", 5]], "mica-laminate", "積層台", "観察窓を熱から守る透明積層材。", 1, 80], ["smelting", "青銅金網を編む", [["bronze-strip", 10], ["rivet", 10]], "filter-mesh", "金網織機", "細条を編み、丈夫な濾過面にする。", 1, 85], ["ceramic", "薬液瓶を厚吹きする", [["glass-blank", 10], ["resin-lacquer", 5]], "glass-vial", "ガラス工房", "厚手で割れにくい薬液瓶を作る代替法。", 1, 100], ["bio", "薬草を低温抽出する", [["herbs", 15], ["water", 10], ["salt", 5]], "herb-extract", "錬金釜", "低温で香気を残した抽出液を多く得る。", 2, 100], ["machine", "耐霧種子箱を簡易組立する", [["sealed-board", 20], ["resin-gasket", 30], ["mica-laminate", 10]], "seed-vault", "木工作業台", "真鍮板を使わず軽量に仕上げる。", 1, 125], ["smelting", "銅鉱石を水洗選鉱する", [["copper-ore", 10], ["water", 5]], "copper-concentrate", "選鉱台", "鉱石を洗って製錬効率を上げる。", 2, 90], ["smelting", "亜鉛鉱石を水洗選鉱する", [["zinc-ore", 10], ["water", 5]], "zinc-concentrate", "選鉱台", "初期鉱脈から真鍮の副成分を得る。", 2, 90]
 ];
 
@@ -23,8 +37,89 @@ if (brassStockRecipe) {
     brassStockRecipe[5] = '序盤から作れる基本の機械資材。';
     brassStockRecipe[7] = 55;
 }
+CRAFTING_RECIPES.push([
+    'smelting',
+    '銅塊と亜鉛塊から真鍮資材を配合する',
+    [['copper-ingot', 10], ['zinc-ingot', 5], ['coal', 5]],
+    'brass-stock',
+    '高温炉',
+    '製錬済みの金属から真鍮資材を追加生産する。',
+    1,
+    75
+]);
 
 export const CRAFTING_ITEM_BY_ID = new Map(CRAFTING_ITEMS.map(item => [item[0], item]));
+const recipeRouteCounts = new Map();
+CRAFTING_RECIPES.forEach((recipe) => recipeRouteCounts.set(recipe[3], (recipeRouteCounts.get(recipe[3]) || 0) + 1));
+CRAFTING_RECIPES.forEach((recipe) => {
+    const outputName = CRAFTING_ITEM_BY_ID.get(recipe[3])?.[1];
+    if (!outputName) return;
+    const routeMaterials = recipeRouteCounts.get(recipe[3]) > 1
+        ? `（${recipe[2].map(([itemId, amount]) => `${CRAFTING_ITEM_BY_ID.get(itemId)?.[1] || itemId}×${amount}`).join('・')}）`
+        : '';
+    recipe[1] = `${outputName}を製作する${routeMaterials}`;
+});
+
+export const DEFERRED_CRAFTING_ITEM_IDS = new Set([
+    'fog-filter',
+    'steam-alembic',
+    'relic-detector',
+    'hinge',
+    'hand-lamp',
+    'fog-mask',
+    'field-still',
+    'steam-pump',
+    'soil-auger',
+    'steam-winch',
+    'field-sieve',
+    'herb-press',
+    'seed-vault'
+]);
+
+const DEFERRED_CRAFTING_PROPOSED_USES = Object.freeze({
+    'fog-filter': '浄化タワーや面具に装着し、霧の影響を軽減する',
+    'steam-alembic': '新しい蒸留レシピや薬液レシピの解放に使う',
+    'relic-detector': '遺跡・残骸・埋蔵資源をマップ上で探索する',
+    hinge: 'ストレージや点検口など、開閉設備の建築素材にする',
+    'hand-lamp': '暗所や濃霧の視界を改善する',
+    'fog-mask': '濃霧地帯の移動・採集制限を緩和する',
+    'field-still': '野営地で水や薬草から水・抽出液を得る',
+    'steam-pump': '水・蒸気ネットワークの揚水能力を高める',
+    'soil-auger': '未知セルの地下資源を調査・発見する',
+    'steam-winch': '運搬や採掘、貨車への積み込みを補助する',
+    'field-sieve': '砂・石材から鉱片を低確率で回収する',
+    'herb-press': '薬草・海藻から薬草抽出液を作る',
+    'seed-vault': '森林の種・古種を保管し、地形変成や栽培に使う'
+});
+
+export const DEFERRED_CRAFTING_CONTENT = Object.freeze(CRAFTING_ITEMS
+    .filter(item => DEFERRED_CRAFTING_ITEM_IDS.has(item[0]))
+    .map(item => {
+        const relatedRecipes = CRAFTING_RECIPES.filter(recipe =>
+            recipe[3] === item[0] || recipe[2].some(([inputId]) => inputId === item[0]));
+        return Object.freeze({
+            item: Object.freeze([...item]),
+            recipes: Object.freeze(relatedRecipes.map(recipe => Object.freeze([
+                ...recipe.slice(0, 2),
+                Object.freeze(recipe[2].map(input => Object.freeze([...input]))),
+                ...recipe.slice(3)
+            ]))),
+            proposedUse: DEFERRED_CRAFTING_PROPOSED_USES[item[0]]
+        });
+    }));
+
+for (let index = CRAFTING_ITEMS.length - 1; index >= 0; index--) {
+    if (DEFERRED_CRAFTING_ITEM_IDS.has(CRAFTING_ITEMS[index][0])) CRAFTING_ITEMS.splice(index, 1);
+}
+for (const itemId of DEFERRED_CRAFTING_ITEM_IDS) CRAFTING_ITEM_BY_ID.delete(itemId);
+for (let index = CRAFTING_RECIPES.length - 1; index >= 0; index--) {
+    const recipe = CRAFTING_RECIPES[index];
+    if (DEFERRED_CRAFTING_ITEM_IDS.has(recipe[3])
+        || recipe[2].some(([inputId]) => DEFERRED_CRAFTING_ITEM_IDS.has(inputId))) {
+        CRAFTING_RECIPES.splice(index, 1);
+    }
+}
+
 export const CRAFTING_RECIPES_BY_OUTPUT = new Map(CRAFTING_RECIPES.map(recipe => [recipe[3], recipe]));
 
 export const HANDCRAFT_STATION = '手作業';
@@ -43,11 +138,23 @@ HANDCRAFT_RECIPE_NOTES.forEach((note, outputItem) => {
     }
 });
 
+const normalizeStationName = (station) => {
+    if (station === '炉') return '簡易炉';
+    if (station === '高温炉' || station === '鍛造炉') return '炉';
+    return station;
+};
+CRAFTING_ITEMS.forEach((item) => { item[3] = normalizeStationName(item[3]); });
+CRAFTING_RECIPES.forEach((recipe) => { recipe[4] = normalizeStationName(recipe[4]); });
+const lumberItem = CRAFTING_ITEMS.find(item => item[0] === 'lumber');
+if (lumberItem) lumberItem[3] = '木材加工・乾燥';
+const lumberRecipe = CRAFTING_RECIPES.find(recipe => recipe[3] === 'lumber');
+if (lumberRecipe) lumberRecipe[4] = '木材加工・乾燥';
+
 export const CRAFTING_STATION_BUILDING_IDS = Object.freeze({
     '木工作業台': ['craft-bench'],
-    '炉': ['simple-furnace'],
+    '簡易炉': ['simple-furnace', 'boiler-forge'],
+    '炉': ['boiler-forge'],
     '炭焼き窯': ['charcoal-kiln'],
-    '高温炉': ['boiler-forge'],
     '旋盤': ['machine-lathe'],
     '巻線治具': ['machine-lathe'],
     '細管引き台': ['machine-lathe'],
@@ -65,7 +172,6 @@ export const CRAFTING_STATION_BUILDING_IDS = Object.freeze({
     '撚り台': ['craft-bench'],
     '紙漉き台': ['craft-bench'],
     '塗料釜': ['resin-workshop'],
-    '鍛造炉': ['boiler-forge'],
     '圧延台': ['brass-workshop'],
     '細工台': ['machine-lathe'],
     '積層台': ['brass-workshop'],
@@ -75,5 +181,9 @@ export const CRAFTING_STATION_BUILDING_IDS = Object.freeze({
     '鋳造台': ['boiler-forge'],
     '裁縫台': ['craft-bench'],
     '機械組立台': ['gear-forge'],
-    '選鉱台': ['ore-washer']
+    '選鉱台': ['ore-washer'],
+    '木材加工・乾燥': ['craft-bench', 'drying-rack'],
+    '階差演算台': ['difference-tower'],
+    '浄化設備': ['filter-tower'],
+    '培養設備': ['alchemical-distillery']
 });

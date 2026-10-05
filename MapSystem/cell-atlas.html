@@ -45,6 +45,16 @@
         .guide-resource-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
         .guide-resource-link { display: inline-flex; align-items: center; gap: 10px; flex: 0 0 auto; padding: 9px 12px; color: #17120f; background: linear-gradient(180deg, #f3c653, #b8832d); border: 1px solid #ffe69b; border-radius: 3px; font-weight: 700; text-decoration: none; }
         .guide-resource-link span { font-size: 1.2em; }
+        .terraforming-goal { margin: 0 0 18px; padding: 16px; background: linear-gradient(120deg, rgba(98,194,170,.10), rgba(29,23,20,.92)); border: 1px solid rgba(98,194,170,.38); border-left: 3px solid var(--mint); }
+        .terraforming-goal h2 { margin: 0 0 6px; color: var(--gold); font: 600 18px Georgia, "Yu Mincho", serif; }
+        .terraforming-goal > p { margin: 0 0 12px; color: #d0cec4; font-size: 12px; }
+        .terraforming-goal-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+        .terraforming-goal-block { min-width: 0; padding: 10px; background: rgba(12, 16, 13, .55); border: 1px solid var(--line); }
+        .terraforming-goal-block h3 { margin: 0 0 6px; color: var(--mint); font-size: 12px; }
+        .terraforming-goal-block ul { margin: 0; padding-left: 18px; color: #d0cec4; font-size: 11px; line-height: 1.6; }
+        .terraforming-goal-block li + li { margin-top: 3px; }
+        .terraforming-goal-footnote { margin: 10px 0 0 !important; color: var(--muted) !important; font-size: 10px !important; }
+        .terraforming-goal > .guide-resource-link { margin-top: 10px; }
         .manual-heading { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(220px, 0.8fr); gap: 20px; align-items: end; margin: 4px 0 18px; padding: 14px 16px; background: linear-gradient(100deg, rgba(98, 194, 170, 0.10), rgba(28, 23, 19, 0.72)); border-left: 3px solid var(--mint); }
         .manual-heading h2 { margin: 0 0 5px; color: var(--gold); font: 600 21px Georgia, "Yu Mincho", serif; }
         .manual-heading p { margin: 0; color: #c9c5b7; font-size: 12px; }
@@ -59,16 +69,14 @@
         .manual-flow span { padding: 4px 8px; color: #e4d4a7; background: rgba(197, 160, 89, 0.08); border: 1px solid rgba(197, 160, 89, 0.26); border-radius: 3px; font-size: 11px; }
         .manual-step-media { display: grid; gap: 8px; min-width: 0; }
         .manual-shot { min-width: 0; margin: 0; overflow: hidden; background: #111713; border: 1px solid var(--line); border-radius: 4px; }
-        .manual-shot img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; object-position: center; background: #120e0c; }
+        .manual-shot img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: contain; object-position: center; background: #120e0c; }
         .manual-shot figcaption { min-height: 30px; padding: 6px 8px; color: var(--muted); font-size: 10px; line-height: 1.4; }
         .manual-callout { position: relative; display: grid; grid-template-columns: minmax(116px, .7fr) minmax(0, 1fr); align-items: center; gap: 10px; margin: 0; padding: 8px 10px; color: var(--text); background: linear-gradient(120deg, rgba(98,194,170,.12), rgba(29,23,20,.92)); border: 1px solid rgba(98,194,170,.38); border-left: 3px solid var(--mint); border-radius: 4px; }
         .manual-callout::before { position: absolute; top: -6px; left: 22px; width: 10px; height: 10px; content: ''; background: #1b211d; border-top: 1px solid rgba(98,194,170,.38); border-left: 1px solid rgba(98,194,170,.38); transform: rotate(45deg); }
-        .manual-zoom { min-width: 0; aspect-ratio: 3 / 2; overflow: hidden; background: #100d0b; border: 1px solid rgba(243,198,83,.42); }
-        .manual-zoom img { display: block; width: 100%; height: 100%; object-fit: contain; }
+        .manual-zoom { min-width: 0; overflow: hidden; background: #100d0b; border: 1px solid rgba(243,198,83,.42); }
+        .manual-zoom img { display: block; width: 100%; height: auto; object-fit: contain; }
         .manual-callout--wide { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); }
-        .manual-callout--wide .manual-zoom { aspect-ratio: 5 / 1; }
-        .manual-callout--stacked { grid-template-columns: minmax(0, 1fr); }
-        .manual-callout--stacked .manual-zoom { aspect-ratio: 5.5 / 1; }
+        .manual-callout--text-only { grid-template-columns: minmax(0, 1fr); }
         .manual-callout-note strong { display: block; margin-bottom: 3px; color: var(--gold); font-size: 11px; }
         .manual-callout-note p { margin: 0; color: #d0cec4; font-size: 11px; line-height: 1.5; }
         .manual-support-shots { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
@@ -150,6 +158,14 @@
         .pattern-resin { --pattern: radial-gradient(circle, transparent 0 5px, rgba(225,171,75,.9) 6px 7px, transparent 8px 14px); --pattern-size: 30px 26px; }
         .pattern-machinery { --pattern: repeating-linear-gradient(0deg, transparent 0 13px, rgba(201,171,111,.8) 14px 16px, transparent 17px 25px), repeating-linear-gradient(90deg, transparent 0 12px, rgba(116,151,145,.8) 13px 15px, transparent 16px 27px); --pattern-size: 29px 27px; }
         .pattern-airship { --pattern: radial-gradient(ellipse at 30% 35%, rgba(209,182,124,.95) 0 3px, transparent 4px), repeating-linear-gradient(125deg, transparent 0 15px, rgba(143,164,148,.85) 16px 18px, transparent 19px 29px); --pattern-size: 34px 28px; }
+        .pattern-fiber { --pattern: repeating-linear-gradient(108deg, transparent 0 9px, rgba(215,199,143,.85) 10px 11px, transparent 12px 19px), radial-gradient(ellipse, rgba(141,171,101,.7) 0 2px, transparent 3px); --pattern-size: 24px 23px, 29px 25px; }
+        .pattern-reed { --pattern: repeating-linear-gradient(90deg, transparent 0 8px, rgba(204,183,113,.82) 9px 10px, transparent 11px 18px), linear-gradient(0deg, transparent 70%, rgba(124,156,88,.78) 71% 74%, transparent 75%); --pattern-size: 25px 26px, 33px 29px; }
+        .pattern-ash { --pattern: radial-gradient(circle, rgba(218,212,196,.75) 0 1.4px, transparent 2px), repeating-linear-gradient(145deg, transparent 0 14px, rgba(75,80,78,.68) 15px 16px, transparent 17px 27px); --pattern-size: 17px 16px, 31px 28px; }
+        .pattern-magnetite { --pattern: radial-gradient(circle at 25% 35%, #bf7656 0 2px, transparent 2.8px), radial-gradient(circle at 72% 68%, #252f30 0 4px, transparent 5px), repeating-linear-gradient(135deg, transparent 0 16px, rgba(155,175,162,.58) 17px 18px, transparent 19px 31px); --pattern-size: 32px 28px; }
+        .pattern-mica { --pattern: repeating-linear-gradient(135deg, transparent 0 9px, rgba(210,220,188,.82) 10px 11px, transparent 12px 19px), repeating-linear-gradient(45deg, transparent 0 15px, rgba(126,162,145,.7) 16px 17px, transparent 18px 28px); --pattern-size: 25px 25px, 33px 32px; }
+        .pattern-obsidian { --pattern: repeating-linear-gradient(125deg, transparent 0 12px, rgba(181,218,214,.8) 13px 14px, transparent 15px 26px), linear-gradient(45deg, transparent 46%, rgba(39,54,62,.85) 47% 54%, transparent 55%); --pattern-size: 30px 27px; }
+        .pattern-pumice { --pattern: radial-gradient(circle at 30% 35%, rgba(78,82,74,.85) 0 2px, transparent 3px), radial-gradient(circle at 72% 68%, rgba(78,82,74,.8) 0 3px, transparent 4px), radial-gradient(circle, rgba(222,211,184,.6) 0 1px, transparent 2px); --pattern-size: 24px 22px, 31px 26px, 13px 13px; }
+        .pattern-seaweed { --pattern: repeating-linear-gradient(105deg, transparent 0 10px, rgba(157,187,112,.85) 11px 12px, transparent 13px 21px), radial-gradient(ellipse, rgba(45,100,67,.9) 0 4px, transparent 5px); --pattern-size: 25px 28px, 31px 24px; }
         .resources { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; }
         .item { display: inline-flex; align-items: center; gap: 5px; min-height: 26px; padding: 3px 7px 3px 4px; color: #d6ded5; background: #171b18; border: 1px solid #38423b; border-radius: 3px; font-size: 10px; }
         .item svg { width: 18px; height: 18px; flex: 0 0 18px; image-rendering: pixelated; }
@@ -165,6 +181,19 @@
         .item-source { margin: 2px 0 0; color: var(--muted); font-size: 10px; line-height: 1.35; }
         .item-power-cost { margin: 2px 0 0; color: var(--gold); font-size: 10px; line-height: 1.35; }
         .item-catalog-note { margin: 0 0 12px; color: var(--muted); font-size: 12px; }
+        .recipe-guide-note { margin: 0 0 12px; color: var(--muted); font-size: 12px; line-height: 1.55; }
+        .recipe-guide-search { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 8px; margin: 10px 0 16px; color: var(--gold); font-size: 12px; }
+        .recipe-guide-search input { min-width: 0; padding: 8px 10px; color: var(--text); background: #171b18; border: 1px solid var(--line); font: inherit; }
+        .recipe-guide-group { margin: 22px 0; }
+        .recipe-guide-group h3 { margin: 0 0 9px; padding-bottom: 6px; color: var(--mint); border-bottom: 1px solid var(--line); font-size: 15px; }
+        .recipe-guide-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+        .recipe-guide-card { min-width: 0; padding: 10px; background: var(--panel); border: 1px solid var(--line); }
+        .recipe-guide-card[hidden] { display: none; }
+        .recipe-guide-card h4 { margin: 0 0 5px; color: var(--gold); font-size: 12px; }
+        .recipe-guide-card p { margin: 4px 0; color: var(--muted); font-size: 10px; line-height: 1.45; }
+        .recipe-guide-flow { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 7px; }
+        .recipe-guide-chip { padding: 3px 6px; color: var(--text); background: rgba(98, 194, 170, .08); border: 1px solid rgba(98, 194, 170, .22); font-size: 10px; }
+        .recipe-guide-cost { color: #efc967; }
         .icon-catalog { margin-top: 38px; }
         .icon-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
         .icon-entry { display: flex; align-items: center; gap: 10px; min-width: 0; min-height: 66px; padding: 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 4px; }
@@ -180,6 +209,7 @@
             .tabs { width: 100%; }
             .tab { flex: 1; padding-right: 8px; padding-left: 8px; }
             .grid { grid-template-columns: minmax(0,1fr); }
+            .recipe-guide-grid { grid-template-columns: minmax(0, 1fr); }
             .icon-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
             .item-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
             .icon-entry { gap: 6px; padding: 6px; }
@@ -191,6 +221,8 @@
             .guide-resource-links { align-items: stretch; flex-direction: column; gap: 10px; padding: 10px; }
             .guide-resource-actions { flex-direction: column; }
             .guide-resource-link { justify-content: center; }
+            .terraforming-goal { padding: 10px; }
+            .terraforming-goal-grid { grid-template-columns: minmax(0, 1fr); gap: 8px; }
             .manual-step { grid-template-columns: minmax(0, 1fr); gap: 10px; padding: 12px 0 16px; }
             .manual-step-copy h3 { font-size: 15px; }
             .manual-callout { grid-template-columns: minmax(102px, .64fr) minmax(0, 1fr); gap: 8px; padding: 7px; }
@@ -221,6 +253,14 @@
         <symbol id="i-iron" viewBox="0 0 24 24"><path fill="#454f53" d="m2 14 4-8 6-3 9 5 1 8-7 6-9-2z"/><path fill="#8f9a98" d="m6 7 6-4 3 7-5 4z"/><path fill="#b67552" d="m5 15 4-2 2 3-5 3z"/><path fill="#252e32" d="m13 13 7-4 1 7-6 5z"/></symbol>
         <symbol id="i-copper" viewBox="0 0 24 24"><path fill="#a76543" d="m3 15 5-11h7l6 8-3 8-9 1z"/><path fill="none" stroke="#e6a274" stroke-width="2" d="m7 17 4-6 6-3"/><path fill="#d38a5f" d="m8 5 5-1 2 4-6 3z"/></symbol>
         <symbol id="i-coal" viewBox="0 0 24 24"><path fill="#303638" d="m2 14 4-8 7-3 8 6 1 8-7 5-9-2z"/><path fill="#596064" d="m6 7 7-4 4 7-7 4z"/><path fill="#202729" d="m10 14 7-4 5 7-7 5z"/></symbol>
+        <symbol id="i-fiber" viewBox="0 0 24 24"><path fill="none" stroke="#d9c28a" stroke-width="2" stroke-linecap="round" d="M5 22C2 16 9 12 6 2m6 20c-3-6 4-10 1-20m5 20c-3-6 4-10 1-20"/><path fill="none" stroke="#88a966" stroke-width="1.2" d="M4 7c3 1 4 3 5 5m2-8c3 1 4 3 5 5m1 1c3 1 4 3 5 5"/></symbol>
+        <symbol id="i-reed" viewBox="0 0 24 24"><path fill="none" stroke="#708e5a" stroke-width="1.7" d="M6 23V7m6 16V3m6 20V8"/><path fill="#b69a5d" d="M4 3h4v5H4zm6-2h4v6h-4zm6 5h4v5h-4z"/><path fill="none" stroke="#d6c58a" stroke-width="1" d="M6 12c-3-2-4-4-4-6m12 6c3-2 4-4 4-6m-2 12c3-2 4-4 4-6"/></symbol>
+        <symbol id="i-ash" viewBox="0 0 24 24"><path fill="#747a70" d="m2 18 4-7 4 3 4-11 4 11 3-4 3 8v4H2z"/><path fill="#c4b99c" d="m10 18 4-15 4 15z"/><circle cx="5" cy="7" r="1" fill="#e0d1ae"/><circle cx="20" cy="9" r="1.3" fill="#d8c8a4"/></symbol>
+        <symbol id="i-magnetite" viewBox="0 0 24 24"><path fill="#404d4d" stroke="#91a39a" stroke-width="1" d="m2 14 3-9 7-3 9 5 1 9-8 6-10-3z"/><path fill="#c16049" d="M7 7h4v8H7zm6 0h4v8h-4z"/><path fill="#7da49a" d="M7 14h4v5H7zm6 0h4v5h-4z"/></symbol>
+        <symbol id="i-mica" viewBox="0 0 24 24"><path fill="#6f7971" d="m3 17 4-13 11-2 4 15-9 5z"/><path fill="#c7c9a7" d="m7 4 11-2-5 11z"/><path fill="#a2c5ad" d="m13 13 9 4-9 5z"/><path fill="#e2d8b4" d="m3 17 10-4v9z"/></symbol>
+        <symbol id="i-obsidian" viewBox="0 0 24 24"><path fill="#202b32" stroke="#80b7b6" stroke-width="1" d="m3 18 2-12 5-4 4 7 3-5 5 14-9 4z"/><path fill="#596e78" d="m5 6 5-4 4 7-4 7z"/><path fill="#2c414a" d="m14 9 3-5 5 14-9 4z"/></symbol>
+        <symbol id="i-pumice" viewBox="0 0 24 24"><path fill="#b5a98d" stroke="#e7d9b7" stroke-width="1" d="m3 14 3-9 7-3 7 5 2 9-7 6-9-2z"/><g fill="#686b5e"><circle cx="9" cy="9" r="1.3"/><circle cx="15" cy="7" r="1"/><circle cx="17" cy="15" r="1.6"/><circle cx="9" cy="17" r="1"/></g></symbol>
+        <symbol id="i-seaweed" viewBox="0 0 24 24"><path fill="none" stroke="#4f805d" stroke-width="2" stroke-linecap="round" d="M5 23c4-5-3-8 1-13 2-2 2-5 1-8m5 21c4-5-1-8 3-13 2-2 2-5 1-8m2 21c4-5 0-8 4-13"/><path fill="none" stroke="#a7b875" stroke-width="1.2" d="M6 12c-3-1-4-3-4-5m7 12c4-1 5-3 5-6m3 5c-3-1-4-3-4-5"/></symbol>
         <symbol id="i-sulfur" viewBox="0 0 24 24"><path fill="#aa9638" d="M4 8 8 4l5 2 5-1 3 6-2 8-7 2-8-4z"/><path fill="#ead45d" d="m6 9 3-3 3 2-2 4-4 1zm8-1 4-1 2 4-4 2zM9 15l4-2 3 3-2 4-5-1z"/><path fill="none" stroke="#574c27" stroke-width="1.5" d="m8 5 2 3-2 3m8-4-1 4 3 1m-7 3 2 3"/></symbol>
         <symbol id="i-clay" viewBox="0 0 24 24"><path fill="#bd8068" d="M4 16c0-4 4-8 8-8s8 4 8 8c0 3-4 5-8 5s-8-2-8-5Z"/><path fill="#d99b7b" d="M7 10c2-3 8-4 11 0l-2 3-8 1z"/><path fill="#8e5b4d" d="M9 16h7v2H9z"/></symbol>
         <symbol id="i-limestone" viewBox="0 0 24 24"><path fill="#8f8975" d="M3 5h18v5H3zm-1 7h20v5H2zm3 7h15v3H5z"/><path fill="#d8d0b2" d="M3 5h18v2H3zm-1 7h20v2H2zm3 7h15v1H5z"/><circle cx="8" cy="9" r="1.5" fill="#f0e4c1"/><circle cx="16" cy="16" r="2" fill="none" stroke="#d8d0b2" stroke-width="1.2"/><circle cx="16" cy="16" r=".7" fill="#d8d0b2"/></symbol>
@@ -268,18 +308,26 @@
         <nav class="guide-tabs" role="tablist" aria-label="ガイドの内容">
             <button class="guide-tab" id="how-to-tab" type="button" role="tab" aria-controls="how-to-page" aria-selected="true" data-guide-view="how-to-page">遊び方</button>
             <button class="guide-tab" id="cell-guide-tab" type="button" role="tab" aria-controls="cell-guide-page" aria-selected="false" data-guide-view="cell-guide-page">セル・素材</button>
+            <button class="guide-tab" id="recipe-guide-tab" type="button" role="tab" aria-controls="recipe-guide-page" aria-selected="false" data-guide-view="recipe-guide-page">加工・建築レシピ</button>
         </nav>
 
         <section class="guide-resource-links" aria-labelledby="resource-links-title">
             <div>
                 <p class="eyebrow">CRAFTING REFERENCE</p>
-                <h2 id="resource-links-title">真鍮資材と合成ツリー</h2>
-                <p>真鍮資材は、銅鉱石・亜鉛鉱石・石炭を炉で直接配合する序盤の基本素材です。</p>
+                <h2 id="resource-links-title">実装データ連動のレシピ・建築一覧</h2>
+                <p>必要素材と作成場所はゲーム内の実装データから表示します。素材不足の名前をタップすると、採集先・レシピ・用途を辿れます。</p>
             </div>
             <div class="guide-resource-actions">
-                <a class="guide-resource-link" href="../design/item-crafting-tree-draft.html">合成ツリー案を開く<span aria-hidden="true">→</span></a>
-                <a class="guide-resource-link" href="../design/building-development-draft.html">建築開発案を開く<span aria-hidden="true">→</span></a>
+                <button class="guide-resource-link" type="button" data-guide-view="recipe-guide-page">実装レシピを見る<span aria-hidden="true">→</span></button>
             </div>
+        </section>
+
+        <section class="terraforming-goal" aria-labelledby="terraforming-goal-title">
+            <h2 id="terraforming-goal-title">最終目標: 新天地テラフォーミングドーム</h2>
+            <p>必要な拠点を整え、専用部品を加工して、ドームを建設します。以下はゲーム本体の建築・レシピデータから表示します。</p>
+            <div class="terraforming-goal-grid" id="terraforming-goal-content" aria-live="polite"></div>
+            <p class="terraforming-goal-footnote">現時点ではドームの建設と前提条件まで実装されています。完成後に地形・気候が変化する処理はまだありません。</p>
+            <button class="guide-resource-link" type="button" data-guide-view="recipe-guide-page">ドームの必要素材・作成場所をレシピ一覧で確認<span aria-hidden="true">→</span></button>
         </section>
 
         <section id="how-to-page" class="guide-view" role="tabpanel" aria-labelledby="how-to-tab">
@@ -301,8 +349,8 @@
                     </div>
                     <div class="manual-step-media">
                         <figure class="manual-shot"><img src="assets/guide-screenshots/01-exploration-landscape.png" alt="スマートフォンを横向きにした探索画面"><figcaption>このガイドではスマートフォン横向きの画面例を使っています。</figcaption></figure>
-                        <aside class="manual-callout">
-                            <div class="manual-zoom"><img src="assets/guide-screenshots/01b-movement-pad.png" alt="方向ボタンと中央ジョイスティック"></div>
+                        <aside class="manual-callout manual-callout--wide">
+                            <div class="manual-zoom"><img src="assets/guide-screenshots/01b-movement-pad.png" alt="上下左右ボタンと中央ジョイスティックを含む移動パッド"></div>
                             <div class="manual-callout-note"><strong>移動コントローラー</strong><p>方向ボタンかジョイスティックを使います。縦画面では下へスクロールするとナビゲーションへ進めます。</p></div>
                         </aside>
                     </div>
@@ -315,8 +363,7 @@
                     </div>
                     <div class="manual-step-media">
                         <figure class="manual-shot"><img src="assets/guide-screenshots/02-status.png" alt="体力、スチーム、座標を表示したステータス画面"><figcaption>ステータスを開いた状態</figcaption></figure>
-                        <aside class="manual-callout manual-callout--stacked">
-                            <div class="manual-zoom"><img src="assets/guide-screenshots/02b-status-values.png" alt="体力、スチーム、座標をまとめたステータス欄"></div>
+                        <aside class="manual-callout manual-callout--text-only">
                             <div class="manual-callout-note"><strong>座標とスチーム</strong><p>スクロールの対象セルや運転状況を確認するときに使います。</p></div>
                         </aside>
                     </div>
@@ -329,7 +376,7 @@
                         <p>紙・布スクロールとスクロールブックも所持品に含まれます。地形の記号・採取物・必要動力は「セル・素材」タブにまとめています。</p>
                     </div>
                     <div class="manual-step-media">
-                        <figure class="manual-shot"><img src="assets/guide-screenshots/03-inventory.png" alt="アイコン付き所持品と製作レシピを切り替えるインベントリ"><figcaption>所持品の確認と合成</figcaption></figure>
+                        <figure class="manual-shot"><img src="assets/guide-screenshots/03-inventory.png" alt="アイコンと数量が並ぶ所持品一覧"><figcaption>所持品の確認</figcaption></figure>
                         <aside class="manual-callout manual-callout--wide">
                             <div class="manual-zoom"><img src="assets/guide-screenshots/03b-crafting.png" alt="材料数を確認して合成を開始するレシピ一覧"></div>
                             <div class="manual-callout-note"><strong>素材を使って製作</strong><p>材料不足のレシピは開始できません。投入した素材は製作開始時に消費され、所要時間後に完成品が所持品へ加わります。</p></div>
@@ -339,15 +386,14 @@
 
                 <section class="manual-step">
                     <div class="manual-step-copy">
-                        <h3><span>04</span>線路・建築物を連続配置する</h3>
-                        <p>インベントリの「建築」から配置するものを選びます。通常は配置位置を選んで「ここに配置」を押します。「続けて配置」を有効にすると、タップのたびに配置して選択状態を保てます。</p>
-                        <p>線路、基礎セル、床タイルはドラッグでも連続配置できます。線路の向きはドラッグ経路と接続先から自動で決まります。大型建築物や車両はタップごとに配置されます。終わるときは「キャンセル」を押します。</p>
+                        <h3><span>04</span>建築キットを作って配置する</h3>
+                        <p>インベントリの「建築」タブで必要素材と作成数を確認し、建築キットを作ります。作ったキットは所持品に入ります。所持品タブでキットを選ぶと詳細が開き、そこで「単一配置」か「連続配置」を選びます。</p>
+                        <p>単一配置はマップ上の位置を選んで確定します。連続配置は配置可能なセルをタップまたはドラッグして置けます。線路の向きは経路と接続先から決まり、大型建築物などはタップごとに配置されます。終了時は「キャンセル」を押します。</p>
                     </div>
                     <div class="manual-step-media">
-                        <figure class="manual-shot"><img src="assets/guide-screenshots/12-building-placement.png" alt="マップ上で線路を連続配置している状態"><figcaption>線路をドラッグして連続配置</figcaption></figure>
-                        <aside class="manual-callout manual-callout--wide">
-                            <div class="manual-zoom"><img src="assets/guide-screenshots/12b-continuous-placement.png" alt="続けて配置を有効にした配置コントロール"></div>
-                            <div class="manual-callout-note"><strong>配置モード</strong><p>配置可能なセルだけが置かれます。真鍮は配置数に応じて消費されます。</p></div>
+                        <figure class="manual-shot"><img src="assets/guide-screenshots/04-building-list.png" alt="建築タブに必要素材とキット作成欄が表示されたインベントリ"><figcaption>建築タブで必要素材と作成数を確認</figcaption></figure>
+                        <aside class="manual-callout manual-callout--text-only">
+                            <div class="manual-callout-note"><strong>配置モードは所持品で選択</strong><p>建築タブはキットの作成場所です。配置方法は、作成後に所持品からキットを開いた詳細画面で選びます。</p></div>
                         </aside>
                     </div>
                 </section>
@@ -355,14 +401,13 @@
                 <section class="manual-step">
                     <div class="manual-step-copy">
                         <h3><span>05</span>保存ギアを選んで起動する</h3>
-                        <p>下部のドットで「保存ギアプレビュー」へ切り替えます。設計を選んで接続とプレビューを確認し、「スクロールを起動」を押すと対象セルで動作します。</p>
-                        <p>稼働中は同じボタンで停止できます。設計を直すときは一覧の歯車ボタンから編集します。</p>
+                        <p>下部のドットで「保存ギアプレビュー」へ切り替えます。保存済み設計を選んで接続と対象セルを確認し、「スクロールを起動」を押します。設計がまだない場合は、紙・布スクロールからギア編集を開いて作成・保存してください。</p>
+                        <p>保存した設計が一覧に並びます。稼働中は同じボタンで停止でき、設計を直すときは一覧の歯車ボタンから編集します。</p>
                     </div>
                     <div class="manual-step-media">
-                        <figure class="manual-shot"><img src="assets/guide-screenshots/06-control-preview.png" alt="保存ギア一覧、選択した設計と起動ボタン"><figcaption>選択した設計の接続プレビュー</figcaption></figure>
-                        <aside class="manual-callout manual-callout--wide">
-                            <div class="manual-zoom"><img src="assets/guide-screenshots/04b-scroll-start-button.png" alt="スクロールを起動・停止するボタン"></div>
-                            <div class="manual-callout-note"><strong>起動前に確認</strong><p>接続が正しいことを見てから起動します。稼働状況は動力ダッシュボードにも表示されます。</p></div>
+                        <figure class="manual-shot"><img src="assets/guide-screenshots/04-scroll-book.png" alt="保存ギアプレビューの保存済みスクロール一覧"><figcaption>保存済み設計の一覧。新規作成時は空です。</figcaption></figure>
+                        <aside class="manual-callout manual-callout--text-only">
+                            <div class="manual-callout-note"><strong>選択して起動</strong><p>設計を選ぶとプレビューと起動操作が表示されます。起動できない場合は接続や対象セル、必要条件を確認してください。</p></div>
                         </aside>
                     </div>
                 </section>
@@ -370,14 +415,13 @@
                 <section class="manual-step">
                     <div class="manual-step-copy">
                         <h3><span>06</span>ギアを作成・編集する</h3>
-                        <p>インベントリから紙・布のスクロールを開き、「ギア編集」を押します。ギア編集でサイズを選び、盤面をタップして配置します。中心のメインギアから噛み合う位置につなげます。ギアを選ぶと右側の設定が開きます。</p>
-                        <p>工業・動力ギアは「動力を蓄積」を選ぶと、1回転ごとに歯数分の動力を生成します。設計名を付けて保存すると、スクロールブックから使えます。</p>
+                        <p>インベントリで紙・布のスクロールを選び、詳細の「ギア編集」を押します。段とギア／ベルトを選び、盤面に配置して中心のメインギアにつなげます。保存名と効果を設定して「名前を付けて保存」を押すと、保存ギアプレビューの一覧に追加されます。</p>
+                        <p>工業・動力ギアは「動力を蓄積」を選ぶと、1回転ごとに歯数分の動力を生成します。錬金ギアの「地形変成」では、麻草地・葦原・火山灰地・磁鉄鉱脈・雲母露頭・黒曜石地・軽石地・海藻場も変成先に選べます。設計名を付けて保存すると、スクロールブックから使えます。</p>
                     </div>
                     <div class="manual-step-media">
-                        <figure class="manual-shot"><img src="assets/guide-screenshots/05-gear-editor.png" alt="ギア編集盤面と選択ギアの設定"><figcaption>ギアを選択して種類と処理を設定</figcaption></figure>
-                        <aside class="manual-callout manual-callout--wide">
-                            <div class="manual-zoom"><img src="assets/guide-screenshots/05b-process-mode.png" alt="工業ギアの処理内容選択欄"></div>
-                            <div class="manual-callout-note"><strong>処理内容</strong><p>「動力を蓄積」や「資材収集」など、ギアの役割をここで選びます。</p></div>
+                        <figure class="manual-shot"><img src="assets/guide-screenshots/05-gear-editor.png" alt="ギア編集画面の盤面、レイヤー選択、保存操作"><figcaption>盤面、段、保存設定を編集</figcaption></figure>
+                        <aside class="manual-callout manual-callout--text-only">
+                            <div class="manual-callout-note"><strong>保存までが必要</strong><p>編集しただけでは一覧に登録されません。保存名を付けて保存してから、保存ギアプレビューで選択してください。</p></div>
                         </aside>
                     </div>
                 </section>
@@ -389,9 +433,8 @@
                         <p>霧の回収と霧から水を作る処理は動力を使いません。</p>
                     </div>
                     <div class="manual-step-media">
-                        <figure class="manual-shot"><img src="assets/guide-screenshots/07-dashboard.png" alt="資源ごとの保有量、生成、消費を示す動力ダッシュボード"><figcaption>保有量とレートをまとめて確認</figcaption></figure>
-                        <aside class="manual-callout manual-callout--wide">
-                            <div class="manual-zoom"><img src="assets/guide-screenshots/07b-power-row.png" alt="動力の保有量、生成、消費レート"></div>
+                        <figure class="manual-shot"><img src="assets/guide-screenshots/07-dashboard.png" alt="資源ごとの保有量、生成・回収、消費を示す動力ダッシュボード"><figcaption>数値は建物の稼働状況に応じて変わります。</figcaption></figure>
+                        <aside class="manual-callout manual-callout--text-only">
                             <div class="manual-callout-note"><strong>動力の行</strong><p>保有量と、1秒あたりの生成・消費が表示されます。</p></div>
                         </aside>
                     </div>
@@ -404,10 +447,9 @@
                         <p>ワールドシードやマップ初期ズームは設定で変更できます。初期マップと現在マップの違いは全体マップで切り替えて確認します。</p>
                     </div>
                     <div class="manual-step-media">
-                        <figure class="manual-shot"><img src="assets/guide-screenshots/08-navigation.png" alt="全体マップ、ガイド、設定を開くナビゲーション"><figcaption>ナビゲーションから各画面へ</figcaption></figure>
-                        <aside class="manual-callout">
-                            <div class="manual-zoom"><img src="assets/guide-screenshots/08b-navigation-actions.png" alt="ナビゲーションの各画面へのボタン"></div>
-                            <div class="manual-callout-note"><strong>画面移動</strong><p>全体マップで探索範囲を見渡し、設定からシードとズームを調整できます。</p></div>
+                        <figure class="manual-shot"><img src="assets/guide-screenshots/08-navigation.png" alt="ナビゲーションから画面を開く操作画面"><figcaption>ナビゲーションのメニュー</figcaption></figure>
+                        <aside class="manual-callout manual-callout--text-only">
+                            <div class="manual-callout-note"><strong>画面移動とデータ保存</strong><p>全体マップで探索範囲を見渡し、設定でシードやズームを調整します。Save / Load はセーブデータの書き出し・読み込みです。</p></div>
                         </aside>
                         <div class="manual-support-shots">
                             <figure class="manual-shot"><img src="assets/guide-screenshots/09-world-map.png" alt="全体マップの現在地と地形"><figcaption>全体マップ</figcaption></figure>
@@ -418,8 +460,18 @@
             </div>
         </section>
 
+        <section id="recipe-guide-page" class="guide-view" role="tabpanel" aria-labelledby="recipe-guide-tab" hidden>
+            <header class="group-head">
+                <h2>加工・合成・建築の実装レシピ</h2>
+                <p id="recipe-guide-count"></p>
+            </header>
+            <p class="recipe-guide-note">この一覧はゲーム本体のレシピ・建築コストから生成しています。製作場所欄の設備を設置してから、設備をタップしてレシピを開いてください。炉は簡易炉で作れるものも作れます。</p>
+            <label class="recipe-guide-search"><span>検索</span><input id="recipe-guide-search" type="search" autocomplete="off" placeholder="素材・製品・設備名"></label>
+            <div id="recipe-guide-content"></div>
+        </section>
+
         <section id="cell-guide-page" class="guide-view" role="tabpanel" aria-labelledby="cell-guide-tab" hidden>
-        <header class="group-head"><h2>セルの見た目と採取の目印</h2><p>色と模様、採取物、変形候補を確認できます。</p></header>
+        <header class="group-head"><h2>セルの見た目と採取の目印</h2><p>色と模様、採取物、必要動力を確認できます。変質地形はギアの「地形変成」で対象にできます。</p></header>
         <div class="toolbar">
             <div class="tabs" role="group" aria-label="地形のカテゴリ">
                 <button class="tab" type="button" data-filter="all" aria-pressed="true">全体</button>
@@ -460,8 +512,47 @@
             COLLECTION_POWER_COSTS,
             TERRAIN_TRANSFORM_RECIPES,
             getCellDrops
-        } from './js/worldCells.js?v=8';
+        } from './js/worldCells.js?v=9';
         import { getMosaicColor } from './js/cellRules.js?v=4';
+        import { CRAFTING_ITEMS, CRAFTING_RECIPES, CRAFTING_STATION_BUILDING_IDS, HANDCRAFT_STATION } from './js/craftingData.js?v=13';
+        import { BUILDING_DEFINITIONS } from './js/buildingData.js?v=30';
+
+        const terraformingGoalContent = document.getElementById('terraforming-goal-content');
+        const terraformingDome = BUILDING_DEFINITIONS.find((building) => building.id === 'terraforming-dome');
+        if (!terraformingDome || !terraformingGoalContent) throw new Error('テラフォーミングドームのガイドデータを読み込めません。');
+        const buildingNameById = new Map(BUILDING_DEFINITIONS.map((building) => [building.id, building.name]));
+        const itemNameById = new Map(CRAFTING_ITEMS.map(([id, name]) => [id, name]));
+        const domeRecipesByOutput = new Map(CRAFTING_RECIPES.map((recipe) => [recipe[3], recipe]));
+        const appendGoalList = (title, entries) => {
+            const block = document.createElement('section');
+            block.className = 'terraforming-goal-block';
+            const heading = document.createElement('h3');
+            heading.textContent = title;
+            const list = document.createElement('ul');
+            entries.forEach((entry) => {
+                const item = document.createElement('li');
+                item.textContent = entry;
+                list.appendChild(item);
+            });
+            block.append(heading, list);
+            terraformingGoalContent.appendChild(block);
+        };
+        appendGoalList('先に建設する拠点', terraformingDome.requiredBuildings.map((id) => {
+            const name = buildingNameById.get(id);
+            if (!name) throw new Error(`必要建築「${id}」の名前が見つかりません。`);
+            return name;
+        }));
+        appendGoalList('ドーム本体の素材', terraformingDome.materialCosts.map(([id, amount]) => {
+            const name = itemNameById.get(id) || buildingNameById.get(id);
+            if (!name) throw new Error(`ドーム素材「${id}」の名前が見つかりません。`);
+            return `${name} ×${amount}`;
+        }));
+        appendGoalList('専用部品と製作場所', ['climate-control-core', 'closed-loop-unit', 'ecosystem-starter'].map((id) => {
+            const name = itemNameById.get(id);
+            const recipe = domeRecipesByOutput.get(id);
+            if (!name || !recipe) throw new Error(`ドーム専用部品「${id}」のレシピが見つかりません。`);
+            return `${name} — ${recipe[4]}`;
+        }));
 
         const categoryConfig = {
             initial: { title: '初期地形', description: 'マップ生成時に広がりやすい基本地形です。' },
@@ -488,6 +579,14 @@
             PEAT_BOG: 'peat',
             SALT_MARSH: 'salt',
             OIL_SEEP: 'oil',
+            FIBER_FIELD: 'fiber',
+            REED_BED: 'reed',
+            ASH_DEPOSIT: 'ash',
+            MAGNETITE_VEIN: 'magnetite',
+            MICA_OUTCROP: 'mica',
+            OBSIDIAN_FIELD: 'obsidian',
+            PUMICE_FIELD: 'pumice',
+            SEAWEED_BED: 'seaweed',
             TIN_VEIN: 'tin',
             ZINC_VEIN: 'zinc',
             CRYSTAL_VEIN: 'crystal',
@@ -516,6 +615,14 @@
             PEAT_BOG: 'i-peat',
             SALT_MARSH: 'i-salt',
             OIL_SEEP: 'i-oil',
+            FIBER_FIELD: 'i-fiber',
+            REED_BED: 'i-reed',
+            ASH_DEPOSIT: 'i-ash',
+            MAGNETITE_VEIN: 'i-magnetite',
+            MICA_OUTCROP: 'i-mica',
+            OBSIDIAN_FIELD: 'i-obsidian',
+            PUMICE_FIELD: 'i-pumice',
+            SEAWEED_BED: 'i-seaweed',
             TIN_VEIN: 'i-tin',
             ZINC_VEIN: 'i-zinc',
             CRYSTAL_VEIN: 'i-crystal',
@@ -537,6 +644,14 @@
             'iron-ore': 'i-iron',
             'copper-ore': 'i-copper',
             coal: 'i-coal',
+            fiber: 'i-fiber',
+            reed: 'i-reed',
+            ash: 'i-ash',
+            magnetite: 'i-magnetite',
+            mica: 'i-mica',
+            obsidian: 'i-obsidian',
+            pumice: 'i-pumice',
+            seaweed: 'i-seaweed',
             sulfur: 'i-sulfur',
             clay: 'i-clay',
             limestone: 'i-limestone',
@@ -554,7 +669,7 @@
             coke: 'i-coke',
             vein_mold: 'i-vein-mold',
             'navigation-crystal': 'i-device',
-            preserved_spores: 'i-spore-vial',
+            'preserved-spores': 'i-spore-vial',
             compost: 'i-compost',
             forest_seed: 'i-forest-seed',
             ancient_seed: 'i-seedcase'
@@ -587,6 +702,150 @@
                 };
             })
             .filter((material) => material.source);
+
+        const guideItemNames = new Map(CRAFTING_ITEMS.map(([id, name]) => [id, name]));
+        Object.entries(CELL_MATERIALS).forEach(([id, material]) => {
+            if (!guideItemNames.has(id)) guideItemNames.set(id, material.label);
+        });
+        BUILDING_DEFINITIONS.forEach((building) => guideItemNames.set(building.id, building.name));
+        const getGuideItemName = (id) => guideItemNames.get(id) || id;
+        const makeGuideElement = (tag, className, text) => {
+            const element = document.createElement(tag);
+            if (className) element.className = className;
+            if (text !== undefined) element.textContent = text;
+            return element;
+        };
+        const recipeGuide = document.getElementById('recipe-guide-content');
+        const recipeGuideCards = [];
+        const recipeGuideGroup = (title) => {
+            const section = makeGuideElement('section', 'recipe-guide-group');
+            section.appendChild(makeGuideElement('h3', '', title));
+            const grid = makeGuideElement('div', 'recipe-guide-grid');
+            section.appendChild(grid);
+            recipeGuide.appendChild(section);
+            return grid;
+        };
+        const appendRecipeGuideCard = (container, title, description, station, ingredients, outputText, searchTerms) => {
+            const card = makeGuideElement('article', 'recipe-guide-card');
+            card.dataset.search = searchTerms.toLocaleLowerCase('ja');
+            card.appendChild(makeGuideElement('h4', '', title));
+            card.appendChild(makeGuideElement('p', '', station));
+            if (description) card.appendChild(makeGuideElement('p', '', description));
+            const flow = makeGuideElement('div', 'recipe-guide-flow');
+            ingredients.forEach(([id, amount], index) => {
+                if (index) flow.appendChild(makeGuideElement('span', '', '+'));
+                flow.appendChild(makeGuideElement('span', 'recipe-guide-chip', `${getGuideItemName(id)} ×${amount}`));
+            });
+            if (outputText) {
+                flow.appendChild(makeGuideElement('span', '', '→'));
+                flow.appendChild(makeGuideElement('span', 'recipe-guide-chip recipe-guide-cost', outputText));
+            }
+            card.appendChild(flow);
+            container.appendChild(card);
+            recipeGuideCards.push(card);
+        };
+        const recipesByStation = new Map();
+        CRAFTING_RECIPES.forEach((recipe) => {
+            if (!recipesByStation.has(recipe[4])) recipesByStation.set(recipe[4], []);
+            recipesByStation.get(recipe[4]).push(recipe);
+        });
+        recipesByStation.forEach((stationRecipes, station) => {
+            const stationBuildingNames = (CRAFTING_STATION_BUILDING_IDS[station] || [])
+                .map((buildingId) => BUILDING_DEFINITIONS.find((building) => building.id === buildingId)?.name)
+                .filter(Boolean);
+            const where = station === HANDCRAFT_STATION
+                ? '作成場所: 手作業（設備不要）'
+                : `作成場所: ${stationBuildingNames.join(' / ') || '対応設備未登録'}`;
+            const group = recipeGuideGroup(`${station}（${stationRecipes.length}レシピ）`);
+            stationRecipes.forEach((recipe) => {
+                const [family, title, inputs, output, , note, batch = 1] = recipe;
+                const outputName = getGuideItemName(output);
+                appendRecipeGuideCard(group, `${title} → ${outputName} ×${batch}`, note, where, inputs, '', [family, title, note, station, outputName, ...inputs.map(([id]) => getGuideItemName(id))].join(' '));
+            });
+        });
+
+        const buildingGroup = recipeGuideGroup(`建築キット（${BUILDING_DEFINITIONS.length}種類）`);
+        BUILDING_DEFINITIONS.forEach((building) => {
+            const costs = [['brass-stock', building.brassCost], ...(building.materialCosts || [])];
+            const requirements = (building.requiredBuildings || [])
+                .map((buildingId) => BUILDING_DEFINITIONS.find((candidate) => candidate.id === buildingId)?.name || buildingId);
+            const description = [building.description, requirements.length ? `建築条件: ${requirements.join('・')}` : ''].filter(Boolean).join(' ');
+            appendRecipeGuideCard(
+                buildingGroup,
+                `${building.name} / ${building.width}×${building.height}`,
+                [building.width >= 2 && building.height >= 2 ? '作成場所: インベントリの「建築」タブ。作成には作業台以上の設備が必要です。' : '作成場所: インベントリの「建築」タブ。', description].filter(Boolean).join(' '),
+                '建築キット',
+                costs,
+                '',
+                [building.name, building.id, ...costs.map(([id]) => getGuideItemName(id))].join(' ')
+            );
+        });
+
+        const recipeInputIds = new Set(CRAFTING_RECIPES.flatMap((recipe) => recipe[2].map(([id]) => id)));
+        const constructionInputIds = new Set(BUILDING_DEFINITIONS.flatMap((building) => (building.materialCosts || []).map(([id]) => id)));
+        const transformInputIds = new Set(Object.values(TERRAIN_TRANSFORM_RECIPES).flatMap((inputs) => Object.keys(inputs)));
+        const unconsumedRecipes = CRAFTING_RECIPES.filter((recipe) =>
+            !recipeInputIds.has(recipe[3])
+            && !constructionInputIds.has(recipe[3])
+            && !transformInputIds.has(recipe[3])
+        );
+        const unconsumedOutputs = new Map();
+        unconsumedRecipes.forEach((recipe) => {
+            if (!unconsumedOutputs.has(recipe[3])) unconsumedOutputs.set(recipe[3], []);
+            unconsumedOutputs.get(recipe[3]).push(recipe);
+        });
+        const unconsumedRawItems = CRAFTING_ITEMS.filter(([itemId, , category]) =>
+            category === 'raw'
+            && !recipeInputIds.has(itemId)
+            && !constructionInputIds.has(itemId)
+            && !transformInputIds.has(itemId)
+        );
+        if (unconsumedOutputs.size || unconsumedRawItems.length) {
+            const unusedGroup = recipeGuideGroup(`後続用途が未設定（加工品 ${unconsumedOutputs.size}種類 / 採集素材 ${unconsumedRawItems.length}種類）`);
+            unconsumedOutputs.forEach((outputRecipes, outputId) => {
+                const outputName = getGuideItemName(outputId);
+                const card = makeGuideElement('article', 'recipe-guide-card');
+                card.dataset.search = [outputName, ...outputRecipes.flatMap((recipe) => [
+                    recipe[1], recipe[4], ...recipe[2].map(([id]) => getGuideItemName(id))
+                ])].join(' ').toLocaleLowerCase('ja');
+                card.appendChild(makeGuideElement('h4', '', outputName));
+                card.appendChild(makeGuideElement('p', '', '現行の加工レシピ・建築コスト・地形変成で消費されません。固有効果の実装も要確認です。'));
+                outputRecipes.forEach((recipe) => {
+                    const stationBuildings = (CRAFTING_STATION_BUILDING_IDS[recipe[4]] || [])
+                        .map((buildingId) => BUILDING_DEFINITIONS.find((building) => building.id === buildingId)?.name)
+                        .filter(Boolean);
+                    card.appendChild(makeGuideElement('p', '', `${recipe[1]} / 作成場所: ${stationBuildings.join(' / ') || recipe[4]}`));
+                    const flow = makeGuideElement('div', 'recipe-guide-flow');
+                    recipe[2].forEach(([id, amount], index) => {
+                        if (index) flow.appendChild(makeGuideElement('span', '', '+'));
+                        flow.appendChild(makeGuideElement('span', 'recipe-guide-chip', `${getGuideItemName(id)} ×${amount}`));
+                    });
+                    card.appendChild(flow);
+                });
+                unusedGroup.appendChild(card);
+                recipeGuideCards.push(card);
+            });
+            unconsumedRawItems.forEach(([itemId, itemName]) => {
+                const card = makeGuideElement('article', 'recipe-guide-card');
+                const sources = Object.entries(WORLD_CELL_TYPES)
+                    .filter(([type, cell]) => cell.collect === itemId
+                        || Array.from({ length: 5 }, (_, count) => count).some((count) => getCellDrops(type, count).includes(itemId)))
+                    .map(([, cell]) => cell.label);
+                card.dataset.search = [itemName, ...sources].join(' ').toLocaleLowerCase('ja');
+                card.appendChild(makeGuideElement('h4', '', itemName));
+                card.appendChild(makeGuideElement('p', '', '現行の加工レシピ・建築コスト・地形変成では消費されません。'));
+                if (sources.length) card.appendChild(makeGuideElement('p', '', `採集先: ${sources.join(' / ')}`));
+                unusedGroup.appendChild(card);
+                recipeGuideCards.push(card);
+            });
+        }
+
+        const recipeGuideCount = document.getElementById('recipe-guide-count');
+        recipeGuideCount.textContent = `${CRAFTING_RECIPES.length}加工・合成 / ${BUILDING_DEFINITIONS.length}建築 / 用途未設定: 加工品 ${unconsumedOutputs.size}種類・採集素材 ${unconsumedRawItems.length}種類`;
+        document.getElementById('recipe-guide-search').addEventListener('input', (event) => {
+            const query = event.currentTarget.value.normalize('NFKC').toLocaleLowerCase('ja').trim();
+            recipeGuideCards.forEach((card) => { card.hidden = query !== '' && !card.dataset.search.includes(query); });
+        });
 
         const groups = Object.entries(categoryConfig).map(([id, config]) => ({
             id,
@@ -685,12 +944,12 @@
         tabs.forEach((tab) => tab.addEventListener('click', () => showGroup(tab.dataset.filter)));
         showGroup('all');
 
-        const guideTabs = [...document.querySelectorAll('.guide-tab')];
-        guideTabs.forEach((tab) => tab.addEventListener('click', () => {
-            const activeView = tab.dataset.guideView;
-            guideTabs.forEach((guideTab) => guideTab.setAttribute('aria-selected', String(guideTab === tab)));
+        const selectGuideView = (activeView) => {
+            document.querySelectorAll('.guide-tab').forEach((tab) => tab.setAttribute('aria-selected', String(tab.dataset.guideView === activeView)));
             document.querySelectorAll('.guide-view').forEach((view) => { view.hidden = view.id !== activeView; });
-        }));
+        };
+        document.querySelectorAll('[data-guide-view]').forEach((tab) => tab.addEventListener('click', () => selectGuideView(tab.dataset.guideView)));
+        if (new URLSearchParams(window.location.search).get('guide') === '7') selectGuideView('recipe-guide-page');
     </script>
 </body>
 </html>

@@ -137,7 +137,7 @@ const groups=[
 {name:'開拓気球・軽飛空艇ドック',size:'6×6',materials:'測量道具・羅針盤・防水布',desc:'偵察気球や小型貨物艇を整備・発着させる。',art:'balloon',accent:'#d39067'}
 ]},
 {id:'mega',name:'大型メガストラクチャー',items:[
-{name:'開拓地総司令グランドギルド',size:'7×7',materials:'石材・鋼材・耐霧種子箱',desc:'地図統合と技術解放を担う中央拠点。',art:'guild',accent:'#e1bd62'},
+{name:'テラフォーミング管制棟',size:'7×7',materials:'鋼材・製材板・防水板・ガラス・鉄板',desc:'テラフォーミング設備を統括し、ドーム建設計画を管理する。',art:'guild',accent:'#e1bd62'},
 {name:'古代遺物共振解読炉',size:'7×7',materials:'遺物片・遺物探知器・共振核',desc:'巨大遺物を解読し、再起動を試みる。',art:'relic',accent:'#82bdc7'},
 {name:'大型飛空艇ドックヤード',size:'8×8',materials:'鋼材・木材・大型飛空艇部材',desc:'本国との物資輸送艇を建造・発着させる。',art:'hangar',accent:'#d39067'},
 {name:'環境浄化スチームタワー',size:'8×8',materials:'鋼材・活性炭層・耐熱隔離環',desc:'濃霧や胞子を熱分解・ろ過する巨大塔。',art:'filtertower',accent:'#82c8b0'}
@@ -145,7 +145,7 @@ const groups=[
 {id:'final',name:'ハイパープロジェクト / 最終級',items:[
 {name:'移動都市用走行脚フレーム',size:'10×10',materials:'鋼塊・大型蒸気ピストン・軸受',desc:'拠点を支え、危険域から移動させる巨脚。',art:'walker',accent:'#d28a61'},
 {name:'地熱ダイレクト蒸気コレクター',size:'12×12',materials:'耐圧鋼管・耐熱隔離環・蒸気弁',desc:'深部の地熱を直接、高圧蒸気として回収する。',art:'geothermal',accent:'#d28a61'},
-{name:'新天地テラフォーミングドーム',size:'16×16',materials:'雲母窓ガラス・大型フィルター網・蒸気調整弁',desc:'巨大歯車と濾過翼で霧・熱・湿度を段階調律し、広域居住圏を支える。',art:'dome',accent:'#82bdc7'}
+{name:'新天地テラフォーミングドーム',size:'16×16',materials:'気候制御核・閉鎖循環ユニット・生態系スターター',desc:'気候を制御し、水と空気を循環させ、植生を定着させる最終施設。',art:'dome',accent:'#82bdc7'}
 ]}
 ];
 glyphs.lodge='<path d="M14 42h68v42H14z" fill="#68503c" stroke="#d3ae63" stroke-width="3"/><path d="m10 43 38-26 38 26z" fill="#b58950" stroke="#e0c574" stroke-width="3"/><path d="M23 53h20v31H23zm31 0h20v31H54z" fill="#35473e" stroke="#d2ac60" stroke-width="2"/><path d="M29 60h8v13h-8zm31 0h8v13h-8z" fill="#94b7a6"/><path d="M44 58h9v26h-9z" fill="#2d3d35"/><path d="M18 49h60" stroke="#f0d88a" stroke-width="2"/>';
@@ -281,7 +281,7 @@ production:[
 	{name:'貨物駅',size:'3×2',materials:'木材・鋼材・線路',desc:'既存案を統合。列車の積み下ろしを行う。',legacySymbol:'i-station-plate',accent:'#d39067'}
 ],
 automation:[
-	{name:'開拓者宿舎・診療所',size:'3×3',materials:'製材板・ガラス・薬液',desc:'交代要員の休息と軽傷の手当てを行う。',art:'lodge',accent:'#82c8b0'}
+	{name:'生態系試験棟',size:'3×3',materials:'保存胞子・菌糸堆肥・薬草抽出液',desc:'ドームへ植生を定着させる生態系スターターを準備する。',art:'lodge',accent:'#82c8b0'}
 ]
 };
 for(const group of groups){

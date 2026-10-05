@@ -24,7 +24,15 @@ const TYPE_INDEX = Object.freeze({
     RESIN_FOREST: 21,
     MACHINE_WRECK: 22,
     AIRSHIP_WRECK: 23,
-    FOUNDATION: 24
+    FOUNDATION: 24,
+    FIBER_FIELD: 25,
+    REED_BED: 26,
+    ASH_DEPOSIT: 27,
+    MAGNETITE_VEIN: 28,
+    MICA_OUTCROP: 29,
+    OBSIDIAN_FIELD: 30,
+    PUMICE_FIELD: 31,
+    SEAWEED_BED: 32
 });
 const NUMERIC_TYPES = Object.freeze(['PLAINS', 'MOUNTAIN', 'FOREST', 'SEA', 'SAND']);
 let atlasPromise = null;
@@ -35,7 +43,7 @@ export function loadCellIconAtlas() {
             const image = new Image();
             image.onload = () => resolve(image);
             image.onerror = () => reject(new Error('Cell icon atlas failed to load'));
-            image.src = new URL('../cell-icons.svg?v=4', import.meta.url).href;
+            image.src = new URL('../cell-icons.svg?v=5', import.meta.url).href;
         });
     }
     return atlasPromise;

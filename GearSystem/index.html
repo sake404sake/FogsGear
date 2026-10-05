@@ -108,7 +108,7 @@
             <label id="main-gear-size-row" class="main-gear-hidden">ギアサイズ <select id="main-gear-size-select"><option value="XXS">XXS (4歯)</option><option value="SS">SS (6歯)</option><option value="S">S (10歯)</option><option value="M">M (14歯)</option><option value="L">L (18歯)</option><option value="LL">LL (24歯)</option><option value="3L">3L (32歯)</option><option value="4L">4L (40歯)</option><option value="MAX">MAX (48歯)</option></select></label>
             <label id="gear-design-row">ギア種類 <select id="gear-design-select"><option value="INDUSTRIAL">工業・動力</option><option value="ALCHEMICAL">加工・錬金</option><option value="LOGISTICS">物流・搬送</option><option value="CLOCKWORK">精密・制御</option><option value="PRODUCTION">産業・生産</option></select></label>
             <label id="gear-process-row">処理内容 <select id="gear-process-select"><option value="NONE">処理なし</option></select></label>
-            <label id="gear-terrain-target-row" hidden>変成先セル <select id="gear-terrain-target-select"><option value="IRON_VEIN">鉄鉱脈</option><option value="COPPER_VEIN">銅鉱脈</option><option value="COAL_SEAM">石炭層</option><option value="SULFUR_DEPOSIT">硫黄鉱床</option><option value="CLAY_BED">粘土層</option><option value="LIMESTONE">石灰岩層</option><option value="PEAT_BOG">泥炭地</option><option value="SALT_MARSH">塩沼</option><option value="OIL_SEEP">油浸地</option><option value="TIN_VEIN">錫鉱脈</option><option value="ZINC_VEIN">亜鉛鉱脈</option><option value="CRYSTAL_VEIN">水晶脈</option><option value="MYCELIUM">菌糸群落</option><option value="HERB_FIELD">薬草地</option><option value="RESIN_FOREST">樹脂林</option></select></label>
+            <label id="gear-terrain-target-row" hidden>変成先セル <select id="gear-terrain-target-select"><option value="IRON_VEIN">鉄鉱脈</option><option value="COPPER_VEIN">銅鉱脈</option><option value="COAL_SEAM">石炭層</option><option value="SULFUR_DEPOSIT">硫黄鉱床</option><option value="CLAY_BED">粘土層</option><option value="LIMESTONE">石灰岩層</option><option value="PEAT_BOG">泥炭地</option><option value="SALT_MARSH">塩沼</option><option value="OIL_SEEP">油浸地</option><option value="FIBER_FIELD">麻草地</option><option value="REED_BED">葦原</option><option value="ASH_DEPOSIT">火山灰地</option><option value="MAGNETITE_VEIN">磁鉄鉱脈</option><option value="MICA_OUTCROP">雲母露頭</option><option value="OBSIDIAN_FIELD">黒曜石地</option><option value="PUMICE_FIELD">軽石地</option><option value="SEAWEED_BED">海藻場</option><option value="TIN_VEIN">錫鉱脈</option><option value="ZINC_VEIN">亜鉛鉱脈</option><option value="CRYSTAL_VEIN">水晶脈</option><option value="MYCELIUM">菌糸群落</option><option value="HERB_FIELD">薬草地</option><option value="RESIN_FOREST">樹脂林</option></select></label>
             <section id="gear-control-config" class="control-config" hidden aria-label="条件制御の設定">
                 <label for="gear-control-action">制御内容<select id="gear-control-action"><option value="STOP_MAIN_GEAR">メインギアを停止</option><option value="START_MAIN_GEAR">メインギアを起動</option><option value="SYNC_AXIS">同軸同期</option><option value="UNSYNC_AXIS">同軸同期解除</option><option value="TOGGLE_SYNC_AXIS">同軸同期状態の切り替え</option></select></label>
                 <fieldset id="gear-control-target-fieldset" class="control-target-fieldset">
@@ -195,7 +195,7 @@
             </div>
         </section>
     </div>
-    <script type="module" src="js/main.js?v=scroll-edit-38"></script>
+    <script type="module" src="js/main.js?v=scroll-edit-40"></script>
     <script>
         document.addEventListener('click', (event) => {
             const target = event.target.closest('a, button[onclick]');

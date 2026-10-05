@@ -213,7 +213,7 @@ if (switchCard) {
 				width: 2304,
 				height: 96
 			});
-			atlasIcon.setAttribute('href', '../MapSystem/cell-icons.svg?v=4');
+			atlasIcon.setAttribute('href', '../MapSystem/cell-icons.svg?v=5');
 			iconViewport.append(atlasIcon);
 			terrainLayer.append(iconViewport);
 			gridLayer.append(createSvgElement('rect', {
@@ -252,7 +252,7 @@ if (switchCard) {
 					const foundationIcon = createSvgElement('svg', { x: foundationX + tileSize * 0.21, y: foundationY + tileSize * 0.21, width: tileSize * 0.58, height: tileSize * 0.58, viewBox: '0 0 96 96' });
 					foundationIcon.setAttribute('opacity', '0.38');
 					const foundationAtlasIcon = createSvgElement('image', { x: -cellIcons.FOUNDATION * 96, y: 0, width: 2400, height: 96 });
-					foundationAtlasIcon.setAttribute('href', '../MapSystem/cell-icons.svg?v=4');
+					foundationAtlasIcon.setAttribute('href', '../MapSystem/cell-icons.svg?v=5');
 					foundationIcon.append(foundationAtlasIcon);
 					foundationLayer.append(foundationIcon);
 				}

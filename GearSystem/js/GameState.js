@@ -1,5 +1,5 @@
 import { GearNetwork } from './GearSystem.js?v=network-8';
-import { ACTIVE_SCROLL_TARGETS_KEY, CELL_MATERIALS, TERRAIN_TRANSFORM_RECIPES, WORLD_CELL_TYPES } from '../../MapSystem/js/worldCells.js?v=3';
+import { ACTIVE_SCROLL_TARGETS_KEY, CELL_MATERIALS, TERRAIN_TRANSFORM_RECIPES, WORLD_CELL_TYPES } from '../../MapSystem/js/worldCells.js?v=8';
 
 const ACTIVE_SCROLL_SYNC_STATE_KEY = 'fogsgear_active_scroll_sync_state';
 const INITIAL_MATERIAL_INVENTORY = Object.freeze({ paper_scroll: 10, cloth_scroll: 10, scroll_book: 1 });

@@ -26,7 +26,7 @@ const definitions = [
     ['drying-rack', '木材乾燥棚', 2, 2, 'workshop', 'outpost'],
     ['charcoal-kiln', '炭焼き窯', 2, 2, 'furnace', 'outpost'],
     ['fog-cistern', '霧水貯蔵槽', 2, 2, 'tank', 'outpost'],
-    ['boiler-forge', '蒸気ボイラー＆鍛造炉', 3, 3, 'boiler', 'production'],
+    ['boiler-forge', '炉', 3, 3, 'boiler', 'production'],
     ['ore-washer', '水洗選鉱プラント', 3, 3, 'washer', 'production'],
     ['ceramic-kiln', '耐熱ガラス・陶器窯', 3, 3, 'furnace', 'production'],
     ['water-tower', '蒸気揚水・濾過タワー', 3, 3, 'tower', 'production'],
@@ -43,8 +43,8 @@ const definitions = [
     ['deep-drill', '巨大深部土壌掘削ドリル', 5, 5, 'drill', 'automation'],
     ['automaton-factory', 'オートマトン製造工場', 6, 6, 'automaton', 'automation'],
     ['airship-workshop', '開拓気球・軽飛空艇ドック', 6, 6, 'airship', 'automation'],
-    ['settler-lodge', '開拓者宿舎・診療所', 3, 3, 'lodge', 'automation'],
-    ['council-hall', '開拓地総司令グランドギルド', 7, 7, 'guild', 'mega'],
+    ['settler-lodge', '生態系試験棟', 3, 3, 'lodge', 'automation'],
+    ['council-hall', 'テラフォーミング管制棟', 7, 7, 'guild', 'mega'],
     ['relic-reactor', '古代遺物共振解読炉', 7, 7, 'relic', 'mega'],
     ['airship-dockyard', '大型飛空艇ドックヤード', 8, 8, 'airship', 'mega'],
     ['filter-tower', '環境浄化スチームタワー', 8, 8, 'filter', 'mega'],
@@ -57,7 +57,7 @@ const definitions = [
 ];
 
 export const BUILDING_MATERIAL_COSTS_BY_ID = Object.freeze({
-    'foundation-cell': [['limestone', 2], ['clay', 1]],
+    'foundation-cell': [['limestone', 2], ['clay', 1], ['stone', 2]],
     'brick-tile': [['clay', 2], ['limestone', 1]],
     'concrete-tile': [['limestone', 2], ['iron-ore', 1]],
     'grate-tile': [['iron-plate', 2], ['steel-ingot', 1]],
@@ -73,7 +73,7 @@ export const BUILDING_MATERIAL_COSTS_BY_ID = Object.freeze({
     'simple-furnace': [['clay', 3], ['limestone', 2], ['wood', 2]],
     'simple-storage': [['lumber', 4], ['rivet', 2]],
     'hand-pump': [['lumber', 2], ['crank-handle', 1], ['bronze-bearing', 1]],
-    'pressure-gauge-tower': [['pressure-gauge', 1], ['copper-capillary', 2], ['iron-plate', 1]],
+    'pressure-gauge-tower': [['brass-sheet', 1], ['copper-capillary', 2], ['iron-plate', 1]],
     'fog-vent': [['steam-nozzle', 1], ['ceramic-barrier', 1], ['copper-capillary', 1]],
     'gear-forge': [['ceramic-crucible', 2], ['bronze-ingot', 3], ['steel-spring', 1]],
     'steam-fountain': [['brass-sheet', 3], ['lumber', 2], ['copper-capillary', 1]],
@@ -82,16 +82,16 @@ export const BUILDING_MATERIAL_COSTS_BY_ID = Object.freeze({
     'drying-rack': [['wood', 4], ['sealed-board', 2]],
     'charcoal-kiln': [['clay', 6], ['limestone', 4], ['lumber', 3]],
     'fog-cistern': [['sealed-board', 5], ['copper-capillary', 2], ['rivet', 4]],
-    'boiler-forge': [['steel-ingot', 12], ['iron-plate', 8], ['ceramic-barrier', 4], ['iron-screw', 8]],
-    'ore-washer': [['iron-plate', 6], ['copper-capillary', 3], ['bronze-bearing', 2], ['sealed-board', 3]],
-    'ceramic-kiln': [['steel-ingot', 5], ['clay', 8], ['sand', 5], ['mica-laminate', 3], ['ceramic-crucible', 2]],
+    'boiler-forge': [['iron-ingot', 12], ['brass-stock', 8], ['clay', 12]],
+    'ore-washer': [['iron-plate', 6], ['brass-stock', 3], ['sealed-board', 3]],
+    'ceramic-kiln': [['steel-ingot', 5], ['clay', 8], ['sand', 5], ['limestone', 5]],
     'water-tower': [['lumber', 8], ['sealed-board', 6], ['filter-cartridge', 2], ['iron-plate', 4]],
-    'machine-lathe': [['steel-ingot', 10], ['iron-plate', 8], ['axle', 4], ['bronze-bearing', 4], ['steel-spring', 2]],
+    'machine-lathe': [['steel-ingot', 10], ['iron-plate', 8], ['brass-stock', 6]],
     'alchemical-distillery': [['glass-vial', 8], ['ceramic-barrier', 4], ['sealed-board', 6], ['copper-capillary', 4]],
     'rail-freight-station': [['steel-ingot', 8], ['lumber', 8], ['axle', 4], ['rail-track', 6]],
     'steam-accumulator': [['steel-ingot', 8], ['iron-plate', 6], ['ceramic-barrier', 4], ['pressure-case', 2]],
-    'resin-workshop': [['sealed-board', 6], ['resin-lacquer', 4], ['iron-plate', 4], ['copper-capillary', 2]],
-    'brass-workshop': [['brass-sheet', 8], ['lumber', 6], ['bronze-bearing', 3], ['iron-screw', 8]],
+    'resin-workshop': [['sealed-board', 6], ['iron-plate', 4], ['copper-capillary', 2]],
+    'brass-workshop': [['brass-stock', 8], ['lumber', 6], ['bronze-bearing', 3], ['iron-screw', 8]],
     'steam-tower': [['steel-ingot', 8], ['iron-plate', 6], ['copper-capillary', 4], ['ceramic-barrier', 2]],
     'freight-platform': [['lumber', 8], ['steel-ingot', 4], ['rail-track', 4], ['iron-screw', 6]],
     'central-turbine': [['steel-ingot', 24], ['bronze-bearing', 8], ['steel-spring', 6], ['ceramic-barrier', 8], ['copper-capillary', 6]],
@@ -101,12 +101,12 @@ export const BUILDING_MATERIAL_COSTS_BY_ID = Object.freeze({
     'airship-workshop': [['sealed-board', 12], ['lumber', 10], ['rope', 8], ['brass-sheet', 6], ['survey-kit', 1]],
     'settler-lodge': [['lumber', 20], ['sealed-board', 10], ['glass-blank', 6], ['herb-extract', 3], ['rivet', 12]],
     'council-hall': [['steel-ingot', 48], ['lumber', 30], ['sealed-board', 20], ['glass-blank', 16], ['iron-plate', 24]],
-    'relic-reactor': [['relic-fragment', 12], ['relic-core', 3], ['navigation-crystal', 6], ['steel-ingot', 20], ['brass-sheet', 12]],
+    'relic-reactor': [['relic-fragment', 12], ['navigation-crystal', 6], ['steel-ingot', 20], ['brass-sheet', 12]],
     'airship-dockyard': [['steel-ingot', 72], ['lumber', 48], ['sealed-board', 32], ['axle', 16], ['rope', 20]],
-    'filter-tower': [['steel-ingot', 56], ['filter-cartridge', 20], ['ceramic-barrier', 16], ['copper-capillary', 12], ['brass-sheet', 10]],
+    'filter-tower': [['steel-ingot', 56], ['filter-cartridge', 20], ['ceramic-barrier', 16], ['copper-capillary', 12], ['brass-sheet', 10], ['tar', 12]],
     'walking-city-frame': [['steel-ingot', 80], ['iron-plate', 48], ['axle', 24], ['steel-spring', 24], ['bronze-bearing', 20]],
-    'geothermal-collector': [['steel-ingot', 72], ['ceramic-barrier', 24], ['copper-capillary', 24], ['pressure-case', 8], ['mica-laminate', 12]],
-    'terraforming-dome': [['steel-ingot', 120], ['glass-blank', 64], ['sealed-board', 48], ['filter-cartridge', 24], ['bronze-bearing', 16]],
+    'geothermal-collector': [['steel-ingot', 72], ['ceramic-barrier', 24], ['copper-capillary', 24], ['pressure-case', 8], ['mica-laminate', 12], ['steam-valve', 4], ['burner-cup', 4]],
+    'terraforming-dome': [['steel-ingot', 120], ['glass-blank', 64], ['sealed-board', 48], ['filter-cartridge', 24], ['bronze-bearing', 16], ['climate-control-core', 1], ['closed-loop-unit', 1], ['ecosystem-starter', 1]],
     'steam-locomotive': [['steel-ingot', 10], ['steel-spring', 3], ['axle', 2], ['bronze-bearing', 2], ['brass-sheet', 2]],
     'ore-wagon': [['iron-plate', 4], ['axle', 2], ['lumber', 2]],
     'freight-wagon': [['lumber', 5], ['iron-plate', 2], ['axle', 2]]
@@ -129,6 +129,27 @@ const BUILDING_UTILITY_CONFIG_BY_ID = Object.freeze({
     'geothermal-collector': { ports: [{ resource: 'steam', mode: 'output' }] }
 });
 
+const BUILDING_REQUIREMENTS_BY_ID = Object.freeze({
+    'terraforming-dome': [
+        'deep-drill',
+        'geothermal-collector',
+        'central-turbine',
+        'relic-reactor',
+        'difference-tower',
+        'filter-tower',
+        'settler-lodge',
+        'council-hall'
+    ]
+});
+
+const BUILDING_DESCRIPTIONS_BY_ID = Object.freeze({
+    'simple-storage': '小型の物理資材庫。建築メニューから資材を預け入れ・取り出しできます。',
+    warehouse: '大容量の物理資材庫。建築メニューから資材を預け入れ・取り出しできます。',
+    'drying-rack': '木材を乾燥させ、製材板を作るための作業設備です。',
+    'settler-lodge': 'ドームへ植生を定着させる生態系培地を準備します。',
+    'council-hall': 'テラフォーミング設備を統括し、ドーム建設計画を管理する管制拠点です。'
+});
+
 export const BUILDING_DEFINITIONS = definitions.map(([id, name, width, height, kind, group, brassCost, tileEffects = []]) => {
     const role = group === 'foundation' ? 'foundation'
         : group === 'tile' ? 'decoration'
@@ -149,6 +170,9 @@ export const BUILDING_DEFINITIONS = definitions.map(([id, name, width, height, k
     utilityPorts: (BUILDING_UTILITY_CONFIG_BY_ID[id]?.ports || []).map(port => ({ ...port })),
     utilityStorageCapacity: { ...(BUILDING_UTILITY_CONFIG_BY_ID[id]?.storageCapacity || {}) },
     utilityRates: { ...(BUILDING_UTILITY_CONFIG_BY_ID[id]?.rates || {}) },
+    storageCapacity: id === 'simple-storage' ? 50 : id === 'warehouse' ? 300 : 0,
+    requiredBuildings: [...(BUILDING_REQUIREMENTS_BY_ID[id] || [])],
+    description: BUILDING_DESCRIPTIONS_BY_ID[id] || '',
     tileEffects: tileEffects.map(effect => ({ ...effect }))
     };
 });
