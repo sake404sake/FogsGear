@@ -3,7 +3,7 @@ import { MapGenerator, BIOME_COLORS, loadMapSnapshot, saveMapSnapshot } from './
 import { SkinRenderer } from './skinRenderer.js?v=3';
 import { CELL_DEFINITIONS, canEnterCell, getCellEntryRule, getMosaicColor } from './cellRules.js';
 import { drawCellIcon, loadCellIconAtlas } from './cellIconRenderer.js?v=5';
-import { ACTIVE_SCROLL_TARGETS_KEY, CELL_MATERIALS, TERRAIN_TRANSFORM_RECIPES, WORLD_CELL_TYPES, applyCellChanges, chooseEraCellType, getCellCollectionPowerCost, getCellDrops, readCellChanges, saveCellChange } from './worldCells.js?v=8';
+import { ACTIVE_SCROLL_TARGETS_KEY, CELL_MATERIALS, TERRAIN_TRANSFORM_RECIPES, WORLD_CELL_TYPES, applyCellChanges, chooseEraCellType, getCellCollectionPowerCost, getCellDrops, readCellChanges, saveCellChange } from './worldCells.js?v=12';
 import { CRAFTING_ITEMS, CRAFTING_ITEM_BY_ID, CRAFTING_RATE_MULTIPLIER, CRAFTING_RECIPES, CRAFTING_STATION_BUILDING_IDS, DEFERRED_CRAFTING_ITEM_IDS, HANDCRAFT_STATION } from './craftingData.js?v=13';
 import { BUILDING_BY_ID, BUILDING_DEFINITIONS, canPlaceBuildingOnTerrainCell, drawBuilding, getRailAutoRotation, getRailConnections, getTileEffectsUnderFootprint, getVehicleRailRotation, loadBuildingIconImages, normalizeBuildingUtilityState } from './buildingData.js?v=30';
 import { getBuildingUtilityStatus, simulateBuildingUtilityNetworks } from './buildingUtilityNetworks.js?v=4';
@@ -904,7 +904,7 @@ function handleWorldCellOperation(operation) {
     if (operation.mode === 'TERRAIN_TRANSFORM') {
         const nextType = operation.terrainTargetType;
         const definition = WORLD_CELL_TYPES[nextType];
-        if (!definition || !['direct', 'item'].includes(definition.category) || tile.isSea || tile.isLake) return { success: false };
+        if (!definition || !['direct', 'direct2'].includes(definition.category) || tile.isSea || tile.isLake) return { success: false };
         const recipe = TERRAIN_TRANSFORM_RECIPES[nextType] || {};
         const hasMaterials = Object.entries(recipe).every(([item, count]) => (Number(operation.materials?.[item]) || 0) >= count);
         if (!hasMaterials || nextType === currentType) return { success: false };

@@ -1,4 +1,4 @@
-import { CELL_MATERIALS } from '../../MapSystem/js/worldCells.js?v=8';
+import { CELL_MATERIALS } from '../../MapSystem/js/worldCells.js?v=12';
 
 /**
  * UIController - DOM操作、ポインター入力、ギア設定吹き出しを管理する。

@@ -46,15 +46,21 @@
         .guide-resource-link { display: inline-flex; align-items: center; gap: 10px; flex: 0 0 auto; padding: 9px 12px; color: #17120f; background: linear-gradient(180deg, #f3c653, #b8832d); border: 1px solid #ffe69b; border-radius: 3px; font-weight: 700; text-decoration: none; }
         .guide-resource-link span { font-size: 1.2em; }
         .terraforming-goal { margin: 0 0 18px; padding: 16px; background: linear-gradient(120deg, rgba(98,194,170,.10), rgba(29,23,20,.92)); border: 1px solid rgba(98,194,170,.38); border-left: 3px solid var(--mint); }
-        .terraforming-goal h2 { margin: 0 0 6px; color: var(--gold); font: 600 18px Georgia, "Yu Mincho", serif; }
-        .terraforming-goal > p { margin: 0 0 12px; color: #d0cec4; font-size: 12px; }
+        .terraforming-goal summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; cursor: pointer; list-style: none; }
+        .terraforming-goal summary::-webkit-details-marker { display: none; }
+        .terraforming-goal summary::after { flex: 0 0 auto; color: var(--mint); font-size: 12px; font-weight: 700; content: "＋ 開く"; }
+        .terraforming-goal[open] summary::after { content: "－ 閉じる"; }
+        .terraforming-goal summary:focus-visible { outline: 2px solid var(--gold); outline-offset: 4px; }
+        .terraforming-goal h2 { margin: 0; color: var(--gold); font: 600 18px Georgia, "Yu Mincho", serif; }
+        .terraforming-goal-content { padding-top: 12px; }
+        .terraforming-goal-content > p { margin: 0 0 12px; color: #d0cec4; font-size: 12px; }
         .terraforming-goal-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
         .terraforming-goal-block { min-width: 0; padding: 10px; background: rgba(12, 16, 13, .55); border: 1px solid var(--line); }
         .terraforming-goal-block h3 { margin: 0 0 6px; color: var(--mint); font-size: 12px; }
         .terraforming-goal-block ul { margin: 0; padding-left: 18px; color: #d0cec4; font-size: 11px; line-height: 1.6; }
         .terraforming-goal-block li + li { margin-top: 3px; }
         .terraforming-goal-footnote { margin: 10px 0 0 !important; color: var(--muted) !important; font-size: 10px !important; }
-        .terraforming-goal > .guide-resource-link { margin-top: 10px; }
+        .terraforming-goal-content > .guide-resource-link { margin-top: 10px; }
         .manual-heading { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(220px, 0.8fr); gap: 20px; align-items: end; margin: 4px 0 18px; padding: 14px 16px; background: linear-gradient(100deg, rgba(98, 194, 170, 0.10), rgba(28, 23, 19, 0.72)); border-left: 3px solid var(--mint); }
         .manual-heading h2 { margin: 0 0 5px; color: var(--gold); font: 600 21px Georgia, "Yu Mincho", serif; }
         .manual-heading p { margin: 0; color: #c9c5b7; font-size: 12px; }
@@ -322,13 +328,15 @@
             </div>
         </section>
 
-        <section class="terraforming-goal" aria-labelledby="terraforming-goal-title">
-            <h2 id="terraforming-goal-title">最終目標: 新天地テラフォーミングドーム</h2>
-            <p>必要な拠点を整え、専用部品を加工して、ドームを建設します。以下はゲーム本体の建築・レシピデータから表示します。</p>
-            <div class="terraforming-goal-grid" id="terraforming-goal-content" aria-live="polite"></div>
-            <p class="terraforming-goal-footnote">現時点ではドームの建設と前提条件まで実装されています。完成後に地形・気候が変化する処理はまだありません。</p>
-            <button class="guide-resource-link" type="button" data-guide-view="recipe-guide-page">ドームの必要素材・作成場所をレシピ一覧で確認<span aria-hidden="true">→</span></button>
-        </section>
+        <details class="terraforming-goal">
+            <summary><h2>最終目標: 新天地テラフォーミングドーム</h2></summary>
+            <div class="terraforming-goal-content">
+                <p>必要な拠点を整え、専用部品を加工して、ドームを建設します。以下はゲーム本体の建築・レシピデータから表示します。</p>
+                <div class="terraforming-goal-grid" id="terraforming-goal-content" aria-live="polite"></div>
+                <p class="terraforming-goal-footnote">現時点ではドームの建設と前提条件まで実装されています。完成後に地形・気候が変化する処理はまだありません。</p>
+                <button class="guide-resource-link" type="button" data-guide-view="recipe-guide-page">ドームの必要素材・作成場所をレシピ一覧で確認<span aria-hidden="true">→</span></button>
+            </div>
+        </details>
 
         <section id="how-to-page" class="guide-view" role="tabpanel" aria-labelledby="how-to-tab">
             <header class="manual-heading">
@@ -429,7 +437,7 @@
                 <section class="manual-step">
                     <div class="manual-step-copy">
                         <h3><span>07</span>動力と資源の収支を見る</h3>
-                        <p>下部の「動力ダッシュボード」ページで、資源の保有量・生成レート・消費レートを確認します。動力が足りないと資材収集は進まず、必要量が貯まると再開します。</p>
+                        <p>下部の「動力ダッシュボード」ページで、資源の保有量・生成レート・消費レートを確認します。資材収集ギアは1回転ごとに歯数分の採集を試みますが、動力が不足すると途中で止まり、必要量が貯まると再開します。</p>
                         <p>霧の回収と霧から水を作る処理は動力を使いません。</p>
                     </div>
                     <div class="manual-step-media">
@@ -471,13 +479,13 @@
         </section>
 
         <section id="cell-guide-page" class="guide-view" role="tabpanel" aria-labelledby="cell-guide-tab" hidden>
-        <header class="group-head"><h2>セルの見た目と採取の目印</h2><p>色と模様、採取物、必要動力を確認できます。変質地形はギアの「地形変成」で対象にできます。</p></header>
+        <header class="group-head"><h2>セルの見た目と採取の目印</h2><p>色と模様、採取物、必要動力を確認できます。地形変成には、変成先の地形から採取したサンプルが1個必要です。</p></header>
         <div class="toolbar">
             <div class="tabs" role="group" aria-label="地形のカテゴリ">
                 <button class="tab" type="button" data-filter="all" aria-pressed="true">全体</button>
                 <button class="tab" type="button" data-filter="initial" aria-pressed="false">初期地形</button>
                 <button class="tab" type="button" data-filter="direct" aria-pressed="false">変質地形</button>
-                <button class="tab" type="button" data-filter="item" aria-pressed="false">採取素材</button>
+                <button class="tab" type="button" data-filter="direct2" aria-pressed="false">変質地形2</button>
                 <button class="tab" type="button" data-filter="event" aria-pressed="false">発見地形</button>
                 <button class="tab" type="button" data-filter="constructed" aria-pressed="false">施工地形</button>
             </div>
@@ -512,7 +520,7 @@
             COLLECTION_POWER_COSTS,
             TERRAIN_TRANSFORM_RECIPES,
             getCellDrops
-        } from './js/worldCells.js?v=9';
+        } from './js/worldCells.js?v=12';
         import { getMosaicColor } from './js/cellRules.js?v=4';
         import { CRAFTING_ITEMS, CRAFTING_RECIPES, CRAFTING_STATION_BUILDING_IDS, HANDCRAFT_STATION } from './js/craftingData.js?v=13';
         import { BUILDING_DEFINITIONS } from './js/buildingData.js?v=30';
@@ -556,9 +564,9 @@
 
         const categoryConfig = {
             initial: { title: '初期地形', description: 'マップ生成時に広がりやすい基本地形です。' },
-            direct: { title: '変質地形', description: '通常の地形変化で増える資源セルです。' },
-            item: { title: '採取素材', description: '再利用しやすい素材の収集先です。' },
-            event: { title: '発見地形', description: '通常の探索では出現しにくく、特別な発見や変化が発生します。' },
+            direct: { title: '変質地形', description: '通常の時代変質などで入手できる資源セルです。変成には、その地形から採取できる素材が1個必要です。' },
+            direct2: { title: '変質地形2', description: '時代変質でまれに入手できる地形です。変成には、その地形から採取できる素材が1個必要です。' },
+            event: { title: '発見地形', description: '時代変質では通常地形の1/100の重みで出現する、珍しい地形です。' },
             constructed: { title: '施工地形', description: 'プレイヤーが基礎材を敷いて作る人工地面です。自然生成・採取・時代変化の対象外です。' }
         };
 
@@ -877,7 +885,7 @@
             const entries = Object.entries(recipe)
                 .filter(([materialId]) => Boolean(CELL_MATERIALS[materialId]));
             if (!entries.length) return '';
-            return `<div class="recipe"><span class="recipe-label">変化資材</span>${entries.map(([materialId]) => itemChip(materialId)).join('<span class="arrow" aria-hidden="true">＋</span>')}</div>`;
+            return `<div class="recipe"><span class="recipe-label">変成サンプル</span>${entries.map(([materialId]) => itemChip(materialId)).join('<span class="arrow" aria-hidden="true">＋</span>')}</div>`;
         };
 
         const renderCard = (cell) => {

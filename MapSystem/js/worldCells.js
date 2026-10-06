@@ -23,25 +23,22 @@ export const WORLD_CELL_TYPES = Object.freeze({
     OBSIDIAN_FIELD: { label: '黒曜石地', color: '#34434b', category: 'direct', collect: 'obsidian' },
     PUMICE_FIELD: { label: '軽石地', color: '#b5a98d', category: 'direct', collect: 'pumice' },
     SEAWEED_BED: { label: '海藻場', color: '#3e765a', category: 'direct', collect: 'seaweed' },
-    TIN_VEIN: { label: '錫鉱脈', color: '#6b7770', category: 'item', collect: 'tin-ore' },
-    ZINC_VEIN: { label: '亜鉛鉱脈', color: '#536b62', category: 'item', collect: 'zinc-ore' },
-    CRYSTAL_VEIN: { label: '水晶脈', color: '#397783', category: 'item', collect: 'crystal-shard' },
-    MYCELIUM: { label: '菌糸群落', color: '#756c5c', category: 'item', collect: 'spores' },
-    HERB_FIELD: { label: '薬草地', color: '#5f824f', category: 'item', collect: 'herbs' },
-    RESIN_FOREST: { label: '樹脂林', color: '#3e674a', category: 'item', collect: 'resin' },
+    TIN_VEIN: { label: '錫鉱脈', color: '#6b7770', category: 'direct2', collect: 'tin-ore' },
+    ZINC_VEIN: { label: '亜鉛鉱脈', color: '#536b62', category: 'direct2', collect: 'zinc-ore' },
+    CRYSTAL_VEIN: { label: '水晶脈', color: '#397783', category: 'direct2', collect: 'crystal-shard' },
+    MYCELIUM: { label: '菌糸群落', color: '#756c5c', category: 'direct2', collect: 'spores' },
+    HERB_FIELD: { label: '薬草地', color: '#5f824f', category: 'direct2', collect: 'herbs' },
+    RESIN_FOREST: { label: '樹脂林', color: '#3e674a', category: 'direct2', collect: 'resin' },
     MACHINE_WRECK: { label: '機械の残骸', color: '#545d59', category: 'event', collect: 'salvage' },
     AIRSHIP_WRECK: { label: '飛行船の墜落跡', color: '#625949', category: 'event', collect: 'navigation-crystal' },
     FOUNDATION: { label: '基礎', color: '#909799', category: 'constructed', collect: null }
 });
 
-export const TERRAIN_TRANSFORM_RECIPES = Object.freeze({
-    TIN_VEIN: { mining_sample: 1, coke: 1 },
-    ZINC_VEIN: { 'tin-ore': 1, sulfur: 1, vein_mold: 1 },
-    CRYSTAL_VEIN: { 'navigation-crystal': 1, salt: 1, limestone: 1 },
-    MYCELIUM: { 'preserved-spores': 1, peat: 1 },
-    HERB_FIELD: { ancient_seed: 1, compost: 1 },
-    RESIN_FOREST: { forest_seed: 1, compost: 1 }
-});
+export const TERRAIN_TRANSFORM_RECIPES = Object.freeze(Object.fromEntries(
+    Object.entries(WORLD_CELL_TYPES)
+        .filter(([, definition]) => ['direct', 'direct2'].includes(definition.category) && definition.collect)
+        .map(([type, definition]) => [type, Object.freeze({ [definition.collect]: 1 })])
+));
 
 export const CELL_MATERIALS = Object.freeze({
     water: { label: '水', icon: 'water' },
@@ -170,13 +167,29 @@ export function saveCellChange(seed, x, y, change) {
 }
 
 export function chooseEraCellType(seed, x, y, count, initialType, currentType) {
-    const regularTypes = Object.keys(WORLD_CELL_TYPES).filter(type => ['initial', 'direct', 'item'].includes(WORLD_CELL_TYPES[type].category) && type !== currentType);
+    const regularTypes = Object.keys(WORLD_CELL_TYPES).filter(type =>
+        ['initial', 'direct', 'direct2'].includes(WORLD_CELL_TYPES[type].category)
+        && type !== 'SEA'
+        && type !== 'LAKE'
+        && type !== currentType
+    );
     const eraTypes = Object.keys(WORLD_CELL_TYPES).filter(type => WORLD_CELL_TYPES[type].category === 'event');
     const options = initialType === 'RUIN' ? [...regularTypes, ...eraTypes.filter(type => type !== currentType)] : regularTypes;
     let hash = 2166136261;
     for (const character of `${seed}:${x}:${y}:${count}`) hash = Math.imul(hash ^ character.charCodeAt(0), 16777619);
-    const index = (hash >>> 0) % options.length;
-    return options[index];
+    const getWeight = type => {
+        const category = WORLD_CELL_TYPES[type].category;
+        if (category === 'event') return 1;
+        if (category === 'direct2') return 5;
+        return 100;
+    };
+    const totalWeight = options.reduce((total, type) => total + getWeight(type), 0);
+    let selection = (hash >>> 0) % totalWeight;
+    for (const type of options) {
+        selection -= getWeight(type);
+        if (selection < 0) return type;
+    }
+    return options.at(-1);
 }
 
 export function getCellDrops(type, collectionCount = 0) {
