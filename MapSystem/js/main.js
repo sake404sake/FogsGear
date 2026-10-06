@@ -9,7 +9,7 @@ import { BUILDING_BY_ID, BUILDING_DEFINITIONS, canPlaceBuildingOnTerrainCell, dr
 import { getBuildingUtilityStatus, simulateBuildingUtilityNetworks } from './buildingUtilityNetworks.js?v=4';
 import { buildTerritoryBorderSegments } from './territoryBorders.js?v=35';
 import { directionToVehicleRotation, findNextRailStep, getTrackDirection, getVehicleRenderState, STATION_CONTROL_DEFAULTS, VEHICLE_DEFAULTS } from './railwayRuntime.js?v=8';
-import { GameState as EngineGameState } from '../../GearSystem/js/GameState.js?v=runtime-34';
+import { GameState as EngineGameState } from '../../GearSystem/js/GameState.js?v=runtime-36';
 import { GearManager as EngineGearManager } from '../../GearSystem/js/GearManager.js?v=runtime-5';
 
 const canvas = document.getElementById('gameCanvas');
@@ -4235,6 +4235,12 @@ window.addEventListener('message', event => {
             appPageFrame = null;
             return;
         }
+        if (event.data?.type === 'fogsgear:reset-game') {
+            appPageFrame.parentElement.remove();
+            appPageFrame = null;
+            window.location.reload();
+            return;
+        }
     }
     if (scrollLibraryFrame && event.data?.type === 'fogsgear:edit-scroll') {
         const scrollId = String(event.data.scrollId || '');
@@ -4246,11 +4252,6 @@ window.addEventListener('message', event => {
         openGearEditor(null, scrollId);
         return;
     }
-    if (!gearEditorFrame
-        || event.source !== gearEditorFrame.contentWindow
-        || event.data?.type !== 'fogsgear:close-editor') return;
-    gearEditorFrame.parentElement.remove();
-    gearEditorFrame = null;
 });
 
 document.getElementById('inventory-item-modal')?.addEventListener('click', (event) => {

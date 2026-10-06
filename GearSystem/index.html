@@ -163,7 +163,6 @@
                 <button class="btn btn-action" id="btn-redo" data-action="redo" disabled>Redo ↪</button>
                 <button class="btn btn-main-gear" data-action="toggle-main-gear" aria-pressed="true">メインギア: 起動中</button>
                 <button class="btn btn-action" data-action="toggle-creative" aria-pressed="false">テストモード: OFF</button>
-                <button class="btn btn-reset" data-action="reset">盤面リセット</button>
             </div>
         </div>
 
@@ -184,19 +183,7 @@
             }
         })();
     </script>
-    <div id="reset-confirm-modal" class="scroll-choice-modal" hidden role="dialog" aria-modal="true" aria-labelledby="reset-confirm-title">
-        <section class="scroll-choice-panel">
-            <button class="scroll-choice-close" type="button" data-action="cancel-reset" aria-label="閉じる">×</button>
-            <div class="scroll-library-kicker">RESET BOARD</div>
-            <h2 id="reset-confirm-title">盤面をリセットしますか？</h2>
-            <p>配置したギア、資材、履歴が初期状態に戻ります。</p>
-            <div class="scroll-choice-actions">
-                <button class="btn btn-action" type="button" data-action="cancel-reset">キャンセル</button>
-                <button class="btn btn-reset" type="button" data-action="confirm-reset">リセット</button>
-            </div>
-        </section>
-    </div>
-    <script type="module" src="js/main.js?v=scroll-edit-40"></script>
+    <script type="module" src="js/main.js?v=scroll-edit-46"></script>
     <script>
         document.addEventListener('click', (event) => {
             const target = event.target.closest('a, button[onclick]');

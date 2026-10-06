@@ -5,6 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Steampunk Explorer - Settings</title>
     <link rel="stylesheet" href="css/style.css?v=578">
+    <style>
+        .settings-danger-zone { margin-top: 32px; padding: 14px; border: 1px solid rgba(210, 83, 65, .65); border-left: 3px solid #d25341; background: rgba(90, 24, 19, .18); }
+        .settings-danger-zone h2 { margin: 0 0 6px; color: #f08a78; font-size: 16px; }
+        .settings-danger-zone p { margin: 0 0 12px; }
+        .game-reset-dialog { width: min(520px, calc(100% - 32px)); padding: 20px; color: #e2d9cd; background: #1d1714; border: 1px solid rgba(197, 160, 89, .55); box-shadow: 0 18px 46px rgba(0, 0, 0, .65); }
+        .game-reset-dialog::backdrop { background: rgba(0, 0, 0, .72); }
+        .game-reset-dialog h2 { margin: 0 0 8px; color: #f3c653; }
+        .game-reset-dialog p { margin: 0 0 14px; }
+        .game-reset-choices { display: grid; gap: 10px; }
+        .game-reset-choice { display: grid; justify-items: start; gap: 4px; width: 100%; text-align: left; }
+        .game-reset-choice small { color: inherit; font-size: 11px; font-weight: 400; opacity: .85; }
+        .game-reset-cancel { margin-top: 12px; }
+    </style>
 </head>
 <body class="settings-page">
     <div id="loadingOverlay" class="loading-overlay" role="status" aria-live="polite">
@@ -51,8 +64,30 @@
             <button class="btn btn-reset" id="backToGame" type="button">ゲーム画面へ戻る</button>
         </div>
         <p id="saveMessage" class="rule-text" aria-live="polite"></p>
+        <section class="settings-danger-zone" aria-labelledby="reset-game-title">
+            <h2 id="reset-game-title">ゲームリセット</h2>
+            <p class="rule-text">初期状態からやり直すか、保存ギア設計を引き継いで再開します。</p>
+            <button class="btn btn-reset" id="resetGameData" type="button">ゲームリセット</button>
+        </section>
     </main>
+    <dialog class="game-reset-dialog" id="gameResetDialog" aria-labelledby="game-reset-dialog-title">
+        <h2 id="game-reset-dialog-title">リセット方法を選択</h2>
+        <p>どちらも建築物・所持品・探索進行・地形変化を初期化して初期地点から再開します。ワールドシード・表示設定・スキンは保持します。</p>
+        <div class="game-reset-choices">
+            <button class="btn btn-action game-reset-choice" type="button" data-reset-mode="new-game-plus">
+                強くてニューゲーム
+                <small>保存ギア設計だけを残します。</small>
+            </button>
+            <button class="btn btn-reset game-reset-choice" type="button" data-reset-mode="all">
+                オールリセット
+                <small>保存ギア設計を含むすべての進行データを消去します。</small>
+            </button>
+        </div>
+        <button class="btn btn-action game-reset-cancel" id="cancelGameReset" type="button">キャンセル</button>
+    </dialog>
     <script type="module">
+        import { clearGameProgress } from '../GearSystem/js/GameState.js?v=runtime-36';
+
         const createRandomSeed = () => {
             const values = new Uint32Array(4);
             crypto.getRandomValues(values);
@@ -142,6 +177,27 @@
             updateCreativeModeView();
         };
         updateCreativeModeView();
+        const gameResetDialog = document.getElementById('gameResetDialog');
+        document.getElementById('resetGameData').onclick = () => gameResetDialog.showModal();
+        document.getElementById('cancelGameReset').onclick = () => gameResetDialog.close();
+        gameResetDialog.addEventListener('click', event => {
+            if (event.target === gameResetDialog) gameResetDialog.close();
+        });
+        gameResetDialog.querySelectorAll('[data-reset-mode]').forEach(button => {
+            button.addEventListener('click', () => {
+                const keepSavedGears = button.dataset.resetMode === 'new-game-plus';
+                const resetName = keepSavedGears ? '強くてニューゲーム' : 'オールリセット';
+                if (!window.confirm(`${resetName}を実行します。進行データは初期化されます。この操作は取り消せません。続行しますか？`)) return;
+                clearGameProgress(keepSavedGears);
+                gameResetDialog.close();
+                if (window.parent !== window) {
+                    window.parent.postMessage({ type: 'fogsgear:reset-game' }, window.location.origin === 'null' ? '*' : window.location.origin);
+                    document.getElementById('saveMessage').textContent = `${resetName}を実行しました。初期地点から再開します...`;
+                    return;
+                }
+                window.location.replace('./index.html');
+            });
+        });
         const settings = getSettings();
         if (!settings.seed || settings.seed === 'SteampunkIsland_01') {
             settings.seed = createRandomSeed();

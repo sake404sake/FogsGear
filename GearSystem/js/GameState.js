@@ -2,9 +2,26 @@ import { GearNetwork } from './GearSystem.js?v=network-8';
 import { ACTIVE_SCROLL_TARGETS_KEY, CELL_MATERIALS, TERRAIN_TRANSFORM_RECIPES, WORLD_CELL_TYPES } from '../../MapSystem/js/worldCells.js?v=12';
 
 const ACTIVE_SCROLL_SYNC_STATE_KEY = 'fogsgear_active_scroll_sync_state';
+const SAVED_SCROLL_LIBRARY_KEY = 'fogsgear_scroll_library';
+const PERSISTENT_GAME_SETTINGS = new Set([
+    'steampunk_explorer_settings',
+    'steampunk_explorer_skin_url',
+    'steampunk_explorer_skin_source',
+    'steampunk_explorer_skin_name'
+]);
 const INITIAL_MATERIAL_INVENTORY = Object.freeze({ paper_scroll: 10, cloth_scroll: 10, scroll_book: 1 });
 const MATERIAL_INVENTORY_VERSION = 4;
 const LEGACY_INITIAL_MATERIAL_INVENTORY = Object.freeze({ 'iron-screw': 12, 'pressure-gauge': 1 });
+
+export function clearGameProgress(keepSavedGears = false) {
+    for (let index = localStorage.length - 1; index >= 0; index--) {
+        const key = localStorage.key(index);
+        if (!key || PERSISTENT_GAME_SETTINGS.has(key)
+            || (keepSavedGears && key === SAVED_SCROLL_LIBRARY_KEY)
+            || (!key.startsWith('fogsgear_') && !key.startsWith('steampunk_explorer_') && key !== 'fog_thermo_save')) continue;
+        localStorage.removeItem(key);
+    }
+}
 
 function removeLegacyInitialMaterials(value) {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return value;
@@ -356,6 +373,10 @@ export class GameState {
         }
         this.updatePowerGrid();
         this.saveGameData();
+        for (let index = localStorage.length - 1; index >= 0; index--) {
+            const key = localStorage.key(index);
+            if (key?.startsWith('fogsgear_scroll_draft_')) localStorage.removeItem(key);
+        }
         this.notify();
     }
 
@@ -491,32 +512,6 @@ export class GameState {
         this.selectedSize = null;
         this.beltSelection = [];
         this.ghostGear = null;
-        this.notify();
-    }
-
-    reset() {
-        // 保存データと盤面を初期状態へ戻す。
-        localStorage.removeItem('fog_thermo_save');
-        this.placedGears = [this.createGear
-            ? this.createGear({ q: 0, r: 0, size: 'LL', layer: 0, isCore: true })
-            : { q: 0, r: 0, sizeKey: 'LL', layer: 0, isCore: true, angle: 0 }];
-        this.steamPower = 100;
-        this.power = 0;
-        this.water = 200;
-        this.fog = 0;
-        this.brass = 300;
-        this.materialInventoryVersion = MATERIAL_INVENTORY_VERSION;
-        this.materialInventory = { ...INITIAL_MATERIAL_INVENTORY };
-        this.craftingJobs = [];
-        this.mainGearRunning = true;
-        this.userStoppedMainGear = false;
-        this.autoStoppedBySteam = false;
-        this.undoStack = [];
-        this.redoStack = [];
-        this.belts = [];
-        this.beltSelection = [];
-        this.updatePowerGrid();
-        this.saveGameData();
         this.notify();
     }
 

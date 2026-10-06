@@ -119,16 +119,6 @@ export class UIController {
                 } else {
                     this.showNotice('保存名を入力してください。');
                 }
-            } else if (button.dataset.action === 'reset') {
-                const modal = document.getElementById('reset-confirm-modal');
-                if (modal) modal.hidden = false;
-            } else if (button.dataset.action === 'cancel-reset') {
-                const modal = document.getElementById('reset-confirm-modal');
-                if (modal) modal.hidden = true;
-            } else if (button.dataset.action === 'confirm-reset') {
-                const modal = document.getElementById('reset-confirm-modal');
-                if (modal) modal.hidden = true;
-                this.state.reset();
             } else if (button.dataset.action === 'delete-gear') {
                 const gear = this.gearManager.findGearById(this.state.selectedGearId);
                 if (gear && this.gearManager.removeGear(gear)) this.closeGearPopover();
@@ -138,14 +128,9 @@ export class UIController {
         document.getElementById('gear-size-popup')?.addEventListener('click', event => {
             if (event.target.id === 'gear-size-popup') this.closeGearSizePopup();
         });
-        document.getElementById('reset-confirm-modal')?.addEventListener('click', event => {
-            if (event.target.id === 'reset-confirm-modal') event.currentTarget.hidden = true;
-        });
         document.addEventListener('keydown', event => {
             if (event.key === 'Escape') {
                 this.closeGearSizePopup();
-                const modal = document.getElementById('reset-confirm-modal');
-                if (modal) modal.hidden = true;
             }
         });
 
