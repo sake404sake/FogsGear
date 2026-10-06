@@ -552,10 +552,21 @@ canvas {
 .scroll-actions { display: flex; gap: 7px; }
 .scroll-actions .btn { white-space: nowrap; }
 .embedded-library:not(.scroll-book-view) #scroll-share { display: none; }
-.scroll-share-panel { display: grid; justify-items: center; width: min(100%, 420px); margin: auto; }
+.scroll-share-panel { position: relative; display: grid; justify-items: center; width: min(100%, 420px); margin: auto; }
 .scroll-share-panel > * { max-width: 100%; }
+.scroll-share-panel #scroll-share-save { position: absolute; top: 8px; left: 10px; display: grid; place-items: center; width: 32px; min-width: 32px; height: 32px; min-height: 32px; box-sizing: border-box; margin: 0; padding: 6px; color: #f7d77d; background: rgba(98, 194, 170, .12); border: 1px solid rgba(198, 154, 82, .55); border-radius: 4px; cursor: pointer; }
+.scroll-share-panel #scroll-share-save svg { display: block; width: 18px; height: 18px; }
+.scroll-share-panel #scroll-share-save:disabled { opacity: .42; cursor: not-allowed; }
 .scroll-share-qr { display: block; justify-self: center; width: min(320px, calc(100vw - 100px)); height: auto; box-sizing: border-box; margin: 14px auto; padding: 8px; background: #fff; image-rendering: pixelated; }
 .scroll-share-qr[hidden] { display: none; }
+.scroll-share-pages { display: flex; justify-content: center; align-items: center; gap: 12px; margin: -6px auto 8px; }
+.scroll-share-pages[hidden] { display: none; }
+.scroll-share-pages .btn { min-width: 34px; min-height: 32px; padding: 3px 8px; }
+.scroll-share-pages span { min-width: 76px; color: var(--text-muted); font: .72rem monospace; text-align: center; }
+.scroll-share-camera-preview { display: grid; justify-items: center; gap: 8px; width: min(100%, 360px); margin: 10px 0; }
+.scroll-share-camera-preview[hidden] { display: none; }
+.scroll-share-camera-preview video { display: block; width: 100%; max-height: 45vh; aspect-ratio: 4 / 3; object-fit: cover; background: #080706; border: 1px solid var(--border-gold); }
+.scroll-share-camera-preview .btn { min-height: 38px; }
 .scroll-share-panel .scroll-choice-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; width: 100%; }
 .scroll-share-panel .scroll-choice-actions .btn { display: flex; align-items: center; justify-content: center; box-sizing: border-box; width: 100%; min-width: 0; min-height: 54px; margin: 0; padding: 8px; line-height: 1.3; text-align: center; white-space: normal; }
 .scroll-share-panel #scroll-share-file { display: none; }

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>スクロール書庫 | Fogs Gear</title>
-    <link rel="stylesheet" href="css/style.css?v=scroll-45">
+    <link rel="stylesheet" href="css/style.css?v=scroll-46">
 </head>
 <body class="scroll-library-page">
     <main class="scroll-library-shell">
@@ -101,19 +101,33 @@
     <div id="scroll-share-modal" class="scroll-choice-modal scroll-share-modal" hidden role="dialog" aria-modal="true" aria-labelledby="scroll-share-title">
         <div class="scroll-choice-panel scroll-share-panel">
             <button id="scroll-share-close" class="scroll-choice-close" type="button" aria-label="閉じる">×</button>
+            <button id="scroll-share-save" class="btn btn-action" type="button" aria-label="QR画像を保存" title="QR画像を保存" disabled>
+                <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+                    <path d="M12 3v11m0 0 4-4m-4 4-4-4M5 16v4h14v-4" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"/>
+                </svg>
+            </button>
             <div class="scroll-library-kicker">BLUEPRINT SHARE</div>
             <h2 id="scroll-share-title">スクロールを共有</h2>
             <p id="scroll-share-status" role="status" aria-live="polite">QR画像を作成しています...</p>
             <img id="scroll-share-qr" class="scroll-share-qr" alt="共有用QRコード" hidden>
+            <div id="scroll-share-pages" class="scroll-share-pages" hidden>
+                <button id="scroll-share-page-previous" class="btn btn-action" type="button" aria-label="前の共有画像">‹</button>
+                <span id="scroll-share-page-label" aria-live="polite"></span>
+                <button id="scroll-share-page-next" class="btn btn-action" type="button" aria-label="次の共有画像">›</button>
+            </div>
+            <div id="scroll-share-camera-preview" class="scroll-share-camera-preview" hidden>
+                <video id="scroll-share-camera" autoplay playsinline muted aria-label="QRコード読み取りカメラ"></video>
+                <button id="scroll-share-camera-stop" class="btn btn-action" type="button">カメラを停止</button>
+            </div>
             <div class="scroll-choice-actions">
-                <button id="scroll-share-save" class="btn btn-action" type="button" disabled>QR画像を保存</button>
-                <label class="btn btn-action" for="scroll-share-file">QR画像から読み込む</label>
+                <label class="btn btn-action" for="scroll-share-file">画像から読み込む</label>
                 <input id="scroll-share-file" type="file" accept="image/*" hidden>
+                <button id="scroll-share-camera-start" class="btn btn-action" type="button">カメラで読み込む</button>
             </div>
         </div>
     </div>
     <script src="js/vendor/qrcode-generator.min.js?v=2.0.4"></script>
     <script src="js/vendor/jsQR.js?v=1.4.0"></script>
-    <script type="module" src="js/scroll-library.js?v=43"></script>
+    <script type="module" src="js/scroll-library.js?v=47"></script>
 </body>
 </html>

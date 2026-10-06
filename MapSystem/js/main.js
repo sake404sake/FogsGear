@@ -4299,6 +4299,13 @@ document.getElementById('save-transfer-modal')?.addEventListener('click', event 
 
 window.addEventListener('message', event => {
     if (event.origin !== window.location.origin && event.origin !== 'null') return;
+    if (gearEditorFrame && event.source === gearEditorFrame.contentWindow) {
+        if (event.data?.type === 'fogsgear:close-editor') {
+            gearEditorFrame.parentElement?.remove();
+            gearEditorFrame = null;
+            return;
+        }
+    }
     const scrollLibraryFrame = [
         appPageFrame,
         document.querySelector('iframe[title="保存スクロールのギアプレビュー"]')
@@ -4745,9 +4752,8 @@ if (minZoomSelect) {
 
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-        navigator.serviceWorker.getRegistrations().then((registrations) => {
-            return Promise.all(registrations.map((registration) => registration.unregister()));
-        }).catch(() => {});
+        navigator.serviceWorker.register('./sw.js', { scope: './' })
+            .catch(error => console.error('Service worker registration failed:', error));
     });
 }
 

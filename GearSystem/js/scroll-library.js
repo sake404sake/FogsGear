@@ -33,6 +33,25 @@ const shareStatus = document.getElementById('scroll-share-status');
 const shareQr = document.getElementById('scroll-share-qr');
 const shareSaveButton = document.getElementById('scroll-share-save');
 const shareFileInput = document.getElementById('scroll-share-file');
+const sharePages = document.getElementById('scroll-share-pages');
+const sharePageLabel = document.getElementById('scroll-share-page-label');
+const sharePreviousButton = document.getElementById('scroll-share-page-previous');
+const shareNextButton = document.getElementById('scroll-share-page-next');
+const shareCameraPreview = document.getElementById('scroll-share-camera-preview');
+const shareCameraVideo = document.getElementById('scroll-share-camera');
+const shareCameraStartButton = document.getElementById('scroll-share-camera-start');
+const shareCameraStopButton = document.getElementById('scroll-share-camera-stop');
+const shareCameraCanvas = document.createElement('canvas');
+let shareCameraStream = null;
+let shareCameraAnimationFrame = 0;
+let lastShareCameraScanAt = 0;
+let lastShareCameraQrData = '';
+let shareQrImages = [];
+let shareQrPage = 0;
+const sharedScrollParts = new Map();
+const SHARE_QR_PART_LENGTH = 1050;
+const SHARE_QR_MAX_PARTS = 32;
+const SHARE_QR_MAX_COMPRESSED_BYTES = Math.floor((SHARE_QR_PART_LENGTH * SHARE_QR_MAX_PARTS - 2) / 4) * 3;
 const pageParams = new URLSearchParams(window.location.search);
 const isEmbedded = pageParams.get('embed') === '1';
 const isScrollBook = pageParams.get('source') === 'scroll-book';
@@ -234,12 +253,11 @@ async function encodeSharedScroll(scroll) {
     };
     const bytes = new TextEncoder().encode(JSON.stringify(payload));
     if ('CompressionStream' in window) {
-        try {
-            const compressed = await transformShareBytes(bytes, CompressionStream);
-            return `z.${bytesToBase64Url(compressed)}`;
-        } catch (error) {
-            console.warn('Scroll share compression is unavailable; using an uncompressed link.', error);
-        }
+        const compressed = await transformShareBytes(bytes, CompressionStream, SHARE_QR_MAX_COMPRESSED_BYTES);
+        return `z.${bytesToBase64Url(compressed)}`;
+    }
+    if (bytes.length > SHARE_QR_MAX_COMPRESSED_BYTES) {
+        throw new Error('この端末では大きな設計図を共有できません。別のブラウザーをお試しください。');
     }
     return `j.${bytesToBase64Url(bytes)}`;
 }
@@ -346,7 +364,21 @@ function validateSharedScroll(payload) {
 }
 
 function closeShareModal() {
+    stopQrCamera();
+    lastShareCameraQrData = '';
     if (shareModal) shareModal.hidden = true;
+}
+
+function renderShareQrPage() {
+    const total = shareQrImages.length;
+    if (!total) return;
+    shareQrPage = Math.max(0, Math.min(total - 1, shareQrPage));
+    shareQr.src = shareQrImages[shareQrPage];
+    shareQr.hidden = false;
+    sharePages.hidden = total < 2;
+    sharePageLabel.textContent = `${shareQrPage + 1} / ${total}`;
+    sharePreviousButton.disabled = shareQrPage === 0;
+    shareNextButton.disabled = shareQrPage === total - 1;
 }
 
 function renderQrPng(qrCode) {
@@ -376,21 +408,55 @@ function renderQrPng(qrCode) {
 
 async function openShareModal(scroll) {
     if (!scroll || !shareModal) return;
+    stopQrCamera();
     shareModal.hidden = false;
+    shareCameraPreview.hidden = true;
     shareQr.hidden = true;
+    sharePages.hidden = true;
+    shareQrImages = [];
+    shareQrPage = 0;
     shareSaveButton.disabled = true;
-    shareStatus.textContent = 'QR画像を作成しています...';
+    shareStatus.textContent = '設計図を圧縮しています...';
     try {
         const encoded = await encodeSharedScroll(scroll);
-        const qrCode = window.qrcode(0, 'M');
-        qrCode.addData(`FOGSGEAR-SCROLL:1:${encoded}`, 'Byte');
-        qrCode.make();
-        shareQr.src = renderQrPng(qrCode);
-        shareQr.hidden = false;
+        const singleData = `FOGSGEAR-SCROLL:1:${encoded}`;
+        const qrValues = new TextEncoder().encode(singleData).length <= 1800
+            ? [singleData]
+            : (() => {
+                const transferId = Array.from(crypto.getRandomValues(new Uint8Array(8)), byte =>
+                    byte.toString(16).padStart(2, '0')).join('');
+                const chunks = encoded.match(new RegExp(`.{1,${SHARE_QR_PART_LENGTH}}`, 'g')) || [];
+                if (chunks.length > SHARE_QR_MAX_PARTS) {
+                    throw new Error(`設計図が大きすぎて共有できません。ギアやベルトを減らしてください（上限 ${SHARE_QR_MAX_PARTS}枚）。`);
+                }
+                return chunks.map((chunk, index) =>
+                    `FOGSGEAR-SCROLL-PART:1:${transferId}:${index + 1}:${chunks.length}:${chunk}`);
+            })();
+        for (let index = 0; index < qrValues.length; index++) {
+            shareStatus.textContent = qrValues.length > 1
+                ? `共有画像を作成しています... ${index + 1}/${qrValues.length}`
+                : '共有画像を作成しています...';
+            await new Promise(resolve => requestAnimationFrame(() => resolve()));
+            const qrCode = window.qrcode(0, 'M');
+            qrCode.addData(qrValues[index], 'Byte');
+            try {
+                qrCode.make();
+            } catch (error) {
+                if (typeof error === 'string' && error.includes('code length overflow')) {
+                    throw new Error('共有画像1枚の容量を超えました。設計図を分割して再度お試しください。');
+                }
+                throw error;
+            }
+            shareQrImages.push(renderQrPng(qrCode));
+        }
+        renderShareQrPage();
         shareSaveButton.disabled = false;
-        shareStatus.textContent = `${scroll.name || 'スクロール'} のQR画像を保存できます。`;
+        shareStatus.textContent = qrValues.length > 1
+            ? `${scroll.name || 'スクロール'} の共有画像です。すべての画像を相手に渡してください。`
+            : `${scroll.name || 'スクロール'} の共有画像を保存できます。`;
     } catch (error) {
-        shareStatus.textContent = error.message || 'QR画像を作成できませんでした。';
+        shareStatus.textContent = error instanceof Error ? error.message : String(error) || '共有画像を作成できませんでした。';
+        sharePages.hidden = true;
         console.error('Scroll QR image creation failed.', error);
     }
 }
@@ -402,26 +468,69 @@ function saveQrImage() {
         .replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_')
         .slice(0, 60);
     const download = document.createElement('a');
-    download.href = shareQr.src;
-    download.download = `FogsGear-${safeName}.png`;
+    download.href = shareQrImages[shareQrPage];
+    download.download = shareQrImages.length > 1
+        ? `FogsGear-${safeName}-${String(shareQrPage + 1).padStart(2, '0')}-of-${String(shareQrImages.length).padStart(2, '0')}.png`
+        : `FogsGear-${safeName}.png`;
     download.click();
-    shareStatus.textContent = 'QR画像を保存しました。ファイルとして相手に渡してください。';
+    shareStatus.textContent = shareQrImages.length > 1
+        ? `共有画像 ${shareQrPage + 1}/${shareQrImages.length} を保存しました。すべての画像を相手に渡してください。`
+        : '共有画像を保存しました。ファイルとして相手に渡してください。';
 }
 
 async function decodeSharedScroll(value) {
     const match = /^FOGSGEAR-SCROLL:1:([zj])\.([A-Za-z0-9_-]+)$/.exec(value);
     if (!match) throw new Error('Fogs Gearの共有QR画像ではありません。');
     let bytes = base64UrlToBytes(match[2]);
-    if (bytes.length > 10000) throw new Error('共有データが大きすぎます。');
+    if (bytes.length > SHARE_QR_MAX_COMPRESSED_BYTES) throw new Error('共有データが大きすぎます。');
     if (match[1] === 'z') {
         if (!('DecompressionStream' in window)) throw new Error('このブラウザーは共有データの展開に対応していません。');
-        bytes = await transformShareBytes(bytes, DecompressionStream, 512 * 1024);
+        bytes = await transformShareBytes(bytes, DecompressionStream, 2 * 1024 * 1024);
     }
     return validateSharedScroll(JSON.parse(new TextDecoder().decode(bytes)));
 }
 
 async function importSharedScrollData(value) {
     try {
+        const partMatch = /^FOGSGEAR-SCROLL-PART:1:([A-Za-z0-9_-]{8,24}):(\d{1,2}):(\d{1,2}):([A-Za-z0-9_.-]+)$/.exec(value);
+        if (partMatch) {
+            const [, transferId, indexText, totalText, chunk] = partMatch;
+            const index = Number(indexText);
+            const total = Number(totalText);
+            if (total < 2 || total > SHARE_QR_MAX_PARTS || index < 1 || index > total) {
+                throw new Error('共有画像の分割情報が正しくありません。');
+            }
+            if (!chunk || chunk.length > SHARE_QR_PART_LENGTH) {
+                throw new Error('共有画像の内容が正しくありません。');
+            }
+            const now = Date.now();
+            sharedScrollParts.forEach((entry, id) => {
+                if (now - entry.updatedAt > 15 * 60 * 1000) sharedScrollParts.delete(id);
+            });
+            if (!sharedScrollParts.has(transferId) && sharedScrollParts.size >= 5) {
+                const oldest = [...sharedScrollParts.entries()]
+                    .sort((first, second) => first[1].updatedAt - second[1].updatedAt)[0];
+                if (oldest) sharedScrollParts.delete(oldest[0]);
+            }
+            let transfer = sharedScrollParts.get(transferId);
+            if (!transfer) {
+                transfer = { total, chunks: new Map(), updatedAt: now };
+                sharedScrollParts.set(transferId, transfer);
+            }
+            if (transfer.total !== total) throw new Error('異なる共有画像が混在しています。最初から読み込み直してください。');
+            if (transfer.chunks.has(index) && transfer.chunks.get(index) !== chunk) {
+                throw new Error('同じ番号の共有画像に異なる内容があります。');
+            }
+            transfer.chunks.set(index, chunk);
+            transfer.updatedAt = now;
+            const received = transfer.chunks.size;
+            if (received < total) {
+                shareStatus.textContent = `共有画像 ${received}/${total} 枚を読み込みました。続けて次の画像を読み込んでください。`;
+                return false;
+            }
+            value = `FOGSGEAR-SCROLL:1:${[...Array(total)].map((_, partIndex) => transfer.chunks.get(partIndex + 1)).join('')}`;
+            sharedScrollParts.delete(transferId);
+        }
         const shared = await decodeSharedScroll(value);
         if (!window.confirm(`「${shared.name}」をスクロール書庫に取り込みますか？`)) {
             shareStatus.textContent = 'スクロールの取り込みをキャンセルしました。';
@@ -472,6 +581,7 @@ async function importQrImage(file) {
         shareStatus.textContent = '画像ファイルを選択してください。';
         return;
     }
+
     if (file.size > 12 * 1024 * 1024) {
         shareStatus.textContent = '画像が大きすぎます。12MB以下のQR画像を選んでください。';
         return;
@@ -501,6 +611,99 @@ async function importQrImage(file) {
     } finally {
         bitmap?.close?.();
         shareFileInput.value = '';
+    }
+}
+
+function stopQrCamera() {
+    if (shareCameraAnimationFrame) cancelAnimationFrame(shareCameraAnimationFrame);
+    shareCameraAnimationFrame = 0;
+    shareCameraStream?.getTracks().forEach(track => track.stop());
+    shareCameraStream = null;
+    if (shareCameraVideo) shareCameraVideo.srcObject = null;
+    if (shareCameraPreview) shareCameraPreview.hidden = true;
+    if (shareCameraStartButton) shareCameraStartButton.disabled = false;
+}
+
+function scanQrCameraFrame(timestamp) {
+    if (!shareCameraStream || !shareCameraVideo) return;
+    shareCameraAnimationFrame = requestAnimationFrame(scanQrCameraFrame);
+    if (timestamp - lastShareCameraScanAt < 180 || shareCameraVideo.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return;
+    lastShareCameraScanAt = timestamp;
+    const videoWidth = shareCameraVideo.videoWidth;
+    const videoHeight = shareCameraVideo.videoHeight;
+    if (!videoWidth || !videoHeight) return;
+    const scale = Math.min(1, 960 / videoWidth);
+    const width = Math.round(videoWidth * scale);
+    const height = Math.round(videoHeight * scale);
+    shareCameraCanvas.width = width;
+    shareCameraCanvas.height = height;
+    const context = shareCameraCanvas.getContext('2d', { willReadFrequently: true });
+    if (!context) {
+        stopQrCamera();
+        shareStatus.textContent = 'カメラ映像を読み取れません。画像ファイルから読み込んでください。';
+        return;
+    }
+    context.drawImage(shareCameraVideo, 0, 0, width, height);
+    const imageData = context.getImageData(0, 0, width, height);
+    const result = window.jsQR?.(imageData.data, width, height, { inversionAttempts: 'attemptBoth' });
+    if (result?.data?.startsWith('FOGSGEAR-SCROLL:') || result?.data?.startsWith('FOGSGEAR-SCROLL-PART:')) {
+        const sharedData = result.data;
+        if (sharedData === lastShareCameraQrData) return;
+        lastShareCameraQrData = sharedData;
+        importSharedScrollData(sharedData).then(imported => {
+            if (imported) {
+                stopQrCamera();
+                lastShareCameraQrData = '';
+                shareStatus.textContent = 'カメラで共有画像を読み込みました。';
+            }
+        });
+        return;
+    }
+    if (result?.data) shareStatus.textContent = 'Fogs Gearの共有QRコードをカメラに映してください。';
+}
+
+async function startQrCamera() {
+    if (!navigator.mediaDevices?.getUserMedia) {
+        shareStatus.textContent = isSecureContext
+            ? 'このブラウザーではカメラを利用できません。QR画像から読み込んでください。'
+            : 'カメラ読み取りにはHTTPS接続が必要です。QR画像から読み込んでください。';
+        return;
+    }
+    if (typeof window.jsQR !== 'function') {
+        shareStatus.textContent = 'QR読み取り機能を読み込めませんでした。ページを再読み込みしてください。';
+        return;
+    }
+    stopQrCamera();
+    lastShareCameraQrData = '';
+    shareCameraPreview.hidden = false;
+    shareCameraStartButton.disabled = true;
+    shareStatus.textContent = 'カメラを起動しています...';
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+            audio: false,
+            video: { facingMode: { ideal: 'environment' } }
+        });
+        if (shareModal.hidden || !shareCameraStartButton.disabled) {
+            stream.getTracks().forEach(track => track.stop());
+            return;
+        }
+        shareCameraStream = stream;
+        shareCameraVideo.srcObject = shareCameraStream;
+        await shareCameraVideo.play();
+        lastShareCameraScanAt = 0;
+        shareStatus.textContent = '共有QRコードをカメラに映してください。';
+        shareCameraAnimationFrame = requestAnimationFrame(scanQrCameraFrame);
+    } catch (error) {
+        stopQrCamera();
+        const message = error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError'
+            ? 'カメラの使用が許可されていません。ブラウザーのカメラ設定を確認してください。'
+            : error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError'
+                ? '利用できるカメラが見つかりません。QR画像から読み込んでください。'
+                : error.name === 'NotReadableError'
+                    ? 'カメラを起動できません。他のアプリでカメラを使用していないか確認してください。'
+                    : error.message || 'カメラを起動できませんでした。';
+        shareStatus.textContent = message;
+        console.error('QR camera startup failed.', error);
     }
 }
 
@@ -836,12 +1039,28 @@ toggleButton.addEventListener('click', () => {
 
 shareButton?.addEventListener('click', () => openShareModal(getSelectedScroll()));
 shareSaveButton?.addEventListener('click', saveQrImage);
+sharePreviousButton?.addEventListener('click', () => {
+    shareQrPage--;
+    renderShareQrPage();
+});
+shareNextButton?.addEventListener('click', () => {
+    shareQrPage++;
+    renderShareQrPage();
+});
 shareFileInput?.addEventListener('change', event => importQrImage(event.target.files?.[0]));
+shareCameraStartButton?.addEventListener('click', startQrCamera);
+shareCameraStopButton?.addEventListener('click', () => {
+    stopQrCamera();
+    shareStatus.textContent = 'カメラを停止しました。';
+});
 shareModal?.addEventListener('click', event => {
     if (event.target === shareModal || event.target.closest('#scroll-share-close')) closeShareModal();
 });
 window.addEventListener('keydown', event => {
     if (event.key === 'Escape') closeShareModal();
+});
+document.addEventListener('visibilitychange', () => {
+    if (document.hidden) stopQrCamera();
 });
 
 choiceEditButton?.addEventListener('click', () => {
