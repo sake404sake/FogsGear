@@ -39,19 +39,16 @@
         .guide-tab { min-height: 36px; padding: 6px 16px; color: #c8d7cb; background: rgba(19, 26, 22, 0.82); border: 1px solid rgba(98, 194, 170, 0.25); border-radius: 4px; font: inherit; cursor: pointer; }
         .guide-tab[aria-selected="true"] { color: #17120f; background: linear-gradient(180deg, #f3c653, #b8832d); border-color: #ffe69b; font-weight: 700; }
         .guide-view[hidden] { display: none; }
-        .guide-resource-links { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin: 0 0 18px; padding: 14px 16px; background: linear-gradient(100deg, rgba(243, 198, 83, 0.12), rgba(28, 23, 19, 0.72)); border: 1px solid rgba(198, 154, 82, 0.42); border-left: 3px solid var(--gold); }
-        .guide-resource-links h2 { margin: 0 0 4px; color: var(--gold); font: 600 18px Georgia, "Yu Mincho", serif; }
-        .guide-resource-links p:last-child { margin: 0; color: #d0cec4; font-size: 12px; }
-        .guide-resource-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
-        .guide-resource-link { display: inline-flex; align-items: center; gap: 10px; flex: 0 0 auto; padding: 9px 12px; color: #17120f; background: linear-gradient(180deg, #f3c653, #b8832d); border: 1px solid #ffe69b; border-radius: 3px; font-weight: 700; text-decoration: none; }
-        .guide-resource-link span { font-size: 1.2em; }
         .terraforming-goal { margin: 0 0 18px; padding: 16px; background: linear-gradient(120deg, rgba(98,194,170,.10), rgba(29,23,20,.92)); border: 1px solid rgba(98,194,170,.38); border-left: 3px solid var(--mint); }
         .terraforming-goal summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; cursor: pointer; list-style: none; }
         .terraforming-goal summary::-webkit-details-marker { display: none; }
         .terraforming-goal summary::after { flex: 0 0 auto; color: var(--mint); font-size: 12px; font-weight: 700; content: "＋ 開く"; }
         .terraforming-goal[open] summary::after { content: "－ 閉じる"; }
         .terraforming-goal summary:focus-visible { outline: 2px solid var(--gold); outline-offset: 4px; }
-        .terraforming-goal h2 { margin: 0; color: var(--gold); font: 600 18px Georgia, "Yu Mincho", serif; }
+        .terraforming-goal-title { display: flex; align-items: center; gap: 9px; min-width: 0; }
+        .terraforming-goal-title h2 { margin: 0; color: var(--gold); font: 600 18px Georgia, "Yu Mincho", serif; }
+        .terraforming-goal-title > span { display: grid; place-items: center; width: 38px; height: 38px; flex: 0 0 38px; padding: 3px; background: rgba(98,194,170,.08); border: 1px solid var(--line); border-radius: 4px; }
+        .terraforming-goal-title svg { width: 100%; height: 100%; }
         .terraforming-goal-content { padding-top: 12px; }
         .terraforming-goal-content > p { margin: 0 0 12px; color: #d0cec4; font-size: 12px; }
         .terraforming-goal-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
@@ -59,8 +56,12 @@
         .terraforming-goal-block h3 { margin: 0 0 6px; color: var(--mint); font-size: 12px; }
         .terraforming-goal-block ul { margin: 0; padding-left: 18px; color: #d0cec4; font-size: 11px; line-height: 1.6; }
         .terraforming-goal-block li + li { margin-top: 3px; }
+        .terraforming-goal-block ul { padding-left: 0; list-style: none; }
+        .terraforming-goal-item { display: flex; align-items: center; gap: 7px; width: 100%; padding: 4px; color: inherit; background: transparent; border: 1px solid transparent; font: inherit; text-align: left; }
+        .terraforming-goal-item[data-guide-item-id] { cursor: pointer; }
+        .terraforming-goal-item[data-guide-item-id]:hover, .terraforming-goal-item[data-guide-item-id]:focus-visible { color: var(--amber); background: rgba(98,194,170,.08); border-color: var(--line); }
+        .terraforming-goal-item svg { width: 26px; height: 26px; flex: 0 0 26px; }
         .terraforming-goal-footnote { margin: 10px 0 0 !important; color: var(--muted) !important; font-size: 10px !important; }
-        .terraforming-goal-content > .guide-resource-link { margin-top: 10px; }
         .manual-heading { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(220px, 0.8fr); gap: 20px; align-items: end; margin: 4px 0 18px; padding: 14px 16px; background: linear-gradient(100deg, rgba(98, 194, 170, 0.10), rgba(28, 23, 19, 0.72)); border-left: 3px solid var(--mint); }
         .manual-heading h2 { margin: 0 0 5px; color: var(--gold); font: 600 21px Georgia, "Yu Mincho", serif; }
         .manual-heading p { margin: 0; color: #c9c5b7; font-size: 12px; }
@@ -191,6 +192,7 @@
         .recipe-guide-search { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 8px; margin: 10px 0 16px; color: var(--gold); font-size: 12px; }
         .recipe-guide-search input { min-width: 0; padding: 8px 10px; color: var(--text); background: #171b18; border: 1px solid var(--line); font: inherit; }
         .recipe-guide-group { margin: 22px 0; }
+        .recipe-guide-group[hidden] { display: none; }
         .recipe-guide-group h3 { margin: 0 0 9px; padding-bottom: 6px; color: var(--mint); border-bottom: 1px solid var(--line); font-size: 15px; }
         .recipe-guide-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
         .recipe-guide-card { min-width: 0; padding: 10px; background: var(--panel); border: 1px solid var(--line); }
@@ -198,7 +200,12 @@
         .recipe-guide-card h4 { margin: 0 0 5px; color: var(--gold); font-size: 12px; }
         .recipe-guide-card p { margin: 4px 0; color: var(--muted); font-size: 10px; line-height: 1.45; }
         .recipe-guide-flow { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 7px; }
-        .recipe-guide-chip { padding: 3px 6px; color: var(--text); background: rgba(98, 194, 170, .08); border: 1px solid rgba(98, 194, 170, .22); font-size: 10px; }
+        .recipe-guide-chip { display: inline-flex; align-items: center; gap: 4px; min-height: 28px; padding: 3px 6px; color: var(--text); background: rgba(98, 194, 170, .08); border: 1px solid rgba(98, 194, 170, .22); font: inherit; font-size: 10px; text-align: left; }
+        button.recipe-guide-chip { cursor: pointer; }
+        button.recipe-guide-chip:hover, button.recipe-guide-chip:focus-visible { color: var(--amber); border-color: var(--gold); }
+        .recipe-guide-chip svg { width: 20px; height: 20px; flex: 0 0 20px; }
+        .recipe-guide-empty { padding: 14px; color: var(--muted); background: rgba(29, 23, 20, .8); border: 1px dashed var(--line); }
+        .recipe-guide-empty[hidden] { display: none; }
         .recipe-guide-cost { color: #efc967; }
         .icon-catalog { margin-top: 38px; }
         .icon-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
@@ -224,9 +231,6 @@
             .item-entry > svg { width: 30px; height: 30px; flex-basis: 30px; }
             .manual-heading { grid-template-columns: minmax(0, 1fr); gap: 6px; padding: 10px; }
             .manual-note { text-align: left; }
-            .guide-resource-links { align-items: stretch; flex-direction: column; gap: 10px; padding: 10px; }
-            .guide-resource-actions { flex-direction: column; }
-            .guide-resource-link { justify-content: center; }
             .terraforming-goal { padding: 10px; }
             .terraforming-goal-grid { grid-template-columns: minmax(0, 1fr); gap: 8px; }
             .manual-step { grid-template-columns: minmax(0, 1fr); gap: 10px; padding: 12px 0 16px; }
@@ -316,27 +320,6 @@
             <button class="guide-tab" id="cell-guide-tab" type="button" role="tab" aria-controls="cell-guide-page" aria-selected="false" data-guide-view="cell-guide-page">セル・素材</button>
             <button class="guide-tab" id="recipe-guide-tab" type="button" role="tab" aria-controls="recipe-guide-page" aria-selected="false" data-guide-view="recipe-guide-page">加工・建築レシピ</button>
         </nav>
-
-        <section class="guide-resource-links" aria-labelledby="resource-links-title">
-            <div>
-                <p class="eyebrow">CRAFTING REFERENCE</p>
-                <h2 id="resource-links-title">実装データ連動のレシピ・建築一覧</h2>
-                <p>必要素材と作成場所はゲーム内の実装データから表示します。素材不足の名前をタップすると、採集先・レシピ・用途を辿れます。</p>
-            </div>
-            <div class="guide-resource-actions">
-                <button class="guide-resource-link" type="button" data-guide-view="recipe-guide-page">実装レシピを見る<span aria-hidden="true">→</span></button>
-            </div>
-        </section>
-
-        <details class="terraforming-goal">
-            <summary><h2>最終目標: 新天地テラフォーミングドーム</h2></summary>
-            <div class="terraforming-goal-content">
-                <p>必要な拠点を整え、専用部品を加工して、ドームを建設します。以下はゲーム本体の建築・レシピデータから表示します。</p>
-                <div class="terraforming-goal-grid" id="terraforming-goal-content" aria-live="polite"></div>
-                <p class="terraforming-goal-footnote">現時点ではドームの建設と前提条件まで実装されています。完成後に地形・気候が変化する処理はまだありません。</p>
-                <button class="guide-resource-link" type="button" data-guide-view="recipe-guide-page">ドームの必要素材・作成場所をレシピ一覧で確認<span aria-hidden="true">→</span></button>
-            </div>
-        </details>
 
         <section id="how-to-page" class="guide-view" role="tabpanel" aria-labelledby="how-to-tab">
             <header class="manual-heading">
@@ -469,12 +452,26 @@
         </section>
 
         <section id="recipe-guide-page" class="guide-view" role="tabpanel" aria-labelledby="recipe-guide-tab" hidden>
+            <details class="terraforming-goal">
+                <summary>
+                    <span class="terraforming-goal-title">
+                        <span id="terraforming-dome-icon" aria-hidden="true"></span>
+                        <h2>最終目標: 新天地テラフォーミングドーム</h2>
+                    </span>
+                </summary>
+                <div class="terraforming-goal-content">
+                    <p>ドーム建設に必要な拠点・素材・設備です。</p>
+                    <div class="terraforming-goal-grid" id="terraforming-goal-content" aria-live="polite"></div>
+                    <p class="terraforming-goal-footnote">ドームの建設と前提条件まで実装されています。完成後に地形・気候が変化する処理はまだありません。</p>
+                </div>
+            </details>
             <header class="group-head">
                 <h2>加工・合成・建築の実装レシピ</h2>
                 <p id="recipe-guide-count"></p>
             </header>
             <p class="recipe-guide-note">この一覧はゲーム本体のレシピ・建築コストから生成しています。製作場所欄の設備を設置してから、設備をタップしてレシピを開いてください。炉は簡易炉で作れるものも作れます。</p>
             <label class="recipe-guide-search"><span>検索</span><input id="recipe-guide-search" type="search" autocomplete="off" placeholder="素材・製品・設備名"></label>
+            <p id="recipe-guide-empty" class="recipe-guide-empty" hidden>検索条件に一致するレシピはありません。</p>
             <div id="recipe-guide-content"></div>
         </section>
 
@@ -531,6 +528,38 @@
         const buildingNameById = new Map(BUILDING_DEFINITIONS.map((building) => [building.id, building.name]));
         const itemNameById = new Map(CRAFTING_ITEMS.map(([id, name]) => [id, name]));
         const domeRecipesByOutput = new Map(CRAFTING_RECIPES.map((recipe) => [recipe[3], recipe]));
+        const guideIconIds = {
+            relic_fragment: 'i-relic', iron_ore: 'i-iron', copper_ore: 'i-copper', tar: 'i-oil',
+            crystal_shard: 'i-crystal', 'crystal-shard': 'i-crystal',
+            mining_sample: 'i-mining-sample', vein_mold: 'i-vein-mold',
+            navigation_crystal: 'i-device', preserved_spores: 'i-spore-vial', 'preserved-spores': 'i-spore-vial',
+            forest_seed: 'i-forest-seed', ancient_seed: 'i-seedcase',
+            'climate-control-core': 'i-crystal', 'closed-loop-unit': 'i-filter-cartridge',
+            'ecosystem-starter': 'i-compost',
+            paper_scroll: 'i-paper_scroll', cloth_scroll: 'i-cloth_scroll', scroll_book: 'i-scroll_book',
+            steam_power: 'i-steam_power'
+        };
+        const guideBuildingIds = new Set(BUILDING_DEFINITIONS.map((building) => building.id));
+        const makeGuideIcon = (id) => {
+            const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            icon.setAttribute('aria-hidden', 'true');
+            if (guideBuildingIds.has(id)) {
+                icon.setAttribute('viewBox', '0 0 96 96');
+                const use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+                use.setAttribute('href', `assets/building-icons.svg?v=1#building-${id}`);
+                use.setAttribute('width', '96');
+                use.setAttribute('height', '96');
+                icon.appendChild(use);
+            } else {
+                icon.setAttribute('viewBox', '0 0 64 64');
+                const use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+                use.setAttribute('href', `../MainSystem/icons/items/crafting-icons.svg?v=9#${guideIconIds[id] || `i-${id.replaceAll('_', '-')}`}`);
+                icon.appendChild(use);
+            }
+            return icon;
+        };
+        const domeIcon = document.getElementById('terraforming-dome-icon');
+        if (domeIcon) domeIcon.appendChild(makeGuideIcon(terraformingDome.id));
         const appendGoalList = (title, entries) => {
             const block = document.createElement('section');
             block.className = 'terraforming-goal-block';
@@ -539,7 +568,15 @@
             const list = document.createElement('ul');
             entries.forEach((entry) => {
                 const item = document.createElement('li');
-                item.textContent = entry;
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'terraforming-goal-item';
+                button.dataset.guideItemId = entry.id;
+                button.append(makeGuideIcon(entry.id));
+                const label = document.createElement('span');
+                label.textContent = entry.label;
+                button.appendChild(label);
+                item.appendChild(button);
                 list.appendChild(item);
             });
             block.append(heading, list);
@@ -548,18 +585,18 @@
         appendGoalList('先に建設する拠点', terraformingDome.requiredBuildings.map((id) => {
             const name = buildingNameById.get(id);
             if (!name) throw new Error(`必要建築「${id}」の名前が見つかりません。`);
-            return name;
+            return { id, label: name };
         }));
         appendGoalList('ドーム本体の素材', terraformingDome.materialCosts.map(([id, amount]) => {
             const name = itemNameById.get(id) || buildingNameById.get(id);
             if (!name) throw new Error(`ドーム素材「${id}」の名前が見つかりません。`);
-            return `${name} ×${amount}`;
+            return { id, label: `${name} ×${amount}` };
         }));
         appendGoalList('専用部品と製作場所', ['climate-control-core', 'closed-loop-unit', 'ecosystem-starter'].map((id) => {
             const name = itemNameById.get(id);
             const recipe = domeRecipesByOutput.get(id);
             if (!name || !recipe) throw new Error(`ドーム専用部品「${id}」のレシピが見つかりません。`);
-            return `${name} — ${recipe[4]}`;
+            return { id, label: `${name} — ${recipe[4]}` };
         }));
 
         const categoryConfig = {
@@ -723,30 +760,41 @@
             if (text !== undefined) element.textContent = text;
             return element;
         };
+        const makeGuideItemChip = (id, amount, className = '') => {
+            const chip = makeGuideElement('button', `recipe-guide-chip ${className}`.trim());
+            chip.type = 'button';
+            chip.dataset.guideItemId = id;
+            chip.title = `${getGuideItemName(id)}の詳細を見る`;
+            chip.setAttribute('aria-label', `${getGuideItemName(id)}${amount ? ` ×${amount}` : ''} の詳細を見る`);
+            chip.append(makeGuideIcon(id), makeGuideElement('span', '', `${getGuideItemName(id)}${amount ? ` ×${amount}` : ''}`));
+            return chip;
+        };
         const recipeGuide = document.getElementById('recipe-guide-content');
         const recipeGuideCards = [];
+        const recipeGuideGroups = [];
         const recipeGuideGroup = (title) => {
             const section = makeGuideElement('section', 'recipe-guide-group');
             section.appendChild(makeGuideElement('h3', '', title));
             const grid = makeGuideElement('div', 'recipe-guide-grid');
             section.appendChild(grid);
             recipeGuide.appendChild(section);
+            recipeGuideGroups.push(section);
             return grid;
         };
-        const appendRecipeGuideCard = (container, title, description, station, ingredients, outputText, searchTerms) => {
+        const appendRecipeGuideCard = (container, title, description, station, ingredients, outputId, outputAmount, searchTerms) => {
             const card = makeGuideElement('article', 'recipe-guide-card');
-            card.dataset.search = searchTerms.toLocaleLowerCase('ja');
+            card.dataset.search = searchTerms.normalize('NFKC').toLocaleLowerCase('ja');
             card.appendChild(makeGuideElement('h4', '', title));
             card.appendChild(makeGuideElement('p', '', station));
             if (description) card.appendChild(makeGuideElement('p', '', description));
             const flow = makeGuideElement('div', 'recipe-guide-flow');
             ingredients.forEach(([id, amount], index) => {
                 if (index) flow.appendChild(makeGuideElement('span', '', '+'));
-                flow.appendChild(makeGuideElement('span', 'recipe-guide-chip', `${getGuideItemName(id)} ×${amount}`));
+                flow.appendChild(makeGuideItemChip(id, amount));
             });
-            if (outputText) {
+            if (outputId) {
                 flow.appendChild(makeGuideElement('span', '', '→'));
-                flow.appendChild(makeGuideElement('span', 'recipe-guide-chip recipe-guide-cost', outputText));
+                flow.appendChild(makeGuideItemChip(outputId, outputAmount, 'recipe-guide-cost'));
             }
             card.appendChild(flow);
             container.appendChild(card);
@@ -768,7 +816,7 @@
             stationRecipes.forEach((recipe) => {
                 const [family, title, inputs, output, , note, batch = 1] = recipe;
                 const outputName = getGuideItemName(output);
-                appendRecipeGuideCard(group, `${title} → ${outputName} ×${batch}`, note, where, inputs, '', [family, title, note, station, outputName, ...inputs.map(([id]) => getGuideItemName(id))].join(' '));
+                appendRecipeGuideCard(group, `${title} → ${outputName} ×${batch}`, note, where, inputs, output, batch, [family, title, note, station, outputName, ...inputs.map(([id]) => getGuideItemName(id))].join(' '));
             });
         });
 
@@ -784,7 +832,8 @@
                 [building.width >= 2 && building.height >= 2 ? '作成場所: インベントリの「建築」タブ。作成には作業台以上の設備が必要です。' : '作成場所: インベントリの「建築」タブ。', description].filter(Boolean).join(' '),
                 '建築キット',
                 costs,
-                '',
+                building.id,
+                1,
                 [building.name, building.id, ...costs.map(([id]) => getGuideItemName(id))].join(' ')
             );
         });
@@ -815,7 +864,7 @@
                 const card = makeGuideElement('article', 'recipe-guide-card');
                 card.dataset.search = [outputName, ...outputRecipes.flatMap((recipe) => [
                     recipe[1], recipe[4], ...recipe[2].map(([id]) => getGuideItemName(id))
-                ])].join(' ').toLocaleLowerCase('ja');
+                ])].join(' ').normalize('NFKC').toLocaleLowerCase('ja');
                 card.appendChild(makeGuideElement('h4', '', outputName));
                 card.appendChild(makeGuideElement('p', '', '現行の加工レシピ・建築コスト・地形変成で消費されません。固有効果の実装も要確認です。'));
                 outputRecipes.forEach((recipe) => {
@@ -826,8 +875,10 @@
                     const flow = makeGuideElement('div', 'recipe-guide-flow');
                     recipe[2].forEach(([id, amount], index) => {
                         if (index) flow.appendChild(makeGuideElement('span', '', '+'));
-                        flow.appendChild(makeGuideElement('span', 'recipe-guide-chip', `${getGuideItemName(id)} ×${amount}`));
+                        flow.appendChild(makeGuideItemChip(id, amount));
                     });
+                    flow.appendChild(makeGuideElement('span', '', '→'));
+                    flow.appendChild(makeGuideItemChip(outputId, undefined, 'recipe-guide-cost'));
                     card.appendChild(flow);
                 });
                 unusedGroup.appendChild(card);
@@ -839,7 +890,7 @@
                     .filter(([type, cell]) => cell.collect === itemId
                         || Array.from({ length: 5 }, (_, count) => count).some((count) => getCellDrops(type, count).includes(itemId)))
                     .map(([, cell]) => cell.label);
-                card.dataset.search = [itemName, ...sources].join(' ').toLocaleLowerCase('ja');
+                card.dataset.search = [itemName, ...sources].join(' ').normalize('NFKC').toLocaleLowerCase('ja');
                 card.appendChild(makeGuideElement('h4', '', itemName));
                 card.appendChild(makeGuideElement('p', '', '現行の加工レシピ・建築コスト・地形変成では消費されません。'));
                 if (sources.length) card.appendChild(makeGuideElement('p', '', `採集先: ${sources.join(' / ')}`));
@@ -849,10 +900,30 @@
         }
 
         const recipeGuideCount = document.getElementById('recipe-guide-count');
-        recipeGuideCount.textContent = `${CRAFTING_RECIPES.length}加工・合成 / ${BUILDING_DEFINITIONS.length}建築 / 用途未設定: 加工品 ${unconsumedOutputs.size}種類・採集素材 ${unconsumedRawItems.length}種類`;
+        const fullRecipeCount = `${CRAFTING_RECIPES.length}加工・合成 / ${BUILDING_DEFINITIONS.length}建築 / 用途未設定: 加工品 ${unconsumedOutputs.size}種類・採集素材 ${unconsumedRawItems.length}種類`;
+        recipeGuideCount.textContent = fullRecipeCount;
         document.getElementById('recipe-guide-search').addEventListener('input', (event) => {
             const query = event.currentTarget.value.normalize('NFKC').toLocaleLowerCase('ja').trim();
-            recipeGuideCards.forEach((card) => { card.hidden = query !== '' && !card.dataset.search.includes(query); });
+            let visibleCount = 0;
+            recipeGuideCards.forEach((card) => {
+                card.hidden = query !== '' && !card.dataset.search.includes(query);
+                if (!card.hidden) visibleCount++;
+            });
+            recipeGuideGroups.forEach((group) => {
+                group.hidden = query !== '' && !group.querySelector('.recipe-guide-card:not([hidden])');
+            });
+            document.getElementById('recipe-guide-empty').hidden = query === '' || visibleCount > 0;
+            recipeGuideCount.textContent = query === ''
+                ? fullRecipeCount
+                : `${visibleCount}件が一致`;
+        });
+
+        document.addEventListener('click', (event) => {
+            const chip = event.target.closest('[data-guide-item-id]');
+            if (!chip || new URLSearchParams(window.location.search).get('modal') !== '1') return;
+            const message = { type: 'fogsgear:show-guide-item-detail', itemId: chip.dataset.guideItemId };
+            const targetOrigin = window.location.origin === 'null' ? '*' : window.location.origin;
+            window.parent.postMessage(message, targetOrigin);
         });
 
         const groups = Object.entries(categoryConfig).map(([id, config]) => ({
@@ -957,7 +1028,7 @@
             document.querySelectorAll('.guide-view').forEach((view) => { view.hidden = view.id !== activeView; });
         };
         document.querySelectorAll('[data-guide-view]').forEach((tab) => tab.addEventListener('click', () => selectGuideView(tab.dataset.guideView)));
-        if (new URLSearchParams(window.location.search).get('guide') === '7') selectGuideView('recipe-guide-page');
+        selectGuideView('how-to-page');
     </script>
 </body>
 </html>

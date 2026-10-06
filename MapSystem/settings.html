@@ -86,7 +86,7 @@
         <button class="btn btn-action game-reset-cancel" id="cancelGameReset" type="button">キャンセル</button>
     </dialog>
     <script type="module">
-        import { clearGameProgress } from '../GearSystem/js/GameState.js?v=runtime-36';
+        import { clearGameProgress } from '../GearSystem/js/GameState.js?v=runtime-41';
 
         const createRandomSeed = () => {
             const values = new Uint32Array(4);
@@ -183,19 +183,34 @@
         gameResetDialog.addEventListener('click', event => {
             if (event.target === gameResetDialog) gameResetDialog.close();
         });
+        window.addEventListener('message', event => {
+            if (event.origin !== window.location.origin || event.data?.type !== 'fogsgear:reset-game-failed') return;
+            document.getElementById('saveMessage').textContent = event.data.message || 'ゲームデータを消去できませんでした。';
+            document.getElementById('saveMessage').setAttribute('role', 'alert');
+        });
         gameResetDialog.querySelectorAll('[data-reset-mode]').forEach(button => {
             button.addEventListener('click', () => {
                 const keepSavedGears = button.dataset.resetMode === 'new-game-plus';
                 const resetName = keepSavedGears ? '強くてニューゲーム' : 'オールリセット';
                 if (!window.confirm(`${resetName}を実行します。進行データは初期化されます。この操作は取り消せません。続行しますか？`)) return;
-                clearGameProgress(keepSavedGears);
-                gameResetDialog.close();
                 if (window.parent !== window) {
-                    window.parent.postMessage({ type: 'fogsgear:reset-game' }, window.location.origin === 'null' ? '*' : window.location.origin);
+                    window.parent.postMessage({
+                        type: 'fogsgear:reset-game',
+                        keepSavedGears
+                    }, window.location.origin === 'null' ? '*' : window.location.origin);
+                    gameResetDialog.close();
                     document.getElementById('saveMessage').textContent = `${resetName}を実行しました。初期地点から再開します...`;
                     return;
                 }
-                window.location.replace('./index.html');
+                try {
+                    clearGameProgress(keepSavedGears);
+                    gameResetDialog.close();
+                    window.location.replace('./index.html');
+                } catch (error) {
+                    console.error('Game progress reset failed.', error);
+                    document.getElementById('saveMessage').textContent = error.message || 'ゲームデータを消去できませんでした。';
+                    document.getElementById('saveMessage').setAttribute('role', 'alert');
+                }
             });
         });
         const settings = getSettings();

@@ -551,6 +551,14 @@ canvas {
 .scroll-status { margin: 0; color: var(--text-muted); font-size: 0.76rem; }
 .scroll-actions { display: flex; gap: 7px; }
 .scroll-actions .btn { white-space: nowrap; }
+.embedded-library:not(.scroll-book-view) #scroll-share { display: none; }
+.scroll-share-panel { display: grid; justify-items: center; width: min(100%, 420px); margin: auto; }
+.scroll-share-panel > * { max-width: 100%; }
+.scroll-share-qr { display: block; justify-self: center; width: min(320px, calc(100vw - 100px)); height: auto; box-sizing: border-box; margin: 14px auto; padding: 8px; background: #fff; image-rendering: pixelated; }
+.scroll-share-qr[hidden] { display: none; }
+.scroll-share-panel .scroll-choice-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; width: 100%; }
+.scroll-share-panel .scroll-choice-actions .btn { display: flex; align-items: center; justify-content: center; box-sizing: border-box; width: 100%; min-width: 0; min-height: 54px; margin: 0; padding: 8px; line-height: 1.3; text-align: center; white-space: normal; }
+.scroll-share-panel #scroll-share-file { display: none; }
 .scroll-choice-modal { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 18px; background: rgba(8, 7, 6, 0.78); }
 .scroll-choice-modal[hidden] { display: none; }
 .scroll-choice-panel { position: relative; width: min(100%, 360px); box-sizing: border-box; padding: 28px 24px 20px; color: var(--text-main); background: linear-gradient(145deg, #30251d, #17120f); border: 1px solid var(--border-gold); border-radius: 8px; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.72); text-align: center; }
@@ -643,6 +651,7 @@ canvas {
 .embedded-library .scroll-detail-footer { position: absolute; z-index: 2; right: 14px; bottom: 10px; left: 14px; justify-content: flex-end; margin: 0; pointer-events: none; }
 .embedded-library .scroll-actions { pointer-events: auto; }
 .embedded-library .scroll-actions .btn { padding: 6px 10px; font-size: 0.7rem; }
+.embedded-library .scroll-share-modal { position: fixed; z-index: 40; }
 .embedded-library .scroll-list-panel { position: relative; box-sizing: border-box; max-height: none; touch-action: pan-y; transition: opacity 180ms ease; }
 .embedded-library.scroll-list-hidden .scroll-list-panel { display: none; }
 .embedded-library.scroll-is-running .scroll-detail-heading h2 { display: inline-block; }

@@ -9,7 +9,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="icon" href="../MainSystem/icons/app-icon.jpg" type="image/jpeg">
-    <link rel="stylesheet" href="css/style.css?v=607">
+    <link rel="stylesheet" href="css/style.css?v=627">
 </head>
 <body>
     <div id="loadingOverlay" class="loading-overlay" role="status" aria-live="polite">
@@ -139,7 +139,10 @@
             <section class="inventory-modal-panel recipe-detail-panel">
                 <button class="inventory-modal-close" type="button" data-action="close-recipe-detail" aria-label="レシピ詳細を閉じる">×</button>
                 <div class="inventory-modal-kicker">ITEM / RECIPE GUIDE</div>
-                <h2 id="recipe-detail-title">素材の作り方</h2>
+                <div class="recipe-detail-item-heading">
+                    <div id="recipe-detail-icon" class="recipe-detail-item-icon" aria-hidden="true"></div>
+                    <h2 id="recipe-detail-title">素材の作り方</h2>
+                </div>
                 <div id="recipe-detail-content" class="recipe-detail-content"></div>
                 <div class="inventory-modal-actions">
                     <button id="recipe-detail-back" class="inventory-modal-secondary" type="button" data-action="recipe-detail-back" hidden>戻る</button>
@@ -217,7 +220,7 @@
         </div>
                     </section>
                     <section class="main-page gear-preview-page" aria-label="保存ギアプレビューページ">
-                        <iframe src="../GearSystem/scroll-library.html?embed=1&hideMapBack=1&v=18" title="保存スクロールのギアプレビュー"></iframe>
+                        <iframe src="../GearSystem/scroll-library.html?embed=1&hideMapBack=1&v=20" title="保存スクロールのギアプレビュー"></iframe>
                     </section>
                 </div>
             </div>
@@ -229,6 +232,6 @@
         </div>
     </div>
 
-    <script type="module" src="js/main.js?v=687"></script>
+    <script type="module" src="js/main.js?v=705"></script>
 </body>
 </html>

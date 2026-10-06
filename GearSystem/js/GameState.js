@@ -3,23 +3,47 @@ import { ACTIVE_SCROLL_TARGETS_KEY, CELL_MATERIALS, TERRAIN_TRANSFORM_RECIPES, W
 
 const ACTIVE_SCROLL_SYNC_STATE_KEY = 'fogsgear_active_scroll_sync_state';
 const SAVED_SCROLL_LIBRARY_KEY = 'fogsgear_scroll_library';
+const GAME_PROGRESS_EPOCH_KEY = 'fogsgear_game_progress_epoch';
 const PERSISTENT_GAME_SETTINGS = new Set([
     'steampunk_explorer_settings',
     'steampunk_explorer_skin_url',
     'steampunk_explorer_skin_source',
-    'steampunk_explorer_skin_name'
+    'steampunk_explorer_skin_name',
+    GAME_PROGRESS_EPOCH_KEY
 ]);
 const INITIAL_MATERIAL_INVENTORY = Object.freeze({ paper_scroll: 10, cloth_scroll: 10, scroll_book: 1 });
 const MATERIAL_INVENTORY_VERSION = 4;
 const LEGACY_INITIAL_MATERIAL_INVENTORY = Object.freeze({ 'iron-screw': 12, 'pressure-gauge': 1 });
+let gameProgressResetInProgress = false;
 
 export function clearGameProgress(keepSavedGears = false) {
-    for (let index = localStorage.length - 1; index >= 0; index--) {
-        const key = localStorage.key(index);
-        if (!key || PERSISTENT_GAME_SETTINGS.has(key)
-            || (keepSavedGears && key === SAVED_SCROLL_LIBRARY_KEY)
-            || (!key.startsWith('fogsgear_') && !key.startsWith('steampunk_explorer_') && key !== 'fog_thermo_save')) continue;
-        localStorage.removeItem(key);
+    gameProgressResetInProgress = true;
+    const previousEpoch = localStorage.getItem(GAME_PROGRESS_EPOCH_KEY);
+    try {
+        localStorage.setItem(GAME_PROGRESS_EPOCH_KEY, `${Date.now()}-${Math.random().toString(36).slice(2)}`);
+        const storedKeys = Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index));
+        storedKeys.forEach(key => {
+            if (!key || PERSISTENT_GAME_SETTINGS.has(key)
+                || (keepSavedGears && key === SAVED_SCROLL_LIBRARY_KEY)
+                || (!key.startsWith('fogsgear_') && !key.startsWith('steampunk_explorer_') && key !== 'fog_thermo_save')) return;
+            localStorage.removeItem(key);
+        });
+        const remainingProgressKeys = [];
+        for (let index = 0; index < localStorage.length; index++) {
+            const key = localStorage.key(index);
+            if (!key || PERSISTENT_GAME_SETTINGS.has(key)
+                || (keepSavedGears && key === SAVED_SCROLL_LIBRARY_KEY)
+                || (!key.startsWith('fogsgear_') && !key.startsWith('steampunk_explorer_') && key !== 'fog_thermo_save')) continue;
+            remainingProgressKeys.push(key);
+        }
+        if (remainingProgressKeys.length) {
+            throw new Error(`ゲームデータを消去できませんでした: ${remainingProgressKeys.join(', ')}`);
+        }
+    } catch (error) {
+        if (previousEpoch === null) localStorage.removeItem(GAME_PROGRESS_EPOCH_KEY);
+        else localStorage.setItem(GAME_PROGRESS_EPOCH_KEY, previousEpoch);
+        gameProgressResetInProgress = false;
+        throw error;
     }
 }
 
@@ -55,6 +79,7 @@ function restoreMaterialInventory(value, version = MATERIAL_INVENTORY_VERSION) {
 export class GameState {
     // 資源、配置ギア、保存、Undo/Redo、UI通知を一元管理するアプリケーション状態。
     constructor() {
+        this.gameProgressEpoch = localStorage.getItem(GAME_PROGRESS_EPOCH_KEY) || '';
         this.steamPower = 100;
         this.power = 0;
         this.water = 200;
@@ -516,6 +541,7 @@ export class GameState {
     }
 
     saveGameData() {
+        if (!this.isGameProgressEpochCurrent()) return;
         // 次回起動で復元する資源・ギア・履歴をlocalStorageへ保存する。
         const data = {
             updatedAt: Date.now(),
@@ -583,7 +609,13 @@ export class GameState {
         return `fogsgear_scroll_draft_${material === 'cloth' ? 'cloth' : 'paper'}`;
     }
 
+    isGameProgressEpochCurrent() {
+        return !gameProgressResetInProgress
+            && (localStorage.getItem(GAME_PROGRESS_EPOCH_KEY) || '') === this.gameProgressEpoch;
+    }
+
     saveScrollDraft() {
+        if (!this.isGameProgressEpochCurrent()) return;
         if (!this.currentScrollMaterial || this.currentScrollId) return;
         localStorage.setItem(this.getScrollDraftKey(this.currentScrollMaterial), JSON.stringify(this.getScrollBlueprint()));
     }
@@ -639,6 +671,7 @@ export class GameState {
     }
 
     saveNamedScroll(name, blueprint = null, effect = null) {
+        if (!this.isGameProgressEpochCurrent()) return null;
         const trimmedName = String(name || '').trim();
         if (!trimmedName) return null;
         const library = this.getNamedScrollLibrary();
