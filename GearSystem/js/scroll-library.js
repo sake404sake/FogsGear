@@ -67,7 +67,7 @@ if (isEmbedded && !hasExternalDashboard && window.matchMedia('(max-width: 700px)
 }
 window.addEventListener('message', event => {
     if (!isEmbedded || event.source !== window.parent || event.data?.type !== 'fogsgear:engine-dashboard') return;
-    const { values, rates, generationRates, creativeMode } = event.data;
+    const { values, rates, generationRates, consumptionRates = {}, creativeMode } = event.data;
     if (!values || !rates || !generationRates) return;
     Object.entries(values).forEach(([id, value]) => {
         const element = document.getElementById(id);
@@ -78,7 +78,8 @@ window.addEventListener('message', event => {
         if (element) element.textContent = String(value);
     });
     document.querySelectorAll('[data-generated-resource]').forEach(row => {
-        row.hidden = !(Number(generationRates[row.dataset.generatedResource]) > 0);
+        const resource = row.dataset.generatedResource;
+        row.hidden = !(Number(generationRates[resource]) > 0 || Number(consumptionRates[resource]) > 0);
     });
     const resourceTable = document.querySelector('.dashboard-resource-table');
     if (resourceTable && Array.isArray(event.data.collectedMaterials)) {

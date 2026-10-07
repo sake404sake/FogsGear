@@ -4020,7 +4020,7 @@ function updateEngineDashboard() {
     };
     const displayValues = Object.fromEntries(Object.entries(values).map(([id, value]) => [
         id,
-        id === 'main-engine-steam' ? String(Math.floor(Number(value) || 0)) : formatCompact(value)
+        formatCompact(id === 'main-engine-steam' ? Math.floor(Number(value) || 0) : value)
     ]));
     const rates = {
         'main-water-generation': save.waterGenerationRate,
@@ -4037,6 +4037,12 @@ function updateEngineDashboard() {
         fog: save.fogRecoveryRate,
         power: save.powerGenerationRate,
         steam: save.steamGenerationRate
+    };
+    const consumptionRates = {
+        water: save.waterConsumptionRate,
+        fog: save.fogConsumptionRate,
+        power: save.powerConsumptionRate,
+        steam: save.steamConsumptionRate
     };
     const collectedMaterialRates = new Map();
     if (save.mainGearRunning && (save.creativeMode || save.steamPower > 0) && state.map.length) {
@@ -4071,7 +4077,8 @@ function updateEngineDashboard() {
             if (element) element.textContent = `${formatCompact(value)} /秒`;
         });
         dashboard.querySelectorAll('[data-generated-resource]').forEach(row => {
-            row.hidden = !(Number(generationRates[row.dataset.generatedResource]) > 0);
+            const resource = row.dataset.generatedResource;
+            row.hidden = !(Number(generationRates[resource]) > 0 || Number(consumptionRates[resource]) > 0);
         });
         const resourceTable = dashboard.querySelector('.dashboard-resource-table');
         const collectedIds = new Set(collectedMaterials.map(material => material.itemId));
@@ -4103,6 +4110,7 @@ function updateEngineDashboard() {
         values: displayValues,
         rates: Object.fromEntries(Object.entries(rates).map(([id, value]) => [id, `${formatCompact(value)} /秒`])),
         generationRates,
+        consumptionRates,
         collectedMaterials,
         creativeMode: Boolean(save.creativeMode)
     }, '*');

@@ -653,8 +653,15 @@ export class UIController {
             power: this.state.powerGenerationRate,
             steam: this.state.steamGenerationRate
         };
+        const consumptionRates = {
+            water: this.state.waterConsumptionRate,
+            fog: this.state.fogConsumptionRate,
+            power: this.state.powerConsumptionRate,
+            steam: this.state.steamConsumptionRate
+        };
         document.querySelectorAll('[data-generated-resource]').forEach(row => {
-            row.hidden = !(Number(generationRates[row.dataset.generatedResource]) > 0);
+            const resource = row.dataset.generatedResource;
+            row.hidden = !(Number(generationRates[resource]) > 0 || Number(consumptionRates[resource]) > 0);
         });
         const selectedGear = this.gearManager.findGearById(this.state.selectedGearId);
         if (selectedGear) {
