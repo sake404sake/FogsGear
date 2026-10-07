@@ -4068,6 +4068,43 @@ function updateEngineDashboard() {
         amount: getCraftingItemCount(itemId),
         rate: formatCompact(rate)
     }));
+    const dashboard = document.querySelector('.gear-preview-dashboard');
+    if (dashboard) {
+        Object.entries(displayValues).forEach(([id, value]) => {
+            const element = dashboard.querySelector(`#${id}`);
+            if (element) element.textContent = String(value);
+        });
+        Object.entries(rates).forEach(([id, value]) => {
+            const element = dashboard.querySelector(`#${id}`);
+            if (element) element.textContent = `${formatCompact(value)} /秒`;
+        });
+        dashboard.querySelectorAll('[data-generated-resource]').forEach(row => {
+            row.hidden = !(Number(generationRates[row.dataset.generatedResource]) > 0);
+        });
+        const resourceTable = dashboard.querySelector('.dashboard-resource-table');
+        const collectedIds = new Set(collectedMaterials.map(material => material.itemId));
+        resourceTable?.querySelectorAll('[data-collected-material]').forEach(row => {
+            if (!collectedIds.has(row.dataset.collectedMaterial)) row.remove();
+        });
+        collectedMaterials.forEach(material => {
+            if (typeof material.itemId !== 'string' || typeof material.name !== 'string') return;
+            let row = resourceTable?.querySelector(`[data-collected-material="${CSS.escape(material.itemId)}"]`);
+            if (!row && resourceTable) {
+                row = document.createElement('div');
+                row.className = 'dashboard-resource-row';
+                row.dataset.collectedMaterial = material.itemId;
+                row.append(document.createElement('span'), document.createElement('strong'), document.createElement('span'), document.createElement('span'));
+                resourceTable.appendChild(row);
+            }
+            if (!row) return;
+            row.children[0].textContent = material.name;
+            row.children[1].textContent = String(material.amount);
+            row.children[2].textContent = `${material.rate} /秒`;
+            row.children[3].textContent = '—';
+        });
+        const creativeIndicator = dashboard.querySelector('#main-creative-mode-indicator');
+        if (creativeIndicator) creativeIndicator.hidden = !save.creativeMode;
+    }
     const previewFrame = document.querySelector('.gear-preview-page iframe');
     previewFrame?.contentWindow?.postMessage({
         type: 'fogsgear:engine-dashboard',

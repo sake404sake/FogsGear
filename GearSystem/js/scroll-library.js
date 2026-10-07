@@ -56,9 +56,15 @@ const pageParams = new URLSearchParams(window.location.search);
 const isEmbedded = pageParams.get('embed') === '1';
 const isScrollBook = pageParams.get('source') === 'scroll-book';
 const hideMapBack = pageParams.get('hideMapBack') === '1';
+const hasExternalDashboard = pageParams.get('dashboard') === 'external';
 if (isEmbedded) document.body.classList.add('embedded-library');
 if (isEmbedded && hideMapBack) document.body.classList.add('hide-embedded-map-back');
 if (isScrollBook) document.body.classList.add('scroll-book-view');
+if (isEmbedded && hasExternalDashboard) document.body.classList.add('external-engine-dashboard');
+if (isEmbedded && !hasExternalDashboard && window.matchMedia('(max-width: 700px) and (max-height: 520px)').matches) {
+    const dashboard = document.querySelector('.embedded-engine-dashboard');
+    if (dashboard) dashboard.open = true;
+}
 window.addEventListener('message', event => {
     if (!isEmbedded || event.source !== window.parent || event.data?.type !== 'fogsgear:engine-dashboard') return;
     const { values, rates, generationRates, creativeMode } = event.data;
@@ -994,7 +1000,6 @@ function selectScroll(scrollId) {
     renderList();
     renderDetail();
     resizePreview();
-    setListVisibility(false);
 }
 
 function resizePreview() {
@@ -1014,8 +1019,17 @@ if ('ResizeObserver' in window) {
 }
 
 tabs.forEach(tab => tab.addEventListener('click', () => {
+    const wasActive = tab.classList.contains('active');
+    if (isEmbedded && wasActive) {
+        tabs.forEach(item => {
+            item.classList.remove('active');
+            item.setAttribute('aria-selected', 'false');
+        });
+        setListVisibility(false);
+        return;
+    }
     setListVisibility(true);
-    const deselect = tab.classList.contains('active');
+    const deselect = wasActive;
     currentMaterial = deselect ? 'all' : tab.dataset.material;
     tabs.forEach(item => {
         const active = !deselect && item === tab;
@@ -1099,8 +1113,6 @@ choiceEditButton?.addEventListener('click', () => {
 choiceModal?.addEventListener('click', event => {
     if (event.target === choiceModal || event.target.closest('#scroll-choice-close')) closeChoiceModal();
 });
-
-previewFrame?.addEventListener('pointerup', () => setListVisibility(false));
 
 window.addEventListener('storage', event => {
     if (event.key === LIBRARY_KEY || event.key === ACTIVE_SCROLL_KEY || event.key === ACTIVE_SCROLL_RUNNING_KEY || event.key === ACTIVE_SCROLL_TARGETS_KEY || event.key === ACTIVE_SCROLL_SYNC_STATE_KEY || event.key === GAME_SAVE_KEY) {

@@ -10,7 +10,7 @@
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="icon" href="../MainSystem/icons/app-icon.jpg" type="image/jpeg">
     <link rel="apple-touch-icon" href="assets/app-icon-192.png">
-    <link rel="stylesheet" href="css/style.css?v=630">
+    <link rel="stylesheet" href="css/style.css?v=634">
 </head>
 <body>
     <div id="loadingOverlay" class="loading-overlay" role="status" aria-live="polite">
@@ -221,7 +221,36 @@
         </div>
                     </section>
                     <section class="main-page gear-preview-page" aria-label="保存ギアプレビューページ">
-                        <iframe src="../GearSystem/scroll-library.html?embed=1&hideMapBack=1&v=20" title="保存スクロールのギアプレビュー"></iframe>
+                        <section class="engine-dashboard-page gear-preview-dashboard" aria-label="動力ダッシュボード">
+                            <div class="dashboard main-engine-dashboard">
+                                <div class="dashboard-title-row">
+                                    <div class="dashboard-title">LIVE ENGINE DASHBOARD</div>
+                                    <span id="main-creative-mode-indicator" class="creative-mode-indicator" hidden>CREATIVE MODE: ON</span>
+                                </div>
+                                <div class="dashboard-resource-table">
+                                    <div class="dashboard-resource-row dashboard-resource-header">
+                                        <span>資源</span><span>保有量</span><span>生成 / 回収</span><span>消費</span>
+                                    </div>
+                                    <div class="dashboard-resource-row" data-generated-resource="steam" hidden>
+                                        <span>スチーム</span><strong id="main-engine-steam">0</strong>
+                                        <span id="main-steam-generation">0 /秒</span><span id="main-steam-consumption">0 /秒</span>
+                                    </div>
+                                    <div class="dashboard-resource-row" data-generated-resource="water" hidden>
+                                        <span>水</span><strong id="main-engine-water">0</strong>
+                                        <span id="main-water-generation">0 /秒</span><span id="main-water-consumption">0 /秒</span>
+                                    </div>
+                                    <div class="dashboard-resource-row" data-generated-resource="fog" hidden>
+                                        <span>霧</span><strong id="main-engine-fog">0</strong>
+                                        <span id="main-fog-generation">0 /秒</span><span id="main-fog-consumption">0 /秒</span>
+                                    </div>
+                                    <div class="dashboard-resource-row" data-generated-resource="power" hidden>
+                                        <span>動力</span><strong id="main-engine-power">0</strong>
+                                        <span id="main-power-generation">0 /秒</span><span id="main-power-consumption">0 /秒</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+                        <iframe src="../GearSystem/scroll-library.html?embed=1&hideMapBack=1&dashboard=external&v=33" title="保存スクロールのギアプレビュー"></iframe>
                     </section>
                 </div>
             </div>
@@ -233,6 +262,6 @@
         </div>
     </div>
 
-    <script type="module" src="js/main.js?v=714"></script>
+    <script type="module" src="js/main.js?v=715"></script>
 </body>
 </html>

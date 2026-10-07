@@ -599,6 +599,7 @@ body.guide-item-detail-open #recipe-detail-modal { z-index: 1300; }
 .main-page-dot { width: 8px; height: 8px; padding: 0; background: #4a3b2c; border: 1px solid #8b6b3f; border-radius: 50%; cursor: pointer; }
 .main-page-dot.active { background: #f3c653; border-color: #ffe69b; box-shadow: 0 0 7px rgba(243, 198, 83, 0.55); }
 .gear-preview-page { display: flex; flex-direction: column; gap: 8px; padding: 0; overflow-y: auto; }
+.gear-preview-page > .gear-preview-dashboard { display: none; }
 .gear-preview-page iframe { display: block; width: 100%; height: min(70vh, 620px); min-height: 520px; flex: 0 0 auto; border: 0; background: var(--bg-deep); touch-action: pan-y; }
 .gear-preview-page .engine-dashboard-disclosure { flex: 0 0 auto; width: min(100%, 650px); margin: 0 auto 8px; }
 .gear-preview-page .engine-dashboard-disclosure > summary { box-sizing: border-box; width: 100%; margin: 0; list-style: none; }
@@ -606,6 +607,7 @@ body.guide-item-detail-open #recipe-detail-modal { z-index: 1300; }
 .gear-preview-page .engine-dashboard-disclosure > summary span { display: inline-block; transition: transform 160ms ease; }
 .gear-preview-page .engine-dashboard-disclosure[open] > summary span { transform: rotate(45deg); }
 .gear-preview-page .engine-dashboard-page { display: block; min-height: 0; padding: 12px 8px; overflow: visible; }
+.gear-preview-page > .gear-preview-dashboard.engine-dashboard-page { display: none; }
 .gear-preview-page .engine-dashboard-page .main-engine-dashboard { width: 100%; }
 .engine-dashboard-page { display: flex; align-items: center; justify-content: center; min-height: 520px; padding: 28px 12px; box-sizing: border-box; overflow-y: auto; background: linear-gradient(145deg, rgba(98, 194, 170, 0.08), rgba(18, 14, 12, 0.92)); border: 1px solid rgba(98, 194, 170, 0.24); }
 .engine-dashboard-page .main-engine-dashboard { width: min(100%, 650px); max-height: none; margin: 0 auto; box-sizing: border-box; }
@@ -1575,6 +1577,56 @@ canvas#gameCanvas {
     }
     body:has(#gameCanvas) > .panel:last-of-type .main-page {
         height: 100% !important;
+        min-height: 0;
+    }
+}
+
+@media (max-width: 620px) and (max-aspect-ratio: 1 / 1) {
+    body:has(#gameCanvas) > .panel:last-of-type .gear-preview-page {
+        flex-direction: row;
+        align-items: stretch;
+        gap: 4px;
+        overflow: hidden;
+    }
+    body:has(#gameCanvas) > .panel:last-of-type .gear-preview-dashboard {
+        display: flex;
+        flex: 0 0 46%;
+        width: 46%;
+        min-width: 0;
+        min-height: 0;
+        box-sizing: border-box;
+        padding: 4px;
+        overflow: hidden;
+        align-items: flex-start;
+        border: 1px solid rgba(98, 194, 170, 0.24);
+    }
+    body:has(#gameCanvas) > .panel:last-of-type .gear-preview-dashboard .main-engine-dashboard {
+        width: 100%;
+        min-width: 0;
+        margin: 0;
+        padding: 3px;
+    }
+    body:has(#gameCanvas) > .panel:last-of-type .gear-preview-dashboard .dashboard-title-row { margin-bottom: 3px; }
+    body:has(#gameCanvas) > .panel:last-of-type .gear-preview-dashboard .dashboard-title { font-size: 0.52rem; letter-spacing: 0; }
+    body:has(#gameCanvas) > .panel:last-of-type .gear-preview-dashboard .dashboard-resource-table { grid-template-columns: 1fr; }
+    body:has(#gameCanvas) > .panel:last-of-type .gear-preview-dashboard .dashboard-resource-header { display: none; }
+    body:has(#gameCanvas) > .panel:last-of-type .gear-preview-dashboard .dashboard-resource-row {
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-rows: auto auto;
+        gap: 0 2px;
+        min-height: 23px;
+        line-height: 1.05;
+        font-size: 0.49rem;
+    }
+    body:has(#gameCanvas) > .panel:last-of-type .gear-preview-dashboard .dashboard-resource-row > :first-child { grid-column: 1; grid-row: 1; text-align: left; }
+    body:has(#gameCanvas) > .panel:last-of-type .gear-preview-dashboard .dashboard-resource-row > strong { grid-column: 2; grid-row: 1; font-size: 0.57rem; }
+    body:has(#gameCanvas) > .panel:last-of-type .gear-preview-dashboard .dashboard-resource-row > :nth-child(3) { grid-column: 1; grid-row: 2; text-align: left; white-space: nowrap; font-size: 0.44rem; }
+    body:has(#gameCanvas) > .panel:last-of-type .gear-preview-dashboard .dashboard-resource-row > :nth-child(4) { grid-column: 2; grid-row: 2; text-align: right; white-space: nowrap; font-size: 0.44rem; }
+    body:has(#gameCanvas) > .panel:last-of-type .gear-preview-page iframe {
+        flex: 1 1 0;
+        width: 0;
+        height: 100%;
+        min-width: 0;
         min-height: 0;
     }
 }
