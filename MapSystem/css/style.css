@@ -817,6 +817,7 @@ canvas.engine-runtime-canvas { display: none; }
 
 /* 説明・補足テキスト */
 .rule-text {
+    visibility: hidden;
     font-size: 0.7rem;
     color: var(--text-muted);
     margin-top: 8px;
@@ -1425,7 +1426,8 @@ canvas#gameCanvas {
         grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
     }
     body:has(#gameCanvas) > .panel:last-of-type .movement-pad {
-        width: min(100%, 230px);
+        width: min(calc(100% - 12px), 210px);
+        margin-inline: auto;
         aspect-ratio: 1;
         grid-template-columns: repeat(3, minmax(0, 1fr));
         grid-template-rows: repeat(3, minmax(0, 1fr));
@@ -1574,6 +1576,25 @@ canvas#gameCanvas {
     }
     body:has(#gameCanvas) > .panel:last-of-type .main-page {
         height: 100% !important;
+        min-height: 0;
+    }
+}
+
+@media (min-aspect-ratio: 1/1) and (max-width: 1000px) and (max-height: 400px) {
+    body:has(#gameCanvas) > .panel:last-of-type {
+        height: 100%;
+        min-height: 0;
+        max-height: 100%;
+    }
+    body:has(#gameCanvas) > .panel:last-of-type .main-control-pager {
+        flex: 1 1 0;
+        height: auto;
+        min-height: 0;
+        max-height: 100%;
+    }
+    body:has(#gameCanvas) > .panel:last-of-type .main-page-viewport {
+        flex: 1 1 0;
+        height: auto;
         min-height: 0;
     }
 }
