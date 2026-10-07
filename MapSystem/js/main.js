@@ -1173,9 +1173,19 @@ function normalizeInventorySearch(value) {
     return String(value || '').normalize('NFKC').toLocaleLowerCase('ja');
 }
 
+function getCraftingRecipeForBuilding(recipe, buildingId) {
+    if (!recipe || buildingId !== 'boiler-forge' || recipe[4] !== '簡易炉') return recipe;
+    const upgradedRecipe = recipe.slice();
+    upgradedRecipe[5] = `${recipe[5]} 炉では産出数が2倍になり、製作時間が25%短縮されます。`;
+    upgradedRecipe[6] = (Number(recipe[6]) || 1) * 2;
+    upgradedRecipe[7] = Math.ceil((Number(recipe[7]) || 90) * 0.75);
+    return upgradedRecipe;
+}
+
 function getCraftingRecipesForBuilding(buildingId) {
     return CRAFTING_RECIPES.map((recipe, index) => ({ recipe, index }))
-        .filter(({ recipe }) => (CRAFTING_STATION_BUILDING_IDS[recipe[4]] || []).includes(buildingId));
+        .filter(({ recipe }) => (CRAFTING_STATION_BUILDING_IDS[recipe[4]] || []).includes(buildingId))
+        .map(({ recipe, index }) => ({ recipe: getCraftingRecipeForBuilding(recipe, buildingId), index }));
 }
 
 function createBuildingSvgIcon(buildingId) {
@@ -2213,7 +2223,9 @@ function canCraftRecipeAtBuilding(recipe, buildingInstanceId) {
 }
 
 function craftRecipe(recipeIndex, buildingInstanceId = '', requestedCount) {
-    const recipe = CRAFTING_RECIPES[recipeIndex];
+    const baseRecipe = CRAFTING_RECIPES[recipeIndex];
+    const buildingId = state.buildings.find(building => building.instanceId === buildingInstanceId)?.id;
+    const recipe = getCraftingRecipeForBuilding(baseRecipe, buildingId);
     const creative = Boolean(engineRuntimeState?.creativeMode);
     const isHandcraft = recipe?.[4] === HANDCRAFT_STATION;
     if (!recipe || (isHandcraft ? Boolean(buildingInstanceId) : !canCraftRecipeAtBuilding(recipe, buildingInstanceId))) {

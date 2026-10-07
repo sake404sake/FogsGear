@@ -1,4 +1,4 @@
-const CACHE_NAME = 'steampunk-explorer-v121';
+const CACHE_NAME = 'steampunk-explorer-v122';
 const APP_SHELL = [
     './',
     './index.html',

@@ -10,14 +10,13 @@
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="icon" href="../MainSystem/icons/app-icon.jpg" type="image/jpeg">
     <link rel="apple-touch-icon" href="assets/app-icon-192.png">
-    <link rel="stylesheet" href="css/style.css?v=634">
+    <link rel="stylesheet" href="css/style.css?v=635">
 </head>
 <body>
     <div id="loadingOverlay" class="loading-overlay" role="status" aria-live="polite">
         <div class="loading-panel"><div class="loading-spinner"></div><div id="loadingMessage">マップを読み込んでいます...</div><div class="loading-progress" aria-label="マップ読み込み中"></div></div>
     </div>
     <div id="app-notice" class="app-notice" role="status" aria-live="polite" hidden></div>
-    <section id="crafting-notifications" class="crafting-notifications" aria-label="建築・合成の進行状況" aria-live="polite"></section>
     <div class="landscape-main-frame">
         <!-- 上部パネル：プレイヤー情報 -->
         <div class="panel">
@@ -75,6 +74,7 @@
             <canvas id="gameCanvas" width="640" height="480"></canvas>
             <div id="vehicleAnimationLayer" class="vehicle-animation-layer" aria-hidden="true"></div>
             <canvas id="gearCanvas" class="engine-runtime-canvas" width="800" height="600" aria-hidden="true"></canvas>
+            <section id="crafting-notifications" class="crafting-notifications" aria-label="建築・合成の進行状況" aria-live="polite"></section>
         </div>
     </div>
 
@@ -250,7 +250,7 @@
                                 </div>
                             </div>
                         </section>
-                        <iframe src="../GearSystem/scroll-library.html?embed=1&hideMapBack=1&dashboard=external&v=33" title="保存スクロールのギアプレビュー"></iframe>
+                        <iframe src="../GearSystem/scroll-library.html?embed=1&hideMapBack=1&dashboard=external&v=34" title="保存スクロールのギアプレビュー"></iframe>
                     </section>
                 </div>
             </div>
@@ -262,6 +262,6 @@
         </div>
     </div>
 
-    <script type="module" src="js/main.js?v=715"></script>
+    <script type="module" src="js/main.js?v=716"></script>
 </body>
 </html>
