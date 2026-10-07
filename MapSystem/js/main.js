@@ -2365,10 +2365,6 @@ function createCraftingNotification(job) {
     title.className = 'crafting-progress-title';
     const meta = document.createElement('span');
     meta.className = 'crafting-progress-meta';
-    const batch = document.createElement('span');
-    batch.className = 'crafting-progress-batch';
-    const remaining = document.createElement('span');
-    remaining.className = 'crafting-progress-remaining';
     const track = document.createElement('span');
     track.className = 'crafting-progress-track';
     track.setAttribute('role', 'progressbar');
@@ -2377,18 +2373,10 @@ function createCraftingNotification(job) {
     const fill = document.createElement('span');
     fill.className = 'crafting-progress-fill';
     track.appendChild(fill);
-    meta.append(batch, remaining);
-    copy.append(title, meta, track);
-    const cancel = document.createElement('button');
-    cancel.type = 'button';
-    cancel.className = 'crafting-progress-cancel';
-    cancel.dataset.action = 'cancel-crafting-job';
-    cancel.dataset.jobId = job.jobId;
-    cancel.setAttribute('aria-label', `${getCraftingItemName(job.outputItem)}の製作をキャンセル`);
-    cancel.textContent = '×';
-    card.append(icon, copy, cancel);
+    copy.append(title, meta);
+    card.append(icon, copy, track);
     document.getElementById('crafting-notifications')?.appendChild(card);
-    const entry = { card, title, batch, remaining, track, fill };
+    const entry = { card, title, meta, track, fill };
     bindCraftingNotificationSwipe(entry);
     return entry;
 }
@@ -2397,7 +2385,7 @@ function bindCraftingNotificationSwipe(entry) {
     let pointerStart = null;
     let swiping = false;
     entry.card.addEventListener('pointerdown', event => {
-        if (event.button !== 0 || !event.target.closest('.crafting-progress-track')) return;
+        if (event.button !== 0) return;
         pointerStart = { id: event.pointerId, x: event.clientX, y: event.clientY };
         swiping = false;
     });
@@ -2422,7 +2410,7 @@ function bindCraftingNotificationSwipe(entry) {
         const deltaX = event.clientX - pointerStart.x;
         pointerStart = null;
         entry.card.classList.remove('is-dragging');
-        if (swiping && Math.abs(deltaX) > Math.max(72, entry.card.clientWidth * .3)) {
+        if (swiping && Math.abs(deltaX) > Math.max(48, entry.card.clientWidth * .3)) {
             const direction = Math.sign(deltaX);
             entry.card.style.setProperty('--crafting-dismiss-x', `${direction * (window.innerWidth + entry.card.clientWidth)}px`);
             entry.card.classList.add('is-dismissing');
@@ -2489,11 +2477,6 @@ function syncCraftingNotifications() {
         craftingNotificationCards.delete(jobId);
     }
     const now = syncAt;
-    const queuePositions = new Map(jobs
-        .slice()
-        .sort((first, second) => Number(first.startedAt) - Number(second.startedAt)
-            || Number(first.completesAt) - Number(second.completesAt))
-        .map((job, index) => [job.jobId, index + 1]));
     let didUpdateProgress = false;
     visibleJobs.forEach(job => {
         let entry = craftingNotificationCards.get(job.jobId);
@@ -2512,17 +2495,14 @@ function syncCraftingNotifications() {
         const progress = Math.max(0, Math.min(100, ((now - start) / duration) * 100));
         const secondsLeft = Math.max(0, Math.ceil((completesAt - now) / 1000));
         const queued = now < start;
-        const queuePosition = queuePositions.get(job.jobId);
         entry.title.textContent = `${outputName}${outputAmount > 1 ? ` ×${outputAmount}` : ''}`;
-        const batchLabel = queued
-            ? `キュー ${queuePosition}/${jobs.length}`
-            : `${batchCount > 1 ? `製作中 ${batchIndex}/${batchCount}` : '製作中'}${jobs.length > 1 ? ` / 待機 ${jobs.length - 1}件` : ''}`;
+        const batchLabel = `製作中 ${batchIndex}/${batchCount} 待機 ${Math.max(0, jobs.length - 1)}件`;
         const remainingLabel = queued
             ? `着手まで ${Math.max(0, Math.ceil((start - now) / 1000))}秒`
             : `残り ${secondsLeft}秒`;
         entry.card.toggleAttribute('data-queued', queued);
-        if (entry.batch.textContent !== batchLabel) entry.batch.textContent = batchLabel;
-        if (entry.remaining.textContent !== remainingLabel) entry.remaining.textContent = remainingLabel;
+        const statusText = `${batchLabel}　${remainingLabel}`;
+        if (entry.meta.textContent !== statusText) entry.meta.textContent = statusText;
         const ariaLabel = `${outputName}の製作進行状況`;
         if (entry.track.getAttribute('aria-label') !== ariaLabel) entry.track.setAttribute('aria-label', ariaLabel);
         const progressValue = String(Math.round(progress));
@@ -4328,10 +4308,6 @@ document.addEventListener('click', (event) => {
     }
     if (button.dataset.action === 'redo-building') {
         applyBuildingHistory('redo');
-        return;
-    }
-    if (button.dataset.action === 'cancel-crafting-job') {
-        cancelCraftingJob(button.dataset.jobId);
         return;
     }
     if (button.dataset.action === 'select-craft-quantity') {
