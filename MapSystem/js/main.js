@@ -1623,6 +1623,7 @@ function createInventoryItemCard(itemId) {
     name.textContent = getCraftingItemName(itemId);
     const itemCount = document.createElement('strong');
     itemCount.className = 'inventory-item-count';
+    itemCount.dataset.itemKey = itemId;
     itemCount.textContent = formatInventoryCount(itemId, getCraftingItemCount(itemId));
     button.append(icon, name, itemCount);
     return button;
@@ -1646,7 +1647,7 @@ function renderCellMaterials() {
     ];
     const inventorySearch = normalizeInventorySearch(document.getElementById('inventory-item-search')?.value);
     const visibleInventoryIds = orderedIds.filter(id => !inventorySearch || normalizeInventorySearch(getCraftingItemName(id)).includes(inventorySearch));
-    const inventorySignature = `${inventorySearch}:${JSON.stringify(visibleInventoryIds.map(id => [id, getCraftingItemCount(id)]))}`;
+    const inventorySignature = `${inventorySearch}:${JSON.stringify(visibleInventoryIds)}`;
     if (inventoryList && inventorySignature !== inventoryRenderSignature) {
         inventoryRenderSignature = inventorySignature;
         inventoryList.replaceChildren();
@@ -1694,6 +1695,13 @@ function renderCellMaterials() {
                 inventoryList.appendChild(section);
             });
         }
+    }
+    if (inventoryList) {
+        inventoryList.querySelectorAll('.inventory-item-count[data-item-key]').forEach(countElement => {
+            const itemId = countElement.dataset.itemKey;
+            const countText = formatInventoryCount(itemId, getCraftingItemCount(itemId));
+            if (countElement.textContent !== countText) countElement.textContent = countText;
+        });
     }
 
     const recipeList = document.getElementById('crafting-recipe-list');
