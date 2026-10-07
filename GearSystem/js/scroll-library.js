@@ -521,11 +521,12 @@ async function importSharedScrollData(value) {
             if (transfer.chunks.has(index) && transfer.chunks.get(index) !== chunk) {
                 throw new Error('同じ番号の共有画像に異なる内容があります。');
             }
+            const duplicate = transfer.chunks.has(index);
             transfer.chunks.set(index, chunk);
             transfer.updatedAt = now;
             const received = transfer.chunks.size;
             if (received < total) {
-                shareStatus.textContent = `共有画像 ${received}/${total} 枚を読み込みました。続けて次の画像を読み込んでください。`;
+                shareStatus.textContent = `共有QR ${index}/${total}枚目を${duplicate ? '再読込しました' : '読み込みました'}（受信 ${received}/${total}枚）。順不同で続けて読み込めます。`;
                 return false;
             }
             value = `FOGSGEAR-SCROLL:1:${[...Array(total)].map((_, partIndex) => transfer.chunks.get(partIndex + 1)).join('')}`;
@@ -570,23 +571,23 @@ async function importSharedScrollData(value) {
         console.error('Shared scroll import failed.', error);
         const message = error.message || '共有スクロールを取り込めませんでした。';
         shareStatus.textContent = message;
-        window.alert(message);
         return false;
     }
 }
 
-async function importQrImage(file) {
-    if (!file) return;
+async function importQrImage(file, position, total) {
+    const prefix = total > 1 ? `選択画像 ${position}/${total}: ` : '';
+    if (!file) return false;
     if (!file.type.startsWith('image/')) {
-        shareStatus.textContent = '画像ファイルを選択してください。';
-        return;
+        shareStatus.textContent = `${prefix}画像ファイルを選択してください。`;
+        return false;
     }
 
     if (file.size > 12 * 1024 * 1024) {
-        shareStatus.textContent = '画像が大きすぎます。12MB以下のQR画像を選んでください。';
-        return;
+        shareStatus.textContent = `${prefix}画像が大きすぎます。12MB以下のQR画像を選んでください。`;
+        return false;
     }
-    shareStatus.textContent = 'QR画像を読み取っています...';
+    shareStatus.textContent = `${prefix}QR画像を読み取っています...`;
     let bitmap;
     try {
         if (typeof window.jsQR !== 'function') throw new Error('QR画像読み取り機能を読み込めませんでした。');
@@ -604,13 +605,31 @@ async function importQrImage(file) {
         const imageData = imageContext.getImageData(0, 0, bitmap.width, bitmap.height);
         const result = window.jsQR(imageData.data, bitmap.width, bitmap.height, { inversionAttempts: 'attemptBoth' });
         if (!result?.data) throw new Error('画像からQRコードを読み取れませんでした。');
-        if (await importSharedScrollData(result.data)) shareStatus.textContent = 'QR画像を読み込みました。';
+        const partMatch = /^FOGSGEAR-SCROLL-PART:1:[A-Za-z0-9_-]{8,24}:(\d{1,2}):(\d{1,2}):/.exec(result.data);
+        const partLabel = partMatch ? `共有QR ${Number(partMatch[1])}/${Number(partMatch[2])}枚目: ` : '';
+        if (await importSharedScrollData(result.data)) {
+            shareStatus.textContent = `${prefix}${partLabel}設計図を取り込みました。`;
+            return true;
+        }
+        return false;
     } catch (error) {
-        shareStatus.textContent = error.message || 'QR画像を読み込めませんでした。';
+        shareStatus.textContent = `${prefix}${error instanceof Error ? error.message : String(error) || 'QR画像を読み込めませんでした。'}`;
         console.error('QR image import failed.', error);
+        return false;
     } finally {
         bitmap?.close?.();
-        shareFileInput.value = '';
+    }
+}
+
+async function importQrImages(files) {
+    const selectedFiles = [...files];
+    let importedCount = 0;
+    for (let index = 0; index < selectedFiles.length; index++) {
+        const imported = await importQrImage(selectedFiles[index], index + 1, selectedFiles.length);
+        if (imported) importedCount++;
+    }
+    if (selectedFiles.length > 1 && importedCount) {
+        shareStatus.textContent = `${selectedFiles.length}枚中${importedCount}件の設計図を取り込みました。`;
     }
 }
 
@@ -1047,7 +1066,12 @@ shareNextButton?.addEventListener('click', () => {
     shareQrPage++;
     renderShareQrPage();
 });
-shareFileInput?.addEventListener('change', event => importQrImage(event.target.files?.[0]));
+shareFileInput?.addEventListener('change', event => {
+    const input = event.currentTarget;
+    importQrImages(input.files || []).finally(() => {
+        input.value = '';
+    });
+});
 shareCameraStartButton?.addEventListener('click', startQrCamera);
 shareCameraStopButton?.addEventListener('click', () => {
     stopQrCamera();

@@ -68,7 +68,7 @@ body {
 .crafting-progress-meta { display: flex; justify-content: space-between; gap: 8px; color: #a9d8c9; font: .62rem/1.2 monospace; }
 .crafting-progress-track { display: flex; align-items: center; height: 16px; overflow: hidden; background: rgba(0, 0, 0, .45); border: 1px solid rgba(98, 194, 170, .35); cursor: grab; touch-action: pan-y; user-select: none; }
 .crafting-progress-track:active { cursor: grabbing; }
-.crafting-progress-fill { display: block; width: var(--crafting-progress, 0%); height: 6px; background: linear-gradient(90deg, #62c2aa, #f0d17c); transition: width .12s linear; pointer-events: none; }
+.crafting-progress-fill { display: block; width: 100%; height: 6px; background: linear-gradient(90deg, #62c2aa, #f0d17c); transform: scaleX(var(--crafting-progress-scale, 0)); transform-origin: left center; transition: transform .1s linear; will-change: transform; pointer-events: none; }
 .crafting-progress-cancel { display: grid; place-items: center; width: 28px; height: 28px; padding: 0; color: #ffd3bd; background: rgba(113, 46, 31, .62); border: 1px solid rgba(255, 154, 120, .55); border-radius: 3px; font: 700 1.1rem/1 monospace; cursor: pointer; }
 .crafting-progress-cancel:hover, .crafting-progress-cancel:focus-visible { color: #fff; background: rgba(156, 57, 34, .9); outline: 1px solid #ffd3bd; }
 .building-item-card { position: relative; }

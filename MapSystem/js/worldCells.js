@@ -171,6 +171,7 @@ export function chooseEraCellType(seed, x, y, count, initialType, currentType) {
         ['initial', 'direct', 'direct2'].includes(WORLD_CELL_TYPES[type].category)
         && type !== 'SEA'
         && type !== 'LAKE'
+        && type !== 'RUIN'
         && type !== currentType
     );
     const eraTypes = Object.keys(WORLD_CELL_TYPES).filter(type => WORLD_CELL_TYPES[type].category === 'event');

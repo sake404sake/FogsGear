@@ -660,8 +660,8 @@ canvas {
 .embedded-library .scroll-preview-frame canvas { width: 100%; height: 100%; object-fit: contain; }
 .embedded-library .preview-lock-label { display: none; }
 .embedded-library .scroll-detail-footer { position: absolute; z-index: 2; right: 14px; bottom: 10px; left: 14px; justify-content: flex-end; margin: 0; pointer-events: none; }
-.embedded-library .scroll-actions { pointer-events: auto; }
-.embedded-library .scroll-actions .btn { padding: 6px 10px; font-size: 0.7rem; }
+.embedded-library .scroll-actions { width: auto; margin-left: auto; pointer-events: auto; }
+.embedded-library .scroll-actions .btn { width: auto; flex: 0 0 auto; padding: 6px 10px; font-size: 0.7rem; }
 .embedded-library .scroll-share-modal { position: fixed; z-index: 40; }
 .embedded-library .scroll-list-panel { position: relative; box-sizing: border-box; max-height: none; touch-action: pan-y; transition: opacity 180ms ease; }
 .embedded-library.scroll-list-hidden .scroll-list-panel { display: none; }
@@ -685,6 +685,15 @@ canvas {
         min-height: 32px;
         padding: 4px 6px;
         font-size: 0.58rem;
+    }
+    .embedded-library .scroll-detail-footer {
+        position: relative;
+        right: auto;
+        bottom: auto;
+        left: auto;
+        justify-content: flex-end;
+        margin: 6px 2px 0;
+        pointer-events: auto;
     }
 }
 

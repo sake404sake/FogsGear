@@ -3,7 +3,7 @@ import { MapGenerator, BIOME_COLORS, loadMapSnapshot, saveMapSnapshot } from './
 import { SkinRenderer } from './skinRenderer.js?v=3';
 import { CELL_DEFINITIONS, canEnterCell, getCellEntryRule, getMosaicColor } from './cellRules.js';
 import { drawCellIcon, loadCellIconAtlas } from './cellIconRenderer.js?v=5';
-import { ACTIVE_SCROLL_TARGETS_KEY, CELL_MATERIALS, TERRAIN_TRANSFORM_RECIPES, WORLD_CELL_TYPES, applyCellChanges, chooseEraCellType, getCellCollectionPowerCost, getCellDrops, readCellChanges, saveCellChange } from './worldCells.js?v=12';
+import { ACTIVE_SCROLL_TARGETS_KEY, CELL_MATERIALS, TERRAIN_TRANSFORM_RECIPES, WORLD_CELL_TYPES, applyCellChanges, chooseEraCellType, getCellCollectionPowerCost, getCellDrops, readCellChanges, saveCellChange } from './worldCells.js?v=13';
 import { CRAFTING_ITEMS, CRAFTING_ITEM_BY_ID, CRAFTING_RATE_MULTIPLIER, CRAFTING_RECIPES, CRAFTING_STATION_BUILDING_IDS, DEFERRED_CRAFTING_ITEM_IDS, HANDCRAFT_STATION } from './craftingData.js?v=13';
 import { BUILDING_BY_ID, BUILDING_DEFINITIONS, canPlaceBuildingOnTerrainCell, drawBuilding, getRailAutoRotation, getRailConnections, getTileEffectsUnderFootprint, getVehicleRailRotation, loadBuildingIconImages, normalizeBuildingUtilityState } from './buildingData.js?v=30';
 import { getBuildingUtilityStatus, simulateBuildingUtilityNetworks } from './buildingUtilityNetworks.js?v=4';
@@ -130,13 +130,16 @@ let cameraStart = { x: 0, y: 0 };
 let initialPinchDist = null;
 let initialZoom = 1.0;
 let selectedSavedScrollId = null;
-let inventoryRenderSignature = '';
 const inventoryOpenCategories = new Set(['scrolls']);
 let craftingRenderSignature = '';
 let buildingRenderSignature = '';
 let buildingCraftingRenderSignature = '';
 const craftingQuantitySelections = new Map();
 const craftingNotificationCards = new Map();
+let inventoryRefreshTimer = 0;
+let lastCraftingProgressUpdateAt = 0;
+let lastCraftingNotificationSyncAt = 0;
+let lastCraftingCountdownUpdateAt = 0;
 
 const INVENTORY_ITEM_DEFINITIONS = {
     paper_scroll: { name: 'スクロール（紙）', description: '新しいギア設計を記録する紙の巻物。ギア編集画面で設計を作成できます。', iconId: 'paper_scroll', image: null, meta: '未使用・新規設計用' },
@@ -1025,7 +1028,7 @@ function createCraftQuantityControl(label, selectionKey, maxCount, defaultCount,
     const selectedCount = maxCount > 0
         ? Math.min(maxCount, Math.max(1, rememberedCount || defaultCount))
         : 0;
-    control.dataset.selectedCount = String(selectedCount);
+    if (control.dataset.selectedCount !== String(selectedCount)) control.dataset.selectedCount = String(selectedCount);
     if (maxCount > 0) craftingQuantitySelections.set(selectionKey, selectedCount);
 
     const options = maxCount > 0
@@ -1629,6 +1632,70 @@ function createInventoryItemCard(itemId) {
     return button;
 }
 
+function syncInventoryItemCards(container, itemIds) {
+    const existingCards = new Map([...container.children]
+        .filter(child => child instanceof HTMLButtonElement && child.classList.contains('inventory-item-card'))
+        .map(card => [card.dataset.itemKey, card]));
+    const orderedCards = itemIds.map(itemId => {
+        let card = existingCards.get(itemId);
+        if (card) existingCards.delete(itemId);
+        else card = createInventoryItemCard(itemId);
+        return card;
+    });
+    existingCards.forEach(card => card.remove());
+    orderedCards.forEach((card, index) => {
+        if (container.children[index] !== card) container.insertBefore(card, container.children[index] || null);
+    });
+}
+
+function createInventoryCategory(category) {
+    const section = document.createElement('details');
+    section.className = `inventory-category${category === 'scrolls' ? ' is-important' : ''}`;
+    section.dataset.inventoryCategory = category;
+    section.open = inventoryOpenCategories.has(category);
+    const heading = document.createElement('summary');
+    heading.className = 'inventory-category-heading';
+    const label = document.createElement('span');
+    label.textContent = INVENTORY_CATEGORY_LABELS[category];
+    const count = document.createElement('strong');
+    heading.append(label, count);
+    const itemGrid = document.createElement('div');
+    itemGrid.className = 'inventory-category-items';
+    section.append(heading, itemGrid);
+    return section;
+}
+
+function syncInventoryCategories(inventoryList, visibleInventoryIds) {
+    const groupedInventory = new Map();
+    visibleInventoryIds.forEach(itemId => {
+        const category = getInventoryCategory(itemId);
+        if (!groupedInventory.has(category)) groupedInventory.set(category, []);
+        groupedInventory.get(category).push(itemId);
+    });
+    const existingSections = new Map([...inventoryList.children]
+        .filter(child => child instanceof HTMLDetailsElement && child.classList.contains('inventory-category'))
+        .map(section => [section.dataset.inventoryCategory, section]));
+    const previousScrollTop = inventoryList.scrollTop;
+    const orderedSections = [];
+    Object.keys(INVENTORY_CATEGORY_LABELS).forEach(category => {
+        const items = groupedInventory.get(category);
+        if (!items) return;
+        let section = existingSections.get(category);
+        if (section) existingSections.delete(category);
+        else section = createInventoryCategory(category);
+        const categoryCount = section.querySelector('.inventory-category-heading strong');
+        const categoryCountText = String(items.length);
+        if (categoryCount.textContent !== categoryCountText) categoryCount.textContent = categoryCountText;
+        syncInventoryItemCards(section.querySelector('.inventory-category-items'), items);
+        orderedSections.push(section);
+    });
+    existingSections.forEach(section => section.remove());
+    orderedSections.forEach((section, index) => {
+        if (inventoryList.children[index] !== section) inventoryList.insertBefore(section, inventoryList.children[index] || null);
+    });
+    inventoryList.scrollTop = previousScrollTop;
+}
+
 function renderCellMaterials() {
     if (!engineRuntimeState) return;
     renderBuildingInventory();
@@ -1647,53 +1714,40 @@ function renderCellMaterials() {
     ];
     const inventorySearch = normalizeInventorySearch(document.getElementById('inventory-item-search')?.value);
     const visibleInventoryIds = orderedIds.filter(id => !inventorySearch || normalizeInventorySearch(getCraftingItemName(id)).includes(inventorySearch));
-    const inventorySignature = `${inventorySearch}:${JSON.stringify(visibleInventoryIds)}`;
-    if (inventoryList && inventorySignature !== inventoryRenderSignature) {
-        inventoryRenderSignature = inventorySignature;
-        inventoryList.replaceChildren();
-        if (!visibleInventoryIds.length) {
-            const empty = document.createElement('span');
-            empty.className = 'inventory-empty';
-            empty.textContent = inventorySearch ? '該当する所持品はありません' : '所持品はありません';
-            inventoryList.appendChild(empty);
+    if (inventoryList) {
+        const mode = inventorySearch
+            ? visibleInventoryIds.length ? 'search-results' : 'empty-search'
+            : visibleInventoryIds.length ? 'categories' : 'empty';
+        if (inventoryList.dataset.renderMode !== mode) {
+            inventoryList.replaceChildren();
+            inventoryList.dataset.renderMode = mode;
         }
-        if (inventorySearch && visibleInventoryIds.length) {
-            const results = document.createElement('section');
-            results.className = 'inventory-search-results';
-            const heading = document.createElement('h3');
-            heading.textContent = `検索結果（${visibleInventoryIds.length}件）`;
-            const itemGrid = document.createElement('div');
-            itemGrid.className = 'inventory-category-items';
-            visibleInventoryIds.forEach(itemId => itemGrid.appendChild(createInventoryItemCard(itemId)));
-            results.append(heading, itemGrid);
-            inventoryList.appendChild(results);
-        } else if (!inventorySearch) {
-            const groupedInventory = new Map();
-            visibleInventoryIds.forEach(itemId => {
-                const category = getInventoryCategory(itemId);
-                if (!groupedInventory.has(category)) groupedInventory.set(category, []);
-                groupedInventory.get(category).push(itemId);
-            });
-            const categoryOrder = Object.keys(INVENTORY_CATEGORY_LABELS);
-            categoryOrder.filter(category => groupedInventory.has(category)).forEach(category => {
-                const items = groupedInventory.get(category);
-                const section = document.createElement('details');
-                section.className = `inventory-category${category === 'scrolls' ? ' is-important' : ''}`;
-                section.dataset.inventoryCategory = category;
-                section.open = inventoryOpenCategories.has(category);
-                const heading = document.createElement('summary');
-                heading.className = 'inventory-category-heading';
-                const label = document.createElement('span');
-                label.textContent = INVENTORY_CATEGORY_LABELS[category];
-                const count = document.createElement('strong');
-                count.textContent = String(items.length);
-                heading.append(label, count);
+        if (mode === 'search-results') {
+            let results = inventoryList.querySelector('.inventory-search-results');
+            if (!results) {
+                results = document.createElement('section');
+                results.className = 'inventory-search-results';
+                const heading = document.createElement('h3');
                 const itemGrid = document.createElement('div');
                 itemGrid.className = 'inventory-category-items';
-                items.forEach(itemId => itemGrid.appendChild(createInventoryItemCard(itemId)));
-                section.append(heading, itemGrid);
-                inventoryList.appendChild(section);
-            });
+                results.append(heading, itemGrid);
+                inventoryList.appendChild(results);
+            }
+            const heading = results.querySelector('h3');
+            const headingText = `検索結果（${visibleInventoryIds.length}件）`;
+            if (heading.textContent !== headingText) heading.textContent = headingText;
+            syncInventoryItemCards(results.querySelector('.inventory-category-items'), visibleInventoryIds);
+        } else if (mode === 'categories') {
+            syncInventoryCategories(inventoryList, visibleInventoryIds);
+        } else {
+            let empty = inventoryList.querySelector('.inventory-empty');
+            if (!empty) {
+                empty = document.createElement('span');
+                empty.className = 'inventory-empty';
+                inventoryList.appendChild(empty);
+            }
+            const emptyText = inventorySearch ? '該当する所持品はありません' : '所持品はありません';
+            if (empty.textContent !== emptyText) empty.textContent = emptyText;
         }
     }
     if (inventoryList) {
@@ -1720,25 +1774,44 @@ function renderCellMaterials() {
     const now = Date.now();
     const jobSignature = JSON.stringify((engineRuntimeState.craftingJobs || [])
         .map(job => [job.jobId, job.recipeKey, Number(job.startedAt), Number(job.completesAt)]));
-    const recipeMaterialSignature = JSON.stringify(visibleRecipes.map(({ recipe, index }) => [
-        index,
-        getCraftingItemCount(recipe[3]),
-        recipe[2].map(([itemId]) => [itemId, getCraftingItemCount(itemId)])
-    ]));
-    const craftingSignature = `${Boolean(engineRuntimeState.creativeMode)}:${selectedFamily}:${recipeSearch}:${recipeMaterialSignature}:${jobSignature}`;
-    if (craftingSignature === craftingRenderSignature) return;
-    craftingRenderSignature = craftingSignature;
-    recipeList.replaceChildren();
-    if (!visibleRecipes.length) {
-        const empty = document.createElement('p');
-        empty.className = 'inventory-empty';
-        empty.textContent = recipeSearch || selectedFamily !== 'all'
-            ? '条件に一致する手作業の加工・合成レシピはありません'
-            : '手作業で作れる加工・合成レシピはありません';
-        recipeList.appendChild(empty);
+    const craftingSignature = `${Boolean(engineRuntimeState.creativeMode)}:${selectedFamily}:${recipeSearch}:${jobSignature}:${visibleRecipes.map(({ index }) => index).join(',')}`;
+    if (craftingSignature === craftingRenderSignature) {
+        visibleRecipes.forEach(({ recipe, index }) => {
+            const card = recipeList.querySelector(`.crafting-recipe-card[data-recipe-index="${index}"]`);
+            if (card) updateCraftingRecipeCard(card, recipe, index, now);
+        });
         return;
     }
-    visibleRecipes.forEach(({ recipe, index }) => recipeList.appendChild(createCraftingRecipeCard(recipe, index, now)));
+    craftingRenderSignature = craftingSignature;
+    if (!visibleRecipes.length) {
+        if (!recipeList.querySelector('.inventory-empty')) {
+            recipeList.replaceChildren();
+            const empty = document.createElement('p');
+            empty.className = 'inventory-empty';
+            recipeList.appendChild(empty);
+        }
+        recipeList.querySelector('.inventory-empty').textContent = recipeSearch || selectedFamily !== 'all'
+            ? '条件に一致する手作業の加工・合成レシピはありません'
+            : '手作業で作れる加工・合成レシピはありません';
+        return;
+    }
+    const previousScrollTop = recipeList.scrollTop;
+    const existingCards = new Map([...recipeList.querySelectorAll('.crafting-recipe-card[data-recipe-index]')]
+        .map(card => [Number(card.dataset.recipeIndex), card]));
+    const orderedCards = [];
+    recipeList.querySelector('.inventory-empty')?.remove();
+    visibleRecipes.forEach(({ recipe, index }) => {
+        let card = existingCards.get(index);
+        if (card) existingCards.delete(index);
+        else card = createCraftingRecipeCard(recipe, index, now);
+        updateCraftingRecipeCard(card, recipe, index, now);
+        orderedCards.push(card);
+    });
+    existingCards.forEach(card => card.remove());
+    orderedCards.forEach((card, index) => {
+        if (recipeList.children[index] !== card) recipeList.insertBefore(card, recipeList.children[index] || null);
+    });
+    recipeList.scrollTop = previousScrollTop;
 }
 
 function createCraftingRecipeCard(recipe, index, now, buildingInstanceId = '') {
@@ -1749,6 +1822,7 @@ function createCraftingRecipeCard(recipe, index, now, buildingInstanceId = '') {
     const defaultCraftCount = maxCraftCount > 0 ? 1 : 0;
     const card = document.createElement('article');
     card.className = `crafting-recipe-card${maxCraftCount > 0 ? '' : ' is-unavailable'}`;
+    card.dataset.recipeIndex = String(index);
     const heading = document.createElement('div');
     heading.className = 'crafting-recipe-title';
     const titleText = document.createElement('strong');
@@ -1790,14 +1864,17 @@ function createCraftingRecipeCard(recipe, index, now, buildingInstanceId = '') {
     const footer = document.createElement('div');
     footer.className = 'crafting-recipe-footer';
     const stationLabel = document.createElement('span');
+    stationLabel.className = 'crafting-station-label';
     stationLabel.textContent = activeJobs.length
         ? `${station} / 進行中 ${activeJobs.length}回`
         : `${station} / ${Math.max(1, Math.round(duration / CRAFTING_RATE_MULTIPLIER))}秒`;
     if (activeJobs.length) {
         const countdown = document.createElement('span');
         countdown.className = 'crafting-countdown';
-        countdown.dataset.completesAt = String(activeJobs[0].completesAt);
-        countdown.textContent = `${Math.max(0, Math.ceil((Number(activeJobs[0].completesAt) - now) / 1000))}秒`;
+        const completesAt = String(activeJobs[0].completesAt);
+        if (countdown.dataset.completesAt !== completesAt) countdown.dataset.completesAt = completesAt;
+        const countdownText = `${Math.max(0, Math.ceil((Number(activeJobs[0].completesAt) - now) / 1000))}秒`;
+        if (countdown.textContent !== countdownText) countdown.textContent = countdownText;
         stationLabel.appendChild(countdown);
     }
     stationLabel.title = stationLabel.textContent;
@@ -1832,6 +1909,104 @@ function createCraftingRecipeCard(recipe, index, now, buildingInstanceId = '') {
     return card;
 }
 
+function updateCraftingRecipeCard(card, recipe, index, now) {
+    const [family, title, inputs, output, station, , batch = 1, duration = 0] = recipe;
+    const recipeKey = `${family}:${title}`;
+    const activeJobs = (engineRuntimeState.craftingJobs || []).filter(job => job.recipeKey === recipeKey);
+    const maxCraftCount = getMaximumCraftCount(inputs);
+    const quantityControl = card.querySelector('.crafting-quantity-control');
+    refreshCraftQuantityControl(quantityControl, maxCraftCount);
+    const selectedCount = Number(quantityControl.dataset.selectedCount) || 0;
+    const outputCaption = card.querySelector('.crafting-output-caption');
+    const outputCaptionText = `生成物 / 所持 ${formatInventoryCount(output, getCraftingItemCount(output))}`;
+    if (outputCaption.textContent !== outputCaptionText) outputCaption.textContent = outputCaptionText;
+    if (outputCaption.title !== outputCaptionText) outputCaption.title = outputCaptionText;
+    const outputCount = card.querySelector('.crafting-output-count');
+    const outputCountText = `×${batch * selectedCount}`;
+    if (outputCount.textContent !== outputCountText) outputCount.textContent = outputCountText;
+    const availableCount = card.querySelector('.crafting-available-count');
+    const availableOutputCount = batch * maxCraftCount;
+    const availableText = `最大 ${formatInventoryCount(output, availableOutputCount)}個`;
+    if (availableCount.textContent !== availableText) availableCount.textContent = availableText;
+    const availableTitle = `製作可能数: ${availableOutputCount}個`;
+    if (availableCount.title !== availableTitle) availableCount.title = availableTitle;
+    const craftButton = card.querySelector('[data-action="craft-recipe"]');
+    if (craftButton.dataset.recipeIndex !== String(index)) craftButton.dataset.recipeIndex = String(index);
+    if (craftButton.disabled !== (maxCraftCount === 0)) craftButton.disabled = maxCraftCount === 0;
+    const craftButtonText = `製作 ×${batch * selectedCount}`;
+    if (craftButton.textContent !== craftButtonText) craftButton.textContent = craftButtonText;
+    card.classList.toggle('is-unavailable', maxCraftCount === 0);
+    updateCraftingMaterialCounts(card, selectedCount);
+    const stationLabel = card.querySelector('.crafting-recipe-footer > .crafting-station-label');
+    if (stationLabel) {
+        const stationText = activeJobs.length
+            ? `${station} / 進行中 ${activeJobs.length}回`
+            : `${station} / ${Math.max(1, Math.round(duration / CRAFTING_RATE_MULTIPLIER))}秒`;
+        const labelNode = stationLabel.firstChild;
+        if (labelNode?.nodeType === Node.TEXT_NODE) {
+            if (labelNode.nodeValue !== stationText) labelNode.nodeValue = stationText;
+        }
+        else stationLabel.prepend(document.createTextNode(stationText));
+        if (stationLabel.title !== stationText) stationLabel.title = stationText;
+        let countdown = stationLabel.querySelector('.crafting-countdown');
+        if (activeJobs.length) {
+            if (!countdown) {
+                countdown = document.createElement('span');
+                countdown.className = 'crafting-countdown';
+                stationLabel.appendChild(countdown);
+            }
+            const completesAt = String(activeJobs[0].completesAt);
+            if (countdown.dataset.completesAt !== completesAt) countdown.dataset.completesAt = completesAt;
+            const countdownText = `${Math.max(0, Math.ceil((Number(activeJobs[0].completesAt) - now) / 1000))}秒`;
+            if (countdown.textContent !== countdownText) countdown.textContent = countdownText;
+        } else {
+            countdown?.remove();
+        }
+    }
+}
+
+function refreshCraftQuantityControl(control, maxCount) {
+    if (!control) return;
+    const toggle = control.querySelector('.crafting-quantity-toggle');
+    const selectionKey = toggle.dataset.selectionKey;
+    const rememberedCount = craftingQuantitySelections.get(selectionKey);
+    const selectedCount = maxCount > 0
+        ? Math.min(maxCount, Math.max(1, rememberedCount || 1))
+        : 0;
+    if (control.dataset.selectedCount !== String(selectedCount)) control.dataset.selectedCount = String(selectedCount);
+    if (maxCount > 0) craftingQuantitySelections.set(selectionKey, selectedCount);
+    const options = maxCount > 0
+        ? [{ count: 1, label: '1' }, { count: 5, label: '5' }, { count: 10, label: '10' }]
+            .filter(option => option.count <= maxCount)
+        : [{ count: 0, label: '0' }];
+    if (maxCount > 0 && !options.some(option => option.count === maxCount)) {
+        options.push({ count: maxCount, label: '最大' });
+    }
+    const existingButtons = new Map([...toggle.children].map(button => [Number(button.dataset.quantity), button]));
+    const orderedButtons = options.map(option => {
+        let button = existingButtons.get(option.count);
+        if (button) existingButtons.delete(option.count);
+        else {
+            button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'crafting-quantity-option';
+            button.dataset.action = 'select-craft-quantity';
+            button.dataset.quantity = String(option.count);
+        }
+        if (button.textContent !== option.label) button.textContent = option.label;
+        const ariaLabel = option.label === '最大' ? `最大 ${maxCount}個` : `${option.count}個`;
+        if (button.getAttribute('aria-label') !== ariaLabel) button.setAttribute('aria-label', ariaLabel);
+        const pressed = String(option.count === selectedCount);
+        if (button.getAttribute('aria-pressed') !== pressed) button.setAttribute('aria-pressed', pressed);
+        if (button.disabled !== (maxCount === 0)) button.disabled = maxCount === 0;
+        return button;
+    });
+    existingButtons.forEach(button => button.remove());
+    orderedButtons.forEach((button, index) => {
+        if (toggle.children[index] !== button) toggle.insertBefore(button, toggle.children[index] || null);
+    });
+}
+
 function createCraftingChip(itemId, amount) {
     const chip = document.createElement('button');
     chip.type = 'button';
@@ -1863,10 +2038,12 @@ function updateCraftingMaterialCounts(card, selectedCount) {
         if (!itemId) return;
         const available = getCraftingItemCount(itemId);
         const required = Number(count.dataset.requiredAmount) * Math.max(1, selectedCount);
-        count.textContent = `所持 ${formatInventoryCount(itemId, available)} / 必要 ${formatInventoryCount(itemId, required)}`;
+        const countText = `所持 ${formatInventoryCount(itemId, available)} / 必要 ${formatInventoryCount(itemId, required)}`;
+        if (count.textContent !== countText) count.textContent = countText;
         const chip = count.closest('.crafting-item-chip');
         chip?.classList.toggle('is-missing', available < required);
-        chip?.setAttribute('aria-label', `${getCraftingItemName(itemId)}: 所持 ${formatInventoryCount(itemId, available)} / 必要 ${formatInventoryCount(itemId, required)}`);
+        const ariaLabel = `${getCraftingItemName(itemId)}: 所持 ${formatInventoryCount(itemId, available)} / 必要 ${formatInventoryCount(itemId, required)}`;
+        if (chip?.getAttribute('aria-label') !== ariaLabel) chip?.setAttribute('aria-label', ariaLabel);
     });
 }
 
@@ -2139,11 +2316,27 @@ function renderBuildingCrafting() {
 }
 
 function updateCraftingCountdowns() {
-    document.querySelectorAll('.crafting-countdown, .building-item-countdown').forEach(countdown => {
-        const remaining = Math.max(0, Math.ceil((Number(countdown.dataset.completesAt) - Date.now()) / 1000));
-        countdown.textContent = `${remaining}秒`;
-    });
+    const now = Date.now();
+    if (now - lastCraftingCountdownUpdateAt >= 250) {
+        document.querySelectorAll('.crafting-countdown, .building-item-countdown').forEach(countdown => {
+            const remaining = Math.max(0, Math.ceil((Number(countdown.dataset.completesAt) - now) / 1000));
+            const text = `${remaining}秒`;
+            if (countdown.textContent !== text) countdown.textContent = text;
+        });
+        lastCraftingCountdownUpdateAt = now;
+    }
     syncCraftingNotifications();
+}
+
+function scheduleInventoryRefresh() {
+    if (inventoryRefreshTimer) return;
+    inventoryRefreshTimer = window.setTimeout(() => {
+        inventoryRefreshTimer = 0;
+        const inventoryPanel = document.getElementById('inventory-panel');
+        if (!inventoryPanel || inventoryPanel.hidden) return;
+        if (!document.getElementById('inventory-building-view')?.hidden) renderBuildingInventory();
+        else renderCellMaterials();
+    }, 100);
 }
 
 function createCraftingNotification(job) {
@@ -2183,7 +2376,7 @@ function createCraftingNotification(job) {
     cancel.textContent = '×';
     card.append(icon, copy, cancel);
     document.getElementById('crafting-notifications')?.appendChild(card);
-    const entry = { card, title, batch, remaining, track };
+    const entry = { card, title, batch, remaining, track, fill };
     bindCraftingNotificationSwipe(entry);
     return entry;
 }
@@ -2269,6 +2462,9 @@ function cancelCraftingJob(jobId) {
 function syncCraftingNotifications() {
     const container = document.getElementById('crafting-notifications');
     if (!container || !engineRuntimeState) return;
+    const syncAt = Date.now();
+    if (syncAt - lastCraftingNotificationSyncAt < 33) return;
+    lastCraftingNotificationSyncAt = syncAt;
     const jobs = engineRuntimeState.craftingJobs || [];
     const orderedJobs = jobs.slice().sort((first, second) =>
         Number(first.completesAt) - Number(second.completesAt)
@@ -2280,12 +2476,13 @@ function syncCraftingNotifications() {
         entry.card.remove();
         craftingNotificationCards.delete(jobId);
     }
-    const now = Date.now();
+    const now = syncAt;
     const queuePositions = new Map(jobs
         .slice()
         .sort((first, second) => Number(first.startedAt) - Number(second.startedAt)
             || Number(first.completesAt) - Number(second.completesAt))
         .map((job, index) => [job.jobId, index + 1]));
+    let didUpdateProgress = false;
     visibleJobs.forEach(job => {
         let entry = craftingNotificationCards.get(job.jobId);
         if (!entry) {
@@ -2314,10 +2511,16 @@ function syncCraftingNotifications() {
         entry.card.toggleAttribute('data-queued', queued);
         if (entry.batch.textContent !== batchLabel) entry.batch.textContent = batchLabel;
         if (entry.remaining.textContent !== remainingLabel) entry.remaining.textContent = remainingLabel;
-        entry.track.setAttribute('aria-label', `${outputName}の製作進行状況`);
-        entry.track.setAttribute('aria-valuenow', String(Math.round(progress)));
-        entry.track.firstElementChild.style.setProperty('--crafting-progress', `${progress}%`);
+        const ariaLabel = `${outputName}の製作進行状況`;
+        if (entry.track.getAttribute('aria-label') !== ariaLabel) entry.track.setAttribute('aria-label', ariaLabel);
+        const progressValue = String(Math.round(progress));
+        if (entry.track.getAttribute('aria-valuenow') !== progressValue) entry.track.setAttribute('aria-valuenow', progressValue);
+        if (now - lastCraftingProgressUpdateAt >= 33 || progress >= 100) {
+            entry.fill.style.setProperty('--crafting-progress-scale', String(progress / 100));
+            didUpdateProgress = true;
+        }
     });
+    if (didUpdateProgress) lastCraftingProgressUpdateAt = now;
 }
 
 function openBuildingCrafting() {
@@ -4271,7 +4474,6 @@ document.getElementById('crafting-family-filter')?.addEventListener('change', ()
 });
 
 document.getElementById('inventory-item-search')?.addEventListener('input', () => {
-    inventoryRenderSignature = '';
     renderCellMaterials();
 });
 
@@ -4462,8 +4664,7 @@ engineRuntimeState.worldCellHandler = handleWorldCellOperation;
 engineRuntimeState.subscribe(() => {
     const inventoryPanel = document.getElementById('inventory-panel');
     if (inventoryPanel && !inventoryPanel.hidden) {
-        if (!document.getElementById('inventory-building-view')?.hidden) renderBuildingInventory();
-        else renderCellMaterials();
+        scheduleInventoryRefresh();
     }
     if (!document.getElementById('building-crafting-modal')?.hidden) renderBuildingCrafting();
     updateCraftingCountdowns();
