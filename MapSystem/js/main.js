@@ -9,7 +9,7 @@ import { BUILDING_BY_ID, BUILDING_DEFINITIONS, canPlaceBuildingOnTerrainCell, dr
 import { getBuildingUtilityStatus, simulateBuildingUtilityNetworks } from './buildingUtilityNetworks.js?v=4';
 import { buildTerritoryBorderSegments } from './territoryBorders.js?v=35';
 import { directionToVehicleRotation, findNextRailStep, getTrackDirection, getVehicleRenderState, STATION_CONTROL_DEFAULTS, VEHICLE_DEFAULTS } from './railwayRuntime.js?v=8';
-import { GameState as EngineGameState, clearGameProgress } from '../../GearSystem/js/GameState.js?v=runtime-41';
+import { GameState as EngineGameState, clearGameProgress } from '../../GearSystem/js/GameState.js?v=runtime-45';
 import { GearManager as EngineGearManager } from '../../GearSystem/js/GearManager.js?v=runtime-5';
 
 const canvas = document.getElementById('gameCanvas');
@@ -136,6 +136,9 @@ let buildingRenderSignature = '';
 let buildingCraftingRenderSignature = '';
 const craftingQuantitySelections = new Map();
 const craftingNotificationCards = new Map();
+let craftingNotificationQueueIds = [];
+let activeCraftingNotificationQueueId = null;
+let isCraftingNotificationFlipInProgress = false;
 let inventoryRefreshTimer = 0;
 let lastCraftingProgressUpdateAt = 0;
 let lastCraftingNotificationSyncAt = 0;
@@ -1411,6 +1414,9 @@ function craftBuildingKit(buildingId, requestedCount) {
             batchIndex: index + 1,
             batchCount: quantity,
             recipeKey: `building:${building.id}`,
+            craftingStationId: 'construction',
+            queuedAt: now,
+            durationMs: duration,
             outputItem: building.id,
             outputAmount: 1,
             inputCosts: creative ? [] : [
@@ -2265,6 +2271,9 @@ function craftRecipe(recipeIndex, buildingInstanceId = '', requestedCount) {
             batchIndex: index + 1,
             batchCount: quantity,
             recipeKey,
+            craftingStationId: buildingInstanceId || 'handcraft',
+            queuedAt: now,
+            durationMs: duration,
             outputItem: recipe[3],
             outputAmount,
             inputCosts: creative ? [] : recipe[2].map(([itemId, amount]) => [itemId, amount]),
@@ -2351,10 +2360,11 @@ function scheduleInventoryRefresh() {
     }, 100);
 }
 
-function createCraftingNotification(job) {
+function createCraftingNotification(job, queueId) {
     const card = document.createElement('article');
     card.className = 'crafting-progress-card';
     card.dataset.jobId = job.jobId;
+    card.dataset.queueId = queueId;
     card.setAttribute('aria-label', `${getCraftingItemName(job.outputItem)}の製作`);
     const icon = document.createElement('span');
     icon.className = 'crafting-progress-icon';
@@ -2365,6 +2375,8 @@ function createCraftingNotification(job) {
     title.className = 'crafting-progress-title';
     const meta = document.createElement('span');
     meta.className = 'crafting-progress-meta';
+    const queuePage = document.createElement('span');
+    queuePage.className = 'crafting-progress-queue-page';
     const track = document.createElement('span');
     track.className = 'crafting-progress-track';
     track.setAttribute('role', 'progressbar');
@@ -2374,62 +2386,114 @@ function createCraftingNotification(job) {
     fill.className = 'crafting-progress-fill';
     track.appendChild(fill);
     copy.append(title, meta);
-    card.append(icon, copy, track);
+    card.append(icon, copy, queuePage, track);
     document.getElementById('crafting-notifications')?.appendChild(card);
-    const entry = { card, title, meta, track, fill };
+    const entry = { card, title, meta, queuePage, track, fill };
     bindCraftingNotificationSwipe(entry);
     return entry;
 }
 
 function bindCraftingNotificationSwipe(entry) {
     let pointerStart = null;
-    let swiping = false;
-    entry.card.addEventListener('pointerdown', event => {
-        if (event.button !== 0) return;
-        pointerStart = { id: event.pointerId, x: event.clientX, y: event.clientY };
-        swiping = false;
-    });
-    entry.card.addEventListener('pointermove', event => {
+    const stopTracking = () => {
+        window.removeEventListener('pointermove', trackPointerMove, true);
+        window.removeEventListener('pointerup', finishPointer, true);
+        window.removeEventListener('pointercancel', cancelPointer, true);
+    };
+    const trackPointerMove = event => {
         if (!pointerStart || pointerStart.id !== event.pointerId) return;
         const deltaX = event.clientX - pointerStart.x;
         const deltaY = event.clientY - pointerStart.y;
-        if (!swiping && (Math.abs(deltaY) > 12 || Math.abs(deltaX) < 8)) {
-            if (Math.abs(deltaY) > 12) pointerStart = null;
-            return;
+        if (!pointerStart.axis) {
+            if (Math.max(Math.abs(deltaX), Math.abs(deltaY)) < 8) return;
+            pointerStart.axis = Math.abs(deltaX) > Math.abs(deltaY) ? 'horizontal' : 'vertical';
+            if (pointerStart.axis === 'vertical' && craftingNotificationQueueIds.length < 2) {
+                pointerStart = null;
+                stopTracking();
+                return;
+            }
         }
-        if (Math.abs(deltaX) <= Math.abs(deltaY)) return;
-        swiping = true;
-        event.preventDefault();
-        if (!entry.card.hasPointerCapture(event.pointerId)) entry.card.setPointerCapture(event.pointerId);
-        entry.card.classList.add('is-dragging');
-        entry.card.style.transform = `translateX(${deltaX}px)`;
-        entry.card.style.opacity = String(Math.max(0, 1 - Math.abs(deltaX) / Math.max(180, entry.card.clientWidth)));
-    });
-    const finishSwipe = event => {
+        if (event.cancelable) event.preventDefault();
+        if (pointerStart.axis === 'horizontal') {
+            entry.card.classList.add('is-dragging');
+            entry.card.style.transform = `translateX(${deltaX}px)`;
+            entry.card.style.opacity = String(Math.max(0, 1 - Math.abs(deltaX) / Math.max(180, entry.card.clientWidth)));
+        } else {
+            entry.card.classList.add('is-vertical-dragging');
+            entry.card.style.transform = `translateY(${deltaY * .25}px)`;
+            entry.card.style.opacity = String(Math.max(.65, 1 - Math.abs(deltaY) / Math.max(500, entry.card.clientHeight * 8)));
+        }
+    };
+    const resetCardGesture = () => {
+        entry.card.classList.remove('is-dragging', 'is-vertical-dragging');
+        entry.card.style.transform = '';
+        entry.card.style.opacity = '';
+        entry.card.style.removeProperty('--crafting-dismiss-x');
+    };
+    const finishPointer = event => {
         if (!pointerStart || pointerStart.id !== event.pointerId) return;
+        event.stopPropagation();
         const deltaX = event.clientX - pointerStart.x;
+        const deltaY = event.clientY - pointerStart.y;
+        const axis = pointerStart.axis;
         pointerStart = null;
-        entry.card.classList.remove('is-dragging');
-        if (swiping && Math.abs(deltaX) > Math.max(48, entry.card.clientWidth * .3)) {
+        stopTracking();
+        entry.card.classList.remove('is-dragging', 'is-vertical-dragging');
+        if (axis === 'horizontal' && Math.abs(deltaX) > Math.max(48, entry.card.clientWidth * .3)) {
             const direction = Math.sign(deltaX);
             entry.card.style.setProperty('--crafting-dismiss-x', `${direction * (window.innerWidth + entry.card.clientWidth)}px`);
             entry.card.classList.add('is-dismissing');
             window.setTimeout(() => cancelCraftingJob(entry.card.dataset.jobId), 220);
             return;
         }
-        swiping = false;
         entry.card.style.transform = '';
         entry.card.style.opacity = '';
         entry.card.style.removeProperty('--crafting-dismiss-x');
+        if (axis === 'vertical' && Math.abs(deltaY) > Math.max(24, entry.card.clientHeight * .3)) {
+            turnCraftingNotificationQueue(deltaY < 0 ? 1 : -1);
+        }
     };
-    entry.card.addEventListener('pointerup', finishSwipe);
-    entry.card.addEventListener('pointercancel', () => {
+    const cancelPointer = event => {
+        if (!pointerStart || pointerStart.id !== event.pointerId) return;
         pointerStart = null;
-        swiping = false;
-        entry.card.classList.remove('is-dragging');
-        entry.card.style.transform = '';
-        entry.card.style.opacity = '';
-        entry.card.style.removeProperty('--crafting-dismiss-x');
+        stopTracking();
+        resetCardGesture();
+    };
+    entry.card.addEventListener('pointerdown', event => {
+        if (event.pointerType === 'mouse' && event.button !== 0) return;
+        event.stopPropagation();
+        pointerStart = { id: event.pointerId, x: event.clientX, y: event.clientY, axis: null };
+        window.addEventListener('pointermove', trackPointerMove, true);
+        window.addEventListener('pointerup', finishPointer, true);
+        window.addEventListener('pointercancel', cancelPointer, true);
+    });
+}
+
+function turnCraftingNotificationQueue(direction) {
+    if (isCraftingNotificationFlipInProgress || craftingNotificationQueueIds.length < 2) return;
+    const currentIndex = craftingNotificationQueueIds.indexOf(activeCraftingNotificationQueueId);
+    const nextIndex = (currentIndex + direction + craftingNotificationQueueIds.length) % craftingNotificationQueueIds.length;
+    const nextQueueId = craftingNotificationQueueIds[nextIndex];
+    const currentEntry = craftingNotificationCards.get(activeCraftingNotificationQueueId);
+    if (!currentEntry || nextQueueId === activeCraftingNotificationQueueId) return;
+    isCraftingNotificationFlipInProgress = true;
+    const duration = matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 180;
+    const exitAngle = direction > 0 ? -68 : 68;
+    currentEntry.card.animate([
+        { transform: 'perspective(520px) rotateX(0deg) translateY(0)', opacity: 1 },
+        { transform: `perspective(520px) rotateX(${exitAngle}deg) translateY(${direction > 0 ? -10 : 10}px)`, opacity: 0 }
+    ], { duration, easing: 'ease-in', fill: 'forwards' }).finished.then(() => {
+        activeCraftingNotificationQueueId = nextQueueId;
+        syncCraftingNotifications(true);
+        const nextEntry = craftingNotificationCards.get(nextQueueId);
+        if (nextEntry) {
+            nextEntry.card.animate([
+                { transform: `perspective(520px) rotateX(${-exitAngle}deg) translateY(${direction > 0 ? 10 : -10}px)`, opacity: 0 },
+                { transform: 'perspective(520px) rotateX(0deg) translateY(0)', opacity: 1 }
+            ], { duration, easing: 'ease-out' });
+        }
+    }).catch(() => {}).finally(() => {
+        isCraftingNotificationFlipInProgress = false;
     });
 }
 
@@ -2448,6 +2512,13 @@ function getCraftingJobRefundItems(job) {
 }
 
 function cancelCraftingJob(jobId) {
+    craftingNotificationCards.forEach(entry => {
+        if (!entry.card.classList.contains('is-dismissing')) return;
+        entry.card.classList.remove('is-dismissing', 'is-dragging', 'is-vertical-dragging');
+        entry.card.style.transform = '';
+        entry.card.style.opacity = '';
+        entry.card.style.removeProperty('--crafting-dismiss-x');
+    });
     const job = engineRuntimeState.craftingJobs.find(candidate => candidate.jobId === jobId);
     if (!job) return;
     const cancelled = engineRuntimeState.cancelCraftingJob(jobId, getCraftingJobRefundItems(job));
@@ -2459,60 +2530,84 @@ function cancelCraftingJob(jobId) {
     showAppNotice(`${getCraftingItemName(cancelled.outputItem)}の製作をキャンセルし、素材を返却しました。`);
 }
 
-function syncCraftingNotifications() {
+function syncCraftingNotifications(force = false) {
     const container = document.getElementById('crafting-notifications');
     if (!container || !engineRuntimeState) return;
     const syncAt = Date.now();
-    if (syncAt - lastCraftingNotificationSyncAt < 33) return;
+    if (!force && syncAt - lastCraftingNotificationSyncAt < 33) return;
     lastCraftingNotificationSyncAt = syncAt;
     const jobs = engineRuntimeState.craftingJobs || [];
-    const orderedJobs = jobs.slice().sort((first, second) =>
-        Number(first.completesAt) - Number(second.completesAt)
-        || Number(first.startedAt) - Number(second.startedAt));
-    const visibleJobs = orderedJobs.slice(0, 1);
-    const activeIds = new Set(visibleJobs.map(job => job.jobId));
-    for (const [jobId, entry] of craftingNotificationCards) {
-        if (activeIds.has(jobId)) continue;
-        entry.card.remove();
-        craftingNotificationCards.delete(jobId);
-    }
-    const now = syncAt;
-    let didUpdateProgress = false;
-    visibleJobs.forEach(job => {
-        let entry = craftingNotificationCards.get(job.jobId);
-        if (!entry) {
-            entry = createCraftingNotification(job);
-            craftingNotificationCards.set(job.jobId, entry);
-        }
-        const outputName = getCraftingItemName(job.outputItem);
-        const outputAmount = Math.max(1, Math.floor(Number(job.outputAmount) || 1));
-        const batchIndex = Math.max(1, Math.floor(Number(job.batchIndex) || 1));
-        const batchCount = Math.max(batchIndex, Math.floor(Number(job.batchCount) || 1));
-        const startedAt = Number(job.startedAt);
-        const completesAt = Number(job.completesAt);
-        const start = Number.isFinite(startedAt) ? startedAt : now;
-        const duration = Math.max(1, completesAt - start);
-        const progress = Math.max(0, Math.min(100, ((now - start) / duration) * 100));
-        const secondsLeft = Math.max(0, Math.ceil((completesAt - now) / 1000));
-        const queued = now < start;
-        entry.title.textContent = `${outputName}${outputAmount > 1 ? ` ×${outputAmount}` : ''}`;
-        const batchLabel = `製作中 ${batchIndex}/${batchCount} 待機 ${Math.max(0, jobs.length - 1)}件`;
-        const remainingLabel = queued
-            ? `着手まで ${Math.max(0, Math.ceil((start - now) / 1000))}秒`
-            : `残り ${secondsLeft}秒`;
-        entry.card.toggleAttribute('data-queued', queued);
-        const statusText = `${batchLabel}　${remainingLabel}`;
-        if (entry.meta.textContent !== statusText) entry.meta.textContent = statusText;
-        const ariaLabel = `${outputName}の製作進行状況`;
-        if (entry.track.getAttribute('aria-label') !== ariaLabel) entry.track.setAttribute('aria-label', ariaLabel);
-        const progressValue = String(Math.round(progress));
-        if (entry.track.getAttribute('aria-valuenow') !== progressValue) entry.track.setAttribute('aria-valuenow', progressValue);
-        if (now - lastCraftingProgressUpdateAt >= 33 || progress >= 100) {
-            entry.fill.style.setProperty('--crafting-progress-scale', String(progress / 100));
-            didUpdateProgress = true;
-        }
+    const queueGroups = new Map();
+    jobs.forEach(job => {
+        const queueId = typeof job.craftingStationId === 'string' && job.craftingStationId
+            ? job.craftingStationId
+            : 'legacy';
+        if (!queueGroups.has(queueId)) queueGroups.set(queueId, []);
+        queueGroups.get(queueId).push(job);
     });
-    if (didUpdateProgress) lastCraftingProgressUpdateAt = now;
+    const queues = [...queueGroups].map(([queueId, queueJobs]) => {
+        queueJobs.sort((first, second) => Number(first.startedAt) - Number(second.startedAt)
+            || Number(first.batchIndex) - Number(second.batchIndex)
+            || Number(first.completesAt) - Number(second.completesAt));
+        return {
+            queueId,
+            jobs: queueJobs,
+            queuedAt: Math.min(...queueJobs.map(job => Number(job.queuedAt ?? job.startedAt) || syncAt))
+        };
+    }).sort((first, second) => first.queuedAt - second.queuedAt || first.queueId.localeCompare(second.queueId));
+    craftingNotificationQueueIds = queues.map(queue => queue.queueId);
+    if (!queues.length) {
+        activeCraftingNotificationQueueId = null;
+    } else if (!craftingNotificationQueueIds.includes(activeCraftingNotificationQueueId)) {
+        activeCraftingNotificationQueueId = queues[0].queueId;
+    }
+    const selectedQueueIndex = queues.findIndex(queue => queue.queueId === activeCraftingNotificationQueueId);
+    const selectedQueue = queues[selectedQueueIndex];
+    for (const [queueId, entry] of craftingNotificationCards) {
+        if (queueId === selectedQueue?.queueId) continue;
+        entry.card.remove();
+        craftingNotificationCards.delete(queueId);
+    }
+    if (!selectedQueue) return;
+    const job = selectedQueue.jobs[0];
+    const queuePositionText = `${selectedQueueIndex + 1}/${queues.length}`;
+    let didUpdateProgress = false;
+    let entry = craftingNotificationCards.get(selectedQueue.queueId);
+    if (!entry) {
+        entry = createCraftingNotification(job, selectedQueue.queueId);
+        craftingNotificationCards.set(selectedQueue.queueId, entry);
+    }
+    entry.card.dataset.jobId = job.jobId;
+    entry.queuePage.textContent = queuePositionText;
+    const outputName = getCraftingItemName(job.outputItem);
+    const outputAmount = Math.max(1, Math.floor(Number(job.outputAmount) || 1));
+    const batchIndex = Math.max(1, Math.floor(Number(job.batchIndex) || 1));
+    const batchCount = Math.max(batchIndex, Math.floor(Number(job.batchCount) || 1));
+    const startedAt = Number(job.startedAt);
+    const completesAt = Number(job.completesAt);
+    const start = Number.isFinite(startedAt) ? startedAt : syncAt;
+    const duration = Math.max(1, completesAt - start);
+    const progress = Math.max(0, Math.min(100, ((syncAt - start) / duration) * 100));
+    const secondsLeft = Math.max(0, Math.ceil((completesAt - syncAt) / 1000));
+    const queued = syncAt < start;
+    entry.title.textContent = `${outputName}${outputAmount > 1 ? ` ×${outputAmount}` : ''}`;
+    const batchLabel = `製作中 ${batchIndex}/${batchCount} 待機 ${Math.max(0, selectedQueue.jobs.length - 1)}件`;
+    const remainingLabel = queued
+        ? `着手まで ${Math.max(0, Math.ceil((start - syncAt) / 1000))}秒`
+        : `残り ${secondsLeft}秒`;
+    entry.card.toggleAttribute('data-queued', queued);
+    entry.card.setAttribute('aria-label', `${outputName}の製作キュー ${queuePositionText}`);
+    const statusText = `${batchLabel}　${remainingLabel}`;
+    if (entry.meta.textContent !== statusText) entry.meta.textContent = statusText;
+    const ariaLabel = `${outputName}の製作進行状況`;
+    if (entry.track.getAttribute('aria-label') !== ariaLabel) entry.track.setAttribute('aria-label', ariaLabel);
+    const progressValue = String(Math.round(progress));
+    if (entry.track.getAttribute('aria-valuenow') !== progressValue) entry.track.setAttribute('aria-valuenow', progressValue);
+    if (syncAt - lastCraftingProgressUpdateAt >= 33 || progress >= 100) {
+        entry.fill.style.setProperty('--crafting-progress-scale', String(progress / 100));
+        didUpdateProgress = true;
+    }
+    if (didUpdateProgress) lastCraftingProgressUpdateAt = syncAt;
 }
 
 function openBuildingCrafting() {
@@ -4901,7 +4996,7 @@ mainPageArrows.forEach(arrow => arrow.addEventListener('click', () => {
 }));
 const captureMainPageSwipe = (event, allowInteractiveTarget = false) => {
     if (event.pointerType === 'touch') return;
-    if (!allowInteractiveTarget && event.target && event.target.closest('button, input, select, .movement-joystick')) return;
+    if (!allowInteractiveTarget && event.target && event.target.closest('button, input, select, .movement-joystick, .crafting-progress-card')) return;
     mainPagePointerStart = { x: event.clientX, y: event.clientY };
 };
 const releaseMainPageSwipe = (point, start = mainPagePointerStart) => {
@@ -4914,6 +5009,7 @@ const releaseMainPageSwipe = (point, start = mainPagePointerStart) => {
     setMainPage(currentMainPage + (deltaX < 0 ? 1 : -1));
 };
 const captureMainPageTouch = event => {
+    if (event.target?.closest('.crafting-progress-card')) return;
     const touch = event.changedTouches[0];
     if (touch) mainPageTouchStart = { x: touch.clientX, y: touch.clientY };
 };

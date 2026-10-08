@@ -480,6 +480,7 @@ export class GameState {
         this.craftingJobs = Array.isArray(data.craftingJobs) ? data.craftingJobs.filter(job =>
             job && typeof job.recipeKey === 'string' && typeof job.outputItem === 'string'
             && Number.isFinite(Number(job.outputAmount)) && Number.isFinite(Number(job.completesAt))) : [];
+        this.completeCraftingJobs(Date.now(), false);
         this.normalizeCraftingQueue();
         const gears = data.gears || data.placedGears || [];
         this.placedGears = this.createGear
@@ -720,6 +721,7 @@ export class GameState {
         this.createGear = createGear;
         let initialInventoryMigrated = false;
         let craftingQueueNormalized = false;
+        let craftingJobsCompleted = false;
         const saved = localStorage.getItem('fog_thermo_save');
         if (saved) {
             try {
@@ -748,6 +750,7 @@ export class GameState {
                 this.craftingJobs = Array.isArray(data.craftingJobs) ? data.craftingJobs.filter(job =>
                     job && typeof job.recipeKey === 'string' && typeof job.outputItem === 'string'
                     && Number.isFinite(Number(job.outputAmount)) && Number.isFinite(Number(job.completesAt))) : [];
+                craftingJobsCompleted = this.completeCraftingJobs(Date.now(), false);
                 craftingQueueNormalized = this.normalizeCraftingQueue();
                 this.belts = Array.isArray(data.belts) ? data.belts.filter(belt => Array.isArray(belt?.gearIds) && belt.gearIds.length >= 2) : [];
                 this.placedGears = (data.gears || data.placedGears || []).map(createGear);
@@ -761,7 +764,7 @@ export class GameState {
                 this.undoStack = data.undoStack || [];
                 this.redoStack = data.redoStack || [];
                 if (this.placedGears.length > 0) {
-                    if (initialInventoryMigrated || craftingQueueNormalized) this.saveGameData();
+                    if (initialInventoryMigrated || craftingQueueNormalized || craftingJobsCompleted) this.saveGameData();
                     return;
                 }
             } catch (error) {
@@ -775,7 +778,7 @@ export class GameState {
         const runtimeBelts = this.getRuntimeBelts();
         const runtimeNetwork = this.runtimeNetwork || this.network;
         if (runtimeNetwork) runtimeNetwork.rebuild(runtimeGears, runtimeBelts).updateRotation();
-        if (initialInventoryMigrated) this.saveGameData();
+        if (initialInventoryMigrated || craftingJobsCompleted) this.saveGameData();
     }
 
     getGearProcessInfo(gear) {
@@ -950,9 +953,9 @@ export class GameState {
         return networkChanged;
     }
 
-    completeCraftingJobs(now = Date.now()) {
+    completeCraftingJobs(now = Date.now(), persist = true) {
         const completed = this.craftingJobs.filter(job => Number(job.completesAt) <= now);
-        if (!completed.length) return;
+        if (!completed.length) return false;
         const completedIds = new Set(completed.map(job => job.jobId));
         this.craftingJobs = this.craftingJobs.filter(job => !completedIds.has(job.jobId));
         completed.forEach(job => {
@@ -960,8 +963,11 @@ export class GameState {
             if (job.outputItem === 'brass-stock') this.brass += amount;
             else this.materialInventory[job.outputItem] = (Number(this.materialInventory[job.outputItem]) || 0) + amount;
         });
-        this.saveGameData();
-        this.notify();
+        if (persist) {
+            this.saveGameData();
+            this.notify();
+        }
+        return true;
     }
 
     cancelCraftingJob(jobId, refundItems = [], now = Date.now()) {
@@ -984,39 +990,63 @@ export class GameState {
             else this.materialInventory[itemId] = (Number(this.materialInventory[itemId]) || 0) + amount;
         });
 
-        this.scheduleCraftingJobs([], now);
+        const stationId = typeof cancelledJob.craftingStationId === 'string' && cancelledJob.craftingStationId
+            ? cancelledJob.craftingStationId
+            : 'legacy';
+        this.scheduleCraftingJobs([], now, stationId);
         this.saveGameData();
         this.notify();
         return cancelledJob;
     }
 
-    scheduleCraftingJobs(newJobs = [], now = Date.now()) {
+    scheduleCraftingJobs(newJobs = [], now = Date.now(), requeueStationId = '') {
         const parallelSlots = Math.max(1, Math.floor(Number(this.craftingParallelSlots) || 1));
-        const activeJobs = this.craftingJobs
-            .filter(job => Number(job.startedAt) <= now && Number(job.completesAt) > now)
-            .sort((first, second) => Number(first.startedAt) - Number(second.startedAt)
-                || Number(first.completesAt) - Number(second.completesAt))
-            .slice(0, parallelSlots);
-        const activeSet = new Set(activeJobs);
-        const slotAvailability = Array(parallelSlots).fill(now);
-        activeJobs.forEach((job, index) => {
-            slotAvailability[index] = Number(job.completesAt);
+        const queueGroups = new Map();
+        [...this.craftingJobs, ...newJobs].forEach(job => {
+            const stationId = typeof job.craftingStationId === 'string' && job.craftingStationId
+                ? job.craftingStationId
+                : 'legacy';
+            if (!queueGroups.has(stationId)) queueGroups.set(stationId, []);
+            queueGroups.get(stationId).push(job);
         });
-        const pendingJobs = [
-            ...this.craftingJobs.filter(job => !activeSet.has(job)),
-            ...newJobs
-        ];
-        pendingJobs.forEach(job => {
-            let slot = 0;
-            for (let index = 1; index < slotAvailability.length; index++) {
-                if (slotAvailability[index] < slotAvailability[slot]) slot = index;
-            }
-            const duration = Math.max(1, Number(job.completesAt) - Number(job.startedAt));
-            job.startedAt = Math.max(now, slotAvailability[slot]);
-            job.completesAt = job.startedAt + duration;
-            slotAvailability[slot] = job.completesAt;
+        const scheduledJobs = [];
+        queueGroups.forEach((queueJobs, stationId) => {
+            const requeuePending = requeueStationId === '*' || stationId === requeueStationId;
+            const activeJobs = queueJobs
+                .filter(job => Number(job.startedAt) <= now && Number(job.completesAt) > now)
+                .sort((first, second) => Number(first.startedAt) - Number(second.startedAt)
+                    || Number(first.completesAt) - Number(second.completesAt))
+                .slice(0, parallelSlots);
+            const activeSet = new Set(activeJobs);
+            const slotAvailability = Array(parallelSlots).fill(now);
+            activeJobs.forEach((job, index) => {
+                slotAvailability[index] = Number(job.completesAt);
+            });
+            const pendingJobs = queueJobs
+                .filter(job => !activeSet.has(job))
+                .sort((first, second) => Number(first.queuedAt ?? first.startedAt) - Number(second.queuedAt ?? second.startedAt)
+                    || Number(first.batchIndex) - Number(second.batchIndex)
+                    || String(first.jobId).localeCompare(String(second.jobId)));
+            pendingJobs.forEach(job => {
+                let slot = 0;
+                for (let index = 1; index < slotAvailability.length; index++) {
+                    if (slotAvailability[index] < slotAvailability[slot]) slot = index;
+                }
+                const previousStart = Number(job.startedAt);
+                const previousCompletion = Number(job.completesAt);
+                const savedDuration = Number(job.durationMs);
+                const fallbackDurationBase = requeuePending && previousStart > now ? previousStart : Math.max(now, previousStart);
+                const duration = Number.isFinite(savedDuration) && savedDuration > 0
+                    ? savedDuration
+                    : Math.max(1, previousCompletion - fallbackDurationBase);
+                const requestedStart = requeuePending ? now : previousStart;
+                job.startedAt = Math.max(now, slotAvailability[slot], Number.isFinite(requestedStart) ? requestedStart : now);
+                job.completesAt = job.startedAt + duration;
+                slotAvailability[slot] = job.completesAt;
+            });
+            scheduledJobs.push(...activeJobs, ...pendingJobs);
         });
-        this.craftingJobs = [...activeJobs, ...pendingJobs]
+        this.craftingJobs = scheduledJobs
             .sort((first, second) => Number(first.startedAt) - Number(second.startedAt)
                 || Number(first.completesAt) - Number(second.completesAt));
         return newJobs;
@@ -1026,7 +1056,7 @@ export class GameState {
         const nextSlots = Math.max(1, Math.floor(Number(slots) || 1));
         if (nextSlots === this.craftingParallelSlots) return false;
         this.craftingParallelSlots = nextSlots;
-        this.scheduleCraftingJobs();
+        this.scheduleCraftingJobs([], Date.now(), '*');
         this.saveGameData();
         this.notify();
         return true;
