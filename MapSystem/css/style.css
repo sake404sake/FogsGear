@@ -786,6 +786,9 @@ body.guide-item-detail-open #recipe-detail-modal { z-index: 1300; }
     overflow: hidden;
 }
 
+#canvas-container, #building-menu-modal { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+#building-menu-modal input, #building-menu-modal textarea, #building-menu-modal select, #building-menu-modal [contenteditable="true"] { -webkit-touch-callout: default; -webkit-user-select: text; user-select: text; }
+
 .engine-runtime-canvas { position: fixed; left: -10000px; top: -10000px; width: 1px; height: 1px; pointer-events: none; opacity: 0; }
 .vehicle-animation-layer { position: absolute; inset: 0; z-index: 2; overflow: hidden; pointer-events: none; }
 .vehicle-motion-sprite { position: absolute; left: 0; top: 0; display: block; image-rendering: auto; will-change: transform; }

@@ -3851,6 +3851,7 @@ function startBuildingPress(placed, event) {
         if (!buildingPressCandidate || buildingPressCandidate.pointerId !== event.pointerId) return;
         buildingPressCandidate.opened = true;
         isDragging = false;
+        window.getSelection?.()?.removeAllRanges();
         openBuildingMenu(placed.instanceId);
     }, 550);
 }
@@ -3864,7 +3865,15 @@ function setupControls() {
     document.addEventListener('contextmenu', event => {
         if (!(event.target instanceof Element)) return;
         if (event.target.closest('input, textarea, select, [contenteditable="true"]')) return;
-        if (event.target.closest('#gameCanvas, #building-menu-modal, #building-placement-controls')) {
+        if (event.target.closest('#canvas-container, #building-menu-modal, #building-placement-controls')) {
+            event.preventDefault();
+        }
+    }, true);
+
+    document.addEventListener('selectstart', event => {
+        const target = event.target instanceof Element ? event.target : event.target?.parentElement;
+        if (!target || target.closest('input, textarea, select, [contenteditable="true"]')) return;
+        if (target.closest('#canvas-container, #building-menu-modal, #building-crafting-modal, #building-placement-controls')) {
             event.preventDefault();
         }
     }, true);
