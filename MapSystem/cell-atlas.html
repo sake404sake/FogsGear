@@ -204,6 +204,8 @@
         button.recipe-guide-chip { cursor: pointer; }
         button.recipe-guide-chip:hover, button.recipe-guide-chip:focus-visible { color: var(--amber); border-color: var(--gold); }
         .recipe-guide-chip svg { width: 20px; height: 20px; flex: 0 0 20px; }
+        .recipe-guide-chip.recipe-guide-building-output { min-height: 40px; gap: 6px; padding: 4px 8px; }
+        .recipe-guide-chip.recipe-guide-building-output svg { width: 32px; height: 32px; flex-basis: 32px; }
         .recipe-guide-empty { padding: 14px; color: var(--muted); background: rgba(29, 23, 20, .8); border: 1px dashed var(--line); }
         .recipe-guide-empty[hidden] { display: none; }
         .recipe-guide-cost { color: #efc967; }
@@ -766,6 +768,7 @@
             chip.dataset.guideItemId = id;
             chip.title = `${getGuideItemName(id)}の詳細を見る`;
             chip.setAttribute('aria-label', `${getGuideItemName(id)}${amount ? ` ×${amount}` : ''} の詳細を見る`);
+            if (guideBuildingIds.has(id) && className.includes('recipe-guide-cost')) chip.classList.add('recipe-guide-building-output');
             chip.append(makeGuideIcon(id), makeGuideElement('span', '', `${getGuideItemName(id)}${amount ? ` ×${amount}` : ''}`));
             return chip;
         };
@@ -800,6 +803,24 @@
             container.appendChild(card);
             recipeGuideCards.push(card);
         };
+        const buildingGroup = recipeGuideGroup(`建築キット（${BUILDING_DEFINITIONS.length}種類）`);
+        BUILDING_DEFINITIONS.forEach((building) => {
+            const costs = [['brass-stock', building.brassCost], ...(building.materialCosts || [])];
+            const requirements = (building.requiredBuildings || [])
+                .map((buildingId) => BUILDING_DEFINITIONS.find((candidate) => candidate.id === buildingId)?.name || buildingId);
+            const description = [building.description, requirements.length ? `建築条件: ${requirements.join('・')}` : ''].filter(Boolean).join(' ');
+            appendRecipeGuideCard(
+                buildingGroup,
+                `${building.name} / ${building.width}×${building.height}`,
+                [building.width >= 2 && building.height >= 2 ? '作成場所: インベントリの「建築」タブ。作成には作業台以上の設備が必要です。' : '作成場所: インベントリの「建築」タブ。', description].filter(Boolean).join(' '),
+                '建築キット',
+                costs,
+                building.id,
+                1,
+                [building.name, building.id, ...costs.map(([id]) => getGuideItemName(id))].join(' ')
+            );
+        });
+
         const recipesByStation = new Map();
         CRAFTING_RECIPES.forEach((recipe) => {
             if (!recipesByStation.has(recipe[4])) recipesByStation.set(recipe[4], []);
@@ -818,24 +839,6 @@
                 const outputName = getGuideItemName(output);
                 appendRecipeGuideCard(group, `${title} → ${outputName} ×${batch}`, note, where, inputs, output, batch, [family, title, note, station, outputName, ...inputs.map(([id]) => getGuideItemName(id))].join(' '));
             });
-        });
-
-        const buildingGroup = recipeGuideGroup(`建築キット（${BUILDING_DEFINITIONS.length}種類）`);
-        BUILDING_DEFINITIONS.forEach((building) => {
-            const costs = [['brass-stock', building.brassCost], ...(building.materialCosts || [])];
-            const requirements = (building.requiredBuildings || [])
-                .map((buildingId) => BUILDING_DEFINITIONS.find((candidate) => candidate.id === buildingId)?.name || buildingId);
-            const description = [building.description, requirements.length ? `建築条件: ${requirements.join('・')}` : ''].filter(Boolean).join(' ');
-            appendRecipeGuideCard(
-                buildingGroup,
-                `${building.name} / ${building.width}×${building.height}`,
-                [building.width >= 2 && building.height >= 2 ? '作成場所: インベントリの「建築」タブ。作成には作業台以上の設備が必要です。' : '作成場所: インベントリの「建築」タブ。', description].filter(Boolean).join(' '),
-                '建築キット',
-                costs,
-                building.id,
-                1,
-                [building.name, building.id, ...costs.map(([id]) => getGuideItemName(id))].join(' ')
-            );
         });
 
         const recipeInputIds = new Set(CRAFTING_RECIPES.flatMap((recipe) => recipe[2].map(([id]) => id)));
