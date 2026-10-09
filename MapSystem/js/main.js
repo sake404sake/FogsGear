@@ -5198,9 +5198,16 @@ function updateBuildingUtilityNetworks() {
 function updateFullscreenButton() {
     const button = document.querySelector('[data-action="toggle-fullscreen"]');
     if (!button) return;
+    const isInstalledApp = isInstalledAppDisplayMode();
+    button.hidden = isInstalledApp;
     const isFullscreen = Boolean(document.fullscreenElement);
     button.textContent = isFullscreen ? '全画面を解除' : '全画面表示';
     button.setAttribute('aria-pressed', String(isFullscreen));
+}
+
+function isInstalledAppDisplayMode() {
+    return window.matchMedia('(display-mode: standalone), (display-mode: fullscreen), (display-mode: minimal-ui)').matches
+        || navigator.standalone === true;
 }
 
 let lockedOrientationType = null;
@@ -5224,6 +5231,7 @@ async function toggleOrientationLock() {
         orientation.unlock?.();
         lockedOrientationType = null;
         updateOrientationLockButton();
+        updateFullscreenButton();
         return;
     }
     const currentType = orientation.type;
@@ -5277,6 +5285,7 @@ function openGearEditor(material, scrollId = null) {
 }
 
 async function toggleFullscreen() {
+    if (isInstalledAppDisplayMode()) return;
     if (!document.fullscreenEnabled) return;
     if (document.fullscreenElement) {
         await document.exitFullscreen();
@@ -5528,7 +5537,10 @@ document.addEventListener('click', (event) => {
         if (scroll) applySavedScrollEffect(scroll);
     }
     if (button.dataset.action === 'toggle-fullscreen') {
-        toggleFullscreen().catch(() => {});
+        toggleFullscreen().catch(error => {
+            console.error('Fullscreen mode could not be changed.', error);
+            showAppNotice('全画面表示を切り替えられませんでした。');
+        });
         return;
     }
     if (button.dataset.action === 'toggle-orientation-lock') {
