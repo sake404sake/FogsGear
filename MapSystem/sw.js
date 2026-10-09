@@ -1,4 +1,4 @@
-const CACHE_NAME = 'steampunk-explorer-v180';
+const CACHE_NAME = 'steampunk-explorer-v181';
 const APP_SHELL = [
     './',
     './index.html',
@@ -6,7 +6,7 @@ const APP_SHELL = [
     './worldmap.html',
     './manifest.webmanifest',
     './css/style.css?v=679',
-    './js/main.js?v=758',
+    './js/main.js?v=759',
     './js/mapGenerator.js?v=89',
     './js/skinRenderer.js?v=5',
     './js/skinPreview.js?v=4',
@@ -43,6 +43,21 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
     if (event.request.method !== 'GET') return;
+    if (new URL(event.request.url).pathname.endsWith('/manifest.webmanifest')) {
+        event.respondWith(
+            fetch(event.request, { cache: 'no-cache' }).then((response) => {
+                if (response.ok && response.type !== 'opaque') {
+                    const copy = response.clone();
+                    event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy)));
+                }
+                return response;
+            }).catch((error) => caches.match(event.request).then((cached) => {
+                if (cached) return cached;
+                throw error;
+            }))
+        );
+        return;
+    }
     event.respondWith(
         caches.match(event.request).then((cached) => cached || fetch(event.request).then((response) => {
             if (!response || response.status !== 200 || response.type === 'opaque') return response;

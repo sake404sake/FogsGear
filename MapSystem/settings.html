@@ -87,7 +87,8 @@
             <button class="btn btn-action" id="toggleTestSave" type="button"></button>
             <p id="testSaveMessage" class="rule-text" aria-live="polite"></p>
         </section>
-        <p class="app-version">アプリバージョン v180</p>
+        <p id="appDisplayModeStatus" class="rule-text" aria-live="polite"></p>
+        <p class="app-version">アプリバージョン v181</p>
     </main>
     <dialog class="game-reset-dialog" id="gameResetDialog" aria-labelledby="game-reset-dialog-title">
         <h2 id="game-reset-dialog-title">リセット方法を選択</h2>
@@ -114,6 +115,15 @@
         const TEST_SAVE_BACKUP_KEY = '__fogsgear_test_save_backup_v1';
         const TEST_SAVE_KEYS = ['fog_thermo_save', 'steampunk_explorer_inventory_items'];
         const isRecord = value => value !== null && typeof value === 'object' && !Array.isArray(value);
+        const displayModeStatus = document.getElementById('appDisplayModeStatus');
+        const isFullscreenDisplay = window.matchMedia('(display-mode: fullscreen)').matches;
+        const isStandaloneDisplay = window.matchMedia('(display-mode: standalone)').matches
+            || window.navigator.standalone === true;
+        displayModeStatus.textContent = isFullscreenDisplay
+            ? 'アプリ表示モード: 全画面が適用されています。'
+            : isStandaloneDisplay
+                ? 'アプリ表示モード: 全画面設定が未反映です。ホーム画面からアプリをアンインストールし、Chromeから再インストールしてください。キャッシュ削除では更新されません。'
+                : 'アプリ表示モード: ブラウザーで表示中です。';
         const setStoredValue = (key, value) => {
             if (value === null) localStorage.removeItem(key);
             else localStorage.setItem(key, value);

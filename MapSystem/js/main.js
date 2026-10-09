@@ -5198,10 +5198,19 @@ function updateBuildingUtilityNetworks() {
 function updateFullscreenButton() {
     const button = document.querySelector('[data-action="toggle-fullscreen"]');
     if (!button) return;
-    const isFullscreen = Boolean(document.fullscreenElement);
-    button.textContent = isFullscreen ? '全画面を解除' : '全画面表示';
+    const isInstalledFullscreen = window.matchMedia('(display-mode: fullscreen)').matches;
+    const isInstalledStandalone = window.matchMedia('(display-mode: standalone)').matches
+        || window.navigator.standalone === true;
+    const isFullscreen = isInstalledFullscreen
+        || (!isInstalledStandalone && Boolean(document.fullscreenElement));
+    button.hidden = isInstalledFullscreen;
+    button.textContent = isInstalledStandalone
+        ? '全画面設定を反映'
+        : isFullscreen ? '全画面を解除' : '全画面表示';
     button.setAttribute('aria-pressed', String(isFullscreen));
 }
+
+updateFullscreenButton();
 
 let lockedOrientationType = null;
 
@@ -5278,6 +5287,10 @@ function openGearEditor(material, scrollId = null) {
 }
 
 async function toggleFullscreen() {
+    if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true) {
+        showAppNotice('このインストールアプリには全画面設定が反映されていません。ホーム画面からアプリをアンインストールし、Chromeから再インストールしてください。キャッシュ削除だけでは表示モードは更新されません。');
+        return;
+    }
     if (!document.fullscreenEnabled) {
         showAppNotice('このアプリでは全画面表示に切り替えられません。アプリを最新版に更新してください。');
         return;
