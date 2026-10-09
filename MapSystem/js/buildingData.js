@@ -44,6 +44,7 @@ const definitions = [
     ['automaton-factory', 'オートマトン製造工場', 6, 6, 'automaton', 'automation'],
     ['airship-workshop', '開拓気球・軽飛空艇ドック', 6, 6, 'airship', 'automation'],
     ['settler-lodge', '生態系試験棟', 3, 3, 'lodge', 'automation'],
+    ['field-automaton', '作業オートマトン', 1, 1, 'automaton', 'automation'],
     ['council-hall', 'テラフォーミング管制棟', 7, 7, 'guild', 'mega'],
     ['relic-reactor', '古代遺物共振解読炉', 7, 7, 'relic', 'mega'],
     ['airship-dockyard', '大型飛空艇ドックヤード', 8, 8, 'airship', 'mega'],
@@ -98,6 +99,7 @@ export const BUILDING_MATERIAL_COSTS_BY_ID = Object.freeze({
     'difference-tower': [['brass-sheet', 12], ['bronze-bearing', 8], ['steel-spring', 4], ['pressure-diaphragm', 4], ['axle', 6]],
     'deep-drill': [['steel-ingot', 24], ['iron-plate', 16], ['obsidian', 6], ['axle', 6], ['steel-spring', 4]],
     'automaton-factory': [['steel-ingot', 20], ['steel-spring', 12], ['brass-sheet', 10], ['bronze-bearing', 8], ['relic-core', 1]],
+    'field-automaton': [['steel-ingot', 4], ['steel-spring', 2], ['brass-sheet', 2], ['bronze-bearing', 1], ['pressure-diaphragm', 1], ['iron-screw', 3]],
     'airship-workshop': [['sealed-board', 12], ['lumber', 10], ['rope', 8], ['brass-sheet', 6], ['survey-kit', 1]],
     'settler-lodge': [['lumber', 20], ['sealed-board', 10], ['glass-blank', 6], ['herb-extract', 3], ['rivet', 12]],
     'council-hall': [['steel-ingot', 48], ['lumber', 30], ['sealed-board', 20], ['glass-blank', 16], ['iron-plate', 24]],
@@ -147,6 +149,7 @@ const BUILDING_DESCRIPTIONS_BY_ID = Object.freeze({
     warehouse: '大容量の物理資材庫。建築メニューから資材を預け入れ・取り出しできます。',
     'drying-rack': '木材を乾燥させ、製材板を作るための作業設備です。',
     'settler-lodge': 'ドームへ植生を定着させる生態系培地を準備します。',
+    'field-automaton': '設定した見た目を活かし、頭の歯車飾りと足元の歯車で識別できる作業人形です。鋼材、ばね、青銅軸受、圧力膜などから建築キットを組み立てます。周囲を巡回し、設定した条件に応じて採取・地形変成・ストレージとの積み下ろしを行います。',
     'council-hall': 'テラフォーミング設備を統括し、ドーム建設計画を管理する管制拠点です。'
 });
 

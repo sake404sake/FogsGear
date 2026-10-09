@@ -15,7 +15,7 @@ export class SkinRenderer {
                 this.isLoaded = true;
                 resolve();
             };
-            this.skinImage.onerror = () => reject(new Error('スキン画像を読み込めませんでした'));
+            this.skinImage.onerror = () => reject(new Error('画像を読み込めませんでした'));
             this.skinImage.src = url;
         });
     }
@@ -28,7 +28,7 @@ export class SkinRenderer {
     }
 
     // コンパクトで頭でっかち可愛い2頭身ミニキャラクター描画
-    draw(ctx, x, y, size) {
+    draw(ctx, x, y, size, { drawShadow = true } = {}) {
         if (!this.isLoaded || !this.skinImage.complete || this.skinImage.naturalWidth === 0) {
             // 外部スキンが読めない場合も、点ではなく人物として見える形で表示する
             const centerX = x + size / 2;
@@ -38,10 +38,12 @@ export class SkinRenderer {
             const bodyWidth = size * 0.42;
             const bodyHeight = size * 0.28;
             const legTop = bodyTop + bodyHeight - 1;
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
-            ctx.beginPath();
-            ctx.ellipse(centerX, y + size * 0.91, size * 0.28, size * 0.07, 0, 0, Math.PI * 2);
-            ctx.fill();
+            if (drawShadow) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+                ctx.beginPath();
+                ctx.ellipse(centerX, y + size * 0.91, size * 0.28, size * 0.07, 0, 0, Math.PI * 2);
+                ctx.fill();
+            }
             ctx.fillStyle = '#f3c653';
             ctx.strokeStyle = '#6b462d';
             ctx.lineWidth = Math.max(1, size * 0.06);
@@ -106,10 +108,12 @@ export class SkinRenderer {
         };
 
         // 影の描画
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
-        ctx.beginPath();
-        ctx.ellipse(centerX, startY + totalHeightUnits * unit, headSize * 0.45, unit * 1.5, 0, 0, Math.PI * 2);
-        ctx.fill();
+        if (drawShadow) {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+            ctx.beginPath();
+            ctx.ellipse(centerX, startY + totalHeightUnits * unit, headSize * 0.45, unit * 1.5, 0, 0, Math.PI * 2);
+            ctx.fill();
+        }
 
         if (this.direction === 0) { // 正面 (Down)
             // 足

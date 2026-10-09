@@ -4,11 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Steampunk Explorer - Settings</title>
-    <link rel="stylesheet" href="css/style.css?v=578">
+    <link rel="stylesheet" href="css/style.css?v=676">
     <style>
         .settings-danger-zone { margin-top: 32px; padding: 14px; border: 1px solid rgba(210, 83, 65, .65); border-left: 3px solid #d25341; background: rgba(90, 24, 19, .18); }
         .settings-danger-zone h2 { margin: 0 0 6px; color: #f08a78; font-size: 16px; }
         .settings-danger-zone p { margin: 0 0 12px; }
+        .app-version { margin: 24px 0 0; color: var(--text-muted); font-size: 0.7rem; text-align: center; }
         .game-reset-dialog { width: min(520px, calc(100% - 32px)); padding: 20px; color: #e2d9cd; background: #1d1714; border: 1px solid rgba(197, 160, 89, .55); box-shadow: 0 18px 46px rgba(0, 0, 0, .65); }
         .game-reset-dialog::backdrop { background: rgba(0, 0, 0, .72); }
         .game-reset-dialog h2 { margin: 0 0 8px; color: #f3c653; }
@@ -43,15 +44,26 @@
                 <option value="0.25">0.25x (標準)</option>
                 <option value="0.5">0.50x (近景)</option>
             </select>
-            <label for="skinUrl">スキン</label>
+            <label for="skinUrl">見た目</label>
             <div class="setting-control skin-setting-control">
-                <input id="skinUrl" type="text" placeholder="Skin URL">
+                <input id="skinUrl" type="text" placeholder="画像URL">
                 <label class="btn btn-action" for="skinFile">ファイル選択</label>
-                <button class="btn btn-action" id="applySkin" type="button">Apply</button>
+                <button class="btn btn-action" id="applySkin" type="button">適用</button>
                 <input id="skinFile" type="file" accept="image/*" hidden>
             </div>
-            <p class="skin-help">URLを使う場合は入力して Apply、画像を使う場合はファイル選択から画像を選びます。</p>
+            <p class="skin-help">URLを使う場合は入力して適用、画像を使う場合はファイル選択から画像を選びます。</p>
             <p id="skinName" class="rule-text" aria-live="polite">選択中: 5504543579.png</p>
+            <section class="skin-showcase" aria-labelledby="player-skin-showcase-title">
+                <h2 id="player-skin-showcase-title">プレイヤーの見た目</h2>
+                <canvas id="player-skin-preview" width="320" height="360" aria-label="プレイヤーの見た目。ドラッグして回転"></canvas>
+                <div class="skin-showcase-rotation">
+                    <button class="btn btn-action" type="button" id="player-skin-rotate-left" aria-label="左へ15度回転">↶</button>
+                    <input id="player-skin-rotation" type="range" min="0" max="359" step="1" value="0" aria-label="プレイヤー立ち絵の回転">
+                    <output id="player-skin-rotation-value" for="player-skin-rotation">0°</output>
+                    <button class="btn btn-action" type="button" id="player-skin-rotate-right" aria-label="右へ15度回転">↷</button>
+                </div>
+                <p id="player-skin-preview-status" class="skin-preview-status" role="status">ドラッグまたはスライダーで向きを変更できます。</p>
+            </section>
             <label for="creativeModeToggle">クリエイティブモード</label>
             <div class="setting-control creative-setting-control">
                 <button class="btn btn-action" id="creativeModeToggle" type="button" aria-pressed="false">クリエイティブモード: OFF</button>
@@ -69,10 +81,17 @@
             <p class="rule-text">初期状態からやり直すか、保存ギア設計を引き継いで再開します。</p>
             <button class="btn btn-reset" id="resetGameData" type="button">ゲームリセット</button>
         </section>
+        <section class="settings-danger-zone" aria-labelledby="test-save-title">
+            <h2 id="test-save-title">テスト用セーブデータ</h2>
+            <p class="rule-text">全アイテムを各99個にしたテスト用データへ切り替えます。元のセーブデータは保存され、戻す操作で復元できます。復元時、テスト中の変更は破棄されます。</p>
+            <button class="btn btn-action" id="toggleTestSave" type="button"></button>
+            <p id="testSaveMessage" class="rule-text" aria-live="polite"></p>
+        </section>
+        <p class="app-version">アプリバージョン v176</p>
     </main>
     <dialog class="game-reset-dialog" id="gameResetDialog" aria-labelledby="game-reset-dialog-title">
         <h2 id="game-reset-dialog-title">リセット方法を選択</h2>
-        <p>どちらも建築物・所持品・探索進行・地形変化を初期化して初期地点から再開します。ワールドシード・表示設定・スキンは保持します。</p>
+        <p>どちらも建築物・所持品・探索進行・地形変化を初期化して初期地点から再開します。ワールドシード・表示設定・見た目は保持します。</p>
         <div class="game-reset-choices">
             <button class="btn btn-action game-reset-choice" type="button" data-reset-mode="new-game-plus">
                 強くてニューゲーム
@@ -86,7 +105,99 @@
         <button class="btn btn-action game-reset-cancel" id="cancelGameReset" type="button">キャンセル</button>
     </dialog>
     <script type="module">
+        import { SkinPreview } from './js/skinPreview.js?v=4';
         import { clearGameProgress } from '../GearSystem/js/GameState.js?v=runtime-41';
+        import { CRAFTING_ITEMS, DEFERRED_CRAFTING_ITEM_IDS } from './js/craftingData.js?v=13';
+        import { BUILDING_DEFINITIONS } from './js/buildingData.js?v=33';
+        import { CELL_MATERIALS } from './js/worldCells.js?v=13';
+
+        const TEST_SAVE_BACKUP_KEY = '__fogsgear_test_save_backup_v1';
+        const TEST_SAVE_KEYS = ['fog_thermo_save', 'steampunk_explorer_inventory_items'];
+        const isRecord = value => value !== null && typeof value === 'object' && !Array.isArray(value);
+        const setStoredValue = (key, value) => {
+            if (value === null) localStorage.removeItem(key);
+            else localStorage.setItem(key, value);
+        };
+        const updateTestSaveButton = () => {
+            const active = localStorage.getItem(TEST_SAVE_BACKUP_KEY) !== null;
+            const button = document.getElementById('toggleTestSave');
+            button.textContent = active ? '元のセーブデータに戻す' : '全アイテムのテストデータを作成';
+            button.classList.toggle('btn-reset', active);
+            button.classList.toggle('btn-action', !active);
+        };
+        const reloadGame = () => {
+            if (window.parent !== window) {
+                window.parent.postMessage({ type: 'fogsgear:reload-game-save' }, window.location.origin);
+                return;
+            }
+            window.location.replace('./index.html');
+        };
+        const toggleTestSave = () => {
+            const message = document.getElementById('testSaveMessage');
+            message.removeAttribute('role');
+            try {
+                const savedBackup = localStorage.getItem(TEST_SAVE_BACKUP_KEY);
+                if (savedBackup !== null) {
+                    if (!window.confirm('テスト中の変更を破棄し、テスト開始前の所持品と資源に戻します。よろしいですか？')) return;
+                    const backup = JSON.parse(savedBackup);
+                    if (!isRecord(backup) || backup.version !== 1 || !isRecord(backup.values)) {
+                        throw new Error('元のセーブデータのバックアップ形式が不正です。');
+                    }
+                    TEST_SAVE_KEYS.forEach(key => {
+                        if (!Object.prototype.hasOwnProperty.call(backup.values, key)
+                            || (backup.values[key] !== null && typeof backup.values[key] !== 'string')) {
+                            throw new Error('元のセーブデータのバックアップが不完全です。');
+                        }
+                        setStoredValue(key, backup.values[key]);
+                    });
+                    localStorage.removeItem(TEST_SAVE_BACKUP_KEY);
+                    reloadGame();
+                    return;
+                }
+                if (!window.confirm('現在の所持品と資源を保存し、全アイテムを99個持つテスト用データに切り替えます。よろしいですか？')) return;
+                const previousValues = Object.fromEntries(TEST_SAVE_KEYS.map(key => [key, localStorage.getItem(key)]));
+                const saveData = JSON.parse(previousValues['fog_thermo_save'] || '{}');
+                const storedItems = JSON.parse(previousValues['steampunk_explorer_inventory_items'] || '[]');
+                if (!isRecord(saveData) || !isRecord(saveData.materialInventory || {})
+                    || !Array.isArray(storedItems) || storedItems.some(item => typeof item !== 'string')) {
+                    throw new Error('現在のセーブデータを読み取れないため、テスト用データを作成できません。');
+                }
+                localStorage.setItem(TEST_SAVE_BACKUP_KEY, JSON.stringify({ version: 1, values: previousValues }));
+                try {
+                    const inventory = { ...saveData.materialInventory };
+                    CRAFTING_ITEMS.forEach(([itemId]) => {
+                        if (!DEFERRED_CRAFTING_ITEM_IDS.has(itemId)) inventory[itemId] = 99;
+                    });
+                    Object.keys(CELL_MATERIALS).forEach(itemId => {
+                        if (!['water', 'power', 'steam_power'].includes(itemId)) inventory[itemId] = 99;
+                    });
+                    BUILDING_DEFINITIONS.forEach(building => { inventory[building.id] = 99; });
+                    ['paper_scroll', 'cloth_scroll', 'scroll_book'].forEach(itemId => { inventory[itemId] = 99; });
+                    Object.assign(saveData, {
+                        materialInventoryVersion: 4,
+                        materialInventory: inventory,
+                        brass: 99,
+                        water: 99,
+                        fog: 99,
+                        power: 99,
+                        steamPower: 99
+                    });
+                    localStorage.setItem('fog_thermo_save', JSON.stringify(saveData));
+                    localStorage.setItem('steampunk_explorer_inventory_items', JSON.stringify(storedItems));
+                } catch (error) {
+                    TEST_SAVE_KEYS.forEach(key => setStoredValue(key, previousValues[key]));
+                    localStorage.removeItem(TEST_SAVE_BACKUP_KEY);
+                    throw error;
+                }
+                reloadGame();
+            } catch (error) {
+                console.error('Temporary test save update failed.', error);
+                message.textContent = error.message || 'テスト用セーブデータを更新できませんでした。';
+                message.setAttribute('role', 'alert');
+            }
+        };
+        document.getElementById('toggleTestSave').onclick = toggleTestSave;
+        updateTestSaveButton();
 
         const createRandomSeed = () => {
             const values = new Uint32Array(4);
@@ -111,10 +222,17 @@
         const creativeModeStatus = document.getElementById('creativeModeStatus');
         const defaultSkin = './5504543579.png';
         const oldDefaultSkin = 'https://mineskin.org/download/639735497';
+        const playerSkinPreview = new SkinPreview({
+            canvas: document.getElementById('player-skin-preview'),
+            rotation: document.getElementById('player-skin-rotation'),
+            rotationValue: document.getElementById('player-skin-rotation-value'),
+            rotateLeft: document.getElementById('player-skin-rotate-left'),
+            rotateRight: document.getElementById('player-skin-rotate-right')
+        });
         const getSkinName = (source) => {
             if (source.startsWith('data:')) return 'ローカル画像';
             const sourcePath = source.split(/[?#]/)[0];
-            return sourcePath.substring(sourcePath.lastIndexOf('/') + 1) || '既定スキン';
+            return sourcePath.substring(sourcePath.lastIndexOf('/') + 1) || '既定の見た目';
         };
         const getStoredSkin = () => {
             try {
@@ -135,6 +253,12 @@
             localStorage.setItem('steampunk_explorer_skin_name', selectedName);
             skinUrlInput.value = url;
             skinName.textContent = `選択中: ${selectedName}`;
+            playerSkinPreview.load(url).then(() => {
+                document.getElementById('player-skin-preview-status').textContent = 'ドラッグまたはスライダーで向きを変更できます。';
+            }).catch(error => {
+                console.error('Player skin preview failed to load.', error);
+                document.getElementById('player-skin-preview-status').textContent = '画像を読み込めませんでした。画像URLを確認してください。';
+            });
             if (window.parent !== window) {
                 window.parent.postMessage({
                     type: 'fogsgear:skin-updated',
@@ -147,6 +271,10 @@
         const storedSkin = getStoredSkin();
         skinUrlInput.value = storedSkin.url;
         skinName.textContent = `選択中: ${storedSkin.name}`;
+        playerSkinPreview.load(storedSkin.url).catch(error => {
+            console.error('Player skin preview failed to load.', error);
+            document.getElementById('player-skin-preview-status').textContent = '画像を読み込めませんでした。画像URLを確認してください。';
+        });
         const resourceDefaults = { steamPower: 100, power: 0, water: 200, fog: 0, brass: 300 };
         const getGearSave = () => {
             try {
@@ -238,7 +366,7 @@
             if (!file) return;
             const reader = new FileReader();
             reader.onload = () => setSkin(String(reader.result || ''), 'file', file.name);
-            reader.onerror = () => window.alert('スキン画像を読み込めませんでした。');
+            reader.onerror = () => window.alert('画像を読み込めませんでした。');
             reader.readAsDataURL(file);
             event.target.value = '';
         });

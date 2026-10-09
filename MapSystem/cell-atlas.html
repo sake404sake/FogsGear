@@ -382,6 +382,10 @@
                         <h3><span>04</span>建築キットを作って配置する</h3>
                         <p>インベントリの「建築」タブで必要素材と作成数を確認し、建築キットを作ります。作ったキットは所持品に入ります。所持品タブでキットを選ぶと詳細が開き、そこで「単一配置」か「連続配置」を選びます。</p>
                         <p>単一配置はマップ上の位置を選んで確定します。連続配置は配置可能なセルをタップまたはドラッグして置けます。線路の向きは経路と接続先から決まり、大型建築物などはタップごとに配置されます。終了時は「キャンセル」を押します。</p>
+                        <p>建築タブで作業オートマトンのキットを作って配置します。素材は鋼塊4、鋼ばね2、真鍮板2、青銅軸受1、圧力膜1、鉄ねじ3です。配置位置を中心に左右または上下へ指定セル数を往復し、専用メニューで資源採取・地形変成・進行方向1マス先のストレージとの積み下ろしを設定します。積み下ろしの対象アイテムはストレージと同じ検索式ピッカーから登録し、「のみ」または「以外」を選びます。積み下ろし中はその場で停止します。プレイヤーとオートマトンは、タイル・基礎・線路以外の建築物があるセルへ進入できません。採取には動力、地形変成には所持資材を使います。オートマトンの見た目はプレビューをドラッグまたは角度スライダーで回転できます。頭の歯車飾りと足元の歯車が目印です。</p>
+                        <p>機関車と貨車は線路上で隣接させると連結します。機関車を起動すると貨車から離れる方向へ進み、連結した貨車も線路に沿って移動します。</p>
+                        <p>簡易ストレージとストレージ倉庫は、資材を種類ごとのスタックに分けて保管します。倉庫内のセルをタップして資材と個数を選び、数量を調整して取り出せます。1スタックは最大99個で、簡易ストレージは50枠、倉庫は300枠です。</p>
+                        <p>建築物メニュー左上のごみ箱から解体できます。確認画面の一覧に表示された建築材料が返却され、保管中の資材は全量戻ります。建築材料は種類ごとに製作時の1/10（端数切り上げ）を返却し、真鍮は返却されません。</p>
                     </div>
                     <div class="manual-step-media">
                         <figure class="manual-shot"><img src="assets/guide-screenshots/04-building-list.png" alt="建築タブに必要素材とキット作成欄が表示されたインベントリ"><figcaption>建築タブで必要素材と作成数を確認</figcaption></figure>
@@ -522,7 +526,7 @@
         } from './js/worldCells.js?v=12';
         import { getMosaicColor } from './js/cellRules.js?v=4';
         import { CRAFTING_ITEMS, CRAFTING_RECIPES, CRAFTING_STATION_BUILDING_IDS, HANDCRAFT_STATION } from './js/craftingData.js?v=13';
-        import { BUILDING_DEFINITIONS } from './js/buildingData.js?v=30';
+        import { BUILDING_DEFINITIONS } from './js/buildingData.js?v=33';
 
         const terraformingGoalContent = document.getElementById('terraforming-goal-content');
         const terraformingDome = BUILDING_DEFINITIONS.find((building) => building.id === 'terraforming-dome');
@@ -548,7 +552,9 @@
             if (guideBuildingIds.has(id)) {
                 icon.setAttribute('viewBox', '0 0 96 96');
                 const use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
-                use.setAttribute('href', `assets/building-icons.svg?v=1#building-${id}`);
+                use.setAttribute('href', id === 'field-automaton'
+                    ? 'assets/field-automaton-icon.svg?v=3#building-field-automaton'
+                    : `assets/building-icons.svg?v=1#building-${id}`);
                 use.setAttribute('width', '96');
                 use.setAttribute('height', '96');
                 icon.appendChild(use);

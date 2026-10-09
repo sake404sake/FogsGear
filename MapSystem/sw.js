@@ -1,13 +1,16 @@
-const CACHE_NAME = 'steampunk-explorer-v141';
+const CACHE_NAME = 'steampunk-explorer-v176';
 const APP_SHELL = [
     './',
     './index.html',
     './settings.html',
+    './worldmap.html',
     './manifest.webmanifest',
-    './css/style.css?v=648',
-    './js/main.js?v=730',
+    './css/style.css?v=676',
+    './js/main.js?v=756',
     './js/mapGenerator.js?v=89',
-    './js/skinRenderer.js?v=2',
+    './js/skinRenderer.js?v=5',
+    './js/skinPreview.js?v=4',
+    './js/buildingData.js?v=33',
     './js/cellRules.js',
     './js/cellIconRenderer.js?v=5',
     './js/worldCells.js?v=13',
@@ -20,7 +23,8 @@ const APP_SHELL = [
     './js/MapGenerator/TerritoryGenerator.js',
     './js/mapWorker.js?v=89',
     './assets/app-icon-192.png',
-    './assets/app-icon-512.png'
+    './assets/app-icon-512.png',
+    './assets/field-automaton-icon.svg?v=3'
 ];
 
 self.addEventListener('install', (event) => {

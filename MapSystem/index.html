@@ -10,7 +10,7 @@
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="icon" href="../MainSystem/icons/app-icon.jpg" type="image/jpeg">
     <link rel="apple-touch-icon" href="assets/app-icon-192.png">
-    <link rel="stylesheet" href="css/style.css?v=648">
+    <link rel="stylesheet" href="css/style.css?v=676">
 </head>
 <body>
     <div id="loadingOverlay" class="loading-overlay" role="status" aria-live="polite">
@@ -80,17 +80,39 @@
 
     <div id="building-menu-modal" class="inventory-modal" hidden role="dialog" aria-modal="true" aria-labelledby="building-menu-title">
         <div class="inventory-modal-panel building-menu-panel">
+            <button id="building-menu-demolish" class="building-menu-demolish" type="button" data-action="demolish-building" aria-label="この建築物を解体">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path d="M4 7h16M9 7V4h6v3m3 0-.8 13H6.8L6 7m4 3v7m4-7v7" />
+                </svg>
+            </button>
             <button class="inventory-modal-close" type="button" data-action="close-building-menu" aria-label="建物メニューを閉じる">×</button>
             <div class="inventory-modal-kicker">BUILDING CONTROL</div>
             <h2 id="building-menu-title">建築物</h2>
             <p id="building-menu-details"></p>
             <section id="building-storage-controls" class="building-storage-controls" hidden>
                 <p id="building-storage-status" role="status"></p>
-                <label>保管する資材<select id="building-storage-item"></select></label>
-                <label>数量<input id="building-storage-amount" type="number" min="1" step="1" value="1"></label>
-                <div class="building-storage-actions">
-                    <button class="inventory-modal-secondary" type="button" data-action="building-storage-transfer" data-direction="deposit">預ける</button>
-                    <button class="inventory-modal-secondary" type="button" data-action="building-storage-transfer" data-direction="withdraw">取り出す</button>
+                <div id="building-storage-grid" class="building-storage-grid" role="group" aria-label="ストレージ内の資材"></div>
+                <div class="building-storage-transfer-fields">
+                    <div class="building-storage-picker">
+                        <button id="building-storage-item-button" class="building-storage-item-button" type="button" aria-expanded="false" aria-controls="building-storage-item-list">
+                            <span id="building-storage-item-icon" class="building-storage-item-icon"></span>
+                            <span id="building-storage-item-name"></span>
+                            <span class="building-storage-item-chevron" aria-hidden="true">▾</span>
+                        </button>
+                        <div id="building-storage-item-picker" class="building-storage-item-picker" hidden>
+                            <input id="building-storage-item-search" type="search" placeholder="資材を検索" autocomplete="off" aria-label="資材を検索">
+                            <div id="building-storage-item-list" class="building-storage-item-list" role="listbox" aria-label="資材を選択"></div>
+                        </div>
+                        <select id="building-storage-item" hidden aria-hidden="true" tabindex="-1"></select>
+                    </div>
+                    <div class="building-storage-amount-picker">
+                        <button id="building-storage-amount-button" class="building-storage-amount" type="button" aria-expanded="false" aria-controls="building-storage-amount-list"><span id="building-storage-amount-value">1</span><span aria-hidden="true">▾</span></button>
+                        <div id="building-storage-amount-popup" class="building-storage-amount-popup" hidden>
+                            <div id="building-storage-amount-list" class="building-storage-amount-list" role="listbox" aria-label="数量を選択"></div>
+                        </div>
+                        <select id="building-storage-amount" hidden aria-hidden="true" tabindex="-1"></select>
+                    </div>
+                    <button id="building-storage-transfer-button" class="inventory-modal-secondary" type="button" data-action="building-storage-transfer" data-direction="deposit" aria-label="選択した資材を預ける">預ける</button>
                 </div>
             </section>
             <button id="building-menu-rotate-rail" class="inventory-modal-secondary" type="button" data-action="rotate-selected-rail" aria-label="配置済み線路の向きを90度回転" hidden>↻ 線路を90度回転</button>
@@ -102,10 +124,100 @@
             <div class="inventory-modal-actions">
                 <button id="building-menu-craft" class="saved-scroll-use" type="button" data-action="open-building-crafting" hidden>製作</button>
                 <button id="building-menu-start-vehicle" class="saved-scroll-use" type="button" data-action="toggle-building-vehicle" hidden>起動</button>
-                <button id="building-menu-demolish" class="inventory-modal-secondary" type="button" data-action="demolish-building">解体</button>
-                <button class="inventory-modal-secondary" type="button" data-action="close-building-menu">閉じる</button>
             </div>
         </div>
+    </div>
+    <div id="automaton-menu-modal" class="inventory-modal" hidden role="dialog" aria-modal="true" aria-labelledby="automaton-menu-title">
+        <section class="inventory-modal-panel automaton-menu-panel">
+            <button class="building-menu-demolish" type="button" data-action="demolish-building" aria-label="このオートマトンを解体">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7h16M9 7V4h6v3m3 0-.8 13H6.8L6 7m4 3v7m4-7v7" /></svg>
+            </button>
+            <button class="inventory-modal-close" type="button" data-action="close-building-menu" aria-label="オートマトンメニューを閉じる">×</button>
+            <div class="inventory-modal-kicker">FIELD AUTOMATON</div>
+            <h2 id="automaton-menu-title">作業オートマトン</h2>
+            <p id="automaton-menu-details"></p>
+            <div class="automaton-preview">
+                <span class="automaton-preview-badge">作業用機械人形</span>
+                <canvas id="automaton-skin-preview" width="300" height="340" aria-label="オートマトンの見た目。ドラッグして回転"></canvas>
+                <div class="automaton-preview-rotation">
+                    <button class="inventory-modal-secondary" type="button" id="automaton-skin-rotate-left" aria-label="左へ15度回転">↶</button>
+                    <input id="automaton-skin-rotation" type="range" min="0" max="359" step="1" value="0" aria-label="立ち絵の回転">
+                    <output id="automaton-skin-rotation-value" for="automaton-skin-rotation">0°</output>
+                    <button class="inventory-modal-secondary" type="button" id="automaton-skin-rotate-right" aria-label="右へ15度回転">↷</button>
+                </div>
+                <p class="skin-preview-status">ドラッグまたはスライダーで向きを変更できます。</p>
+            </div>
+            <p id="automaton-skin-name" class="automaton-status" aria-live="polite"></p>
+            <div class="automaton-skin-controls">
+                <button class="inventory-modal-secondary" type="button" data-action="copy-player-skin-to-automaton">プレイヤーの見た目を使う</button>
+                <label class="inventory-modal-secondary automaton-skin-file-label" for="automaton-skin-file">画像を選択</label>
+                <input id="automaton-skin-file" type="file" accept="image/*" hidden>
+            </div>
+            <label class="automaton-setting-row">巡回方向
+                <select id="automaton-axis"><option value="horizontal">左右</option><option value="vertical">上下</option></select>
+            </label>
+            <label class="automaton-setting-row">巡回距離
+                <select id="automaton-range"><option value="1">1セル</option><option value="2">2セル</option><option value="3">3セル</option><option value="4">4セル</option><option value="5">5セル</option></select>
+            </label>
+            <label class="automaton-setting-row">処理
+                <select id="automaton-action">
+                    <option value="RESOURCE_COLLECTION">資源を採取</option>
+                    <option value="TERRAIN_TRANSFORM">地形を変成</option>
+                    <option value="STORAGE_WITHDRAW">進行方向1マス先のストレージから取り出す</option>
+                    <option value="STORAGE_DEPOSIT">進行方向1マス先のストレージに収める</option>
+                </select>
+            </label>
+            <label class="automaton-setting-row automaton-transform-setting">変成先
+                <select id="automaton-transform-target"></select>
+            </label>
+            <label class="automaton-setting-row">条件：セルの種類
+                <select id="automaton-condition-cell"></select>
+            </label>
+            <section id="automaton-storage-filter-settings" class="automaton-storage-filter-settings" hidden>
+                <div class="automaton-item-filter-toolbar">
+                    <div class="automaton-item-filter-mode">
+                        <span class="automaton-item-filter-label">対象アイテム</span>
+                        <div class="automaton-item-filter-options" role="group" aria-label="対象アイテムの条件">
+                            <button class="is-selected" type="button" data-item-filter-mode="include" aria-pressed="true">のみ</button>
+                            <button type="button" data-item-filter-mode="exclude" aria-pressed="false">以外</button>
+                        </div>
+                    </div>
+                    <div class="automaton-item-registration">
+                        <div class="building-storage-picker automaton-item-picker">
+                            <button id="automaton-item-button" class="building-storage-item-button" type="button" aria-expanded="false" aria-controls="automaton-item-picker">
+                                <span id="automaton-item-icon" class="building-storage-item-icon"></span>
+                                <span id="automaton-item-name"></span>
+                                <span class="building-storage-item-chevron" aria-hidden="true">▾</span>
+                            </button>
+                            <div id="automaton-item-picker" class="building-storage-item-picker" hidden>
+                                <input id="automaton-item-search" type="search" placeholder="アイテムを検索" autocomplete="off" aria-label="対象アイテムを検索">
+                                <div id="automaton-item-option-list" class="building-storage-item-list" role="listbox" aria-label="登録するアイテムを選択"></div>
+                            </div>
+                            <select id="automaton-item-selection" hidden aria-hidden="true" tabindex="-1"></select>
+                        </div>
+                        <button id="automaton-item-register" class="inventory-modal-secondary" type="button">登録</button>
+                    </div>
+                </div>
+                <div id="automaton-registered-items" class="automaton-registered-items" aria-label="登録済みアイテム"></div>
+            </section>
+            <p id="automaton-status" class="automaton-status" role="status"></p>
+            <div class="inventory-modal-actions">
+                <button id="automaton-toggle" class="saved-scroll-use" type="button" data-action="toggle-automaton">起動</button>
+            </div>
+        </section>
+    </div>
+    <div id="building-demolition-confirm-modal" class="inventory-modal demolition-confirm-modal" hidden role="dialog" aria-modal="true" aria-labelledby="building-demolition-confirm-title">
+        <section class="inventory-modal-panel demolition-confirm-panel">
+            <button class="inventory-modal-close" type="button" data-action="cancel-building-demolition" aria-label="解体確認を閉じる">×</button>
+            <div class="inventory-modal-kicker">DEMOLITION</div>
+            <h2 id="building-demolition-confirm-title">建築物を解体</h2>
+            <p id="building-demolition-confirm-message"></p>
+            <div id="building-demolition-refunds" class="building-demolition-refunds" aria-label="返却される建築材料"></div>
+            <div class="inventory-modal-actions">
+                <button class="inventory-modal-secondary" type="button" data-action="cancel-building-demolition">やめる</button>
+                <button class="building-demolition-confirm-button" type="button" data-action="confirm-building-demolition">解体する</button>
+            </div>
+        </section>
     </div>
     <div id="building-crafting-modal" class="inventory-modal" hidden role="dialog" aria-modal="true" aria-labelledby="building-crafting-title">
         <section class="inventory-modal-panel building-crafting-panel">
@@ -158,7 +270,7 @@
             <div class="inventory-modal-icon" aria-hidden="true">📦</div>
             <div class="inventory-modal-kicker">SAVE TRANSFER</div>
             <h2 id="save-transfer-title">セーブデータを読み込みますか？</h2>
-            <p id="save-transfer-description">ゲーム進行、所持品、スキン、保存・起動中スクロール、地形変更をファイルの内容に置き換えます。</p>
+            <p id="save-transfer-description">ゲーム進行、所持品、見た目、保存・起動中スクロール、地形変更をファイルの内容に置き換えます。</p>
             <div id="save-transfer-meta" class="inventory-modal-meta"></div>
             <div class="inventory-modal-actions">
                 <button class="saved-scroll-use" type="button" data-action="confirm-save-import">読み込む</button>
@@ -262,6 +374,6 @@
         </div>
     </div>
 
-    <script type="module" src="js/main.js?v=730"></script>
+    <script type="module" src="js/main.js?v=756"></script>
 </body>
 </html>

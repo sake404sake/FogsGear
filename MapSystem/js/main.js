@@ -1,14 +1,15 @@
 // js/main.js - Steampunk Explorer Game Logic
 import { MapGenerator, BIOME_COLORS, loadMapSnapshot, saveMapSnapshot } from './mapGenerator.js?v=89';
-import { SkinRenderer } from './skinRenderer.js?v=3';
-import { CELL_DEFINITIONS, canEnterCell, getCellEntryRule, getMosaicColor } from './cellRules.js';
+import { SkinRenderer } from './skinRenderer.js?v=5';
+import { SkinPreview } from './skinPreview.js?v=4';
+import { CELL_DEFINITIONS, canEnterCell, getCellEntryRule, getCellTypeKey, getMosaicColor } from './cellRules.js';
 import { drawCellIcon, loadCellIconAtlas } from './cellIconRenderer.js?v=5';
 import { ACTIVE_SCROLL_TARGETS_KEY, CELL_MATERIALS, TERRAIN_TRANSFORM_RECIPES, WORLD_CELL_TYPES, applyCellChanges, chooseEraCellType, getCellCollectionPowerCost, getCellDrops, readCellChanges, saveCellChange } from './worldCells.js?v=13';
 import { CRAFTING_ITEMS, CRAFTING_ITEM_BY_ID, CRAFTING_RATE_MULTIPLIER, CRAFTING_RECIPES, CRAFTING_STATION_BUILDING_IDS, DEFERRED_CRAFTING_ITEM_IDS, HANDCRAFT_STATION } from './craftingData.js?v=13';
-import { BUILDING_BY_ID, BUILDING_DEFINITIONS, canPlaceBuildingOnTerrainCell, drawBuilding, getRailAutoRotation, getRailConnections, getTileEffectsUnderFootprint, getVehicleRailRotation, loadBuildingIconImages, normalizeBuildingUtilityState } from './buildingData.js?v=30';
+import { BUILDING_BY_ID, BUILDING_DEFINITIONS, canPlaceBuildingOnTerrainCell, drawBuilding, getRailAutoRotation, getRailConnections, getTileEffectsUnderFootprint, getVehicleRailRotation, loadBuildingIconImages, normalizeBuildingUtilityState } from './buildingData.js?v=33';
 import { getBuildingUtilityStatus, simulateBuildingUtilityNetworks } from './buildingUtilityNetworks.js?v=4';
 import { buildTerritoryBorderSegments } from './territoryBorders.js?v=35';
-import { directionToVehicleRotation, findNextRailStep, getTrackDirection, getVehicleRenderState, STATION_CONTROL_DEFAULTS, VEHICLE_DEFAULTS } from './railwayRuntime.js?v=8';
+import { directionToVehicleRotation, findNextRailStep, getTrackDirection, getVehicleRenderState, STATION_CONTROL_DEFAULTS, VEHICLE_DEFAULTS } from './railwayRuntime.js?v=9';
 import { GameState as EngineGameState, clearGameProgress } from '../../GearSystem/js/GameState.js?v=runtime-45';
 import { GearManager as EngineGearManager } from '../../GearSystem/js/GearManager.js?v=runtime-5';
 
@@ -16,6 +17,9 @@ const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const vehicleAnimationLayer = document.getElementById('vehicleAnimationLayer');
 const vehicleMotionSprites = new Map();
+const automatonSkinRenderers = new Map();
+let automatonSkinPreview = null;
+let automatonPreviewSource = '';
 let cellIconAtlas = null;
 const INVENTORY_ITEMS_KEY = 'steampunk_explorer_inventory_items';
 const BUILDINGS_STORAGE_KEY = 'fogsgear_world_buildings';
@@ -58,6 +62,7 @@ const state = {
 let activeBuildingPlacement = null;
 let buildingPlacementMode = 'single';
 let selectedBuildingInstanceId = null;
+let pendingBuildingDemolitionInstanceId = null;
 let activeCraftingBuildingInstanceId = null;
 let buildingPressCandidate = null;
 let buildingPressTimer = null;
@@ -143,6 +148,7 @@ let inventoryRefreshTimer = 0;
 let lastCraftingProgressUpdateAt = 0;
 let lastCraftingNotificationSyncAt = 0;
 let lastCraftingCountdownUpdateAt = 0;
+let selectedStorageStack = null;
 
 const INVENTORY_ITEM_DEFINITIONS = {
     paper_scroll: { name: 'スクロール（紙）', description: '新しいギア設計を記録する紙の巻物。ギア編集画面で設計を作成できます。', iconId: 'paper_scroll', image: null, meta: '未使用・新規設計用' },
@@ -584,12 +590,27 @@ function getSkinNameFromSource(source) {
     if (source.startsWith('data:')) return 'ローカル画像';
     const sourcePath = source.split(/[?#]/)[0];
     const fileName = sourcePath.substring(sourcePath.lastIndexOf('/') + 1);
-    return fileName || '既定スキン';
+    return fileName || '既定の見た目';
 }
 
 function updateSkinName(name) {
     const skinName = document.getElementById('skinName');
     if (skinName) skinName.textContent = `選択中: ${name || '未選択'}`;
+}
+
+function getPlayerSkinConfig() {
+    let url = './5504543579.png';
+    let name = '5504543579.png';
+    try {
+        const savedUrl = localStorage.getItem('steampunk_explorer_skin_url');
+        if (savedUrl && savedUrl !== 'https://mineskin.org/download/639735497') {
+            url = savedUrl;
+            name = localStorage.getItem('steampunk_explorer_skin_name') || getSkinNameFromSource(url);
+        }
+    } catch (error) {
+        console.warn('Could not read the selected player skin; using the default skin.', error);
+    }
+    return { url, name };
 }
 
 async function loadAndApplySkin(url, name = '') {
@@ -1106,8 +1127,91 @@ function getStorageMaterialCount(storage, itemId) {
     return Math.max(0, Number(storage.storedMaterials?.[itemId]) || 0);
 }
 
-function getStorageUsedCapacity(storage) {
-    return Object.values(storage.storedMaterials || {}).reduce((total, amount) => total + Math.max(0, Number(amount) || 0), 0);
+function getStorageUsedSlots(storage) {
+    return Object.values(storage.storedMaterials || {}).reduce((total, amount) => {
+        const count = Number(amount);
+        return total + (Number.isFinite(count) ? Math.ceil(Math.max(0, count) / 99) : 0);
+    }, 0);
+}
+
+function getStorageInventoryCount(itemId) {
+    const resourceKey = { water: 'water', fog: 'fog', power: 'power', steam_power: 'steamPower' }[itemId];
+    if (itemId === 'brass-stock') return Math.max(0, Number(engineRuntimeState?.brass) || 0);
+    if (resourceKey) return Math.max(0, Number(engineRuntimeState?.[resourceKey]) || 0);
+    return getCraftingItemCount(itemId);
+}
+
+function createBuildingStorageIcon(itemId) {
+    const icon = document.createElement('span');
+    icon.className = 'inventory-item-icon';
+    icon.appendChild(createInventoryIcon(itemId));
+    return icon;
+}
+
+function renderBuildingStorageItemPicker() {
+    const itemSelect = document.getElementById('building-storage-item');
+    const selectedItemId = itemSelect.value;
+    const button = document.getElementById('building-storage-item-button');
+    const selectedName = getCraftingItemName(selectedItemId);
+    const selectedNameElement = document.getElementById('building-storage-item-name');
+    document.getElementById('building-storage-item-icon').replaceChildren(createBuildingStorageIcon(selectedItemId));
+    selectedNameElement.textContent = selectedName;
+    selectedNameElement.style.fontSize = '';
+    button.setAttribute('aria-label', `資材: ${selectedName}。タップして変更`);
+    const textCanvas = document.createElement('canvas');
+    const context = textCanvas.getContext('2d');
+    if (context) {
+        const baseSize = Number.parseFloat(getComputedStyle(selectedNameElement).fontSize);
+        const availableWidth = selectedNameElement.clientWidth;
+        context.font = getComputedStyle(selectedNameElement).font;
+        const textWidth = context.measureText(selectedName).width;
+        if (availableWidth > 0 && textWidth > availableWidth) {
+            selectedNameElement.style.fontSize = `${Math.max(7, baseSize * availableWidth / textWidth)}px`;
+        }
+    }
+
+    const search = normalizeInventorySearch(document.getElementById('building-storage-item-search').value);
+    const itemList = document.getElementById('building-storage-item-list');
+    const options = CRAFTING_ITEMS.filter(([itemId, name]) =>
+        !search || normalizeInventorySearch(`${name} ${itemId}`).includes(search));
+    const items = options.map(([itemId, name]) => {
+        const option = document.createElement('button');
+        option.type = 'button';
+        option.className = 'building-storage-item-option';
+        option.dataset.itemId = itemId;
+        option.setAttribute('role', 'option');
+        option.setAttribute('aria-selected', String(itemId === selectedItemId));
+        if (itemId === selectedItemId) option.classList.add('is-selected');
+        option.appendChild(createBuildingStorageIcon(itemId));
+        const itemName = document.createElement('span');
+        itemName.className = 'building-storage-item-option-name';
+        itemName.textContent = name;
+        const quantity = document.createElement('span');
+        quantity.className = 'building-storage-item-option-count';
+        quantity.textContent = String(getStorageInventoryCount(itemId));
+        option.append(itemName, quantity);
+        return option;
+    });
+    itemList.replaceChildren(...items);
+    const selectedOption = [...itemList.children].find(option => option.dataset.itemId === selectedItemId);
+    if (!selectedOption && !search) {
+        const selectedName = getCraftingItemName(selectedItemId);
+        const option = document.createElement('button');
+        option.type = 'button';
+        option.className = 'building-storage-item-option is-selected';
+        option.dataset.itemId = selectedItemId;
+        option.setAttribute('role', 'option');
+        option.setAttribute('aria-selected', 'true');
+        option.appendChild(createBuildingStorageIcon(selectedItemId));
+        const itemName = document.createElement('span');
+        itemName.className = 'building-storage-item-option-name';
+        itemName.textContent = selectedName;
+        const quantity = document.createElement('span');
+        quantity.className = 'building-storage-item-option-count';
+        quantity.textContent = String(getStorageInventoryCount(selectedItemId));
+        option.append(itemName, quantity);
+        itemList.prepend(option);
+    }
 }
 
 function renderBuildingStorage(placed, definition) {
@@ -1118,28 +1222,104 @@ function renderBuildingStorage(placed, definition) {
     section.hidden = capacity <= 0;
     if (capacity <= 0) return;
     if (!isRecord(placed.storedMaterials)) placed.storedMaterials = {};
-    const currentItem = itemSelect.value;
+    if (selectedStorageStack && !placed.storedMaterials[selectedStorageStack.itemId]) selectedStorageStack = null;
+    const transferButton = document.getElementById('building-storage-transfer-button');
+    const transferDirection = selectedStorageStack ? 'withdraw' : 'deposit';
+    transferButton.dataset.direction = transferDirection;
+    transferButton.textContent = transferDirection === 'withdraw' ? '取り出す' : '預ける';
+    transferButton.setAttribute('aria-label', transferDirection === 'withdraw' ? '選択した資材を取り出す' : '選択した資材を預ける');
+    const currentItemId = itemSelect.value;
     itemSelect.replaceChildren(...CRAFTING_ITEMS.map(([id, name]) => new Option(name, id)));
-    if (CRAFTING_ITEMS.some(([id]) => id === currentItem)) itemSelect.value = currentItem;
-    const used = getStorageUsedCapacity(placed);
-    document.getElementById('building-storage-status').textContent = `保管量 ${used} / ${capacity}　選択中: ${getStorageMaterialCount(placed, itemSelect.value)}`;
+    itemSelect.value = CRAFTING_ITEM_BY_ID.has(currentItemId) ? currentItemId : CRAFTING_ITEMS[0]?.[0] || '';
+    renderBuildingStorageItemPicker();
+    const usedSlots = getStorageUsedSlots(placed);
+    const selectedItemId = itemSelect.value;
+    const selectedItemCount = getStorageMaterialCount(placed, selectedItemId);
+    document.getElementById('building-storage-status').textContent =
+        `保管枠 ${usedSlots} / ${capacity}　${getCraftingItemName(selectedItemId)} ${selectedItemCount}`;
+    const grid = document.getElementById('building-storage-grid');
+    const cells = [];
+    Object.entries(placed.storedMaterials)
+        .filter(([, amount]) => Number.isFinite(Number(amount)) && Number(amount) > 0)
+        .forEach(([storedItemId, rawAmount]) => {
+            let remaining = Math.floor(Number(rawAmount));
+            let stackIndex = 0;
+            while (remaining > 0) {
+                const stackSize = Math.min(99, remaining);
+                const cell = document.createElement('button');
+                cell.type = 'button';
+                cell.className = 'building-storage-cell';
+                cell.dataset.itemId = storedItemId;
+                cell.dataset.stackCount = String(stackSize);
+                cell.dataset.stackIndex = String(stackIndex);
+                cell.setAttribute('aria-pressed', String(
+                    selectedStorageStack?.itemId === storedItemId && selectedStorageStack.stackIndex === stackIndex
+                ));
+                cell.setAttribute('aria-label', `${getCraftingItemName(storedItemId)} ${stackSize}個`);
+                cell.title = `${getCraftingItemName(storedItemId)} ${stackSize}個`;
+                if (selectedStorageStack?.itemId === storedItemId && selectedStorageStack.stackIndex === stackIndex) {
+                    cell.classList.add('is-selected');
+                }
+                cell.appendChild(createBuildingStorageIcon(storedItemId));
+                const count = document.createElement('span');
+                count.className = 'building-storage-cell-count';
+                count.textContent = String(stackSize);
+                cell.appendChild(count);
+                cells.push(cell);
+                remaining -= stackSize;
+                stackIndex++;
+            }
+        });
+    grid.replaceChildren(...cells);
 }
+
+function setBuildingStorageAmountOptions(maximum, selectedValue = 1) {
+    const amountSelect = document.getElementById('building-storage-amount');
+    if (!amountSelect) return;
+    const optionCount = Math.min(99, Math.max(1, Math.floor(Number(maximum)) || 99));
+    const options = Array.from({ length: optionCount }, (_, index) => {
+        const value = String(index + 1);
+        return new Option(value, value);
+    });
+    amountSelect.replaceChildren(...options);
+    amountSelect.value = String(Math.min(optionCount, Math.max(1, Math.floor(Number(selectedValue)) || 1)));
+    document.getElementById('building-storage-amount-value').textContent = amountSelect.value;
+    const list = document.getElementById('building-storage-amount-list');
+    list.replaceChildren(...options.map(option => {
+        const item = document.createElement('button');
+        item.className = 'building-storage-amount-option';
+        item.type = 'button';
+        item.role = 'option';
+        item.dataset.amount = option.value;
+        item.setAttribute('aria-selected', String(option.value === amountSelect.value));
+        item.textContent = option.value;
+        return item;
+    }));
+}
+
+setBuildingStorageAmountOptions(99);
 
 function transferBuildingStorage(direction) {
     const placed = state.buildings.find(building => building.instanceId === selectedBuildingInstanceId);
     const definition = BUILDING_BY_ID.get(placed?.id);
     const itemId = document.getElementById('building-storage-item')?.value;
-    const amount = Math.floor(Number(document.getElementById('building-storage-amount')?.value));
+    const amountInput = document.getElementById('building-storage-amount');
+    const amount = Math.floor(Number(amountInput?.value));
     if (!placed || !definition?.storageCapacity || !CRAFTING_ITEM_BY_ID.has(itemId) || !Number.isFinite(amount) || amount < 1) {
         showAppNotice('資材と数量を正しく指定してください。');
         return;
     }
     if (!isRecord(placed.storedMaterials)) placed.storedMaterials = {};
-    const inventoryCount = itemId === 'brass-stock' ? Number(engineRuntimeState.brass) || 0 : getCraftingItemCount(itemId);
-    const storedCount = getStorageMaterialCount(placed, itemId);
+    const resourceKey = { water: 'water', fog: 'fog', power: 'power', steam_power: 'steamPower' }[itemId];
+    const inventoryCount = getStorageInventoryCount(itemId);
+    const storedCount = Number.isFinite(getStorageMaterialCount(placed, itemId))
+        ? Math.floor(getStorageMaterialCount(placed, itemId))
+        : 0;
     const before = captureBuildingHistoryState();
     if (direction === 'deposit') {
-        const capacityLeft = Math.floor(definition.storageCapacity - getStorageUsedCapacity(placed));
+        const freeSlots = Math.max(0, definition.storageCapacity - getStorageUsedSlots(placed));
+        const stackSpace = Math.ceil(storedCount / 99) * 99 - storedCount;
+        const capacityLeft = stackSpace + freeSlots * 99;
         const moved = Math.min(amount, capacityLeft, inventoryCount);
         if (moved < 1) {
             showAppNotice(capacityLeft < 1 ? 'ストレージに空きがありません。' : '所持資材がありません。');
@@ -1147,17 +1327,22 @@ function transferBuildingStorage(direction) {
         }
         placed.storedMaterials[itemId] = storedCount + moved;
         if (itemId === 'brass-stock') engineRuntimeState.brass -= moved;
+        else if (resourceKey) engineRuntimeState[resourceKey] = inventoryCount - moved;
         else engineRuntimeState.materialInventory[itemId] = inventoryCount - moved;
     } else {
-        const moved = Math.min(amount, storedCount);
+        const selectedStackLimit = selectedStorageStack?.itemId === itemId ? selectedStorageStack.count : 99;
+        const moved = Math.min(amount, storedCount, selectedStackLimit, 99);
         if (moved < 1) {
             showAppNotice('ストレージに選択した資材がありません。');
             return;
         }
         placed.storedMaterials[itemId] = storedCount - moved;
         if (itemId === 'brass-stock') engineRuntimeState.brass += moved;
+        else if (resourceKey) engineRuntimeState[resourceKey] = inventoryCount + moved;
         else engineRuntimeState.materialInventory[itemId] = inventoryCount + moved;
     }
+    selectedStorageStack = null;
+    setBuildingStorageAmountOptions(99);
     recordBuildingHistory(before);
     saveBuildings();
     engineRuntimeState.saveGameData();
@@ -1198,7 +1383,10 @@ function createBuildingSvgIcon(buildingId) {
     svg.classList.add('building-item-icon-svg');
     svg.setAttribute('viewBox', '0 0 96 96');
     svg.setAttribute('aria-hidden', 'true');
-    use.setAttribute('href', `assets/building-icons.svg?v=1#building-${buildingId}`);
+    const iconSprite = buildingId === 'field-automaton'
+        ? 'assets/field-automaton-icon.svg?v=3#building-field-automaton'
+        : `assets/building-icons.svg?v=1#building-${buildingId}`;
+    use.setAttribute('href', iconSprite);
     use.setAttribute('x', '0');
     use.setAttribute('y', '0');
     use.setAttribute('width', '96');
@@ -1448,7 +1636,13 @@ function captureBuildingHistoryState() {
     return {
         buildings: JSON.parse(JSON.stringify(state.buildings)),
         brass: Number(engineRuntimeState.brass) || 0,
-        materialInventory: { ...engineRuntimeState.materialInventory }
+        materialInventory: { ...engineRuntimeState.materialInventory },
+        resourceInventory: {
+            water: Number(engineRuntimeState.water) || 0,
+            fog: Number(engineRuntimeState.fog) || 0,
+            power: Number(engineRuntimeState.power) || 0,
+            steamPower: Number(engineRuntimeState.steamPower) || 0
+        }
     };
 }
 
@@ -1471,13 +1665,19 @@ function recordBuildingHistory(before, after = captureBuildingHistoryState()) {
         const delta = (Number(after.materialInventory[itemId]) || 0) - (Number(before.materialInventory[itemId]) || 0);
         if (delta) inventoryDeltas[itemId] = delta;
     }
+    const resourceDeltas = {};
+    for (const resourceId of Object.keys(before.resourceInventory)) {
+        const delta = after.resourceInventory[resourceId] - before.resourceInventory[resourceId];
+        if (delta) resourceDeltas[resourceId] = delta;
+    }
     buildingUndoHistory.push({
         changes: changedIds.map(instanceId => ({
             before: beforeById.get(instanceId) || null,
             after: afterById.get(instanceId) || null
         })),
         brassDelta: after.brass - before.brass,
-        inventoryDeltas
+        inventoryDeltas,
+        resourceDeltas
     });
     if (buildingUndoHistory.length > BUILDING_HISTORY_LIMIT) buildingUndoHistory.shift();
     buildingRedoHistory.length = 0;
@@ -1497,7 +1697,11 @@ function applyBuildingHistory(direction) {
         itemId,
         (Number(engineRuntimeState.materialInventory[itemId]) || 0) + delta * resourceDirection
     ]));
-    if (nextBrass < 0 || [...nextInventory.values()].some(count => count < 0)) {
+    const nextResources = new Map(Object.entries(entry.resourceDeltas).map(([resourceId, delta]) => [
+        resourceId,
+        (Number(engineRuntimeState[resourceId]) || 0) + delta * resourceDirection
+    ]));
+    if (nextBrass < 0 || [...nextInventory.values(), ...nextResources.values()].some(count => count < 0)) {
         showAppNotice('必要な素材が足りないため、この操作を戻せません。');
         return;
     }
@@ -1519,6 +1723,9 @@ function applyBuildingHistory(direction) {
     engineRuntimeState.brass = nextBrass;
     nextInventory.forEach((count, itemId) => {
         engineRuntimeState.materialInventory[itemId] = count;
+    });
+    nextResources.forEach((count, resourceId) => {
+        engineRuntimeState[resourceId] = count;
     });
     if (state.buildings.some(building => building.instanceId === selectedBuildingInstanceId)) {
         openBuildingMenu(selectedBuildingInstanceId);
@@ -1578,7 +1785,24 @@ function loadBuildings() {
                         placed.vehicle.movement = null;
                         placed.vehicle.nextMoveAt = 0;
                         migrated = true;
+                    } else if (definition.kind !== 'locomotive' && placed.vehicle.movement) {
+                        placed.vehicle.movement = null;
+                        migrated = true;
                     }
+                }
+            } else if (definition.kind === 'automaton') {
+                const savedAutomaton = isRecord(placed.automaton) ? placed.automaton : {};
+                placed.automaton = {
+                    ...getAutomatonState(placed),
+                    ...savedAutomaton,
+                    origin: isRecord(savedAutomaton.origin) ? savedAutomaton.origin : { x: placed.x, y: placed.y }
+                };
+                if (placed.automaton.running || placed.automaton.movement) {
+                    placed.automaton.running = false;
+                    placed.automaton.movement = null;
+                    placed.automaton.nextMoveAt = 0;
+                    placed.automaton.stopReason = '再読み込み後は停止';
+                    migrated = true;
                 }
             } else if (definition.kind === 'station' && !isRecord(placed.stationControl)) {
                 placed.stationControl = { ...STATION_CONTROL_DEFAULTS, destinations: [], conditions: [] };
@@ -2737,8 +2961,10 @@ function scheduleVehicleAnimation() {
     requestAnimationFrame(now => {
         vehicleFrameQueued = false;
         tickVehicleRuntime(now);
+        tickAutomatons(now);
         drawVehicleAnimation(now);
-        if (state.buildings.some(placed => placed.vehicle?.running || placed.vehicle?.movement)) scheduleVehicleAnimation();
+        if (state.buildings.some(placed => placed.vehicle?.running || placed.vehicle?.movement
+            || placed.automaton?.running || placed.automaton?.movement)) scheduleVehicleAnimation();
     });
 }
 
@@ -2965,7 +3191,16 @@ function drawPlacedBuildings(startCol, endCol, startRow, endRow, now) {
         const building = BUILDING_BY_ID.get(placed.id);
         if (!building) return;
         if (building.role === 'vehicle' && placed.vehicle?.movement) return;
-        if (placed.x + building.width < startCol || placed.x > endCol || placed.y + building.height < startRow || placed.y > endRow) return;
+        const automatonMovement = building.kind === 'automaton' ? placed.automaton?.movement : null;
+        const minX = Math.min(placed.x, automatonMovement?.from.x ?? placed.x, automatonMovement?.to.x ?? placed.x);
+        const maxX = Math.max(placed.x, automatonMovement?.from.x ?? placed.x, automatonMovement?.to.x ?? placed.x);
+        const minY = Math.min(placed.y, automatonMovement?.from.y ?? placed.y, automatonMovement?.to.y ?? placed.y);
+        const maxY = Math.max(placed.y, automatonMovement?.from.y ?? placed.y, automatonMovement?.to.y ?? placed.y);
+        if (maxX + building.width < startCol || minX > endCol || maxY + building.height < startRow || minY > endRow) return;
+        if (building.kind === 'automaton') {
+            drawAutomaton(placed, now);
+            return;
+        }
         drawBuilding(ctx, { ...building, x: placed.x, y: placed.y, rotation: placed.rotation || 0 }, state.tileSize, { zoom: state.zoom });
     });
 }
@@ -3179,7 +3414,7 @@ function draw() {
     });
 
     ctx.restore();
-    if (state.buildings.some(placed => placed.vehicle?.movement)) scheduleVehicleAnimation();
+    if (state.buildings.some(placed => placed.vehicle?.movement || placed.automaton?.movement)) scheduleVehicleAnimation();
 }
 
 function drawWaterCoastline(startCol, endCol, startRow, endRow) {
@@ -3344,6 +3579,9 @@ function setZoom(newZoom, pivotCanvasX, pivotCanvasY) {
 function closeBuildingMenu() {
     const modal = document.getElementById('building-menu-modal');
     if (modal) modal.hidden = true;
+    document.getElementById('automaton-menu-modal').hidden = true;
+    document.getElementById('building-demolition-confirm-modal').hidden = true;
+    pendingBuildingDemolitionInstanceId = null;
     selectedBuildingInstanceId = null;
 }
 
@@ -3357,9 +3595,120 @@ function getVehicleState(placed) {
     return placed.vehicle;
 }
 
+function getAutomatonState(placed) {
+    const saved = isRecord(placed.automaton) ? placed.automaton : {};
+    const skin = typeof saved.skinUrl === 'string' && saved.skinUrl
+        ? { url: saved.skinUrl, name: typeof saved.skinName === 'string' ? saved.skinName : getSkinNameFromSource(saved.skinUrl) }
+        : getPlayerSkinConfig();
+    placed.automaton = {
+        running: false,
+        axis: 'horizontal',
+        direction: 1,
+        range: 3,
+        action: 'RESOURCE_COLLECTION',
+        conditionCellType: '',
+        transformTargetType: 'IRON_VEIN',
+        itemFilterMode: 'include',
+        itemFilterIds: [],
+        facingDirection: { x: 1, y: 0 },
+        skinUrl: skin.url,
+        skinName: skin.name,
+        origin: { x: placed.x, y: placed.y },
+        nextMoveAt: 0,
+        movement: null,
+        ...saved
+    };
+    if (!['horizontal', 'vertical'].includes(placed.automaton.axis)) placed.automaton.axis = 'horizontal';
+    if (typeof placed.automaton.skinUrl !== 'string' || !placed.automaton.skinUrl) placed.automaton.skinUrl = skin.url;
+    if (typeof placed.automaton.skinName !== 'string') placed.automaton.skinName = skin.name;
+    if (!['RESOURCE_COLLECTION', 'TERRAIN_TRANSFORM', 'STORAGE_WITHDRAW', 'STORAGE_DEPOSIT'].includes(placed.automaton.action)) {
+        placed.automaton.action = 'RESOURCE_COLLECTION';
+    }
+    placed.automaton.itemFilterMode = placed.automaton.itemFilterMode === 'exclude' ? 'exclude' : 'include';
+    const validItemIds = new Set(CRAFTING_ITEMS.map(([itemId]) => itemId));
+    placed.automaton.itemFilterIds = Array.isArray(placed.automaton.itemFilterIds)
+        ? [...new Set(placed.automaton.itemFilterIds.filter(itemId => validItemIds.has(itemId)))]
+        : [];
+    if (!isRecord(placed.automaton.facingDirection)
+        || ![-1, 0, 1].includes(placed.automaton.facingDirection.x)
+        || ![-1, 0, 1].includes(placed.automaton.facingDirection.y)
+        || Math.abs(placed.automaton.facingDirection.x) + Math.abs(placed.automaton.facingDirection.y) !== 1) {
+        placed.automaton.facingDirection = {
+            x: placed.automaton.axis === 'horizontal' ? placed.automaton.direction : 0,
+            y: placed.automaton.axis === 'vertical' ? placed.automaton.direction : 0
+        };
+    }
+    placed.automaton.range = Math.max(1, Math.min(5, Math.floor(Number(placed.automaton.range) || 3)));
+    if (!isRecord(placed.automaton.origin)
+        || !Number.isInteger(placed.automaton.origin.x) || !Number.isInteger(placed.automaton.origin.y)) {
+        placed.automaton.origin = { x: placed.x, y: placed.y };
+    }
+    if (!Object.prototype.hasOwnProperty.call(WORLD_CELL_TYPES, placed.automaton.conditionCellType)) {
+        placed.automaton.conditionCellType = '';
+    }
+    if (!['direct', 'direct2'].includes(WORLD_CELL_TYPES[placed.automaton.transformTargetType]?.category)) {
+        placed.automaton.transformTargetType = 'IRON_VEIN';
+    }
+    return placed.automaton;
+}
+
 function getRailAt(x, y) {
     return state.buildings.find(placed => placed.x === x && placed.y === y
         && BUILDING_BY_ID.get(placed.id)?.role === 'rail');
+}
+
+function buildingOccupiesCell(placed, x, y) {
+    const definition = BUILDING_BY_ID.get(placed.id);
+    return Boolean(definition
+        && x >= placed.x && x < placed.x + definition.width
+        && y >= placed.y && y < placed.y + definition.height);
+}
+
+function isBuildingCellBlocked(x, y, movingInstanceId = null) {
+    return state.buildings.some(placed => {
+        if (placed.instanceId === movingInstanceId || !buildingOccupiesCell(placed, x, y)) return false;
+        const role = BUILDING_BY_ID.get(placed.id)?.role;
+        return !['foundation', 'decoration', 'rail'].includes(role);
+    });
+}
+
+function getAdjacentWagons(placed) {
+    const rail = getRailAt(placed.x, placed.y);
+    const railDefinition = BUILDING_BY_ID.get(rail?.id);
+    if (!rail || !railDefinition) return [];
+    return getRailConnections(railDefinition.kind, rail.rotation || 0).flatMap(([dx, dy]) => {
+        const position = { x: placed.x + dx, y: placed.y + dy };
+        const neighborRail = getRailAt(position.x, position.y);
+        const neighborDefinition = BUILDING_BY_ID.get(neighborRail?.id);
+        const connected = neighborRail && neighborDefinition
+            && getRailConnections(neighborDefinition.kind, neighborRail.rotation || 0)
+                .some(([neighborDx, neighborDy]) => neighborDx === -dx && neighborDy === -dy);
+        const wagon = connected && state.buildings.find(other => other.x === position.x && other.y === position.y
+            && BUILDING_BY_ID.get(other.id)?.role === 'vehicle'
+            && BUILDING_BY_ID.get(other.id)?.kind !== 'locomotive');
+        return wagon ? [{ wagon, position, direction: [dx, dy] }] : [];
+    });
+}
+
+function getCoupledWagonsBehind(placed, vehicle) {
+    if (!vehicle.previousRail) return [];
+    const wagons = [];
+    let frontPosition = { x: placed.x, y: placed.y };
+    let backPosition = vehicle.previousRail;
+    const visited = new Set([`${placed.x},${placed.y}`]);
+    while (!visited.has(`${backPosition.x},${backPosition.y}`)) {
+        visited.add(`${backPosition.x},${backPosition.y}`);
+        const wagon = state.buildings.find(other => other.x === backPosition.x && other.y === backPosition.y
+            && BUILDING_BY_ID.get(other.id)?.role === 'vehicle'
+            && BUILDING_BY_ID.get(other.id)?.kind !== 'locomotive');
+        if (!wagon) break;
+        wagons.push({ placed: wagon, from: backPosition, to: frontPosition });
+        const next = findNextRailStep(state.buildings, BUILDING_BY_ID, backPosition, frontPosition);
+        if (next.error) break;
+        frontPosition = backPosition;
+        backPosition = next.position;
+    }
+    return wagons;
 }
 
 function getStationControlAtRail(x, y) {
@@ -3376,6 +3725,482 @@ function getStationControlAtRail(x, y) {
 
 function getStationDirection(control) {
     return ({ north: [0, -1], east: [1, 0], south: [0, 1], west: [-1, 0] })[control?.departureDirection] || null;
+}
+
+function ensureAutomatonPreview() {
+    if (automatonSkinPreview) return automatonSkinPreview;
+    automatonSkinPreview = new SkinPreview({
+        canvas: document.getElementById('automaton-skin-preview'),
+        rotation: document.getElementById('automaton-skin-rotation'),
+        rotationValue: document.getElementById('automaton-skin-rotation-value'),
+        rotateLeft: document.getElementById('automaton-skin-rotate-left'),
+        rotateRight: document.getElementById('automaton-skin-rotate-right'),
+        beforeDraw: drawAutomatonGearShadow,
+        afterDraw: drawAutomatonHeadGear
+    });
+    return automatonSkinPreview;
+}
+
+function renderAutomatonMenu(placed) {
+    const automaton = getAutomatonState(placed);
+    const definition = BUILDING_BY_ID.get(placed.id);
+    document.getElementById('automaton-menu-title').textContent = definition.name;
+    document.getElementById('automaton-menu-details').textContent = `座標 (${placed.x}, ${placed.y}) / 巡回中心 (${automaton.origin.x}, ${automaton.origin.y})`;
+    document.getElementById('automaton-axis').value = automaton.axis;
+    document.getElementById('automaton-range').value = String(automaton.range);
+    document.getElementById('automaton-action').value = automaton.action;
+    const condition = document.getElementById('automaton-condition-cell');
+    if (!condition.options.length) {
+        condition.add(new Option('指定なし', ''));
+        Object.entries(WORLD_CELL_TYPES).forEach(([type, cell]) => condition.add(new Option(cell.label, type)));
+    }
+    condition.value = automaton.conditionCellType;
+    const transformTarget = document.getElementById('automaton-transform-target');
+    if (!transformTarget.options.length) {
+        Object.entries(WORLD_CELL_TYPES)
+            .filter(([, cell]) => ['direct', 'direct2'].includes(cell.category))
+            .forEach(([type, cell]) => transformTarget.add(new Option(cell.label, type)));
+    }
+    transformTarget.value = automaton.transformTargetType;
+    document.querySelector('.automaton-transform-setting').hidden = automaton.action !== 'TERRAIN_TRANSFORM';
+    const isStorageAction = ['STORAGE_WITHDRAW', 'STORAGE_DEPOSIT'].includes(automaton.action);
+    document.getElementById('automaton-storage-filter-settings').hidden = !isStorageAction;
+    document.querySelectorAll('[data-item-filter-mode]').forEach(button => {
+        const isSelected = button.dataset.itemFilterMode === automaton.itemFilterMode;
+        button.classList.toggle('is-selected', isSelected);
+        button.setAttribute('aria-pressed', String(isSelected));
+    });
+    if (isStorageAction) renderAutomatonItemFilter(automaton);
+    const toggle = document.getElementById('automaton-toggle');
+    toggle.textContent = automaton.running ? '停止' : '起動';
+    toggle.classList.toggle('inventory-modal-secondary', automaton.running);
+    toggle.classList.toggle('saved-scroll-use', !automaton.running);
+    document.getElementById('automaton-status').textContent = automaton.running
+        ? `稼働中 / ${{ RESOURCE_COLLECTION: '資源を採取', TERRAIN_TRANSFORM: '地形を変成', STORAGE_WITHDRAW: '前方から取り出し', STORAGE_DEPOSIT: '前方へ収納' }[automaton.action]}`
+        : automaton.stopReason || '停止中';
+    document.getElementById('automaton-skin-name').textContent = `適用中: ${automaton.skinName || 'プレイヤーの見た目'}`;
+    const previewSource = automaton.skinUrl || getPlayerSkinConfig().url;
+    if (automatonPreviewSource !== previewSource) {
+        automatonPreviewSource = previewSource;
+        ensureAutomatonPreview().load(previewSource).catch(error => {
+            console.error('Automaton skin preview failed to load.', error);
+            document.getElementById('automaton-skin-name').textContent = '画像を読み込めませんでした';
+        });
+    }
+}
+
+async function applyAutomatonSkin(source, name) {
+    const placed = state.buildings.find(building => building.instanceId === selectedBuildingInstanceId);
+    if (!placed || BUILDING_BY_ID.get(placed.id)?.kind !== 'automaton') return;
+    const url = String(source || '').trim();
+    if (!url) return;
+    try {
+        await ensureAutomatonPreview().load(url);
+        automatonPreviewSource = url;
+    } catch (error) {
+        console.error('Automaton skin failed to load.', error);
+        showAppNotice('画像を読み込めませんでした。');
+        return;
+    }
+    const automaton = getAutomatonState(placed);
+    automaton.skinUrl = url;
+    automaton.skinName = name || getSkinNameFromSource(url);
+    document.getElementById('automaton-skin-name').textContent = `適用中: ${automaton.skinName}`;
+    automatonSkinRenderers.delete(placed.instanceId);
+    saveBuildings();
+    scheduleDraw();
+}
+
+function changeAutomatonSetting(setting, value) {
+    const placed = state.buildings.find(building => building.instanceId === selectedBuildingInstanceId);
+    if (!placed || BUILDING_BY_ID.get(placed.id)?.kind !== 'automaton') return;
+    const automaton = getAutomatonState(placed);
+    if (setting === 'axis') automaton.axis = value === 'vertical' ? 'vertical' : 'horizontal';
+    if (setting === 'range') automaton.range = Math.max(1, Math.min(5, Math.floor(Number(value) || 1)));
+    if (setting === 'action') automaton.action = value === 'TERRAIN_TRANSFORM' ? value : 'RESOURCE_COLLECTION';
+    if (setting === 'action' && ['STORAGE_WITHDRAW', 'STORAGE_DEPOSIT'].includes(value)) automaton.action = value;
+    if (setting === 'conditionCellType') automaton.conditionCellType = Object.prototype.hasOwnProperty.call(WORLD_CELL_TYPES, value) ? value : '';
+    if (setting === 'transformTargetType' && ['direct', 'direct2'].includes(WORLD_CELL_TYPES[value]?.category)) {
+        automaton.transformTargetType = value;
+    }
+    if (setting === 'itemFilterMode') automaton.itemFilterMode = value === 'exclude' ? 'exclude' : 'include';
+    if (setting === 'itemFilterIds' && Array.isArray(value)) {
+        const validItemIds = new Set(CRAFTING_ITEMS.map(([itemId]) => itemId));
+        automaton.itemFilterIds = [...new Set(value.filter(itemId => validItemIds.has(itemId)))];
+    }
+    renderAutomatonMenu(placed);
+    saveBuildings();
+}
+
+function renderAutomatonItemFilter(automaton) {
+    const select = document.getElementById('automaton-item-selection');
+    const selectedItemId = select.value;
+    if (!select.options.length) {
+        select.replaceChildren(...CRAFTING_ITEMS.map(([itemId, name]) => new Option(name, itemId)));
+        select.value = CRAFTING_ITEMS[0]?.[0] || '';
+    } else if (!CRAFTING_ITEM_BY_ID.has(selectedItemId)) {
+        select.value = CRAFTING_ITEMS[0]?.[0] || '';
+    }
+    const currentItemId = select.value;
+    const currentName = getCraftingItemName(currentItemId);
+    document.getElementById('automaton-item-icon').replaceChildren(createBuildingStorageIcon(currentItemId));
+    document.getElementById('automaton-item-name').textContent = currentName;
+    const button = document.getElementById('automaton-item-button');
+    button.setAttribute('aria-label', `登録するアイテム: ${currentName}。タップして変更`);
+
+    const search = normalizeInventorySearch(document.getElementById('automaton-item-search').value);
+    const optionList = document.getElementById('automaton-item-option-list');
+    const options = CRAFTING_ITEMS.filter(([itemId, name]) =>
+        !search || normalizeInventorySearch(`${name} ${itemId}`).includes(search));
+    optionList.replaceChildren(...options.map(([itemId, name]) => {
+        const option = document.createElement('button');
+        option.type = 'button';
+        option.className = `building-storage-item-option${itemId === currentItemId ? ' is-selected' : ''}`;
+        option.dataset.itemId = itemId;
+        option.setAttribute('role', 'option');
+        option.setAttribute('aria-selected', String(itemId === currentItemId));
+        option.appendChild(createBuildingStorageIcon(itemId));
+        const itemName = document.createElement('span');
+        itemName.className = 'building-storage-item-option-name';
+        itemName.textContent = name;
+        const quantity = document.createElement('span');
+        quantity.className = 'building-storage-item-option-count';
+        quantity.textContent = String(getStorageInventoryCount(itemId));
+        option.append(itemName, quantity);
+        return option;
+    }));
+
+    const registeredItems = document.getElementById('automaton-registered-items');
+    registeredItems.replaceChildren(...automaton.itemFilterIds.map(itemId => {
+        const item = document.createElement('span');
+        item.className = 'automaton-registered-item';
+        const icon = createBuildingStorageIcon(itemId);
+        const name = document.createElement('span');
+        name.className = 'automaton-registered-item-name';
+        name.textContent = getCraftingItemName(itemId);
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'automaton-registered-item-remove';
+        remove.dataset.itemId = itemId;
+        remove.setAttribute('aria-label', `${getCraftingItemName(itemId)}の登録を解除`);
+        remove.textContent = '×';
+        item.append(icon, name, remove);
+        return item;
+    }));
+}
+
+function getAutomatonSkinRenderer(placed, automaton) {
+    const cached = automatonSkinRenderers.get(placed.instanceId);
+    const source = automaton.skinUrl || getPlayerSkinConfig().url;
+    if (cached?.source === source) return cached.renderer;
+    const renderer = new SkinRenderer();
+    renderer.setDirection(0, 1);
+    automatonSkinRenderers.set(placed.instanceId, { source, renderer });
+    renderer.loadSkin(source).then(scheduleDraw).catch(error => {
+        console.warn(`Automaton skin failed to load for ${placed.instanceId}; using fallback rendering.`, error);
+    });
+    return renderer;
+}
+
+function traceGearPath(context, centerX, centerY, outerRadius, teeth = 8) {
+    const steps = teeth * 4;
+    for (let step = 0; step < steps; step += 1) {
+        const angle = (Math.PI * 2 * step / steps) - Math.PI / 2;
+        const phase = step % 4;
+        const radius = phase === 0 || phase === 3 ? outerRadius : outerRadius * .78;
+        const pointX = centerX + Math.cos(angle) * radius;
+        const pointY = centerY + Math.sin(angle) * radius;
+        if (step === 0) context.moveTo(pointX, pointY);
+        else context.lineTo(pointX, pointY);
+    }
+    context.closePath();
+}
+
+function drawAutomatonGearShadow(context, x, y, size, running = false) {
+    context.save();
+    context.translate(x + size / 2, y + size * .8);
+    context.scale(1, .34);
+    context.beginPath();
+    traceGearPath(context, 0, 0, size * .54);
+    context.fillStyle = running ? '#bd7d28' : '#8b5e27';
+    context.strokeStyle = running ? '#fff0a0' : '#e9bd62';
+    context.lineWidth = Math.max(1, size * .024);
+    context.shadowColor = running ? '#ffc94d' : 'transparent';
+    context.shadowBlur = running ? size * .13 : 0;
+    context.fill();
+    context.stroke();
+    context.shadowBlur = 0;
+    context.beginPath();
+    context.arc(0, 0, size * .3, 0, Math.PI * 2);
+    context.fillStyle = running ? '#293a32' : '#252d28';
+    context.fill();
+    context.strokeStyle = running ? '#ffe38a' : '#d8a84b';
+    context.lineWidth = Math.max(1, size * .02);
+    context.stroke();
+    context.beginPath();
+    context.arc(0, 0, size * .09, 0, Math.PI * 2);
+    context.fillStyle = running ? '#ffdf70' : '#c38a35';
+    context.fill();
+    context.strokeStyle = '#f7d67d';
+    context.lineWidth = Math.max(1, size * .016);
+    context.stroke();
+    for (let spoke = 0; spoke < 8; spoke += 1) {
+        const angle = Math.PI * spoke / 4;
+        context.beginPath();
+        context.moveTo(Math.cos(angle) * size * .1, Math.sin(angle) * size * .1);
+        context.lineTo(Math.cos(angle) * size * .27, Math.sin(angle) * size * .27);
+        context.stroke();
+    }
+    context.restore();
+}
+
+function drawAutomatonHeadGear(context, x, y, size, direction = 0) {
+    const isRight = direction === 3;
+    const isLeft = direction === 2;
+    const centerX = x + size * (isLeft ? .34 : isRight ? .66 : .69);
+    const centerY = y + size * .2;
+    const radius = size * .065;
+    context.save();
+    context.lineJoin = 'round';
+    context.lineWidth = Math.max(1, size * .012);
+    context.beginPath();
+    traceGearPath(context, centerX, centerY, radius, 6);
+    context.fillStyle = '#74552e';
+    context.strokeStyle = '#edca72';
+    context.fill();
+    context.stroke();
+    context.beginPath();
+    context.arc(centerX, centerY, radius * .38, 0, Math.PI * 2);
+    context.fillStyle = '#283934';
+    context.fill();
+    context.strokeStyle = '#f0d68d';
+    context.lineWidth = Math.max(1, size * .009);
+    context.stroke();
+    context.restore();
+}
+
+function drawAutomatonSkin(context, renderer, x, y, size, running = false) {
+    drawAutomatonGearShadow(context, x, y, size, running);
+    renderer.draw(context, x, y, size, { drawShadow: false });
+    drawAutomatonHeadGear(context, x, y, size, renderer.direction);
+}
+
+function drawAutomaton(placed, now) {
+    const automaton = getAutomatonState(placed);
+    const movement = automaton.movement;
+    const progress = movement
+        ? Math.max(0, Math.min(1, (now - movement.startedAt) / movement.durationMs))
+        : 1;
+    const x = movement ? movement.from.x + (movement.to.x - movement.from.x) * progress : placed.x;
+    const y = movement ? movement.from.y + (movement.to.y - movement.from.y) * progress : placed.y;
+    const renderer = getAutomatonSkinRenderer(placed, automaton);
+    const facing = movement
+        ? { x: movement.to.x - movement.from.x, y: movement.to.y - movement.from.y }
+        : automaton.facingDirection;
+    renderer.setDirection(facing.x, facing.y);
+    const size = state.tileSize * 0.88;
+    const drawX = x * state.tileSize + (state.tileSize - size) / 2;
+    const drawY = y * state.tileSize + (state.tileSize - size) / 2;
+    drawAutomatonSkin(ctx, renderer, drawX, drawY, size, automaton.running);
+}
+
+function canAutomatonEnter(placed, x, y) {
+    if (x < 0 || y < 0 || x >= state.cols || y >= state.rows) return false;
+    const tile = state.map[y]?.[x];
+    if (!tile) return false;
+    const items = new Set(state.inventoryItems);
+    Object.entries(engineRuntimeState.materialInventory || {}).forEach(([item, count]) => {
+        if (Number(count) > 0) items.add(item);
+    });
+    if (engineRuntimeState.brass > 0) items.add('brass-stock');
+    if (!canEnterCell(tile, { rules: state.cellEntryRules, items })) return false;
+    if (state.player.x === x && state.player.y === y) return false;
+    return !isBuildingCellBlocked(x, y, placed.instanceId);
+}
+
+function getAutomatonStorageTarget(placed, automaton) {
+    const { x: dx, y: dy } = automaton.facingDirection;
+    const targetX = placed.x + dx;
+    const targetY = placed.y + dy;
+    return state.buildings.find(other => {
+        const definition = BUILDING_BY_ID.get(other.id);
+        return definition?.storageCapacity > 0 && buildingOccupiesCell(other, targetX, targetY);
+    });
+}
+
+function transferAutomatonStorage(placed, automaton) {
+    const storage = getAutomatonStorageTarget(placed, automaton);
+    const definition = BUILDING_BY_ID.get(storage?.id);
+    if (!storage || !definition?.storageCapacity) return false;
+    if (!isRecord(storage.storedMaterials)) storage.storedMaterials = {};
+
+    const selectedItems = new Set(automaton.itemFilterIds);
+    const itemIds = CRAFTING_ITEMS
+        .map(([itemId]) => itemId)
+        .filter(itemId => automaton.itemFilterMode === 'include'
+            ? selectedItems.has(itemId)
+            : !selectedItems.has(itemId));
+    let changed = false;
+    for (const itemId of itemIds) {
+        const resourceKey = { water: 'water', fog: 'fog', power: 'power', steam_power: 'steamPower' }[itemId];
+        const storedCount = Math.floor(getStorageMaterialCount(storage, itemId));
+        const inventoryCount = Math.floor(getStorageInventoryCount(itemId));
+        if (automaton.action === 'STORAGE_DEPOSIT') {
+            const freeSlots = Math.max(0, definition.storageCapacity - getStorageUsedSlots(storage));
+            const stackSpace = storedCount > 0 ? Math.ceil(storedCount / 99) * 99 - storedCount : 0;
+            const moved = Math.min(inventoryCount, stackSpace + freeSlots * 99);
+            if (moved < 1) continue;
+            storage.storedMaterials[itemId] = storedCount + moved;
+            if (itemId === 'brass-stock') engineRuntimeState.brass -= moved;
+            else if (resourceKey) engineRuntimeState[resourceKey] -= moved;
+            else engineRuntimeState.materialInventory[itemId] -= moved;
+        } else {
+            if (storedCount < 1) continue;
+            storage.storedMaterials[itemId] = 0;
+            if (itemId === 'brass-stock') engineRuntimeState.brass += storedCount;
+            else if (resourceKey) engineRuntimeState[resourceKey] += storedCount;
+            else engineRuntimeState.materialInventory[itemId] =
+                (Number(engineRuntimeState.materialInventory[itemId]) || 0) + storedCount;
+        }
+        changed = true;
+    }
+    if (!changed) return false;
+    saveBuildings();
+    engineRuntimeState.saveGameData();
+    engineRuntimeState.notify();
+    return true;
+}
+
+function processAutomatonCell(placed, automaton) {
+    const tile = state.map[placed.y]?.[placed.x];
+    if (!tile || automaton.conditionCellType && getCellTypeKey(tile) !== automaton.conditionCellType) return false;
+    if (['STORAGE_WITHDRAW', 'STORAGE_DEPOSIT'].includes(automaton.action)) {
+        return transferAutomatonStorage(placed, automaton);
+    }
+    const mode = automaton.action;
+    const creativeMode = Boolean(engineRuntimeState.creativeMode);
+    const operationMaterials = creativeMode
+        ? Object.fromEntries(Object.keys(TERRAIN_TRANSFORM_RECIPES[automaton.transformTargetType] || {})
+            .map(item => [item, Number.MAX_SAFE_INTEGER]))
+        : engineRuntimeState.materialInventory;
+    const result = handleWorldCellOperation({
+        target: { x: placed.x, y: placed.y },
+        mode,
+        terrainTargetType: automaton.transformTargetType,
+        materials: operationMaterials,
+        power: creativeMode ? Number.MAX_SAFE_INTEGER : engineRuntimeState.power
+    });
+    if (!result?.success) return false;
+    if (!creativeMode) {
+        Object.entries(result.consumedItems || {}).forEach(([item, amount]) => {
+            engineRuntimeState.materialInventory[item] = Math.max(0, (Number(engineRuntimeState.materialInventory[item]) || 0) - amount);
+        });
+        engineRuntimeState.power = Math.max(0, engineRuntimeState.power - (Number(result.consumedPower) || 0));
+    }
+    Object.entries(result.producedItems || {}).forEach(([item, amount]) => {
+        engineRuntimeState.materialInventory[item] = (Number(engineRuntimeState.materialInventory[item]) || 0) + amount;
+    });
+    engineRuntimeState.saveGameData();
+    engineRuntimeState.notify();
+    return true;
+}
+
+function tickAutomatons(now) {
+    let buildingsChanged = false;
+    for (const placed of state.buildings) {
+        if (BUILDING_BY_ID.get(placed.id)?.kind !== 'automaton') continue;
+        const automaton = getAutomatonState(placed);
+        if (!automaton.running) continue;
+        if (automaton.movement) {
+            const movementEnd = automaton.movement.startedAt + automaton.movement.durationMs;
+            if (now < movementEnd) {
+                scheduleDraw();
+                continue;
+            }
+            placed.x = automaton.movement.to.x;
+            placed.y = automaton.movement.to.y;
+            automaton.facingDirection = {
+                x: automaton.movement.to.x - automaton.movement.from.x,
+                y: automaton.movement.to.y - automaton.movement.from.y
+            };
+            automaton.movement = null;
+            const transferred = processAutomatonCell(placed, automaton);
+            automaton.nextMoveAt = movementEnd + (transferred ? 1400 : 250);
+            buildingsChanged = true;
+            continue;
+        }
+        if (now < automaton.nextMoveAt) continue;
+        const axis = automaton.axis === 'vertical' ? 'y' : 'x';
+        const direction = automaton.direction < 0 ? -1 : 1;
+        const step = { x: 0, y: 0 };
+        step[axis] = direction;
+        let target = { x: placed.x + step.x, y: placed.y + step.y };
+        if (Math.abs(target[axis] - automaton.origin[axis]) > automaton.range) {
+            automaton.direction = -direction;
+            target = { x: placed.x - step.x, y: placed.y - step.y };
+        }
+        if (!canAutomatonEnter(placed, target.x, target.y)) {
+            automaton.direction = -automaton.direction;
+            target = { x: placed.x - step.x, y: placed.y - step.y };
+        }
+        if (!canAutomatonEnter(placed, target.x, target.y)) {
+            automaton.running = false;
+            automaton.stopReason = '進行できるセルがありません';
+            if (selectedBuildingInstanceId === placed.instanceId) renderAutomatonMenu(placed);
+            buildingsChanged = true;
+            continue;
+        }
+        automaton.movement = {
+            from: { x: placed.x, y: placed.y },
+            to: target,
+            startedAt: now,
+            durationMs: 420
+        };
+        automaton.nextMoveAt = now + 700;
+        scheduleDraw();
+        buildingsChanged = true;
+    }
+    if (buildingsChanged) {
+        saveBuildings();
+        if (selectedBuildingInstanceId) {
+            const selected = state.buildings.find(building => building.instanceId === selectedBuildingInstanceId);
+            if (selected && BUILDING_BY_ID.get(selected.id)?.kind === 'automaton') renderAutomatonMenu(selected);
+        }
+    }
+}
+
+function toggleSelectedAutomaton() {
+    const placed = state.buildings.find(building => building.instanceId === selectedBuildingInstanceId);
+    if (!placed || BUILDING_BY_ID.get(placed.id)?.kind !== 'automaton') return;
+    const automaton = getAutomatonState(placed);
+    if (automaton.running) {
+        if (automaton.movement) {
+            const progress = Math.max(0, Math.min(1,
+                (performance.now() - automaton.movement.startedAt) / automaton.movement.durationMs));
+            if (progress >= 0.5) {
+                placed.x = automaton.movement.to.x;
+                placed.y = automaton.movement.to.y;
+            }
+        }
+        automaton.running = false;
+        automaton.movement = null;
+        automaton.stopReason = '手動停止';
+    } else {
+        automaton.running = true;
+        automaton.direction = 1;
+        automaton.facingDirection = {
+            x: automaton.axis === 'horizontal' ? 1 : 0,
+            y: automaton.axis === 'vertical' ? 1 : 0
+        };
+        automaton.origin = { x: placed.x, y: placed.y };
+        automaton.stopReason = '';
+        const transferred = processAutomatonCell(placed, automaton);
+        automaton.nextMoveAt = performance.now() + (transferred ? 1400 : 600);
+    }
+    saveBuildings();
+    renderAutomatonMenu(placed);
+    scheduleDraw();
+    scheduleVehicleAnimation();
 }
 
 function vehicleStopLabel(vehicle) {
@@ -3444,7 +4269,7 @@ function updateBuildingMenuDetails(placed, definition) {
     const operationStatus = buildingUtilityOperationStatuses.get(placed.instanceId);
     const utilityNote = utilitySummary ? ` / ${utilitySummary}${operationStatus ? ` / ${operationStatus}` : ''}` : '';
     const storageNote = definition.storageCapacity
-        ? ` / 資材保管 ${getStorageUsedCapacity(placed)} / ${definition.storageCapacity}`
+        ? ` / 資材保管 ${getStorageUsedSlots(placed)} / ${definition.storageCapacity} 枠`
         : '';
     const vehicleNote = definition.role === 'vehicle' ? ' / 線路配置済みの車両' : '';
     const foundationNote = definition.requiresFoundation ? ' / 基礎上に建設' : '';
@@ -3456,7 +4281,16 @@ function openBuildingMenu(instanceId) {
     const placed = state.buildings.find(building => building.instanceId === instanceId);
     const definition = BUILDING_BY_ID.get(placed?.id);
     if (!placed || !definition) return;
+    if (selectedBuildingInstanceId !== instanceId) selectedStorageStack = null;
     selectedBuildingInstanceId = instanceId;
+    cancelBuildingDemolition();
+    if (definition.kind === 'automaton') {
+        document.getElementById('building-menu-modal').hidden = true;
+        renderAutomatonMenu(placed);
+        document.getElementById('automaton-menu-modal').hidden = false;
+        return;
+    }
+    document.getElementById('automaton-menu-modal').hidden = true;
     document.getElementById('building-menu-title').textContent = definition.name;
     renderVehicleMenu(placed, definition);
     updateBuildingMenuDetails(placed, definition);
@@ -3465,9 +4299,9 @@ function openBuildingMenu(instanceId) {
     if (rotateRail) rotateRail.hidden = definition.role !== 'rail';
     const craftButton = document.getElementById('building-menu-craft');
     if (craftButton) craftButton.hidden = !getCraftingRecipesForBuilding(definition.id).length;
-    const demolish = document.getElementById('building-menu-demolish');
-    demolish.dataset.armed = '';
-    demolish.textContent = `解体（真鍮 ${Math.floor(definition.brassCost / 2)} 返却）`;
+    const startVehicleButton = document.getElementById('building-menu-start-vehicle');
+    const actions = document.querySelector('#building-menu-modal .inventory-modal-actions');
+    if (actions) actions.hidden = Boolean(craftButton?.hidden && startVehicleButton?.hidden);
     document.getElementById('building-menu-modal').hidden = false;
 }
 
@@ -3511,12 +4345,22 @@ function settleVehicleMovement(placed, vehicle, now) {
     vehicle.movement = null;
 }
 
+function settleCoupledWagonMovements(locomotive, now) {
+    for (const wagon of state.buildings) {
+        if (BUILDING_BY_ID.get(wagon.id)?.role !== 'vehicle') continue;
+        const vehicle = getVehicleState(wagon);
+        if (vehicle.movement?.locomotiveInstanceId !== locomotive.instanceId) continue;
+        settleVehicleMovement(wagon, vehicle, now);
+    }
+}
+
 function startSelectedVehicle() {
     const placed = state.buildings.find(building => building.instanceId === selectedBuildingInstanceId);
     if (!placed || BUILDING_BY_ID.get(placed.id)?.kind !== 'locomotive') return;
     const vehicle = getVehicleState(placed);
     if (vehicle.running) {
         settleVehicleMovement(placed, vehicle, performance.now());
+        settleCoupledWagonMovements(placed, performance.now());
         vehicle.running = false;
         vehicle.stopReason = '手動停止';
         vehicle.nextMoveAt = 0;
@@ -3534,9 +4378,26 @@ function startSelectedVehicle() {
                 vehicle.running = false;
                 vehicle.stopReason = VEHICLE_STOP_MESSAGES[firstStep.error] || '線路を確認してください';
             } else {
-                vehicle.direction = firstStep.direction;
-                placed.rotation = directionToVehicleRotation(firstStep.direction);
-                vehicle.nextMoveAt = performance.now();
+                const stationDirection = getStationDirection(getStationControlAtRail(placed.x, placed.y));
+                if (!stationDirection) {
+                    const adjacentWagons = getAdjacentWagons(placed);
+                    const wagonBehind = adjacentWagons.find(({ direction }) =>
+                        direction[0] !== firstStep.direction[0] || direction[1] !== firstStep.direction[1])
+                        || adjacentWagons[0];
+                    if (wagonBehind) {
+                        vehicle.previousRail = { ...wagonBehind.position };
+                    }
+                }
+                const departureStep = getVehicleNextStep(placed, vehicle);
+                if (departureStep.error) {
+                    vehicle.running = false;
+                    vehicle.stopReason = VEHICLE_STOP_MESSAGES[departureStep.error] || '線路を確認してください';
+                    vehicle.nextMoveAt = 0;
+                } else {
+                    vehicle.direction = departureStep.direction;
+                    placed.rotation = directionToVehicleRotation(departureStep.direction);
+                    vehicle.nextMoveAt = performance.now();
+                }
             }
         }
     }
@@ -3562,6 +4423,9 @@ function tickVehicleRuntime(now) {
             if (now < movementEndAt) continue;
             settleVehicleMovement(placed, vehicle, movementEndAt);
             settledVehicles.add(placed);
+            settleCoupledWagonMovements(placed, movementEndAt);
+            state.buildings.filter(other => other.vehicle?.movement?.locomotiveInstanceId === placed.instanceId)
+                .forEach(other => settledVehicles.add(other));
             vehicle.nextMoveAt = movementEndAt;
             segmentStartAt = movementEndAt;
             changed = true;
@@ -3575,10 +4439,13 @@ function tickVehicleRuntime(now) {
             changed = true;
             continue;
         }
-        const blockingVehicle = state.buildings.find(other => other.instanceId !== placed.instanceId
+        const coupledWagons = getCoupledWagonsBehind(placed, vehicle);
+        const consistIds = new Set([placed.instanceId, ...coupledWagons.map(({ placed: wagon }) => wagon.instanceId)]);
+        const destinations = [step.position, ...coupledWagons.map(({ to }) => to)];
+        const blockingVehicle = state.buildings.find(other => !consistIds.has(other.instanceId)
             && BUILDING_BY_ID.get(other.id)?.role === 'vehicle'
-            && (other.x === step.position.x && other.y === step.position.y
-                || other.vehicle?.movement?.to.x === step.position.x && other.vehicle?.movement?.to.y === step.position.y));
+            && destinations.some(position => other.x === position.x && other.y === position.y
+                || other.vehicle?.movement?.to.x === position.x && other.vehicle?.movement?.to.y === position.y));
         if (blockingVehicle) {
             vehicle.running = false;
             vehicle.stopReason = VEHICLE_STOP_MESSAGES.collision;
@@ -3586,6 +4453,7 @@ function tickVehicleRuntime(now) {
             if (BUILDING_BY_ID.get(blockingVehicle.id)?.kind === 'locomotive') {
                 const otherVehicle = getVehicleState(blockingVehicle);
                 settleVehicleMovement(blockingVehicle, otherVehicle, now);
+                settleCoupledWagonMovements(blockingVehicle, now);
                 settledVehicles.add(blockingVehicle);
                 otherVehicle.running = false;
                 otherVehicle.stopReason = VEHICLE_STOP_MESSAGES.collision;
@@ -3606,6 +4474,20 @@ function tickVehicleRuntime(now) {
             startedAt: segmentStartAt,
             durationMs
         };
+        coupledWagons.forEach(({ placed: wagon, from, to }) => {
+            const wagonVehicle = getVehicleState(wagon);
+            const wagonDirection = [to.x - from.x, to.y - from.y];
+            wagonVehicle.movement = {
+                from,
+                to,
+                direction: wagonDirection,
+                fromRotation: wagon.rotation || 0,
+                toRotation: directionToVehicleRotation(wagonDirection),
+                startedAt: segmentStartAt,
+                durationMs,
+                locomotiveInstanceId: placed.instanceId
+            };
+        });
         vehicle.nextMoveAt = segmentStartAt + durationMs;
         if (!wasMoving) startedVehicleMotion = true;
         changed = true;
@@ -3716,6 +4598,7 @@ function placeBuildingAt(placement) {
             direction: getTrackDirection(placedBuilding.rotation)
         };
     }
+    if (definition.kind === 'automaton') getAutomatonState(placedBuilding);
     if (definition.kind === 'station') {
         placedBuilding.stationControl = { ...STATION_CONTROL_DEFAULTS, destinations: [], conditions: [] };
     }
@@ -3784,25 +4667,82 @@ function confirmBuildingPlacement() {
     showBuildingPlacementResult(definition, result.placedCount, result.issue);
 }
 
-function demolishSelectedBuilding() {
-    const button = document.getElementById('building-menu-demolish');
-    if (!selectedBuildingInstanceId || !button) return;
-    if (button.dataset.armed !== selectedBuildingInstanceId) {
-        button.dataset.armed = selectedBuildingInstanceId;
-        button.textContent = 'もう一度押して解体';
-        return;
+function getBuildingDemolitionRefunds(placed, definition) {
+    const refunds = new Map();
+    getBuildingMaterialCosts(definition).forEach(([itemId, amount]) => {
+        const refund = Math.ceil(Number(amount) / 10);
+        if (refund > 0) refunds.set(itemId, (refunds.get(itemId) || 0) + refund);
+    });
+    if (isRecord(placed.storedMaterials)) {
+        Object.entries(placed.storedMaterials).forEach(([itemId, amount]) => {
+            const stored = Math.floor(Number(amount));
+            if (stored > 0) refunds.set(itemId, (refunds.get(itemId) || 0) + stored);
+        });
     }
-    const index = state.buildings.findIndex(building => building.instanceId === selectedBuildingInstanceId);
+    return [...refunds].map(([itemId, amount]) => ({ itemId, amount }));
+}
+
+function openBuildingDemolitionConfirmation() {
+    const placed = state.buildings.find(building => building.instanceId === selectedBuildingInstanceId);
+    const definition = BUILDING_BY_ID.get(placed?.id);
+    if (!placed || !definition) return;
+    pendingBuildingDemolitionInstanceId = placed.instanceId;
+    const refunds = getBuildingDemolitionRefunds(placed, definition);
+    const message = document.getElementById('building-demolition-confirm-message');
+    const refundList = document.getElementById('building-demolition-refunds');
+    message.textContent = `${definition.name}を解体しますか？ 以下の資材を獲得します。`;
+    refundList.replaceChildren();
+    if (!refunds.length) {
+        const empty = document.createElement('p');
+        empty.className = 'building-demolition-empty';
+        empty.textContent = '返却される資材はありません';
+        refundList.appendChild(empty);
+    } else {
+        refunds.forEach(({ itemId, amount }) => {
+            const entry = document.createElement('span');
+            entry.className = 'building-demolition-refund';
+            entry.appendChild(createBuildingStorageIcon(itemId));
+            const name = document.createElement('span');
+            name.textContent = getCraftingItemName(itemId);
+            const count = document.createElement('strong');
+            count.textContent = `×${amount}`;
+            entry.append(name, count);
+            refundList.appendChild(entry);
+        });
+    }
+    document.getElementById('building-demolition-confirm-modal').hidden = false;
+}
+
+function cancelBuildingDemolition() {
+    document.getElementById('building-demolition-confirm-modal').hidden = true;
+    pendingBuildingDemolitionInstanceId = null;
+}
+
+function demolishSelectedBuilding() {
+    const demolitionInstanceId = pendingBuildingDemolitionInstanceId;
+    if (!demolitionInstanceId) return;
+    const index = state.buildings.findIndex(building => building.instanceId === demolitionInstanceId);
     const placed = state.buildings[index];
     const definition = BUILDING_BY_ID.get(placed?.id);
-    if (!definition) return closeBuildingMenu();
+    if (!placed || !definition) {
+        cancelBuildingDemolition();
+        showAppNotice('解体する建築物が見つかりません。');
+        return;
+    }
+    const refunds = getBuildingDemolitionRefunds(placed, definition);
     const historyBefore = captureBuildingHistoryState();
     state.buildings.splice(index, 1);
-    engineRuntimeState.brass += Math.floor(definition.brassCost / 2);
+    refunds.forEach(({ itemId, amount }) => {
+        const resourceKey = { water: 'water', fog: 'fog', power: 'power', steam_power: 'steamPower' }[itemId];
+        if (itemId === 'brass-stock') engineRuntimeState.brass += amount;
+        else if (resourceKey) engineRuntimeState[resourceKey] = (Number(engineRuntimeState[resourceKey]) || 0) + amount;
+        else engineRuntimeState.materialInventory[itemId] = getCraftingItemCount(itemId) + amount;
+    });
     recordBuildingHistory(historyBefore);
     engineRuntimeState.saveGameData();
     engineRuntimeState.notify();
     saveBuildings();
+    cancelBuildingDemolition();
     closeBuildingMenu();
     buildingRenderSignature = '';
     renderCellMaterials();
@@ -4067,7 +5007,8 @@ function movePlayer(dx, dy) {
             if (Number(count) > 0) ownedItems.add(item);
         });
         if (engineRuntimeState.brass > 0) ownedItems.add('brass-stock');
-        if (canEnterCell(targetTile, { rules: state.cellEntryRules, items: ownedItems })) {
+        if (canEnterCell(targetTile, { rules: state.cellEntryRules, items: ownedItems })
+            && !isBuildingCellBlocked(newX, newY)) {
             state.player.x = newX;
             state.player.y = newY;
             savePlayerPos();
@@ -4473,7 +5414,7 @@ document.addEventListener('click', (event) => {
         return;
     }
     if (button.dataset.action === 'building-storage-transfer') {
-        transferBuildingStorage(button.dataset.direction);
+        transferBuildingStorage(selectedStorageStack ? 'withdraw' : 'deposit');
         return;
     }
     if (button.dataset.action === 'open-building-crafting') {
@@ -4488,7 +5429,24 @@ document.addEventListener('click', (event) => {
         startSelectedVehicle();
         return;
     }
+    if (button.dataset.action === 'toggle-automaton') {
+        toggleSelectedAutomaton();
+        return;
+    }
+    if (button.dataset.action === 'copy-player-skin-to-automaton') {
+        const skin = getPlayerSkinConfig();
+        applyAutomatonSkin(skin.url, skin.name);
+        return;
+    }
     if (button.dataset.action === 'demolish-building') {
+        openBuildingDemolitionConfirmation();
+        return;
+    }
+    if (button.dataset.action === 'cancel-building-demolition') {
+        cancelBuildingDemolition();
+        return;
+    }
+    if (button.dataset.action === 'confirm-building-demolition') {
         demolishSelectedBuilding();
         return;
     }
@@ -4526,7 +5484,7 @@ document.addEventListener('click', (event) => {
         return;
     }
     if (button.dataset.action === 'open-settings') {
-        openAppPage('settings.html?v=3', '設定');
+        openAppPage('settings.html?v=8', '設定');
         return;
     }
     if (button.dataset.action === 'inspect-inventory-item') {
@@ -4583,6 +5541,88 @@ document.getElementById('vehicle-movement-scroll')?.addEventListener('change', e
     if (!placed || BUILDING_BY_ID.get(placed.id)?.kind !== 'locomotive') return;
     getVehicleState(placed).movementScrollId = event.target.value;
     saveBuildings();
+});
+
+[
+    ['automaton-axis', 'axis'],
+    ['automaton-range', 'range'],
+    ['automaton-action', 'action'],
+    ['automaton-condition-cell', 'conditionCellType'],
+    ['automaton-transform-target', 'transformTargetType']
+].forEach(([id, setting]) => {
+    document.getElementById(id)?.addEventListener('change', event => changeAutomatonSetting(setting, event.target.value));
+});
+
+document.getElementById('automaton-skin-file')?.addEventListener('change', event => {
+    const input = event.currentTarget;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => applyAutomatonSkin(String(reader.result || ''), file.name);
+    reader.onerror = error => {
+        console.error('Automaton skin file could not be read.', error);
+        showAppNotice('画像を読み込めませんでした。');
+    };
+    reader.readAsDataURL(file);
+});
+
+document.querySelectorAll('[data-item-filter-mode]').forEach(button => {
+    button.addEventListener('click', event => {
+        changeAutomatonSetting('itemFilterMode', event.currentTarget.dataset.itemFilterMode);
+    });
+});
+
+document.getElementById('automaton-item-search')?.addEventListener('input', () => {
+    const placed = state.buildings.find(building => building.instanceId === selectedBuildingInstanceId);
+    if (placed && BUILDING_BY_ID.get(placed.id)?.kind === 'automaton') {
+        renderAutomatonItemFilter(getAutomatonState(placed));
+    }
+});
+
+document.getElementById('automaton-item-button')?.addEventListener('click', () => {
+    const picker = document.getElementById('automaton-item-picker');
+    const button = document.getElementById('automaton-item-button');
+    picker.hidden = !picker.hidden;
+    button.setAttribute('aria-expanded', String(!picker.hidden));
+    if (!picker.hidden) {
+        document.getElementById('automaton-item-search').focus();
+        document.getElementById('automaton-item-search').select();
+    }
+});
+
+document.getElementById('automaton-item-option-list')?.addEventListener('click', event => {
+    const option = event.target.closest('.building-storage-item-option');
+    if (!option || !CRAFTING_ITEM_BY_ID.has(option.dataset.itemId)) return;
+    document.getElementById('automaton-item-selection').value = option.dataset.itemId;
+    document.getElementById('automaton-item-picker').hidden = true;
+    document.getElementById('automaton-item-button').setAttribute('aria-expanded', 'false');
+    const placed = state.buildings.find(building => building.instanceId === selectedBuildingInstanceId);
+    if (placed && BUILDING_BY_ID.get(placed.id)?.kind === 'automaton') {
+        renderAutomatonItemFilter(getAutomatonState(placed));
+    }
+});
+
+document.getElementById('automaton-item-register')?.addEventListener('click', () => {
+    const placed = state.buildings.find(building => building.instanceId === selectedBuildingInstanceId);
+    if (!placed || BUILDING_BY_ID.get(placed.id)?.kind !== 'automaton') return;
+    const automaton = getAutomatonState(placed);
+    const itemId = document.getElementById('automaton-item-selection').value;
+    if (!CRAFTING_ITEM_BY_ID.has(itemId)) return;
+    if (automaton.itemFilterIds.includes(itemId)) {
+        showAppNotice(`${getCraftingItemName(itemId)}は登録済みです。`);
+        return;
+    }
+    changeAutomatonSetting('itemFilterIds', [...automaton.itemFilterIds, itemId]);
+});
+
+document.getElementById('automaton-registered-items')?.addEventListener('click', event => {
+    const remove = event.target.closest('.automaton-registered-item-remove');
+    if (!remove) return;
+    const placed = state.buildings.find(building => building.instanceId === selectedBuildingInstanceId);
+    if (!placed || BUILDING_BY_ID.get(placed.id)?.kind !== 'automaton') return;
+    const itemIds = getAutomatonState(placed).itemFilterIds.filter(itemId => itemId !== remove.dataset.itemId);
+    changeAutomatonSetting('itemFilterIds', itemIds);
 });
 
 document.getElementById('save-import-file')?.addEventListener('change', async event => {
@@ -4658,6 +5698,14 @@ window.addEventListener('message', event => {
         document.querySelector('iframe[title="保存スクロールのギアプレビュー"]')
     ].find(frame => frame && event.source === frame.contentWindow);
     if (appPageFrame && event.source === appPageFrame.contentWindow) {
+        if (event.data?.type === 'fogsgear:reload-game-save') {
+            window.clearInterval(engineTickIntervalId);
+            window.clearInterval(buildingUtilityIntervalId);
+            appPageFrame.parentElement.remove();
+            appPageFrame = null;
+            window.location.reload();
+            return;
+        }
         if (event.data?.type === 'fogsgear:skin-updated'
             && typeof event.data.url === 'string'
             && typeof event.data.sourceType === 'string') {
@@ -4665,7 +5713,7 @@ window.addEventListener('message', event => {
                 .then(scheduleDraw)
                 .catch(error => {
                     console.warn('Skin load failed; using fallback.', error);
-                    showAppNotice('スキン画像を読み込めませんでした。');
+                    showAppNotice('画像を読み込めませんでした。');
                 });
             return;
         }
@@ -4729,10 +5777,124 @@ document.getElementById('recipe-detail-modal')?.addEventListener('click', (event
 document.getElementById('building-menu-modal')?.addEventListener('click', event => {
     if (event.target.id === 'building-menu-modal') closeBuildingMenu();
 });
-document.getElementById('building-storage-item')?.addEventListener('change', () => {
+document.getElementById('automaton-menu-modal')?.addEventListener('click', event => {
+    if (event.target.id === 'automaton-menu-modal') closeBuildingMenu();
+});
+document.getElementById('building-demolition-confirm-modal')?.addEventListener('click', event => {
+    if (event.target.id === 'building-demolition-confirm-modal') cancelBuildingDemolition();
+});
+document.getElementById('building-storage-grid')?.addEventListener('click', event => {
+    const cell = event.target.closest('.building-storage-cell');
     const placed = state.buildings.find(building => building.instanceId === selectedBuildingInstanceId);
     const definition = BUILDING_BY_ID.get(placed?.id);
+    if (!cell) {
+        if (!placed || !definition || !selectedStorageStack) return;
+        selectedStorageStack = null;
+        setBuildingStorageAmountOptions(99);
+        renderBuildingStorage(placed, definition);
+        return;
+    }
+    const itemId = cell.dataset.itemId;
+    const stackCount = Math.min(99, Math.floor(Number(cell.dataset.stackCount)));
+    const stackIndex = Math.floor(Number(cell.dataset.stackIndex));
+    if (!placed || !definition || !CRAFTING_ITEM_BY_ID.has(itemId) || stackCount < 1) return;
+    if (!Number.isInteger(stackIndex) || stackIndex < 0) return;
+    const isAlreadySelected = selectedStorageStack?.itemId === itemId && selectedStorageStack.stackIndex === stackIndex;
+    if (isAlreadySelected) {
+        selectedStorageStack = null;
+        setBuildingStorageAmountOptions(99);
+        renderBuildingStorage(placed, definition);
+        return;
+    }
+    selectedStorageStack = { itemId, count: stackCount, stackIndex };
+    const itemSelect = document.getElementById('building-storage-item');
+    const itemPicker = document.getElementById('building-storage-item-picker');
+    const itemPickerButton = document.getElementById('building-storage-item-button');
+    itemSelect.value = itemId;
+    itemPicker.hidden = true;
+    itemPickerButton.setAttribute('aria-expanded', 'false');
+    setBuildingStorageAmountOptions(stackCount, stackCount);
+    renderBuildingStorage(placed, definition);
+});
+
+document.getElementById('building-storage-item-button')?.addEventListener('click', () => {
+    const picker = document.getElementById('building-storage-item-picker');
+    const button = document.getElementById('building-storage-item-button');
+    const amountPicker = document.getElementById('building-storage-amount-popup');
+    amountPicker.hidden = true;
+    document.getElementById('building-storage-amount-button').setAttribute('aria-expanded', 'false');
+    picker.hidden = !picker.hidden;
+    button.setAttribute('aria-expanded', String(!picker.hidden));
+    if (!picker.hidden) {
+        const search = document.getElementById('building-storage-item-search');
+        search.value = '';
+        if (state.buildings.some(building => building.instanceId === selectedBuildingInstanceId)) renderBuildingStorageItemPicker();
+        search.focus();
+    }
+});
+
+document.getElementById('building-storage-amount-button')?.addEventListener('click', () => {
+    const popup = document.getElementById('building-storage-amount-popup');
+    const button = document.getElementById('building-storage-amount-button');
+    const itemPicker = document.getElementById('building-storage-item-picker');
+    itemPicker.hidden = true;
+    document.getElementById('building-storage-item-button').setAttribute('aria-expanded', 'false');
+    popup.hidden = !popup.hidden;
+    button.setAttribute('aria-expanded', String(!popup.hidden));
+    if (!popup.hidden) {
+        const selected = popup.querySelector('[aria-selected="true"]');
+        if (selected) popup.scrollTop = selected.offsetTop - popup.offsetTop;
+    }
+});
+
+document.getElementById('building-storage-amount-list')?.addEventListener('click', event => {
+    const option = event.target.closest('.building-storage-amount-option');
+    if (!option) return;
+    const amountSelect = document.getElementById('building-storage-amount');
+    amountSelect.value = option.dataset.amount;
+    document.getElementById('building-storage-amount-value').textContent = amountSelect.value;
+    document.getElementById('building-storage-amount-popup').hidden = true;
+    document.getElementById('building-storage-amount-button').setAttribute('aria-expanded', 'false');
+    document.querySelectorAll('.building-storage-amount-option[aria-selected="true"]').forEach(selected => {
+        selected.setAttribute('aria-selected', 'false');
+    });
+    option.setAttribute('aria-selected', 'true');
+});
+
+document.getElementById('building-storage-item-search')?.addEventListener('input', () => {
+    if (state.buildings.some(building => building.instanceId === selectedBuildingInstanceId)) renderBuildingStorageItemPicker();
+});
+
+document.getElementById('building-storage-item-list')?.addEventListener('click', event => {
+    const option = event.target.closest('.building-storage-item-option');
+    if (!option || !CRAFTING_ITEM_BY_ID.has(option.dataset.itemId)) return;
+    const placed = state.buildings.find(building => building.instanceId === selectedBuildingInstanceId);
+    const definition = BUILDING_BY_ID.get(placed?.id);
+    selectedStorageStack = null;
+    document.getElementById('building-storage-item').value = option.dataset.itemId;
+    document.getElementById('building-storage-item-picker').hidden = true;
+    document.getElementById('building-storage-item-button').setAttribute('aria-expanded', 'false');
+    setBuildingStorageAmountOptions(99);
     if (placed && definition) renderBuildingStorage(placed, definition);
+});
+
+document.addEventListener('pointerdown', event => {
+    const picker = document.getElementById('building-storage-item-picker');
+    const automatonPicker = document.getElementById('automaton-item-picker');
+    const amountPopup = document.getElementById('building-storage-amount-popup');
+    if (!(event.target instanceof Element)) return;
+    if (picker && !picker.hidden && !event.target.closest('.building-storage-picker')) {
+        picker.hidden = true;
+        document.getElementById('building-storage-item-button').setAttribute('aria-expanded', 'false');
+    }
+    if (automatonPicker && !automatonPicker.hidden && !event.target.closest('.automaton-item-picker')) {
+        automatonPicker.hidden = true;
+        document.getElementById('automaton-item-button').setAttribute('aria-expanded', 'false');
+    }
+    if (amountPopup && !amountPopup.hidden && !event.target.closest('.building-storage-amount-picker')) {
+        amountPopup.hidden = true;
+        document.getElementById('building-storage-amount-button').setAttribute('aria-expanded', 'false');
+    }
 });
 
 document.addEventListener('pointerup', (event) => {
@@ -4760,6 +5922,12 @@ document.addEventListener('pointerup', (event) => {
 
 window.addEventListener('keydown', (event) => {
     if (event.key !== 'Escape') return;
+    const demolitionModal = document.getElementById('building-demolition-confirm-modal');
+    if (demolitionModal && !demolitionModal.hidden) {
+        cancelBuildingDemolition();
+        event.preventDefault();
+        return;
+    }
     const recipeDetailModal = document.getElementById('recipe-detail-modal');
     if (recipeDetailModal && !recipeDetailModal.hidden) {
         closeRecipeDetail();
