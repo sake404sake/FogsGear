@@ -5198,16 +5198,9 @@ function updateBuildingUtilityNetworks() {
 function updateFullscreenButton() {
     const button = document.querySelector('[data-action="toggle-fullscreen"]');
     if (!button) return;
-    const isInstalledApp = isInstalledAppDisplayMode();
-    button.hidden = isInstalledApp;
     const isFullscreen = Boolean(document.fullscreenElement);
     button.textContent = isFullscreen ? '全画面を解除' : '全画面表示';
     button.setAttribute('aria-pressed', String(isFullscreen));
-}
-
-function isInstalledAppDisplayMode() {
-    return window.matchMedia('(display-mode: standalone), (display-mode: fullscreen), (display-mode: minimal-ui)').matches
-        || navigator.standalone === true;
 }
 
 let lockedOrientationType = null;
@@ -5285,12 +5278,14 @@ function openGearEditor(material, scrollId = null) {
 }
 
 async function toggleFullscreen() {
-    if (isInstalledAppDisplayMode()) return;
-    if (!document.fullscreenEnabled) return;
+    if (!document.fullscreenEnabled) {
+        showAppNotice('このアプリでは全画面表示に切り替えられません。アプリを最新版に更新してください。');
+        return;
+    }
     if (document.fullscreenElement) {
         await document.exitFullscreen();
     } else {
-        await document.documentElement.requestFullscreen();
+        await document.documentElement.requestFullscreen({ navigationUI: 'hide' });
     }
 }
 
