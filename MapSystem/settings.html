@@ -88,7 +88,7 @@
             <p id="testSaveMessage" class="rule-text" aria-live="polite"></p>
         </section>
         <p id="appDisplayModeStatus" class="rule-text" aria-live="polite"></p>
-        <p class="app-version">アプリバージョン v181</p>
+        <p class="app-version">アプリバージョン v185</p>
     </main>
     <dialog class="game-reset-dialog" id="gameResetDialog" aria-labelledby="game-reset-dialog-title">
         <h2 id="game-reset-dialog-title">リセット方法を選択</h2>
@@ -414,7 +414,7 @@
                     const appScope = new URL('.', window.location.href).pathname;
                     const registrations = await navigator.serviceWorker.getRegistrations();
                     await Promise.all(registrations
-                        .filter(registration => new URL(registration.scope).pathname.startsWith(appScope))
+                        .filter(registration => appScope.startsWith(new URL(registration.scope).pathname))
                         .map(registration => registration.unregister()));
                 }
                 const targetWindow = window.parent !== window ? window.parent : window;

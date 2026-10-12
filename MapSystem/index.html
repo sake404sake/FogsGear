@@ -165,8 +165,18 @@
                     <option value="TERRAIN_TRANSFORM">地形を変成</option>
                     <option value="STORAGE_WITHDRAW">進行方向1マス先のストレージから取り出す</option>
                     <option value="STORAGE_DEPOSIT">進行方向1マス先のストレージに収める</option>
+                    <option value="STORAGE_TRANSPORT">指定した2つの倉庫間で運搬</option>
                 </select>
             </label>
+            <div id="automaton-transport-settings" hidden>
+                <label class="automaton-setting-row">搬出元
+                    <select id="automaton-source-storage"></select>
+                </label>
+                <label class="automaton-setting-row">搬入先
+                    <select id="automaton-destination-storage"></select>
+                </label>
+                <p class="automaton-status">登録アイテムを最大99個持ち、搬出元から搬入先へ運びます。</p>
+            </div>
             <label class="automaton-setting-row automaton-transform-setting">変成先
                 <select id="automaton-transform-target"></select>
             </label>

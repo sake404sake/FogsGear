@@ -3610,6 +3610,9 @@ function getAutomatonState(placed) {
         transformTargetType: 'IRON_VEIN',
         itemFilterMode: 'include',
         itemFilterIds: [],
+        sourceStorageInstanceId: '',
+        destinationStorageInstanceId: '',
+        cargo: {},
         facingDirection: { x: 1, y: 0 },
         skinUrl: skin.url,
         skinName: skin.name,
@@ -3621,8 +3624,22 @@ function getAutomatonState(placed) {
     if (!['horizontal', 'vertical'].includes(placed.automaton.axis)) placed.automaton.axis = 'horizontal';
     if (typeof placed.automaton.skinUrl !== 'string' || !placed.automaton.skinUrl) placed.automaton.skinUrl = skin.url;
     if (typeof placed.automaton.skinName !== 'string') placed.automaton.skinName = skin.name;
-    if (!['RESOURCE_COLLECTION', 'TERRAIN_TRANSFORM', 'STORAGE_WITHDRAW', 'STORAGE_DEPOSIT'].includes(placed.automaton.action)) {
+    if (!['RESOURCE_COLLECTION', 'TERRAIN_TRANSFORM', 'STORAGE_WITHDRAW', 'STORAGE_DEPOSIT', 'STORAGE_TRANSPORT'].includes(placed.automaton.action)) {
         placed.automaton.action = 'RESOURCE_COLLECTION';
+    }
+    placed.automaton.sourceStorageInstanceId = typeof placed.automaton.sourceStorageInstanceId === 'string'
+        ? placed.automaton.sourceStorageInstanceId : '';
+    placed.automaton.destinationStorageInstanceId = typeof placed.automaton.destinationStorageInstanceId === 'string'
+        ? placed.automaton.destinationStorageInstanceId : '';
+    const cargo = isRecord(placed.automaton.cargo) ? placed.automaton.cargo : {};
+    let cargoSpace = 99;
+    placed.automaton.cargo = {};
+    for (const [itemId] of CRAFTING_ITEMS) {
+        const amount = Math.min(cargoSpace, Math.max(0, Math.floor(Number(cargo[itemId]) || 0)));
+        if (amount > 0) {
+            placed.automaton.cargo[itemId] = amount;
+            cargoSpace -= amount;
+        }
     }
     placed.automaton.itemFilterMode = placed.automaton.itemFilterMode === 'exclude' ? 'exclude' : 'include';
     const validItemIds = new Set(CRAFTING_ITEMS.map(([itemId]) => itemId));
@@ -3763,7 +3780,25 @@ function renderAutomatonMenu(placed) {
     }
     transformTarget.value = automaton.transformTargetType;
     document.querySelector('.automaton-transform-setting').hidden = automaton.action !== 'TERRAIN_TRANSFORM';
-    const isStorageAction = ['STORAGE_WITHDRAW', 'STORAGE_DEPOSIT'].includes(automaton.action);
+    const isTransportAction = automaton.action === 'STORAGE_TRANSPORT';
+    const isStorageAction = ['STORAGE_WITHDRAW', 'STORAGE_DEPOSIT', 'STORAGE_TRANSPORT'].includes(automaton.action);
+    document.getElementById('automaton-transport-settings').hidden = !isTransportAction;
+    const availableStorages = state.buildings.filter(storage => BUILDING_BY_ID.get(storage.id)?.storageCapacity > 0);
+    const sourceStorage = document.getElementById('automaton-source-storage');
+    const destinationStorage = document.getElementById('automaton-destination-storage');
+    const storageOptions = [
+        new Option('倉庫を選択', ''),
+        ...availableStorages.map(storage => new Option(
+            `${BUILDING_BY_ID.get(storage.id).name} (${storage.x}, ${storage.y})`,
+            storage.instanceId
+        ))
+    ];
+    sourceStorage.replaceChildren(...storageOptions.map(option => option.cloneNode(true)));
+    destinationStorage.replaceChildren(...storageOptions.map(option => option.cloneNode(true)));
+    sourceStorage.value = automaton.sourceStorageInstanceId;
+    destinationStorage.value = automaton.destinationStorageInstanceId;
+    if (!sourceStorage.value) automaton.sourceStorageInstanceId = '';
+    if (!destinationStorage.value) automaton.destinationStorageInstanceId = '';
     document.getElementById('automaton-storage-filter-settings').hidden = !isStorageAction;
     document.querySelectorAll('[data-item-filter-mode]').forEach(button => {
         const isSelected = button.dataset.itemFilterMode === automaton.itemFilterMode;
@@ -3775,8 +3810,9 @@ function renderAutomatonMenu(placed) {
     toggle.textContent = automaton.running ? '停止' : '起動';
     toggle.classList.toggle('inventory-modal-secondary', automaton.running);
     toggle.classList.toggle('saved-scroll-use', !automaton.running);
+    const cargoCount = Object.values(automaton.cargo).reduce((total, amount) => total + amount, 0);
     document.getElementById('automaton-status').textContent = automaton.running
-        ? `稼働中 / ${{ RESOURCE_COLLECTION: '資源を採取', TERRAIN_TRANSFORM: '地形を変成', STORAGE_WITHDRAW: '前方から取り出し', STORAGE_DEPOSIT: '前方へ収納' }[automaton.action]}`
+        ? `稼働中 / ${{ RESOURCE_COLLECTION: '資源を採取', TERRAIN_TRANSFORM: '地形を変成', STORAGE_WITHDRAW: '前方から取り出し', STORAGE_DEPOSIT: '前方へ収納', STORAGE_TRANSPORT: `倉庫間運搬 (${cargoCount}/99)` }[automaton.action]}`
         : automaton.stopReason || '停止中';
     document.getElementById('automaton-skin-name').textContent = `適用中: ${automaton.skinName || 'プレイヤーの見た目'}`;
     const previewSource = automaton.skinUrl || getPlayerSkinConfig().url;
@@ -3817,8 +3853,21 @@ function changeAutomatonSetting(setting, value) {
     const automaton = getAutomatonState(placed);
     if (setting === 'axis') automaton.axis = value === 'vertical' ? 'vertical' : 'horizontal';
     if (setting === 'range') automaton.range = Math.max(1, Math.min(5, Math.floor(Number(value) || 1)));
-    if (setting === 'action') automaton.action = value === 'TERRAIN_TRANSFORM' ? value : 'RESOURCE_COLLECTION';
-    if (setting === 'action' && ['STORAGE_WITHDRAW', 'STORAGE_DEPOSIT'].includes(value)) automaton.action = value;
+    if (setting === 'action') {
+        automaton.action = ['TERRAIN_TRANSFORM', 'STORAGE_WITHDRAW', 'STORAGE_DEPOSIT', 'STORAGE_TRANSPORT'].includes(value)
+            ? value : 'RESOURCE_COLLECTION';
+    }
+    if (setting === 'sourceStorageInstanceId' || setting === 'destinationStorageInstanceId') {
+        const selectedStorage = state.buildings.find(storage => storage.instanceId === value
+            && BUILDING_BY_ID.get(storage.id)?.storageCapacity > 0);
+        const otherId = setting === 'sourceStorageInstanceId'
+            ? automaton.destinationStorageInstanceId : automaton.sourceStorageInstanceId;
+        if (selectedStorage && selectedStorage.instanceId === otherId) {
+            showAppNotice('搬出元と搬入先には別々の倉庫を選択してください。');
+        } else {
+            automaton[setting] = selectedStorage?.instanceId || '';
+        }
+    }
     if (setting === 'conditionCellType') automaton.conditionCellType = Object.prototype.hasOwnProperty.call(WORLD_CELL_TYPES, value) ? value : '';
     if (setting === 'transformTargetType' && ['direct', 'direct2'].includes(WORLD_CELL_TYPES[value]?.category)) {
         automaton.transformTargetType = value;
@@ -4071,11 +4120,65 @@ function transferAutomatonStorage(placed, automaton) {
     return true;
 }
 
+function transferAutomatonBetweenStorages(placed, automaton) {
+    const storage = getAutomatonStorageTarget(placed, automaton);
+    if (!storage || storage.instanceId === automaton.sourceStorageInstanceId
+        && storage.instanceId === automaton.destinationStorageInstanceId) return false;
+    const definition = BUILDING_BY_ID.get(storage.id);
+    if (!definition?.storageCapacity) return false;
+    if (!isRecord(storage.storedMaterials)) storage.storedMaterials = {};
+
+    const cargoCount = Object.values(automaton.cargo).reduce((total, amount) => total + amount, 0);
+    const selectedItems = new Set(automaton.itemFilterIds);
+    const itemIds = CRAFTING_ITEMS
+        .map(([itemId]) => itemId)
+        .filter(itemId => automaton.itemFilterMode === 'include'
+            ? selectedItems.has(itemId)
+            : !selectedItems.has(itemId));
+    let changed = false;
+
+    if (cargoCount === 0 && storage.instanceId === automaton.sourceStorageInstanceId) {
+        let remainingCapacity = 99;
+        for (const itemId of itemIds) {
+            const storedCount = Math.floor(getStorageMaterialCount(storage, itemId));
+            const moved = Math.min(storedCount, remainingCapacity);
+            if (moved < 1) continue;
+            storage.storedMaterials[itemId] = storedCount - moved;
+            automaton.cargo[itemId] = moved;
+            remainingCapacity -= moved;
+            changed = true;
+            if (remainingCapacity === 0) break;
+        }
+    } else if (cargoCount > 0 && storage.instanceId === automaton.destinationStorageInstanceId) {
+        for (const itemId of Object.keys(automaton.cargo)) {
+            if (!itemIds.includes(itemId)) continue;
+            const storedCount = Math.floor(getStorageMaterialCount(storage, itemId));
+            const usedSlots = getStorageUsedSlots(storage);
+            const freeSlots = Math.max(0, definition.storageCapacity - usedSlots);
+            const stackSpace = storedCount > 0 ? (99 - storedCount % 99) % 99 : 0;
+            const storageSpace = stackSpace + freeSlots * 99;
+            const moved = Math.min(automaton.cargo[itemId], storageSpace);
+            if (moved < 1) continue;
+            storage.storedMaterials[itemId] = storedCount + moved;
+            automaton.cargo[itemId] -= moved;
+            if (automaton.cargo[itemId] === 0) delete automaton.cargo[itemId];
+            changed = true;
+        }
+    }
+
+    if (!changed) return false;
+    saveBuildings();
+    return true;
+}
+
 function processAutomatonCell(placed, automaton) {
     const tile = state.map[placed.y]?.[placed.x];
     if (!tile || automaton.conditionCellType && getCellTypeKey(tile) !== automaton.conditionCellType) return false;
     if (['STORAGE_WITHDRAW', 'STORAGE_DEPOSIT'].includes(automaton.action)) {
         return transferAutomatonStorage(placed, automaton);
+    }
+    if (automaton.action === 'STORAGE_TRANSPORT') {
+        return transferAutomatonBetweenStorages(placed, automaton);
     }
     const mode = automaton.action;
     const creativeMode = Boolean(engineRuntimeState.creativeMode);
@@ -4102,6 +4205,15 @@ function processAutomatonCell(placed, automaton) {
     });
     engineRuntimeState.saveGameData();
     engineRuntimeState.notify();
+    return true;
+}
+
+function tryAutomatonStorageTransfer(placed, automaton, direction, now) {
+    if (!['STORAGE_WITHDRAW', 'STORAGE_DEPOSIT', 'STORAGE_TRANSPORT'].includes(automaton.action)) return false;
+    automaton.facingDirection = direction;
+    if (!getAutomatonStorageTarget(placed, automaton)) return false;
+    if (!processAutomatonCell(placed, automaton)) return false;
+    automaton.nextMoveAt = now + 1400;
     return true;
 }
 
@@ -4134,16 +4246,27 @@ function tickAutomatons(now) {
         const direction = automaton.direction < 0 ? -1 : 1;
         const step = { x: 0, y: 0 };
         step[axis] = direction;
-        let target = { x: placed.x + step.x, y: placed.y + step.y };
+        let movementStep = step;
+        let target = { x: placed.x + movementStep.x, y: placed.y + movementStep.y };
         if (Math.abs(target[axis] - automaton.origin[axis]) > automaton.range) {
             automaton.direction = -direction;
-            target = { x: placed.x - step.x, y: placed.y - step.y };
+            movementStep = { x: -step.x, y: -step.y };
+            target = { x: placed.x + movementStep.x, y: placed.y + movementStep.y };
         }
         if (!canAutomatonEnter(placed, target.x, target.y)) {
+            if (tryAutomatonStorageTransfer(placed, automaton, movementStep, now)) {
+                buildingsChanged = true;
+                continue;
+            }
             automaton.direction = -automaton.direction;
-            target = { x: placed.x - step.x, y: placed.y - step.y };
+            movementStep = { x: -movementStep.x, y: -movementStep.y };
+            target = { x: placed.x + movementStep.x, y: placed.y + movementStep.y };
         }
         if (!canAutomatonEnter(placed, target.x, target.y)) {
+            if (tryAutomatonStorageTransfer(placed, automaton, movementStep, now)) {
+                buildingsChanged = true;
+                continue;
+            }
             automaton.running = false;
             automaton.stopReason = '進行できるセルがありません';
             if (selectedBuildingInstanceId === placed.instanceId) renderAutomatonMenu(placed);
@@ -4186,6 +4309,23 @@ function toggleSelectedAutomaton() {
         automaton.movement = null;
         automaton.stopReason = '手動停止';
     } else {
+        if (automaton.action === 'STORAGE_TRANSPORT') {
+            const sourceExists = state.buildings.some(storage =>
+                storage.instanceId === automaton.sourceStorageInstanceId
+                && BUILDING_BY_ID.get(storage.id)?.storageCapacity > 0);
+            const destinationExists = state.buildings.some(storage =>
+                storage.instanceId === automaton.destinationStorageInstanceId
+                && BUILDING_BY_ID.get(storage.id)?.storageCapacity > 0);
+            if (!sourceExists || !destinationExists
+                || automaton.sourceStorageInstanceId === automaton.destinationStorageInstanceId) {
+                showAppNotice('搬出元と搬入先に別々のストレージを指定してください。');
+                return;
+            }
+            if (automaton.itemFilterMode === 'include' && automaton.itemFilterIds.length === 0) {
+                showAppNotice('運搬するアイテムを1つ以上登録してください。');
+                return;
+            }
+        }
         automaton.running = true;
         automaton.direction = 1;
         automaton.facingDirection = {
@@ -5567,6 +5707,8 @@ document.getElementById('vehicle-movement-scroll')?.addEventListener('change', e
     ['automaton-axis', 'axis'],
     ['automaton-range', 'range'],
     ['automaton-action', 'action'],
+    ['automaton-source-storage', 'sourceStorageInstanceId'],
+    ['automaton-destination-storage', 'destinationStorageInstanceId'],
     ['automaton-condition-cell', 'conditionCellType'],
     ['automaton-transform-target', 'transformTargetType']
 ].forEach(([id, setting]) => {
@@ -6287,7 +6429,15 @@ if (minZoomSelect) {
 
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js', { scope: './' })
+        const appScope = new URL('../', window.location.href);
+        const previousScope = new URL('./', window.location.href);
+        navigator.serviceWorker.register('../sw.js', { scope: appScope.pathname })
+            .then(async () => {
+                const registrations = await navigator.serviceWorker.getRegistrations();
+                await Promise.all(registrations
+                    .filter(registration => registration.scope === previousScope.href)
+                    .map(registration => registration.unregister()));
+            })
             .catch(error => console.error('Service worker registration failed:', error));
     });
 }
