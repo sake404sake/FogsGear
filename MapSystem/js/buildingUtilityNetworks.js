@@ -1,6 +1,31 @@
 import { BUILDING_BY_ID, getBuildingUtilityNetworkComponents } from './buildingData.js?v=23';
 
 const UTILITY_EPSILON = 0.000001;
+let cachedTopologyBuildings = [];
+let cachedUtilityNetworks = [];
+
+function getUtilityNetworks(placedBuildings) {
+    const isCurrent = placedBuildings.length === cachedTopologyBuildings.length
+        && placedBuildings.every((placed, index) => {
+            const cached = cachedTopologyBuildings[index];
+            return cached.placed === placed
+                && cached.id === placed.id
+                && cached.instanceId === placed.instanceId
+                && cached.x === placed.x
+                && cached.y === placed.y;
+        });
+    if (isCurrent) return cachedUtilityNetworks;
+
+    cachedTopologyBuildings = placedBuildings.map(placed => ({
+        placed,
+        id: placed.id,
+        instanceId: placed.instanceId,
+        x: placed.x,
+        y: placed.y
+    }));
+    cachedUtilityNetworks = getBuildingUtilityNetworkComponents(placedBuildings);
+    return cachedUtilityNetworks;
+}
 
 function getNetworkAmount(network, resource) {
     return network.buildings.reduce((total, { placed }) => total + (Number(placed.utilityState?.stored?.[resource]) || 0), 0);
@@ -19,7 +44,7 @@ export function getBuildingUtilityStatus(placedBuildings) {
             .map(resource => [resource, { connected: false, amount: 0, capacity: 0, pressure: null }])));
     });
 
-    getBuildingUtilityNetworkComponents(placedBuildings).forEach(network => {
+    getUtilityNetworks(placedBuildings).forEach(network => {
         const amount = getNetworkAmount(network, network.resource);
         const capacity = getNetworkCapacity(network, network.resource);
         const pressure = network.resource === 'steam' && capacity > 0
@@ -75,7 +100,7 @@ function buildingTouchesWater(placed, definition, worldMap) {
 
 export function simulateBuildingUtilityNetworks(placedBuildings, worldMap, coalInventory, elapsedSeconds) {
     const elapsed = Math.max(0, Number(elapsedSeconds) || 0);
-    const networks = getBuildingUtilityNetworkComponents(placedBuildings);
+    const networks = getUtilityNetworks(placedBuildings);
     const networksByBuilding = new Map();
     networks.forEach(network => network.buildings.forEach(({ placed }) => {
         networksByBuilding.set(`${network.resource}:${placed.instanceId}`, network);

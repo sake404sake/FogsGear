@@ -7,10 +7,10 @@ import { drawCellIcon, loadCellIconAtlas } from './cellIconRenderer.js?v=5';
 import { ACTIVE_SCROLL_TARGETS_KEY, CELL_MATERIALS, TERRAIN_TRANSFORM_RECIPES, WORLD_CELL_TYPES, applyCellChanges, chooseEraCellType, getCellCollectionPowerCost, getCellDrops, readCellChanges, saveCellChange } from './worldCells.js?v=13';
 import { CRAFTING_ITEMS, CRAFTING_ITEM_BY_ID, CRAFTING_RATE_MULTIPLIER, CRAFTING_RECIPES, CRAFTING_STATION_BUILDING_IDS, DEFERRED_CRAFTING_ITEM_IDS, HANDCRAFT_STATION } from './craftingData.js?v=13';
 import { BUILDING_BY_ID, BUILDING_DEFINITIONS, canPlaceBuildingOnTerrainCell, drawBuilding, getRailAutoRotation, getRailConnections, getTileEffectsUnderFootprint, getVehicleRailRotation, loadBuildingIconImages, normalizeBuildingUtilityState } from './buildingData.js?v=33';
-import { getBuildingUtilityStatus, simulateBuildingUtilityNetworks } from './buildingUtilityNetworks.js?v=4';
+import { getBuildingUtilityStatus, simulateBuildingUtilityNetworks } from './buildingUtilityNetworks.js?v=5';
 import { buildTerritoryBorderSegments } from './territoryBorders.js?v=35';
 import { directionToVehicleRotation, findNextRailStep, getTrackDirection, getVehicleRenderState, STATION_CONTROL_DEFAULTS, VEHICLE_DEFAULTS } from './railwayRuntime.js?v=9';
-import { GameState as EngineGameState, clearGameProgress } from '../../GearSystem/js/GameState.js?v=runtime-45';
+import { GameState as EngineGameState, clearGameProgress } from '../../GearSystem/js/GameState.js?v=runtime-46';
 import { GearManager as EngineGearManager } from '../../GearSystem/js/GearManager.js?v=runtime-5';
 
 const canvas = document.getElementById('gameCanvas');
@@ -18,10 +18,26 @@ const ctx = canvas.getContext('2d');
 const vehicleAnimationLayer = document.getElementById('vehicleAnimationLayer');
 const vehicleMotionSprites = new Map();
 const automatonSkinRenderers = new Map();
+const AUTOMATON_TRANSPORT_RADIUS = 12;
+const automatonTransportRoutes = new Map();
+const automatonTransportPlanCache = new Map();
+const automatonTransportReachabilityCache = new Map();
+let buildingNavigationRevision = 0;
+let buildingDrawOrderCacheRevision = -1;
+let orderedBuildingDrawCache = [];
+const AUTOMATON_TRANSPORT_STEP_DURATION_MS = 300;
 let automatonSkinPreview = null;
 let automatonPreviewSource = '';
+
+function invalidateAutomatonNavigation() {
+    buildingNavigationRevision += 1;
+    automatonTransportPlanCache.clear();
+    automatonTransportReachabilityCache.clear();
+    buildingDrawOrderCacheRevision = -1;
+}
 let cellIconAtlas = null;
 const INVENTORY_ITEMS_KEY = 'steampunk_explorer_inventory_items';
+const INVENTORY_SLOT_LIMIT = 30;
 const BUILDINGS_STORAGE_KEY = 'fogsgear_world_buildings';
 const GAME_PROGRESS_EPOCH_KEY = 'fogsgear_game_progress_epoch';
 const gameProgressEpochAtStart = localStorage.getItem(GAME_PROGRESS_EPOCH_KEY) || '';
@@ -267,6 +283,7 @@ function getStoredSavedScrolls() {
 }
 
 let appNoticeTimer = null;
+let inventoryFullNoticeAt = 0;
 
 function showAppNotice(message) {
     const notice = document.getElementById('app-notice');
@@ -275,6 +292,13 @@ function showAppNotice(message) {
     notice.hidden = false;
     clearTimeout(appNoticeTimer);
     appNoticeTimer = setTimeout(() => { notice.hidden = true; }, 3200);
+}
+
+function notifyInventoryFull() {
+    const now = Date.now();
+    if (now - inventoryFullNoticeAt < 10000) return;
+    inventoryFullNoticeAt = now;
+    showAppNotice(`所持枠が上限（${INVENTORY_SLOT_LIMIT}枠）です。資材をストレージに預けてください。`);
 }
 
 function canPersistGameProgress() {
@@ -730,6 +754,8 @@ async function init() {
     renderSavedScrolls();
     renderCellLegend();
     gameLoop();
+    if (state.buildings.some(placed => placed.vehicle?.running || placed.vehicle?.movement
+        || placed.automaton?.running || placed.automaton?.movement)) scheduleVehicleAnimation();
     document.getElementById('loadingOverlay')?.setAttribute('hidden', '');
     cellIconPromise.then(atlas => {
         if (!atlas) return;
@@ -958,6 +984,10 @@ function handleWorldCellOperation(operation) {
     if (operation.mode === 'RESOURCE_COLLECTION') {
         const drops = getCellDrops(currentType, collectionCount);
         if (!drops.length) return { success: false };
+        if (!canAddInventoryItems(drops)) {
+            notifyInventoryFull();
+            return { success: false, error: 'inventory-full' };
+        }
         const consumedPower = getCellCollectionPowerCost(currentType, collectionCount);
         if ((Number(operation.power) || 0) < consumedPower) return { success: false };
         persistChange(currentType, transformCount, collectionCount + 1);
@@ -1008,6 +1038,10 @@ function getCraftingItemCount(itemId) {
     return Math.max(0, Number(engineRuntimeState?.materialInventory?.[itemId]) || 0);
 }
 
+function canAddInventoryItems(itemIds) {
+    return engineRuntimeState?.canAddInventoryItems(itemIds) ?? false;
+}
+
 function migrateLegacyMaterialIds() {
     const legacyIds = {
         relic_fragment: 'relic-fragment',
@@ -1036,6 +1070,43 @@ function getMaximumCraftCount(inputs, creative = Boolean(engineRuntimeState?.cre
         Math.floor(getCraftingItemCount(itemId) / Math.max(1, Number(amount) || 1)))));
 }
 
+function getMaximumBuildingKitCraftCount(building, creative = Boolean(engineRuntimeState?.creativeMode)) {
+    if (creative) return 99;
+    const materialCosts = getBuildingMaterialCosts(building);
+    return Math.max(0, Math.min(
+        Math.floor(getCraftingItemCount('brass-stock') / Math.max(1, Number(building.brassCost) || 1)),
+        ...materialCosts.map(([itemId, amount]) =>
+            Math.floor(getCraftingItemCount(itemId) / Math.max(1, Number(amount) || 1)))
+    ));
+}
+
+function getMaximumCraftCountForCard(card) {
+    if (card.classList.contains('building-item-card')) {
+        const buildingId = card.querySelector('[data-action="craft-building-kit"]')?.dataset.buildingId;
+        const building = BUILDING_BY_ID.get(buildingId);
+        return building ? getMaximumBuildingKitCraftCount(building) : 0;
+    }
+    const recipeIndex = Number(card.dataset.recipeIndex);
+    const baseRecipe = CRAFTING_RECIPES[recipeIndex];
+    const buildingInstanceId = card.querySelector('[data-action="craft-recipe"]')?.dataset.buildingInstanceId || '';
+    const buildingId = state.buildings.find(building => building.instanceId === buildingInstanceId)?.id;
+    const recipe = getCraftingRecipeForBuilding(baseRecipe, buildingId);
+    return recipe ? getMaximumCraftCount(recipe[2]) : 0;
+}
+
+function formatCompactCount(value) {
+    const number = Number(value) || 0;
+    const absolute = Math.abs(number);
+    const units = [[1e9, 'B'], [1e6, 'M'], [1e3, 'K']];
+    let unitIndex = units.findIndex(([threshold]) => absolute >= threshold);
+    if (unitIndex < 0) return number.toFixed(2);
+    let [threshold, suffix] = units[unitIndex];
+    if (unitIndex > 0 && Math.abs(Number((number / threshold).toFixed(2))) >= 1e3) {
+        [threshold, suffix] = units[--unitIndex];
+    }
+    return `${(number / threshold).toFixed(2).replace(/\.00$/, '').replace(/(\.[0-9])0$/, '$1')}${suffix}`;
+}
+
 function createCraftQuantityControl(label, selectionKey, maxCount, defaultCount, outputBatch = 1, disabled = false) {
     const control = document.createElement('div');
     control.className = 'crafting-quantity-control';
@@ -1048,12 +1119,14 @@ function createCraftQuantityControl(label, selectionKey, maxCount, defaultCount,
     toggle.setAttribute('aria-label', label);
     toggle.dataset.selectionKey = selectionKey;
     toggle.dataset.outputBatch = String(outputBatch);
-    const rememberedCount = craftingQuantitySelections.get(selectionKey);
+    const rememberedSelection = craftingQuantitySelections.get(selectionKey);
     const selectedCount = maxCount > 0
-        ? Math.min(maxCount, Math.max(1, rememberedCount || defaultCount))
+        ? rememberedSelection === 'max'
+            ? maxCount
+            : Math.min(maxCount, Math.max(1, rememberedSelection || defaultCount))
         : 0;
     if (control.dataset.selectedCount !== String(selectedCount)) control.dataset.selectedCount = String(selectedCount);
-    if (maxCount > 0) craftingQuantitySelections.set(selectionKey, selectedCount);
+    if (maxCount > 0 && rememberedSelection !== 'max') craftingQuantitySelections.set(selectionKey, selectedCount);
 
     const options = maxCount > 0
         ? [
@@ -1062,6 +1135,9 @@ function createCraftQuantityControl(label, selectionKey, maxCount, defaultCount,
             { count: 10, label: '10' }
         ].filter(option => option.count <= maxCount)
         : [{ count: 0, label: '0' }];
+    if (maxCount > 0 && selectedCount > 0 && !options.some(option => option.count === selectedCount)) {
+        options.push({ count: selectedCount, label: String(selectedCount) });
+    }
     if (maxCount > 0 && !options.some(option => option.count === maxCount)) {
         options.push({ count: maxCount, label: '最大' });
     }
@@ -1071,6 +1147,7 @@ function createCraftQuantityControl(label, selectionKey, maxCount, defaultCount,
         button.className = 'crafting-quantity-option';
         button.dataset.action = 'select-craft-quantity';
         button.dataset.quantity = String(option.count);
+        button.dataset.isMaximum = String(option.count === maxCount);
         button.textContent = option.label;
         button.setAttribute('aria-label', option.label === '最大'
             ? `最大 ${maxCount}個`
@@ -1188,7 +1265,7 @@ function renderBuildingStorageItemPicker() {
         itemName.textContent = name;
         const quantity = document.createElement('span');
         quantity.className = 'building-storage-item-option-count';
-        quantity.textContent = String(getStorageInventoryCount(itemId));
+        quantity.textContent = formatInventoryCount(itemId, getStorageInventoryCount(itemId));
         option.append(itemName, quantity);
         return option;
     });
@@ -1208,7 +1285,7 @@ function renderBuildingStorageItemPicker() {
         itemName.textContent = selectedName;
         const quantity = document.createElement('span');
         quantity.className = 'building-storage-item-option-count';
-        quantity.textContent = String(getStorageInventoryCount(selectedItemId));
+        quantity.textContent = formatInventoryCount(selectedItemId, getStorageInventoryCount(selectedItemId));
         option.append(itemName, quantity);
         itemList.prepend(option);
     }
@@ -1236,7 +1313,7 @@ function renderBuildingStorage(placed, definition) {
     const selectedItemId = itemSelect.value;
     const selectedItemCount = getStorageMaterialCount(placed, selectedItemId);
     document.getElementById('building-storage-status').textContent =
-        `保管枠 ${usedSlots} / ${capacity}　${getCraftingItemName(selectedItemId)} ${selectedItemCount}`;
+        `保管枠 ${usedSlots} / ${capacity}　${getCraftingItemName(selectedItemId)} ${formatInventoryCount(selectedItemId, selectedItemCount)}`;
     const grid = document.getElementById('building-storage-grid');
     const cells = [];
     Object.entries(placed.storedMaterials)
@@ -1330,6 +1407,10 @@ function transferBuildingStorage(direction) {
         else if (resourceKey) engineRuntimeState[resourceKey] = inventoryCount - moved;
         else engineRuntimeState.materialInventory[itemId] = inventoryCount - moved;
     } else {
+        if (storedCount > 0 && inventoryCount <= 0 && !canAddInventoryItems([itemId])) {
+            notifyInventoryFull();
+            return;
+        }
         const selectedStackLimit = selectedStorageStack?.itemId === itemId ? selectedStorageStack.count : 99;
         const moved = Math.min(amount, storedCount, selectedStackLimit, 99);
         if (moved < 1) {
@@ -1353,8 +1434,11 @@ function transferBuildingStorage(direction) {
 
 function formatInventoryCount(itemId, count) {
     const amount = Number(count) || 0;
-    if (!['water', 'fog', 'power', 'steam_power'].includes(itemId)) return String(Math.floor(amount));
-    return amount.toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1');
+    const isContinuousResource = ['water', 'fog', 'power', 'steam_power'].includes(itemId);
+    const value = isContinuousResource ? amount : Math.floor(amount);
+    if (Math.abs(value) >= 1e3) return formatCompactCount(value);
+    if (!isContinuousResource) return String(value);
+    return value.toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1');
 }
 
 function normalizeInventorySearch(value) {
@@ -1442,10 +1526,7 @@ function renderBuildingInventory() {
         const stationAvailable = !requiresStation || hasConstructionStation;
         const materialCosts = getBuildingMaterialCosts(building);
         const missingRequirements = getMissingBuildingRequirements(building);
-        const affordableCount = creative ? 99 : Math.max(0, Math.min(
-            Math.floor(brass / Math.max(1, building.brassCost)),
-            ...materialCosts.map(([itemId, amount]) => Math.floor(getCraftingItemCount(itemId) / amount))
-        ));
+        const affordableCount = getMaximumBuildingKitCraftCount(building, creative);
         const maxCraftCount = missingRequirements.length && !creative ? 0 : affordableCount;
         const affordable = maxCraftCount > 0;
         const canCraftNow = stationAvailable && affordable;
@@ -1472,7 +1553,7 @@ function renderBuildingInventory() {
         outputBlock.className = 'crafting-recipe-output';
         const outputCaption = document.createElement('span');
         outputCaption.className = 'crafting-output-caption';
-        outputCaption.textContent = `建築物 / 所持 ${ownedCount}`;
+        outputCaption.textContent = `建築物 / 所持 ${formatInventoryCount(building.id, ownedCount)}`;
         outputCaption.title = outputCaption.textContent;
         const outputMain = document.createElement('div');
         outputMain.className = 'crafting-output-main';
@@ -1513,7 +1594,7 @@ function renderBuildingInventory() {
             : !stationAvailable ? '作業台以上の設備が必要'
             : missingRequirements.length ? `前提設備が必要: ${missingRequirementNames.join('・')}`
             : !affordable ? missingCost || '素材不足'
-            : `製作可能${ownedCount ? ` / 所持 ${ownedCount}` : ''}`;
+            : `製作可能${ownedCount ? ` / 所持 ${formatInventoryCount(building.id, ownedCount)}` : ''}`;
         cost.textContent = `建築サイズ ${building.width}×${building.height}${placementRule} / ${status}`;
         if (activeJobs.length) {
             const countdown = document.createElement('span');
@@ -1567,11 +1648,8 @@ function craftBuildingKit(buildingId, requestedCount) {
     }
     const creative = Boolean(engineRuntimeState.creativeMode);
     const materialCosts = getBuildingMaterialCosts(building);
-    const maxCraftCount = creative ? 99 : Math.max(0, Math.min(
-        Math.floor(getCraftingItemCount('brass-stock') / Math.max(1, building.brassCost)),
-        ...materialCosts.map(([itemId, amount]) => Math.floor(getCraftingItemCount(itemId) / amount))
-    ));
-    const quantity = Math.floor(Number(requestedCount));
+    const maxCraftCount = getMaximumBuildingKitCraftCount(building, creative);
+    const quantity = requestedCount === 'max' ? maxCraftCount : Math.floor(Number(requestedCount));
     if (!Number.isFinite(quantity) || quantity < 1 || quantity > maxCraftCount) {
         const missingBrass = getCraftingItemCount('brass-stock') < building.brassCost;
         const missingMaterials = materialCosts
@@ -1579,6 +1657,10 @@ function craftBuildingKit(buildingId, requestedCount) {
             .map(([itemId]) => getCraftingItemName(itemId));
         const missingCost = [...(missingBrass ? ['真鍮'] : []), ...missingMaterials].join('・');
         showAppNotice(maxCraftCount > 0 ? `製作数は1〜${maxCraftCount}個で指定してください。` : `建築キットの製作に必要な${missingCost || '素材'}が足りません。`);
+        return;
+    }
+    if (!canAddInventoryItems(Array(quantity).fill(building.id))) {
+        notifyInventoryFull();
         return;
     }
     if (!creative && getCraftingItemCount('brass-stock') < building.brassCost * quantity) {
@@ -1679,6 +1761,7 @@ function recordBuildingHistory(before, after = captureBuildingHistoryState()) {
         inventoryDeltas,
         resourceDeltas
     });
+    invalidateAutomatonNavigation();
     if (buildingUndoHistory.length > BUILDING_HISTORY_LIMIT) buildingUndoHistory.shift();
     buildingRedoHistory.length = 0;
     updateBuildingHistoryButtons();
@@ -1705,6 +1788,20 @@ function applyBuildingHistory(direction) {
         showAppNotice('必要な素材が足りないため、この操作を戻せません。');
         return;
     }
+    const addedItemIds = [...nextInventory]
+        .filter(([itemId, count]) => count > 0 && (Number(engineRuntimeState.materialInventory[itemId]) || 0) <= 0)
+        .map(([itemId]) => itemId);
+    const resourceItems = { water: 'water', fog: 'fog', power: 'power', steamPower: 'steam_power' };
+    nextResources.forEach((count, resourceId) => {
+        if (count > 0 && (Number(engineRuntimeState[resourceId]) || 0) <= 0 && resourceItems[resourceId]) {
+            addedItemIds.push(resourceItems[resourceId]);
+        }
+    });
+    if (nextBrass > 0 && (Number(engineRuntimeState.brass) || 0) <= 0) addedItemIds.push('brass-stock');
+    if (!canAddInventoryItems(addedItemIds)) {
+        notifyInventoryFull();
+        return;
+    }
 
     const targetSide = undoing ? 'before' : 'after';
     const affectedIds = new Set(entry.changes.flatMap(change => [
@@ -1719,6 +1816,7 @@ function applyBuildingHistory(direction) {
         .forEach(({ building, index }) => {
             state.buildings.splice(Math.min(index, state.buildings.length), 0, JSON.parse(JSON.stringify(building)));
         });
+    invalidateAutomatonNavigation();
 
     engineRuntimeState.brass = nextBrass;
     nextInventory.forEach((count, itemId) => {
@@ -1759,6 +1857,18 @@ function loadBuildings() {
         state.buildings = validBuildings.map(building => {
             const placed = { ...building };
             const definition = BUILDING_BY_ID.get(placed.id);
+            if (typeof placed.customName === 'string') {
+                const normalizedName = placed.customName.replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, 32);
+                if (normalizedName !== placed.customName) migrated = true;
+                placed.customName = normalizedName;
+                if (!placed.customName) {
+                    delete placed.customName;
+                    migrated = true;
+                }
+            } else if (placed.customName !== undefined) {
+                delete placed.customName;
+                migrated = true;
+            }
             const utilityState = normalizeBuildingUtilityState(placed.id, placed.utilityState);
             if (utilityState) {
                 if (JSON.stringify(placed.utilityState) !== JSON.stringify(utilityState)) migrated = true;
@@ -1797,11 +1907,15 @@ function loadBuildings() {
                     ...savedAutomaton,
                     origin: isRecord(savedAutomaton.origin) ? savedAutomaton.origin : { x: placed.x, y: placed.y }
                 };
+                if (savedAutomaton.stopReason === '再読み込み後は停止') {
+                    placed.automaton.running = true;
+                    placed.automaton.stopReason = '';
+                    migrated = true;
+                }
                 if (placed.automaton.running || placed.automaton.movement) {
-                    placed.automaton.running = false;
                     placed.automaton.movement = null;
                     placed.automaton.nextMoveAt = 0;
-                    placed.automaton.stopReason = '再読み込み後は停止';
+                    if (placed.automaton.running) placed.automaton.stopReason = '';
                     migrated = true;
                 }
             } else if (definition.kind === 'station' && !isRecord(placed.stationControl)) {
@@ -1810,6 +1924,7 @@ function loadBuildings() {
             }
             return placed;
         });
+        invalidateAutomatonNavigation();
         if (migrated) saveBuildings();
     } catch (error) {
         state.buildings = [];
@@ -1867,7 +1982,9 @@ function createInventoryItemCard(itemId) {
     const itemCount = document.createElement('strong');
     itemCount.className = 'inventory-item-count';
     itemCount.dataset.itemKey = itemId;
-    itemCount.textContent = formatInventoryCount(itemId, getCraftingItemCount(itemId));
+    const itemCountValue = getCraftingItemCount(itemId);
+    itemCount.textContent = formatInventoryCount(itemId, itemCountValue);
+    itemCount.title = String(itemCountValue);
     button.append(icon, name, itemCount);
     return button;
 }
@@ -1939,6 +2056,10 @@ function syncInventoryCategories(inventoryList, visibleInventoryIds) {
 function renderCellMaterials() {
     if (!engineRuntimeState) return;
     renderBuildingInventory();
+    const capacityStatus = document.getElementById('inventory-capacity-status');
+    if (capacityStatus) {
+        capacityStatus.textContent = `所持枠 ${engineRuntimeState.getInventorySlotCount()} / ${INVENTORY_SLOT_LIMIT}`;
+    }
     const inventoryList = document.getElementById('inventory-item-list');
     const inventoryIds = new Set(Object.entries(engineRuntimeState.materialInventory || {})
         .filter(([, count]) => Number(count) > 0)
@@ -1993,8 +2114,10 @@ function renderCellMaterials() {
     if (inventoryList) {
         inventoryList.querySelectorAll('.inventory-item-count[data-item-key]').forEach(countElement => {
             const itemId = countElement.dataset.itemKey;
-            const countText = formatInventoryCount(itemId, getCraftingItemCount(itemId));
+            const count = getCraftingItemCount(itemId);
+            const countText = formatInventoryCount(itemId, count);
             if (countElement.textContent !== countText) countElement.textContent = countText;
+            if (countElement.title !== String(count)) countElement.title = String(count);
         });
     }
 
@@ -2209,16 +2332,21 @@ function refreshCraftQuantityControl(control, maxCount) {
     if (!control) return;
     const toggle = control.querySelector('.crafting-quantity-toggle');
     const selectionKey = toggle.dataset.selectionKey;
-    const rememberedCount = craftingQuantitySelections.get(selectionKey);
+    const rememberedSelection = craftingQuantitySelections.get(selectionKey);
     const selectedCount = maxCount > 0
-        ? Math.min(maxCount, Math.max(1, rememberedCount || 1))
+        ? rememberedSelection === 'max'
+            ? maxCount
+            : Math.min(maxCount, Math.max(1, rememberedSelection || 1))
         : 0;
     if (control.dataset.selectedCount !== String(selectedCount)) control.dataset.selectedCount = String(selectedCount);
-    if (maxCount > 0) craftingQuantitySelections.set(selectionKey, selectedCount);
+    if (maxCount > 0 && rememberedSelection !== 'max') craftingQuantitySelections.set(selectionKey, selectedCount);
     const options = maxCount > 0
         ? [{ count: 1, label: '1' }, { count: 5, label: '5' }, { count: 10, label: '10' }]
             .filter(option => option.count <= maxCount)
         : [{ count: 0, label: '0' }];
+    if (maxCount > 0 && selectedCount > 0 && !options.some(option => option.count === selectedCount)) {
+        options.push({ count: selectedCount, label: String(selectedCount) });
+    }
     if (maxCount > 0 && !options.some(option => option.count === maxCount)) {
         options.push({ count: maxCount, label: '最大' });
     }
@@ -2233,6 +2361,7 @@ function refreshCraftQuantityControl(control, maxCount) {
             button.dataset.action = 'select-craft-quantity';
             button.dataset.quantity = String(option.count);
         }
+        button.dataset.isMaximum = String(option.count === maxCount);
         if (button.textContent !== option.label) button.textContent = option.label;
         const ariaLabel = option.label === '最大' ? `最大 ${maxCount}個` : `${option.count}個`;
         if (button.getAttribute('aria-label') !== ariaLabel) button.setAttribute('aria-label', ariaLabel);
@@ -2254,7 +2383,7 @@ function createCraftingChip(itemId, amount) {
     chip.dataset.itemKey = itemId;
     const available = getCraftingItemCount(itemId);
     chip.className = `crafting-item-chip${available < amount ? ' is-missing' : ''}`;
-    chip.setAttribute('aria-label', `${getCraftingItemName(itemId)}: 所持 ${formatInventoryCount(itemId, available)} / 必要 ${amount}`);
+    chip.setAttribute('aria-label', `${getCraftingItemName(itemId)}: 所持 ${formatInventoryCount(itemId, available)} / 必要 ${formatInventoryCount(itemId, amount)}`);
     const icon = document.createElement('span');
     icon.className = 'crafting-item-icon';
     icon.appendChild(createInventoryIcon(itemId));
@@ -2266,7 +2395,7 @@ function createCraftingChip(itemId, amount) {
     const count = document.createElement('span');
     count.className = 'crafting-item-count';
     count.dataset.requiredAmount = String(amount);
-    count.textContent = `所持 ${formatInventoryCount(itemId, available)} / 必要 ${amount}`;
+    count.textContent = `所持 ${formatInventoryCount(itemId, available)} / 必要 ${formatInventoryCount(itemId, amount)}`;
     details.append(label, count);
     chip.append(icon, details);
     return chip;
@@ -2463,9 +2592,13 @@ function craftRecipe(recipeIndex, buildingInstanceId = '', requestedCount) {
         return;
     }
     const maxCraftCount = getMaximumCraftCount(recipe[2], creative);
-    const quantity = Math.floor(Number(requestedCount));
+    const quantity = requestedCount === 'max' ? maxCraftCount : Math.floor(Number(requestedCount));
     if (!Number.isFinite(quantity) || quantity < 1 || quantity > maxCraftCount) {
         showAppNotice(maxCraftCount > 0 ? `製作数は1〜${maxCraftCount}回で指定してください。` : '製作に必要な素材が足りません。');
+        return;
+    }
+    if (!canAddInventoryItems(Array(quantity).fill(recipe[3]))) {
+        notifyInventoryFull();
         return;
     }
     if (!creative && recipe[2].some(([itemId, amount]) => getCraftingItemCount(itemId) < amount * quantity)) {
@@ -2954,18 +3087,35 @@ function scheduleDraw() {
 }
 
 let vehicleFrameQueued = false;
+let vehicleAnimationTimer = null;
 
 function scheduleVehicleAnimation() {
     if (vehicleFrameQueued) return;
     vehicleFrameQueued = true;
-    requestAnimationFrame(now => {
+    const hasMovingVehicle = state.buildings.some(placed =>
+        placed.vehicle?.running || placed.vehicle?.movement);
+    const hasMovingAutomaton = state.buildings.some(placed => placed.automaton?.movement);
+    const runningAutomatons = state.buildings.filter(placed => placed.automaton?.running);
+    const hasVehicleRuntime = state.buildings.some(placed =>
+        BUILDING_BY_ID.get(placed.id)?.kind === 'locomotive'
+        && (placed.vehicle?.running || placed.vehicle?.movement));
+    const animate = now => {
+        vehicleAnimationTimer = null;
         vehicleFrameQueued = false;
-        tickVehicleRuntime(now);
+        if (hasVehicleRuntime || vehicleMotionSprites.size) tickVehicleRuntime(now);
         tickAutomatons(now);
-        drawVehicleAnimation(now);
+        if (hasVehicleRuntime || vehicleMotionSprites.size) drawVehicleAnimation(now);
         if (state.buildings.some(placed => placed.vehicle?.running || placed.vehicle?.movement
             || placed.automaton?.running || placed.automaton?.movement)) scheduleVehicleAnimation();
-    });
+    };
+    if (!hasMovingVehicle && !hasMovingAutomaton && runningAutomatons.length) {
+        const nextMoveAt = runningAutomatons.reduce((earliest, placed) =>
+            Math.min(earliest, Math.max(0, Number(placed.automaton.nextMoveAt) || 0)), Infinity);
+        const delay = Math.max(16, Math.min(100, nextMoveAt - performance.now()));
+        vehicleAnimationTimer = setTimeout(() => animate(performance.now()), delay);
+        return;
+    }
+    requestAnimationFrame(animate);
 }
 
 function getVehicleMotionSprite(placed) {
@@ -3086,6 +3236,85 @@ function drawTargetCellHighlights(left, top, viewW, viewH) {
     });
 }
 
+function drawAutomatonTransportOverlay() {
+    const modal = document.getElementById('automaton-menu-modal');
+    const showReachability = !modal?.hidden;
+    const selected = state.buildings.find(building => building.instanceId === selectedBuildingInstanceId
+        && BUILDING_BY_ID.get(building.id)?.kind === 'automaton');
+    const automatons = state.buildings.filter(placed => BUILDING_BY_ID.get(placed.id)?.kind === 'automaton')
+        .filter(placed => {
+            const automaton = getAutomatonState(placed);
+            return automaton.action === 'STORAGE_TRANSPORT'
+                && (automaton.running || placed === selected);
+        });
+    if (!automatons.length) return;
+
+    ctx.save();
+    for (const placed of automatons) {
+        const automaton = getAutomatonState(placed);
+        if (showReachability && placed === selected) {
+            const bounds = getAutomatonTransportBounds(placed, automaton);
+            const reachabilityKey = [
+                buildingNavigationRevision, placed.instanceId, placed.x, placed.y,
+                state.player.x, state.player.y,
+                bounds.minX, bounds.maxX, bounds.minY, bounds.maxY
+            ].join(':');
+            let reachable = automatonTransportReachabilityCache.get(placed.instanceId);
+            if (reachable?.key !== reachabilityKey) {
+                reachable = {
+                    key: reachabilityKey,
+                    cells: getAutomatonWalkPaths(placed, placed, bounds)
+                };
+                automatonTransportReachabilityCache.set(placed.instanceId, reachable);
+            }
+            ctx.fillStyle = 'rgba(92, 224, 185, .10)';
+            reachable.cells.forEach((previous, key) => {
+                const [x, y] = key.split(',').map(Number);
+                ctx.fillRect(x * state.tileSize, y * state.tileSize, state.tileSize, state.tileSize);
+            });
+            ctx.strokeStyle = 'rgba(117, 255, 209, .65)';
+            ctx.lineWidth = 1.5 / state.zoom;
+            ctx.setLineDash([5 / state.zoom, 4 / state.zoom]);
+            ctx.strokeRect(
+                bounds.minX * state.tileSize,
+                bounds.minY * state.tileSize,
+                (bounds.maxX - bounds.minX + 1) * state.tileSize,
+                (bounds.maxY - bounds.minY + 1) * state.tileSize
+            );
+        }
+
+        const activeRoute = automatonTransportRoutes.get(placed.instanceId);
+        const routeIsCurrent = activeRoute?.buildingRevision === buildingNavigationRevision;
+        const plan = routeIsCurrent ? null : getCachedAutomatonTransportPlan(placed, automaton);
+        let path = [];
+        if (routeIsCurrent && activeRoute?.cyclePath) {
+            path = [...activeRoute.cyclePath, ...activeRoute.cyclePath.slice(0, -1).reverse()];
+        } else if (routeIsCurrent && automaton.running && activeRoute) {
+            path = [placed, ...activeRoute.path.slice(activeRoute.index)];
+        } else if (plan) {
+            path = [...plan.sourceRoute.path, ...plan.destinationRoute.path.slice(1)];
+        }
+        if (path.length < 2) continue;
+        ctx.beginPath();
+        path.forEach((point, index) => {
+            const x = (point.x + .5) * state.tileSize;
+            const y = (point.y + .5) * state.tileSize;
+            if (index === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        });
+        ctx.strokeStyle = 'rgba(255, 222, 126, .96)';
+        ctx.lineWidth = Math.max(2, 3 / state.zoom);
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.shadowColor = 'rgba(255, 192, 80, .8)';
+        ctx.shadowBlur = 7 / state.zoom;
+        ctx.setLineDash([state.tileSize * .16, state.tileSize * .2]);
+        ctx.stroke();
+    }
+    ctx.setLineDash([]);
+    ctx.restore();
+}
+
 function hasBuildingResources(building) {
     return Boolean(engineRuntimeState?.creativeMode) || getCraftingItemCount('brass-stock') >= building.brassCost;
 }
@@ -3183,11 +3412,21 @@ function updateBuildingPlacementControls() {
 
 function drawPlacedBuildings(startCol, endCol, startRow, endRow, now) {
     const drawOrder = { foundation: 0, decoration: 1, rail: 2, structure: 3, vehicle: 4 };
-    [...state.buildings].sort((left, right) => {
-        const leftRole = BUILDING_BY_ID.get(left.id)?.role || 'structure';
-        const rightRole = BUILDING_BY_ID.get(right.id)?.role || 'structure';
-        return drawOrder[leftRole] - drawOrder[rightRole];
-    }).forEach(placed => {
+    if (buildingDrawOrderCacheRevision !== buildingNavigationRevision) {
+        orderedBuildingDrawCache = [...state.buildings].sort((left, right) => {
+            const leftRole = BUILDING_BY_ID.get(left.id)?.role || 'structure';
+            const rightRole = BUILDING_BY_ID.get(right.id)?.role || 'structure';
+            return drawOrder[leftRole] - drawOrder[rightRole];
+        });
+        buildingDrawOrderCacheRevision = buildingNavigationRevision;
+    }
+    const activeCraftingStationIds = new Set();
+    for (const job of engineRuntimeState.craftingJobs) {
+        if (Number(job.startedAt) <= now && Number(job.completesAt) > now) {
+            activeCraftingStationIds.add(job.craftingStationId);
+        }
+    }
+    orderedBuildingDrawCache.forEach(placed => {
         const building = BUILDING_BY_ID.get(placed.id);
         if (!building) return;
         if (building.role === 'vehicle' && placed.vehicle?.movement) return;
@@ -3202,7 +3441,36 @@ function drawPlacedBuildings(startCol, endCol, startRow, endRow, now) {
             return;
         }
         drawBuilding(ctx, { ...building, x: placed.x, y: placed.y, rotation: placed.rotation || 0 }, state.tileSize, { zoom: state.zoom });
+        if (activeCraftingStationIds.has(placed.instanceId)) {
+            const zoom = Math.max(0.5, state.zoom);
+            const x = placed.x * state.tileSize;
+            const y = placed.y * state.tileSize;
+            const width = building.width * state.tileSize;
+            const height = building.height * state.tileSize;
+            ctx.save();
+            ctx.strokeStyle = 'rgba(255, 226, 122, .98)';
+            ctx.lineWidth = 2 / zoom;
+            ctx.shadowColor = 'rgba(255, 190, 52, .98)';
+            ctx.shadowBlur = 14 / zoom;
+            ctx.strokeRect(x + 1 / zoom, y + 1 / zoom, width - 2 / zoom, height - 2 / zoom);
+            ctx.restore();
+        }
     });
+}
+
+function isBuildingCraftingActive(placed, now = Date.now()) {
+    return engineRuntimeState.craftingJobs.some(job =>
+        job.craftingStationId === placed.instanceId
+        && Number(job.startedAt) <= now
+        && Number(job.completesAt) > now);
+}
+
+function getActiveCraftingBuildingSignature(now = Date.now()) {
+    return state.buildings
+        .filter(placed => isBuildingCraftingActive(placed, now))
+        .map(placed => placed.instanceId)
+        .sort()
+        .join(',');
 }
 
 function drawBuildingGhost() {
@@ -3390,6 +3658,7 @@ function draw() {
     drawBuildingGhost();
     drawTerritoryOverlay(startCol, endCol, startRow, endRow);
     drawTargetCellHighlights(left, top, viewW, viewH);
+    drawAutomatonTransportOverlay();
 
     state.skin.draw(
         ctx,
@@ -3583,6 +3852,7 @@ function closeBuildingMenu() {
     document.getElementById('building-demolition-confirm-modal').hidden = true;
     pendingBuildingDemolitionInstanceId = null;
     selectedBuildingInstanceId = null;
+    scheduleDraw();
 }
 
 function getVehicleState(placed) {
@@ -3612,6 +3882,7 @@ function getAutomatonState(placed) {
         itemFilterIds: [],
         sourceStorageInstanceId: '',
         destinationStorageInstanceId: '',
+        transportTargetStorageInstanceId: '',
         cargo: {},
         facingDirection: { x: 1, y: 0 },
         skinUrl: skin.url,
@@ -3619,6 +3890,12 @@ function getAutomatonState(placed) {
         origin: { x: placed.x, y: placed.y },
         nextMoveAt: 0,
         movement: null,
+        stopCondition: '',
+        stopAfterItemCount: 0,
+        stopAfterRoundTripCount: 0,
+        processedItemCount: 0,
+        completedRoundTripCount: 0,
+        deliveredAtDestination: false,
         ...saved
     };
     if (!['horizontal', 'vertical'].includes(placed.automaton.axis)) placed.automaton.axis = 'horizontal';
@@ -3627,10 +3904,28 @@ function getAutomatonState(placed) {
     if (!['RESOURCE_COLLECTION', 'TERRAIN_TRANSFORM', 'STORAGE_WITHDRAW', 'STORAGE_DEPOSIT', 'STORAGE_TRANSPORT'].includes(placed.automaton.action)) {
         placed.automaton.action = 'RESOURCE_COLLECTION';
     }
+    if (!['none', 'item-count', 'round-trips', 'source-empty'].includes(placed.automaton.stopCondition)) {
+        placed.automaton.stopCondition = placed.automaton.stopAfterItemCount > 0
+            ? 'item-count'
+            : placed.automaton.action === 'STORAGE_TRANSPORT' ? 'source-empty' : 'none';
+    }
     placed.automaton.sourceStorageInstanceId = typeof placed.automaton.sourceStorageInstanceId === 'string'
         ? placed.automaton.sourceStorageInstanceId : '';
     placed.automaton.destinationStorageInstanceId = typeof placed.automaton.destinationStorageInstanceId === 'string'
         ? placed.automaton.destinationStorageInstanceId : '';
+    placed.automaton.transportTargetStorageInstanceId = typeof placed.automaton.transportTargetStorageInstanceId === 'string'
+        ? placed.automaton.transportTargetStorageInstanceId : '';
+    placed.automaton.stopAfterItemCount = Math.max(1, Math.min(
+        1_000_000_000, Math.floor(Number(placed.automaton.stopAfterItemCount) || 1)
+    ));
+    placed.automaton.stopAfterRoundTripCount = Math.max(1, Math.min(
+        1_000_000_000, Math.floor(Number(placed.automaton.stopAfterRoundTripCount) || 1)
+    ));
+    placed.automaton.processedItemCount = Math.max(0, Math.floor(Number(placed.automaton.processedItemCount) || 0));
+    placed.automaton.completedRoundTripCount = Math.max(
+        0, Math.floor(Number(placed.automaton.completedRoundTripCount) || 0)
+    );
+    placed.automaton.deliveredAtDestination = Boolean(placed.automaton.deliveredAtDestination);
     const cargo = isRecord(placed.automaton.cargo) ? placed.automaton.cargo : {};
     let cargoSpace = 99;
     placed.automaton.cargo = {};
@@ -3761,11 +4056,28 @@ function ensureAutomatonPreview() {
 function renderAutomatonMenu(placed) {
     const automaton = getAutomatonState(placed);
     const definition = BUILDING_BY_ID.get(placed.id);
-    document.getElementById('automaton-menu-title').textContent = definition.name;
+    document.getElementById('automaton-menu-title').textContent = getBuildingTitle(placed, definition);
+    document.getElementById('automaton-custom-name').value = placed.customName || '';
     document.getElementById('automaton-menu-details').textContent = `座標 (${placed.x}, ${placed.y}) / 巡回中心 (${automaton.origin.x}, ${automaton.origin.y})`;
     document.getElementById('automaton-axis').value = automaton.axis;
     document.getElementById('automaton-range').value = String(automaton.range);
     document.getElementById('automaton-action').value = automaton.action;
+    const isTransportAction = automaton.action === 'STORAGE_TRANSPORT';
+    const stopCondition = document.getElementById('automaton-stop-condition');
+    stopCondition.querySelector('[value="round-trips"]').hidden = !isTransportAction;
+    stopCondition.querySelector('[value="source-empty"]').hidden = !isTransportAction;
+    if (!isTransportAction && ['round-trips', 'source-empty'].includes(automaton.stopCondition)) {
+        automaton.stopCondition = 'none';
+    }
+    stopCondition.value = automaton.stopCondition;
+    const stopLimitRow = document.getElementById('automaton-stop-limit-row');
+    const stopLimit = document.getElementById('automaton-stop-limit');
+    const stopLimitLabel = document.getElementById('automaton-stop-limit-label');
+    const needsStopLimit = ['item-count', 'round-trips'].includes(automaton.stopCondition);
+    stopLimitRow.hidden = !needsStopLimit;
+    stopLimitLabel.textContent = automaton.stopCondition === 'round-trips' ? '停止する往復回数' : '停止する個数';
+    stopLimit.value = String(automaton.stopCondition === 'round-trips'
+        ? automaton.stopAfterRoundTripCount : Math.max(1, automaton.stopAfterItemCount));
     const condition = document.getElementById('automaton-condition-cell');
     if (!condition.options.length) {
         condition.add(new Option('指定なし', ''));
@@ -3780,16 +4092,19 @@ function renderAutomatonMenu(placed) {
     }
     transformTarget.value = automaton.transformTargetType;
     document.querySelector('.automaton-transform-setting').hidden = automaton.action !== 'TERRAIN_TRANSFORM';
-    const isTransportAction = automaton.action === 'STORAGE_TRANSPORT';
     const isStorageAction = ['STORAGE_WITHDRAW', 'STORAGE_DEPOSIT', 'STORAGE_TRANSPORT'].includes(automaton.action);
+    document.getElementById('automaton-patrol-settings').hidden = isTransportAction;
     document.getElementById('automaton-transport-settings').hidden = !isTransportAction;
-    const availableStorages = state.buildings.filter(storage => BUILDING_BY_ID.get(storage.id)?.storageCapacity > 0);
+    const transportBounds = getAutomatonTransportBounds(placed, automaton);
+    const availableStorages = state.buildings.filter(storage =>
+        BUILDING_BY_ID.get(storage.id)?.storageCapacity > 0
+        && (!isTransportAction || isStorageWithinAutomatonTransportBounds(storage, transportBounds)));
     const sourceStorage = document.getElementById('automaton-source-storage');
     const destinationStorage = document.getElementById('automaton-destination-storage');
     const storageOptions = [
         new Option('倉庫を選択', ''),
         ...availableStorages.map(storage => new Option(
-            `${BUILDING_BY_ID.get(storage.id).name} (${storage.x}, ${storage.y})`,
+            `${getBuildingSelectionName(storage)} (${storage.x}, ${storage.y})`,
             storage.instanceId
         ))
     ];
@@ -3800,20 +4115,31 @@ function renderAutomatonMenu(placed) {
     if (!sourceStorage.value) automaton.sourceStorageInstanceId = '';
     if (!destinationStorage.value) automaton.destinationStorageInstanceId = '';
     document.getElementById('automaton-storage-filter-settings').hidden = !isStorageAction;
-    document.querySelectorAll('[data-item-filter-mode]').forEach(button => {
-        const isSelected = button.dataset.itemFilterMode === automaton.itemFilterMode;
-        button.classList.toggle('is-selected', isSelected);
-        button.setAttribute('aria-pressed', String(isSelected));
-    });
+    const itemFilterToggle = document.querySelector('[data-item-filter-toggle]');
+    const isIncludingOnly = automaton.itemFilterMode === 'include';
+    itemFilterToggle.setAttribute('aria-checked', String(isIncludingOnly));
+    itemFilterToggle.setAttribute('aria-label', `対象アイテム: ${isIncludingOnly ? 'のみ' : '以外'}`);
+    document.getElementById('automaton-item-filter-toggle-label').textContent =
+        isIncludingOnly ? 'のみ' : '以外';
     if (isStorageAction) renderAutomatonItemFilter(automaton);
     const toggle = document.getElementById('automaton-toggle');
     toggle.textContent = automaton.running ? '停止' : '起動';
     toggle.classList.toggle('inventory-modal-secondary', automaton.running);
     toggle.classList.toggle('saved-scroll-use', !automaton.running);
     const cargoCount = Object.values(automaton.cargo).reduce((total, amount) => total + amount, 0);
+    const itemProgressStatus = automaton.stopCondition === 'item-count'
+        ? `処理個数 ${automaton.processedItemCount}/${automaton.stopAfterItemCount}`
+        : automaton.stopCondition === 'round-trips'
+            ? `往復回数 ${automaton.completedRoundTripCount}/${automaton.stopAfterRoundTripCount}`
+            : automaton.stopCondition === 'source-empty'
+                ? `処理個数 ${automaton.processedItemCount} / 搬出元在庫切れで停止`
+                : `処理個数 ${automaton.processedItemCount}`;
+    const transportStatus = isTransportAction
+        ? `25×25移動範囲 / 倉庫間の点線が経路 / 積荷 ${cargoCount}/99`
+        : '';
     document.getElementById('automaton-status').textContent = automaton.running
-        ? `稼働中 / ${{ RESOURCE_COLLECTION: '資源を採取', TERRAIN_TRANSFORM: '地形を変成', STORAGE_WITHDRAW: '前方から取り出し', STORAGE_DEPOSIT: '前方へ収納', STORAGE_TRANSPORT: `倉庫間運搬 (${cargoCount}/99)` }[automaton.action]}`
-        : automaton.stopReason || '停止中';
+        ? `稼働中 / ${{ RESOURCE_COLLECTION: '資源を採取', TERRAIN_TRANSFORM: '地形を変成', STORAGE_WITHDRAW: '前方から取り出し', STORAGE_DEPOSIT: '前方へ収納', STORAGE_TRANSPORT: `倉庫間運搬 (${cargoCount}/99)` }[automaton.action]} / ${itemProgressStatus}${isTransportAction ? ' / ' + transportStatus : ''}`
+        : `${automaton.stopReason || '停止中'} / ${itemProgressStatus}${transportStatus ? ` / ${transportStatus}` : ''}`;
     document.getElementById('automaton-skin-name').textContent = `適用中: ${automaton.skinName || 'プレイヤーの見た目'}`;
     const previewSource = automaton.skinUrl || getPlayerSkinConfig().url;
     if (automatonPreviewSource !== previewSource) {
@@ -3823,6 +4149,7 @@ function renderAutomatonMenu(placed) {
             document.getElementById('automaton-skin-name').textContent = '画像を読み込めませんでした';
         });
     }
+    scheduleDraw();
 }
 
 async function applyAutomatonSkin(source, name) {
@@ -3853,19 +4180,68 @@ function changeAutomatonSetting(setting, value) {
     const automaton = getAutomatonState(placed);
     if (setting === 'axis') automaton.axis = value === 'vertical' ? 'vertical' : 'horizontal';
     if (setting === 'range') automaton.range = Math.max(1, Math.min(5, Math.floor(Number(value) || 1)));
+    if (setting === 'stopCondition') {
+        const allowedConditions = automaton.action === 'STORAGE_TRANSPORT'
+            ? ['none', 'item-count', 'round-trips', 'source-empty']
+            : ['none', 'item-count'];
+        automaton.stopCondition = allowedConditions.includes(value) ? value : 'none';
+    }
+    if (setting === 'stopLimit') {
+        const limit = Math.max(1, Math.min(1_000_000_000, Math.floor(Number(value) || 1)));
+        if (automaton.stopCondition === 'round-trips') automaton.stopAfterRoundTripCount = limit;
+        else automaton.stopAfterItemCount = limit;
+        if (automaton.running && automaton.stopCondition === 'item-count'
+            && automaton.processedItemCount >= automaton.stopAfterItemCount) {
+            stopAutomatonAtItemLimit(placed, automaton);
+        }
+        if (automaton.running && automaton.stopCondition === 'round-trips'
+            && automaton.completedRoundTripCount >= automaton.stopAfterRoundTripCount) {
+            stopAutomatonAtRoundTripLimit(placed, automaton);
+        }
+    }
+    if (setting === 'stopCondition' && automaton.running) {
+        if (automaton.stopCondition === 'item-count'
+            && automaton.processedItemCount >= automaton.stopAfterItemCount) {
+            stopAutomatonAtItemLimit(placed, automaton);
+        } else if (automaton.stopCondition === 'round-trips'
+            && automaton.completedRoundTripCount >= automaton.stopAfterRoundTripCount) {
+            stopAutomatonAtRoundTripLimit(placed, automaton);
+        } else if (automaton.stopCondition === 'source-empty'
+            && automaton.transportTargetStorageInstanceId === automaton.sourceStorageInstanceId
+            && !hasAutomatonTransportItems(
+                state.buildings.find(storage => storage.instanceId === automaton.sourceStorageInstanceId),
+                automaton
+            )) {
+            stopAutomatonWithReason(placed, automaton, '運搬するアイテムがありません');
+        }
+    }
     if (setting === 'action') {
         automaton.action = ['TERRAIN_TRANSFORM', 'STORAGE_WITHDRAW', 'STORAGE_DEPOSIT', 'STORAGE_TRANSPORT'].includes(value)
             ? value : 'RESOURCE_COLLECTION';
+        automatonTransportRoutes.delete(placed.instanceId);
+        automaton.movement = null;
+        if (automaton.action === 'STORAGE_TRANSPORT' && automaton.running) {
+            automaton.origin = { x: placed.x, y: placed.y };
+        }
     }
     if (setting === 'sourceStorageInstanceId' || setting === 'destinationStorageInstanceId') {
         const selectedStorage = state.buildings.find(storage => storage.instanceId === value
-            && BUILDING_BY_ID.get(storage.id)?.storageCapacity > 0);
+            && BUILDING_BY_ID.get(storage.id)?.storageCapacity > 0
+            && (automaton.action !== 'STORAGE_TRANSPORT'
+                || isStorageWithinAutomatonTransportBounds(storage, getAutomatonTransportBounds(placed, automaton))));
         const otherId = setting === 'sourceStorageInstanceId'
             ? automaton.destinationStorageInstanceId : automaton.sourceStorageInstanceId;
         if (selectedStorage && selectedStorage.instanceId === otherId) {
             showAppNotice('搬出元と搬入先には別々の倉庫を選択してください。');
         } else {
             automaton[setting] = selectedStorage?.instanceId || '';
+        }
+        if (automaton.running && automaton.action === 'STORAGE_TRANSPORT') {
+            automatonTransportRoutes.delete(placed.instanceId);
+            automaton.movement = null;
+            automaton.transportTargetStorageInstanceId = Object.values(automaton.cargo).some(amount => amount > 0)
+                ? automaton.destinationStorageInstanceId
+                : automaton.sourceStorageInstanceId;
         }
     }
     if (setting === 'conditionCellType') automaton.conditionCellType = Object.prototype.hasOwnProperty.call(WORLD_CELL_TYPES, value) ? value : '';
@@ -3877,8 +4253,15 @@ function changeAutomatonSetting(setting, value) {
         const validItemIds = new Set(CRAFTING_ITEMS.map(([itemId]) => itemId));
         automaton.itemFilterIds = [...new Set(value.filter(itemId => validItemIds.has(itemId)))];
     }
+    if (['action', 'sourceStorageInstanceId', 'destinationStorageInstanceId'].includes(setting)
+        && automaton.action === 'STORAGE_TRANSPORT'
+        && automaton.sourceStorageInstanceId && automaton.destinationStorageInstanceId
+        && !getAutomatonTransportPlan(placed, automaton)) {
+        showAppNotice('搬送可能経路がありません');
+    }
     renderAutomatonMenu(placed);
     saveBuildings();
+    scheduleDraw();
 }
 
 function renderAutomatonItemFilter(automaton) {
@@ -3914,7 +4297,7 @@ function renderAutomatonItemFilter(automaton) {
         itemName.textContent = name;
         const quantity = document.createElement('span');
         quantity.className = 'building-storage-item-option-count';
-        quantity.textContent = String(getStorageInventoryCount(itemId));
+        quantity.textContent = formatInventoryCount(itemId, getStorageInventoryCount(itemId));
         option.append(itemName, quantity);
         return option;
     }));
@@ -4064,7 +4447,243 @@ function canAutomatonEnter(placed, x, y) {
     if (engineRuntimeState.brass > 0) items.add('brass-stock');
     if (!canEnterCell(tile, { rules: state.cellEntryRules, items })) return false;
     if (state.player.x === x && state.player.y === y) return false;
-    return !isBuildingCellBlocked(x, y, placed.instanceId);
+    if (isBuildingCellBlocked(x, y, placed.instanceId)) return false;
+    return !state.buildings.some(building =>
+        BUILDING_BY_ID.get(building.id)?.role === 'rail'
+        && buildingOccupiesCell(building, x, y));
+}
+
+function getAutomatonTransportBounds(placed, automaton) {
+    const center = automaton.running && isRecord(automaton.origin)
+        ? automaton.origin
+        : placed;
+    return {
+        minX: Math.max(0, center.x - AUTOMATON_TRANSPORT_RADIUS),
+        maxX: Math.min(state.cols - 1, center.x + AUTOMATON_TRANSPORT_RADIUS),
+        minY: Math.max(0, center.y - AUTOMATON_TRANSPORT_RADIUS),
+        maxY: Math.min(state.rows - 1, center.y + AUTOMATON_TRANSPORT_RADIUS)
+    };
+}
+
+function isInsideAutomatonTransportBounds(x, y, bounds) {
+    return x >= bounds.minX && x <= bounds.maxX && y >= bounds.minY && y <= bounds.maxY;
+}
+
+function isStorageWithinAutomatonTransportBounds(storage, bounds) {
+    const definition = BUILDING_BY_ID.get(storage.id);
+    return Boolean(definition?.storageCapacity > 0
+        && storage.x >= bounds.minX && storage.y >= bounds.minY
+        && storage.x + definition.width - 1 <= bounds.maxX
+        && storage.y + definition.height - 1 <= bounds.maxY);
+}
+
+function getAutomatonWalkPaths(placed, start, bounds, additionalStarts = []) {
+    const items = new Set(state.inventoryItems);
+    Object.entries(engineRuntimeState.materialInventory || {}).forEach(([item, count]) => {
+        if (Number(count) > 0) items.add(item);
+    });
+    if (engineRuntimeState.brass > 0) items.add('brass-stock');
+    const blockedCells = new Set();
+    state.buildings.forEach(building => {
+        if (building.instanceId === placed.instanceId) return;
+        const role = BUILDING_BY_ID.get(building.id)?.role;
+        if (['foundation', 'decoration'].includes(role)) return;
+        const definition = BUILDING_BY_ID.get(building.id);
+        if (!definition) return;
+        for (let y = building.y; y < building.y + definition.height; y++) {
+            for (let x = building.x; x < building.x + definition.width; x++) {
+                blockedCells.add(`${x},${y}`);
+            }
+        }
+    });
+    const entryOptions = { rules: state.cellEntryRules, items };
+    const canEnter = (x, y) => {
+        const tile = state.map[y]?.[x];
+        return Boolean(tile && !(state.player.x === x && state.player.y === y)
+            && !blockedCells.has(`${x},${y}`)
+            && canEnterCell(tile, entryOptions));
+    };
+    const previousByKey = new Map();
+    const queue = [];
+    for (const point of [start, ...additionalStarts]) {
+        const key = `${point.x},${point.y}`;
+        if (previousByKey.has(key) || !isInsideAutomatonTransportBounds(point.x, point.y, bounds)
+            || !canEnter(point.x, point.y)) continue;
+        previousByKey.set(key, null);
+        queue.push({ x: point.x, y: point.y });
+    }
+    if (!queue.length) return previousByKey;
+    const directions = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    for (let index = 0; index < queue.length; index++) {
+        const current = queue[index];
+        for (const [dx, dy] of directions) {
+            const next = { x: current.x + dx, y: current.y + dy };
+            const key = `${next.x},${next.y}`;
+            if (previousByKey.has(key) || !isInsideAutomatonTransportBounds(next.x, next.y, bounds)
+                || !canEnter(next.x, next.y)) continue;
+            previousByKey.set(key, `${current.x},${current.y}`);
+            queue.push(next);
+        }
+    }
+    return previousByKey;
+}
+
+function getAutomatonPathTo(paths, target) {
+    const targetKey = `${target.x},${target.y}`;
+    if (!paths.has(targetKey)) return null;
+    const path = [];
+    let currentKey = targetKey;
+    while (currentKey !== null) {
+        const [x, y] = currentKey.split(',').map(Number);
+        path.push({ x, y });
+        currentKey = paths.get(currentKey);
+    }
+    return path.reverse();
+}
+
+function getAutomatonStorageApproaches(storage, placed, bounds) {
+    const definition = BUILDING_BY_ID.get(storage.id);
+    if (!isStorageWithinAutomatonTransportBounds(storage, bounds)) return [];
+    const right = storage.x + definition.width - 1;
+    const bottom = storage.y + definition.height - 1;
+    const approaches = new Map();
+    const add = (x, y, facingDirection) => {
+        const key = `${x},${y}`;
+        if (!isInsideAutomatonTransportBounds(x, y, bounds)
+            || !canAutomatonEnter(placed, x, y)) return;
+        approaches.set(key, { x, y, facingDirection });
+    };
+    for (let x = storage.x; x <= right; x++) {
+        add(x, storage.y - 1, { x: 0, y: 1 });
+        add(x, bottom + 1, { x: 0, y: -1 });
+    }
+    for (let y = storage.y; y <= bottom; y++) {
+        add(storage.x - 1, y, { x: 1, y: 0 });
+        add(right + 1, y, { x: -1, y: 0 });
+    }
+    return [...approaches.values()];
+}
+
+function findAutomatonRouteToStorage(placed, start, storage, bounds) {
+    const approaches = getAutomatonStorageApproaches(storage, placed, bounds);
+    if (!approaches.length) return null;
+    const paths = getAutomatonWalkPaths(placed, start, bounds);
+    let bestRoute = null;
+    for (const approach of approaches) {
+        const path = getAutomatonPathTo(paths, approach);
+        if (path && (!bestRoute || path.length < bestRoute.path.length)) {
+            bestRoute = { path, approach };
+        }
+    }
+    return bestRoute;
+}
+
+function findAutomatonRouteToApproach(placed, start, approach, bounds) {
+    const paths = getAutomatonWalkPaths(placed, start, bounds);
+    const path = getAutomatonPathTo(paths, approach);
+    return path ? { path, approach } : null;
+}
+
+function findAutomatonRouteBetweenStorages(placed, source, destination, bounds, reachableFromStart) {
+    const sourceApproaches = getAutomatonStorageApproaches(source, placed, bounds)
+        .filter(approach => reachableFromStart.has(`${approach.x},${approach.y}`));
+    const destinationApproaches = getAutomatonStorageApproaches(destination, placed, bounds);
+    if (!sourceApproaches.length || !destinationApproaches.length) return null;
+    const sourceApproachByKey = new Map(sourceApproaches.map(approach => [
+        `${approach.x},${approach.y}`, approach
+    ]));
+    const paths = getAutomatonWalkPaths(placed, sourceApproaches[0], bounds, sourceApproaches.slice(1));
+    let bestRoute = null;
+    for (const destinationApproach of destinationApproaches) {
+        const path = getAutomatonPathTo(paths, destinationApproach);
+        if (!path || bestRoute && path.length >= bestRoute.path.length) continue;
+        bestRoute = {
+            path,
+            sourceApproach: sourceApproachByKey.get(`${path[0].x},${path[0].y}`),
+            destinationApproach
+        };
+    }
+    return bestRoute;
+}
+
+function getAutomatonTransportPlan(placed, automaton, start = placed) {
+    const bounds = getAutomatonTransportBounds(placed, automaton);
+    const source = state.buildings.find(building => building.instanceId === automaton.sourceStorageInstanceId);
+    const destination = state.buildings.find(building => building.instanceId === automaton.destinationStorageInstanceId);
+    if (!source || !destination || source.instanceId === destination.instanceId
+        || !isStorageWithinAutomatonTransportBounds(source, bounds)
+        || !isStorageWithinAutomatonTransportBounds(destination, bounds)) return null;
+    const reachableFromStart = getAutomatonWalkPaths(placed, start, bounds);
+    const connection = findAutomatonRouteBetweenStorages(
+        placed, source, destination, bounds, reachableFromStart
+    );
+    if (!connection) return null;
+    const sourceRoute = {
+        path: getAutomatonPathTo(reachableFromStart, connection.sourceApproach),
+        approach: connection.sourceApproach
+    };
+    if (!sourceRoute.path) return null;
+    const destinationRoute = {
+        path: connection.path,
+        approach: connection.destinationApproach
+    };
+    return { bounds, sourceRoute, destinationRoute };
+}
+
+function getCachedAutomatonTransportPlan(placed, automaton, start = placed) {
+    const key = [
+        buildingNavigationRevision,
+        placed.instanceId,
+        start.x, start.y,
+        automaton.origin.x, automaton.origin.y,
+        automaton.sourceStorageInstanceId,
+        automaton.destinationStorageInstanceId
+    ].join(':');
+    const cached = automatonTransportPlanCache.get(placed.instanceId);
+    if (cached?.key === key) return cached.plan;
+    const plan = getAutomatonTransportPlan(placed, automaton, start);
+    automatonTransportPlanCache.set(placed.instanceId, { key, plan });
+    return plan;
+}
+
+function setAutomatonTransportRoute(
+    placed, automaton, targetStorageInstanceId, precomputedRoute = null, transportPlan = null
+) {
+    const bounds = getAutomatonTransportBounds(placed, automaton);
+    const storage = state.buildings.find(building => building.instanceId === targetStorageInstanceId);
+    if (!storage || !isStorageWithinAutomatonTransportBounds(storage, bounds)) return false;
+    const route = precomputedRoute || findAutomatonRouteToStorage(placed, placed, storage, bounds);
+    if (!route) return false;
+    automaton.transportTargetStorageInstanceId = targetStorageInstanceId;
+    automatonTransportRoutes.set(placed.instanceId, {
+        path: route.path,
+        index: 1,
+        approach: route.approach,
+        targetStorageInstanceId,
+        cyclePath: transportPlan?.destinationRoute.path || null,
+        sourceApproach: transportPlan?.sourceRoute.approach || null,
+        destinationApproach: transportPlan?.destinationRoute.approach || null,
+        buildingRevision: buildingNavigationRevision
+    });
+    return true;
+}
+
+function rebuildAutomatonTransportRoute(placed, automaton, targetStorageInstanceId) {
+    const plan = getCachedAutomatonTransportPlan(placed, automaton);
+    if (!plan) return false;
+    const currentRoute = targetStorageInstanceId === automaton.sourceStorageInstanceId
+        ? plan.sourceRoute
+        : targetStorageInstanceId === automaton.destinationStorageInstanceId
+            ? findAutomatonRouteToApproach(
+                placed,
+                placed,
+                plan.destinationRoute.approach,
+                plan.bounds
+            )
+            : null;
+    return Boolean(currentRoute && setAutomatonTransportRoute(
+        placed, automaton, targetStorageInstanceId, currentRoute, plan
+    ));
 }
 
 function getAutomatonStorageTarget(placed, automaton) {
@@ -4074,6 +4693,46 @@ function getAutomatonStorageTarget(placed, automaton) {
     return state.buildings.find(other => {
         const definition = BUILDING_BY_ID.get(other.id);
         return definition?.storageCapacity > 0 && buildingOccupiesCell(other, targetX, targetY);
+    });
+}
+
+function getAutomatonItemCountRemaining(automaton) {
+    return automaton.stopCondition === 'item-count'
+        ? Math.max(0, automaton.stopAfterItemCount - automaton.processedItemCount)
+        : Infinity;
+}
+
+function stopAutomatonWithReason(placed, automaton, reason) {
+    automaton.running = false;
+    automaton.movement = null;
+    automaton.stopReason = reason;
+    automatonTransportRoutes.delete(placed.instanceId);
+    saveBuildings();
+    if (selectedBuildingInstanceId === placed.instanceId) renderAutomatonMenu(placed);
+    scheduleDraw();
+}
+
+function recordAutomatonItemProgress(automaton, amount) {
+    automaton.processedItemCount += Math.max(0, Math.floor(Number(amount) || 0));
+    return automaton.stopCondition === 'item-count'
+        && automaton.processedItemCount >= automaton.stopAfterItemCount;
+}
+
+function stopAutomatonAtItemLimit(placed, automaton) {
+    stopAutomatonWithReason(placed, automaton, '指定したアイテム数に到達');
+}
+
+function stopAutomatonAtRoundTripLimit(placed, automaton) {
+    stopAutomatonWithReason(placed, automaton, '指定した往復回数に到達');
+}
+
+function hasAutomatonTransportItems(storage, automaton) {
+    if (!storage) return false;
+    const selectedItems = new Set(automaton.itemFilterIds);
+    return CRAFTING_ITEMS.some(([itemId]) => {
+        const isSelected = selectedItems.has(itemId);
+        const included = automaton.itemFilterMode === 'include' ? isSelected : !isSelected;
+        return included && getStorageMaterialCount(storage, itemId) > 0;
     });
 }
 
@@ -4090,6 +4749,8 @@ function transferAutomatonStorage(placed, automaton) {
             ? selectedItems.has(itemId)
             : !selectedItems.has(itemId));
     let changed = false;
+    let movedTotal = 0;
+    let remainingQuota = getAutomatonItemCountRemaining(automaton);
     for (const itemId of itemIds) {
         const resourceKey = { water: 'water', fog: 'fog', power: 'power', steam_power: 'steamPower' }[itemId];
         const storedCount = Math.floor(getStorageMaterialCount(storage, itemId));
@@ -4097,26 +4758,38 @@ function transferAutomatonStorage(placed, automaton) {
         if (automaton.action === 'STORAGE_DEPOSIT') {
             const freeSlots = Math.max(0, definition.storageCapacity - getStorageUsedSlots(storage));
             const stackSpace = storedCount > 0 ? Math.ceil(storedCount / 99) * 99 - storedCount : 0;
-            const moved = Math.min(inventoryCount, stackSpace + freeSlots * 99);
+            const moved = Math.min(inventoryCount, stackSpace + freeSlots * 99, remainingQuota);
             if (moved < 1) continue;
             storage.storedMaterials[itemId] = storedCount + moved;
             if (itemId === 'brass-stock') engineRuntimeState.brass -= moved;
             else if (resourceKey) engineRuntimeState[resourceKey] -= moved;
             else engineRuntimeState.materialInventory[itemId] -= moved;
+            remainingQuota -= moved;
+            movedTotal += moved;
         } else {
-            if (storedCount < 1) continue;
-            storage.storedMaterials[itemId] = 0;
-            if (itemId === 'brass-stock') engineRuntimeState.brass += storedCount;
-            else if (resourceKey) engineRuntimeState[resourceKey] += storedCount;
+            if (storedCount > 0 && inventoryCount <= 0 && !canAddInventoryItems([itemId])) {
+                notifyInventoryFull();
+                continue;
+            }
+            const moved = Math.min(storedCount, remainingQuota);
+            if (moved < 1) continue;
+            storage.storedMaterials[itemId] = storedCount - moved;
+            if (itemId === 'brass-stock') engineRuntimeState.brass += moved;
+            else if (resourceKey) engineRuntimeState[resourceKey] += moved;
             else engineRuntimeState.materialInventory[itemId] =
-                (Number(engineRuntimeState.materialInventory[itemId]) || 0) + storedCount;
+                (Number(engineRuntimeState.materialInventory[itemId]) || 0) + moved;
+            remainingQuota -= moved;
+            movedTotal += moved;
         }
         changed = true;
+        if (remainingQuota <= 0) break;
     }
     if (!changed) return false;
+    const reachedItemLimit = recordAutomatonItemProgress(automaton, movedTotal);
     saveBuildings();
     engineRuntimeState.saveGameData();
     engineRuntimeState.notify();
+    if (reachedItemLimit) stopAutomatonAtItemLimit(placed, automaton);
     return true;
 }
 
@@ -4136,9 +4809,10 @@ function transferAutomatonBetweenStorages(placed, automaton) {
             ? selectedItems.has(itemId)
             : !selectedItems.has(itemId));
     let changed = false;
+    let movedTotal = 0;
 
     if (cargoCount === 0 && storage.instanceId === automaton.sourceStorageInstanceId) {
-        let remainingCapacity = 99;
+        let remainingCapacity = Math.min(99, getAutomatonItemCountRemaining(automaton));
         for (const itemId of itemIds) {
             const storedCount = Math.floor(getStorageMaterialCount(storage, itemId));
             const moved = Math.min(storedCount, remainingCapacity);
@@ -4163,10 +4837,12 @@ function transferAutomatonBetweenStorages(placed, automaton) {
             automaton.cargo[itemId] -= moved;
             if (automaton.cargo[itemId] === 0) delete automaton.cargo[itemId];
             changed = true;
+            movedTotal += moved;
         }
     }
 
     if (!changed) return false;
+    if (movedTotal > 0) recordAutomatonItemProgress(automaton, movedTotal);
     saveBuildings();
     return true;
 }
@@ -4203,8 +4879,13 @@ function processAutomatonCell(placed, automaton) {
     Object.entries(result.producedItems || {}).forEach(([item, amount]) => {
         engineRuntimeState.materialInventory[item] = (Number(engineRuntimeState.materialInventory[item]) || 0) + amount;
     });
+    const producedItemCount = Object.values(result.producedItems || {})
+        .reduce((total, amount) => total + Math.max(0, Math.floor(Number(amount) || 0)), 0);
     engineRuntimeState.saveGameData();
     engineRuntimeState.notify();
+    if (producedItemCount > 0 && recordAutomatonItemProgress(automaton, producedItemCount)) {
+        stopAutomatonAtItemLimit(placed, automaton);
+    }
     return true;
 }
 
@@ -4217,12 +4898,173 @@ function tryAutomatonStorageTransfer(placed, automaton, direction, now) {
     return true;
 }
 
+function stopAutomatonWithoutTransportRoute(placed, automaton) {
+    automaton.running = false;
+    automaton.movement = null;
+    automaton.stopReason = '搬送可能経路がありません';
+    automatonTransportRoutes.delete(placed.instanceId);
+    saveBuildings();
+    if (selectedBuildingInstanceId === placed.instanceId) renderAutomatonMenu(placed);
+    showAppNotice('搬送可能経路がありません');
+    scheduleDraw();
+}
+
+function finishAutomatonTransportLeg(placed, automaton, route, now) {
+    automaton.facingDirection = route.approach.facingDirection;
+    const reachedSource = route.targetStorageInstanceId === automaton.sourceStorageInstanceId;
+    if (reachedSource && automaton.deliveredAtDestination) {
+        automaton.completedRoundTripCount += 1;
+        automaton.deliveredAtDestination = false;
+        if (automaton.stopCondition === 'round-trips'
+            && automaton.completedRoundTripCount >= automaton.stopAfterRoundTripCount) {
+            stopAutomatonAtRoundTripLimit(placed, automaton);
+            return false;
+        }
+    }
+    if (reachedSource && automaton.stopCondition === 'item-count'
+        && getAutomatonItemCountRemaining(automaton) <= 0) {
+        stopAutomatonAtItemLimit(placed, automaton);
+        return false;
+    }
+    const transferSucceeded = processAutomatonCell(placed, automaton);
+    if (!automaton.running) return false;
+    if (reachedSource && !Object.values(automaton.cargo).some(amount => amount > 0)) {
+        const hasSourceItems = hasAutomatonTransportItems(
+            state.buildings.find(storage => storage.instanceId === automaton.sourceStorageInstanceId),
+            automaton
+        );
+        if (!hasSourceItems && automaton.stopCondition !== 'none') {
+            stopAutomatonWithReason(placed, automaton, '運搬するアイテムがありません');
+            return false;
+        }
+    }
+    const cargoCount = Object.values(automaton.cargo).reduce((total, amount) => total + amount, 0);
+    if (!reachedSource && cargoCount > 0) {
+        stopAutomatonWithReason(placed, automaton, '搬入先に空きがありません');
+        return false;
+    }
+    if (!reachedSource && transferSucceeded) automaton.deliveredAtDestination = true;
+    if (!reachedSource && cargoCount === 0 && automaton.stopCondition === 'item-count'
+        && automaton.processedItemCount >= automaton.stopAfterItemCount) {
+        stopAutomatonAtItemLimit(placed, automaton);
+        return false;
+    }
+    if (route.cyclePath && route.sourceApproach && route.destinationApproach) {
+        const targetStorageInstanceId = reachedSource
+            ? automaton.destinationStorageInstanceId : automaton.sourceStorageInstanceId;
+        const path = reachedSource ? route.cyclePath : [...route.cyclePath].reverse();
+        const approach = reachedSource ? route.destinationApproach : route.sourceApproach;
+        automaton.transportTargetStorageInstanceId = targetStorageInstanceId;
+        automatonTransportRoutes.set(placed.instanceId, {
+            ...route,
+            path,
+            index: 1,
+            approach,
+            targetStorageInstanceId
+        });
+        automaton.nextMoveAt = now + 1400;
+        saveBuildings();
+        if (selectedBuildingInstanceId === placed.instanceId) renderAutomatonMenu(placed);
+        scheduleDraw();
+        return true;
+    }
+    const targetStorageId = route.targetStorageInstanceId === automaton.destinationStorageInstanceId
+        && Object.values(automaton.cargo).some(amount => amount > 0)
+        ? automaton.destinationStorageInstanceId
+        : route.targetStorageInstanceId === automaton.sourceStorageInstanceId
+            ? automaton.destinationStorageInstanceId
+            : automaton.sourceStorageInstanceId;
+    if (!setAutomatonTransportRoute(placed, automaton, targetStorageId)) {
+        stopAutomatonWithoutTransportRoute(placed, automaton);
+        return false;
+    }
+    automaton.nextMoveAt = now + 1400;
+    saveBuildings();
+    if (selectedBuildingInstanceId === placed.instanceId) renderAutomatonMenu(placed);
+    scheduleDraw();
+    return true;
+}
+
+function tickAutomatonTransport(placed, automaton, now) {
+    let route = automatonTransportRoutes.get(placed.instanceId);
+    if (route && route.buildingRevision !== buildingNavigationRevision) {
+        automaton.movement = null;
+        route = null;
+    }
+    if (!route) {
+        const targetStorageId = state.buildings.some(storage => storage.instanceId === automaton.transportTargetStorageInstanceId)
+            ? automaton.transportTargetStorageInstanceId
+            : Object.values(automaton.cargo).some(amount => amount > 0)
+                ? automaton.destinationStorageInstanceId
+                : automaton.sourceStorageInstanceId;
+        if (!rebuildAutomatonTransportRoute(placed, automaton, targetStorageId)) {
+            stopAutomatonWithoutTransportRoute(placed, automaton);
+            return true;
+        }
+        route = automatonTransportRoutes.get(placed.instanceId);
+    }
+
+    if (automaton.movement) {
+        const movementEnd = automaton.movement.startedAt + automaton.movement.durationMs;
+        if (now < movementEnd) {
+            scheduleDraw();
+            return false;
+        }
+        placed.x = automaton.movement.to.x;
+        placed.y = automaton.movement.to.y;
+        route.index += 1;
+        automaton.movement = null;
+        if (route.index >= route.path.length) {
+            finishAutomatonTransportLeg(placed, automaton, route, movementEnd);
+        } else {
+            saveBuildings();
+            scheduleDraw();
+        }
+        return true;
+    }
+
+    if (route.index >= route.path.length) {
+        finishAutomatonTransportLeg(placed, automaton, route, now);
+        return true;
+    }
+    if (now < automaton.nextMoveAt) return false;
+
+    const next = route.path[route.index];
+    if (!canAutomatonEnter(placed, next.x, next.y)) {
+        automatonTransportRoutes.delete(placed.instanceId);
+        automatonTransportPlanCache.delete(placed.instanceId);
+        if (!rebuildAutomatonTransportRoute(placed, automaton, route.targetStorageInstanceId)) {
+            stopAutomatonWithoutTransportRoute(placed, automaton);
+            return true;
+        }
+        route = automatonTransportRoutes.get(placed.instanceId);
+        if (route.index >= route.path.length) {
+            finishAutomatonTransportLeg(placed, automaton, route, now);
+            return true;
+        }
+    }
+    const target = route.path[route.index];
+    automaton.movement = {
+        from: { x: placed.x, y: placed.y },
+        to: target,
+        startedAt: now,
+        durationMs: AUTOMATON_TRANSPORT_STEP_DURATION_MS
+    };
+    automaton.nextMoveAt = now + AUTOMATON_TRANSPORT_STEP_DURATION_MS;
+    scheduleDraw();
+    return true;
+}
+
 function tickAutomatons(now) {
     let buildingsChanged = false;
     for (const placed of state.buildings) {
         if (BUILDING_BY_ID.get(placed.id)?.kind !== 'automaton') continue;
         const automaton = getAutomatonState(placed);
         if (!automaton.running) continue;
+        if (automaton.action === 'STORAGE_TRANSPORT') {
+            buildingsChanged = tickAutomatonTransport(placed, automaton, now) || buildingsChanged;
+            continue;
+        }
         if (automaton.movement) {
             const movementEnd = automaton.movement.startedAt + automaton.movement.durationMs;
             if (now < movementEnd) {
@@ -4308,17 +5150,24 @@ function toggleSelectedAutomaton() {
         automaton.running = false;
         automaton.movement = null;
         automaton.stopReason = '手動停止';
+        automatonTransportRoutes.delete(placed.instanceId);
     } else {
+        let transportPlan = null;
         if (automaton.action === 'STORAGE_TRANSPORT') {
             const sourceExists = state.buildings.some(storage =>
                 storage.instanceId === automaton.sourceStorageInstanceId
-                && BUILDING_BY_ID.get(storage.id)?.storageCapacity > 0);
+                && isStorageWithinAutomatonTransportBounds(storage, getAutomatonTransportBounds(placed, automaton)));
             const destinationExists = state.buildings.some(storage =>
                 storage.instanceId === automaton.destinationStorageInstanceId
-                && BUILDING_BY_ID.get(storage.id)?.storageCapacity > 0);
+                && isStorageWithinAutomatonTransportBounds(storage, getAutomatonTransportBounds(placed, automaton)));
             if (!sourceExists || !destinationExists
                 || automaton.sourceStorageInstanceId === automaton.destinationStorageInstanceId) {
                 showAppNotice('搬出元と搬入先に別々のストレージを指定してください。');
+                return;
+            }
+            transportPlan = getCachedAutomatonTransportPlan(placed, automaton);
+            if (!transportPlan) {
+                showAppNotice('搬送可能経路がありません');
                 return;
             }
             if (automaton.itemFilterMode === 'include' && automaton.itemFilterIds.length === 0) {
@@ -4328,14 +5177,37 @@ function toggleSelectedAutomaton() {
         }
         automaton.running = true;
         automaton.direction = 1;
+        automaton.processedItemCount = 0;
+        automaton.completedRoundTripCount = 0;
+        automaton.deliveredAtDestination = false;
         automaton.facingDirection = {
             x: automaton.axis === 'horizontal' ? 1 : 0,
             y: automaton.axis === 'vertical' ? 1 : 0
         };
         automaton.origin = { x: placed.x, y: placed.y };
         automaton.stopReason = '';
-        const transferred = processAutomatonCell(placed, automaton);
-        automaton.nextMoveAt = performance.now() + (transferred ? 1400 : 600);
+        if (automaton.action === 'STORAGE_TRANSPORT') {
+            const hasCargo = Object.values(automaton.cargo).some(amount => amount > 0);
+            const targetStorageId = hasCargo
+                ? automaton.destinationStorageInstanceId
+                : automaton.sourceStorageInstanceId;
+            const initialRoute = hasCargo
+                ? findAutomatonRouteToApproach(
+                    placed, placed, transportPlan.destinationRoute.approach, transportPlan.bounds
+                )
+                : transportPlan.sourceRoute;
+            if (!setAutomatonTransportRoute(
+                placed, automaton, targetStorageId, initialRoute, transportPlan
+            )) {
+                automaton.running = false;
+                showAppNotice('搬送可能経路がありません');
+                return;
+            }
+            automaton.nextMoveAt = performance.now() + 250;
+        } else {
+            const transferred = processAutomatonCell(placed, automaton);
+            automaton.nextMoveAt = performance.now() + (transferred ? 1400 : 600);
+        }
     }
     saveBuildings();
     renderAutomatonMenu(placed);
@@ -4388,6 +5260,15 @@ function formatUtilityAmount(amount) {
     return String(Math.round((Number(amount) || 0) * 10) / 10);
 }
 
+function getBuildingTitle(placed, definition = BUILDING_BY_ID.get(placed.id)) {
+    return placed.customName ? `${placed.customName} / ${definition.name}` : definition.name;
+}
+
+function getBuildingSelectionName(placed) {
+    const definition = BUILDING_BY_ID.get(placed.id);
+    return placed.customName ? `${placed.customName} / ${definition.name}` : definition.name;
+}
+
 function updateBuildingMenuDetails(placed, definition) {
     const tileEffects = getTileEffectsUnderFootprint(state.buildings, placed.x, placed.y, definition.width, definition.height);
     const effectSummary = tileEffects.length
@@ -4414,6 +5295,7 @@ function updateBuildingMenuDetails(placed, definition) {
     const vehicleNote = definition.role === 'vehicle' ? ' / 線路配置済みの車両' : '';
     const foundationNote = definition.requiresFoundation ? ' / 基礎上に建設' : '';
     const railOrientation = definition.role === 'rail' ? ` / 向き ${getBuildingRotationLabel(definition, placed.rotation || 0)}` : '';
+    document.getElementById('building-custom-name').value = placed.customName || '';
     document.getElementById('building-menu-details').textContent = `${definition.width}×${definition.height}セル / 座標 (${placed.x}, ${placed.y}) / 建設真鍮 ${definition.brassCost}${railOrientation}${foundationNote}${vehicleNote}${effectSummary}${utilityNote}${storageNote}`;
 }
 
@@ -4431,7 +5313,7 @@ function openBuildingMenu(instanceId) {
         return;
     }
     document.getElementById('automaton-menu-modal').hidden = true;
-    document.getElementById('building-menu-title').textContent = definition.name;
+    document.getElementById('building-menu-title').textContent = getBuildingTitle(placed, definition);
     renderVehicleMenu(placed, definition);
     updateBuildingMenuDetails(placed, definition);
     renderBuildingStorage(placed, definition);
@@ -4443,6 +5325,22 @@ function openBuildingMenu(instanceId) {
     const actions = document.querySelector('#building-menu-modal .inventory-modal-actions');
     if (actions) actions.hidden = Boolean(craftButton?.hidden && startVehicleButton?.hidden);
     document.getElementById('building-menu-modal').hidden = false;
+}
+
+function saveSelectedBuildingName(input) {
+    const placed = state.buildings.find(building => building.instanceId === selectedBuildingInstanceId);
+    const definition = BUILDING_BY_ID.get(placed?.id);
+    if (!placed || !definition) return;
+    const customName = input.value.replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, 32);
+    input.value = customName;
+    if (customName) placed.customName = customName;
+    else delete placed.customName;
+    saveBuildings();
+    if (definition.kind === 'automaton') renderAutomatonMenu(placed);
+    else {
+        document.getElementById('building-menu-title').textContent = getBuildingTitle(placed, definition);
+        updateBuildingMenuDetails(placed, definition);
+    }
 }
 
 const VEHICLE_STOP_MESSAGES = {
@@ -4870,6 +5768,10 @@ function demolishSelectedBuilding() {
         return;
     }
     const refunds = getBuildingDemolitionRefunds(placed, definition);
+    if (!canAddInventoryItems(refunds.map(({ itemId }) => itemId))) {
+        notifyInventoryFull();
+        return;
+    }
     const historyBefore = captureBuildingHistoryState();
     state.buildings.splice(index, 1);
     refunds.forEach(({ itemId, amount }) => {
@@ -5188,15 +6090,6 @@ function updateUI() {
 
 function updateEngineDashboard() {
     const save = engineRuntimeState;
-    const formatCompact = value => {
-        const number = Number(value) || 0;
-        const absolute = Math.abs(number);
-        const units = [[1e9, 'B'], [1e6, 'M'], [1e3, 'K']];
-        const unit = units.find(([threshold]) => absolute >= threshold);
-        if (!unit) return number.toFixed(2);
-        const [threshold, suffix] = unit;
-        return `${(number / threshold).toFixed(2).replace(/\.00$/, '').replace(/(\.[0-9])0$/, '$1')}${suffix}`;
-    };
     const values = {
         'main-engine-steam': save.steamPower,
         'main-engine-water': save.water,
@@ -5205,7 +6098,7 @@ function updateEngineDashboard() {
     };
     const displayValues = Object.fromEntries(Object.entries(values).map(([id, value]) => [
         id,
-        formatCompact(id === 'main-engine-steam' ? Math.floor(Number(value) || 0) : value)
+        formatCompactCount(id === 'main-engine-steam' ? Math.floor(Number(value) || 0) : value)
     ]));
     const rates = {
         'main-water-generation': save.waterGenerationRate,
@@ -5249,7 +6142,7 @@ function updateEngineDashboard() {
         itemId,
         name: getCraftingItemName(itemId),
         amount: getCraftingItemCount(itemId),
-        rate: formatCompact(rate)
+        rate: formatCompactCount(rate)
     }));
     const dashboard = document.querySelector('.gear-preview-dashboard');
     if (dashboard) {
@@ -5259,7 +6152,7 @@ function updateEngineDashboard() {
         });
         Object.entries(rates).forEach(([id, value]) => {
             const element = dashboard.querySelector(`#${id}`);
-            if (element) element.textContent = `${formatCompact(value)} /秒`;
+            if (element) element.textContent = `${formatCompactCount(value)} /秒`;
         });
         dashboard.querySelectorAll('[data-generated-resource]').forEach(row => {
             const resource = row.dataset.generatedResource;
@@ -5282,7 +6175,7 @@ function updateEngineDashboard() {
             }
             if (!row) return;
             row.children[0].textContent = material.name;
-            row.children[1].textContent = String(material.amount);
+            row.children[1].textContent = formatInventoryCount(material.itemId, material.amount);
             row.children[2].textContent = `${material.rate} /秒`;
             row.children[3].textContent = '—';
         });
@@ -5293,7 +6186,7 @@ function updateEngineDashboard() {
     previewFrame?.contentWindow?.postMessage({
         type: 'fogsgear:engine-dashboard',
         values: displayValues,
-        rates: Object.fromEntries(Object.entries(rates).map(([id, value]) => [id, `${formatCompact(value)} /秒`])),
+        rates: Object.fromEntries(Object.entries(rates).map(([id, value]) => [id, `${formatCompactCount(value)} /秒`])),
         generationRates,
         consumptionRates,
         collectedMaterials,
@@ -5529,17 +6422,24 @@ document.addEventListener('click', (event) => {
             option.setAttribute('aria-pressed', String(selected));
         });
         const quantity = Number(button.dataset.quantity) || 0;
-        if (quantity > 0) craftingQuantitySelections.set(toggle.dataset.selectionKey, quantity);
-        const outputCount = quantity * (Number(toggle.dataset.outputBatch) || 1);
+        const selectedCount = button.dataset.isMaximum === 'true'
+            ? getMaximumCraftCountForCard(card)
+            : quantity;
+        craftingQuantitySelections.set(
+            toggle.dataset.selectionKey,
+            button.dataset.isMaximum === 'true' ? 'max' : selectedCount
+        );
+        const outputCount = selectedCount * (Number(toggle.dataset.outputBatch) || 1);
         const outputCountLabel = card.querySelector('.crafting-output-count');
         const craftButton = card.querySelector('[data-action="craft-recipe"], [data-action="craft-building-kit"]');
         if (outputCountLabel) outputCountLabel.textContent = `×${outputCount}`;
         if (craftButton) craftButton.textContent = `製作 ×${outputCount}`;
-        updateCraftingMaterialCounts(card, quantity);
+        updateCraftingMaterialCounts(card, selectedCount);
         return;
     }
     if (button.dataset.action === 'craft-building-kit') {
-        const quantity = button.closest('.building-item-card')?.querySelector('.crafting-quantity-option[aria-pressed="true"]')?.dataset.quantity;
+        const selectedQuantity = button.closest('.building-item-card')?.querySelector('.crafting-quantity-option[aria-pressed="true"]');
+        const quantity = selectedQuantity?.dataset.isMaximum === 'true' ? 'max' : selectedQuantity?.dataset.quantity;
         craftBuildingKit(button.dataset.buildingId, quantity);
         return;
     }
@@ -5608,7 +6508,8 @@ document.addEventListener('click', (event) => {
         return;
     }
     if (button.dataset.action === 'craft-recipe') {
-        const quantity = button.closest('.crafting-recipe-card')?.querySelector('.crafting-quantity-option[aria-pressed="true"]')?.dataset.quantity;
+        const selectedQuantity = button.closest('.crafting-recipe-card')?.querySelector('.crafting-quantity-option[aria-pressed="true"]');
+        const quantity = selectedQuantity?.dataset.isMaximum === 'true' ? 'max' : selectedQuantity?.dataset.quantity;
         craftRecipe(Number(button.dataset.recipeIndex), button.dataset.buildingInstanceId || '', quantity);
         return;
     }
@@ -5646,7 +6547,7 @@ document.addEventListener('click', (event) => {
     }
     if (button.dataset.action === 'inspect-inventory-item') {
         if (button.dataset.itemKey === 'scroll_book') {
-            openAppPage('../GearSystem/scroll-library.html?embed=1&source=scroll-book&v=10', 'スクロール書庫');
+            openAppPage('../GearSystem/scroll-library.html?embed=1&source=scroll-book&v=11', 'スクロール書庫');
             return;
         }
         openInventoryItem(button.dataset.itemKey);
@@ -5710,7 +6611,9 @@ document.getElementById('vehicle-movement-scroll')?.addEventListener('change', e
     ['automaton-source-storage', 'sourceStorageInstanceId'],
     ['automaton-destination-storage', 'destinationStorageInstanceId'],
     ['automaton-condition-cell', 'conditionCellType'],
-    ['automaton-transform-target', 'transformTargetType']
+    ['automaton-transform-target', 'transformTargetType'],
+    ['automaton-stop-condition', 'stopCondition'],
+    ['automaton-stop-limit', 'stopLimit']
 ].forEach(([id, setting]) => {
     document.getElementById(id)?.addEventListener('change', event => changeAutomatonSetting(setting, event.target.value));
 });
@@ -5729,10 +6632,11 @@ document.getElementById('automaton-skin-file')?.addEventListener('change', event
     reader.readAsDataURL(file);
 });
 
-document.querySelectorAll('[data-item-filter-mode]').forEach(button => {
-    button.addEventListener('click', event => {
-        changeAutomatonSetting('itemFilterMode', event.currentTarget.dataset.itemFilterMode);
-    });
+document.querySelector('[data-item-filter-toggle]')?.addEventListener('click', () => {
+    const placed = state.buildings.find(building => building.instanceId === selectedBuildingInstanceId);
+    if (!placed || BUILDING_BY_ID.get(placed.id)?.kind !== 'automaton') return;
+    const automaton = getAutomatonState(placed);
+    changeAutomatonSetting('itemFilterMode', automaton.itemFilterMode === 'include' ? 'exclude' : 'include');
 });
 
 document.getElementById('automaton-item-search')?.addEventListener('input', () => {
@@ -5942,6 +6846,12 @@ document.getElementById('building-menu-modal')?.addEventListener('click', event 
 document.getElementById('automaton-menu-modal')?.addEventListener('click', event => {
     if (event.target.id === 'automaton-menu-modal') closeBuildingMenu();
 });
+document.getElementById('building-custom-name')?.addEventListener('change', event => {
+    saveSelectedBuildingName(event.currentTarget);
+});
+document.getElementById('automaton-custom-name')?.addEventListener('change', event => {
+    saveSelectedBuildingName(event.currentTarget);
+});
 document.getElementById('building-demolition-confirm-modal')?.addEventListener('click', event => {
     if (event.target.id === 'building-demolition-confirm-modal') cancelBuildingDemolition();
 });
@@ -6128,6 +7038,7 @@ const engineRuntimeState = new EngineGameState();
 migrateLegacyMaterialIds();
 new EngineGearManager(engineRuntimeState);
 engineRuntimeState.worldCellHandler = handleWorldCellOperation;
+let activeCraftingBuildingsSignature = getActiveCraftingBuildingSignature();
 engineRuntimeState.subscribe(() => {
     const inventoryPanel = document.getElementById('inventory-panel');
     if (inventoryPanel && !inventoryPanel.hidden) {
@@ -6136,6 +7047,11 @@ engineRuntimeState.subscribe(() => {
     if (!document.getElementById('building-crafting-modal')?.hidden) renderBuildingCrafting();
     updateCraftingCountdowns();
     updateEngineDashboard();
+    const nextActiveCraftingBuildingsSignature = getActiveCraftingBuildingSignature();
+    if (nextActiveCraftingBuildingsSignature !== activeCraftingBuildingsSignature) {
+        activeCraftingBuildingsSignature = nextActiveCraftingBuildingsSignature;
+        scheduleDraw();
+    }
 });
 syncCraftingNotifications();
 updateEngineDashboard();

@@ -13,6 +13,7 @@ const PERSISTENT_GAME_SETTINGS = new Set([
 ]);
 const INITIAL_MATERIAL_INVENTORY = Object.freeze({ paper_scroll: 10, cloth_scroll: 10, scroll_book: 1 });
 const MATERIAL_INVENTORY_VERSION = 4;
+const MATERIAL_INVENTORY_SLOT_LIMIT = 30;
 const LEGACY_INITIAL_MATERIAL_INVENTORY = Object.freeze({ 'iron-screw': 12, 'pressure-gauge': 1 });
 let gameProgressResetInProgress = false;
 
@@ -336,6 +337,27 @@ export class GameState {
         this.water = snapshot.water;
         this.fog = snapshot.fog;
         this.brass = snapshot.brass;
+    }
+
+    getInventoryAmount(itemId) {
+        if (itemId === 'brass-stock') return Number(this.brass) || 0;
+        const resourceKey = { water: 'water', fog: 'fog', power: 'power', steam_power: 'steamPower' }[itemId];
+        return resourceKey
+            ? Number(this[resourceKey]) || 0
+            : Number(this.materialInventory[itemId]) || 0;
+    }
+
+    addInventoryAmount(itemId, amount) {
+        const addedAmount = Number(amount);
+        if (typeof itemId !== 'string' || !itemId || !Number.isFinite(addedAmount) || addedAmount <= 0) return false;
+        if (this.getInventoryAmount(itemId) <= 0 && !this.canAddInventoryItems([itemId])) return false;
+        if (itemId === 'brass-stock') this.brass = (Number(this.brass) || 0) + addedAmount;
+        else {
+            const resourceKey = { water: 'water', fog: 'fog', power: 'power', steam_power: 'steamPower' }[itemId];
+            if (resourceKey) this[resourceKey] = (Number(this[resourceKey]) || 0) + addedAmount;
+            else this.materialInventory[itemId] = (Number(this.materialInventory[itemId]) || 0) + addedAmount;
+        }
+        return true;
     }
 
     setSelectedSize(size) {
@@ -956,18 +978,63 @@ export class GameState {
     completeCraftingJobs(now = Date.now(), persist = true) {
         const completed = this.craftingJobs.filter(job => Number(job.completesAt) <= now);
         if (!completed.length) return false;
-        const completedIds = new Set(completed.map(job => job.jobId));
-        this.craftingJobs = this.craftingJobs.filter(job => !completedIds.has(job.jobId));
+        const completedIds = new Set();
         completed.forEach(job => {
             const amount = Math.max(1, Math.floor(Number(job.outputAmount) || 1));
-            if (job.outputItem === 'brass-stock') this.brass += amount;
-            else this.materialInventory[job.outputItem] = (Number(this.materialInventory[job.outputItem]) || 0) + amount;
+            if (this.addInventoryAmount(job.outputItem, amount)) completedIds.add(job.jobId);
         });
+        if (!completedIds.size) return false;
+        this.craftingJobs = this.craftingJobs.filter(job => !completedIds.has(job.jobId));
         if (persist) {
             this.saveGameData();
             this.notify();
         }
         return true;
+    }
+
+    getInventorySlotIds(includeReserved = false) {
+        const itemIds = new Set(Object.entries(this.materialInventory || {})
+            .filter(([, count]) => Number(count) > 0)
+            .map(([itemId]) => itemId));
+        if (Number(this.brass) > 0) itemIds.add('brass-stock');
+        [['water', this.water], ['fog', this.fog], ['power', this.power], ['steam_power', this.steamPower]]
+            .forEach(([itemId, count]) => {
+                if (Number(count) > 0) itemIds.add(itemId);
+            });
+        if (this.creativeMode && this.creativeSnapshot) {
+            if (Number(this.creativeSnapshot.brass) > 0) itemIds.add('brass-stock');
+            [['water', this.creativeSnapshot.water], ['fog', this.creativeSnapshot.fog],
+                ['power', this.creativeSnapshot.power], ['steam_power', this.creativeSnapshot.steamPower]]
+                .forEach(([itemId, count]) => {
+                    if (Number(count) > 0) itemIds.add(itemId);
+                });
+        }
+        if (includeReserved) {
+            this.craftingJobs.forEach(job => {
+                if (typeof job.outputItem === 'string' && job.outputItem) itemIds.add(job.outputItem);
+                (Array.isArray(job.inputCosts) ? job.inputCosts : []).forEach(cost => {
+                    if (Array.isArray(cost) && typeof cost[0] === 'string' && cost[0]
+                        && Number(cost[1]) > 0) itemIds.add(cost[0]);
+                });
+            });
+        }
+        return itemIds;
+    }
+
+    getInventorySlotCount() {
+        return this.getInventorySlotIds().size;
+    }
+
+    canAddInventoryItems(itemIds) {
+        const occupiedItemIds = this.getInventorySlotIds(true);
+        let canAdd = true;
+        itemIds.forEach(itemId => {
+            if (typeof itemId === 'string' && itemId && !occupiedItemIds.has(itemId)) {
+                occupiedItemIds.add(itemId);
+                if (occupiedItemIds.size > MATERIAL_INVENTORY_SLOT_LIMIT) canAdd = false;
+            }
+        });
+        return canAdd;
     }
 
     cancelCraftingJob(jobId, refundItems = [], now = Date.now()) {
@@ -982,12 +1049,7 @@ export class GameState {
         refundItems.forEach(([itemId, rawAmount]) => {
             const amount = Math.max(0, Number(rawAmount) || 0);
             if (!amount) return;
-            if (itemId === 'brass-stock') this.brass += amount;
-            else if (itemId === 'water') this.water += amount;
-            else if (itemId === 'fog') this.fog += amount;
-            else if (itemId === 'power') this.power += amount;
-            else if (itemId === 'steam_power') this.steamPower += amount;
-            else this.materialInventory[itemId] = (Number(this.materialInventory[itemId]) || 0) + amount;
+            this.addInventoryAmount(itemId, amount);
         });
 
         const stationId = typeof cancelledJob.craftingStationId === 'string' && cancelledJob.craftingStationId
@@ -1113,13 +1175,13 @@ export class GameState {
         const hasActiveProcess = activeGears.some(gear => !gear.isCore && gear.processMode !== 'NONE' && gear.processMode !== 'CONDITIONAL_CONTROL');
         const ambientWaterRecovery = !this.creativeMode && (!this.mainGearRunning || this.autoStoppedBySteam || this.steamPower <= 0);
         this.waterRecoveryRate = (hasActiveProcess || ambientWaterRecovery) && elapsed > 0 ? 1 : 0;
-        this.water += elapsed * this.waterRecoveryRate;
+        this.addInventoryAmount('water', elapsed * this.waterRecoveryRate);
         this.productionRate = 0;
         const gearRate = gear => gear.teeth * Math.abs(gear.angularVelocity || 0) * 0.012 * 60 / (Math.PI * 2);
         this.powerGenerationRate = activeGears
             .filter(gear => !gear.isCore && gear.designType === 'INDUSTRIAL' && gear.processMode === 'POWER_STORAGE')
             .reduce((sum, gear) => sum + gear.teeth * Math.abs(gear.angularVelocity || 0) * 0.012 * 60 / (Math.PI * 2), 0);
-        this.power += this.powerGenerationRate * elapsed;
+        this.addInventoryAmount('power', this.powerGenerationRate * elapsed);
         this.powerConsumedThisTick = 0;
         this.fogRecoveryRate = activeGears.filter(gear => gear.processMode === 'FOG_COLLECTION').reduce((sum, gear) => sum + gearRate(gear) * 10, 0);
         this.fogToWaterRate = activeGears.filter(gear => gear.designType === 'ALCHEMICAL' && gear.processMode === 'FOG_TO_WATER').reduce((sum, gear) => sum + gearRate(gear) * 2.5, 0);
@@ -1138,12 +1200,15 @@ export class GameState {
         this.steamGenerationRate = this.generatedSteamRate + (this.creativeMode && elapsed > 0 ? 1 : this.waterRecoveryRate) + steamAutoRecoveryRate;
         this.steamConsumptionRate = steamConsumption;
         if (this.creativeMode) {
-            // クリエイティブ中も自然回復は実値へ反映し、上限だけを設けない。
-            this.steamPower += elapsed;
+            // クリエイティブ中も自然回復は実値へ反映し、資源量には上限を設けない。
+            this.addInventoryAmount('steam_power', elapsed);
         } else {
             const autoRecovery = steamAutoRecoveryRate;
             const recoveryRate = this.mainGearRunning ? this.waterRecoveryRate : 0;
-            this.steamPower = Math.max(0, this.steamPower + (recoveryRate + autoRecovery) * elapsed - steamConsumption * elapsed);
+            const previousSteamPower = Number(this.steamPower) || 0;
+            const nextSteamPower = Math.max(0, previousSteamPower + (recoveryRate + autoRecovery) * elapsed - steamConsumption * elapsed);
+            if (nextSteamPower > previousSteamPower) this.addInventoryAmount('steam_power', nextSteamPower - previousSteamPower);
+            else this.steamPower = nextSteamPower;
         }
         if (!this.creativeMode && this.steamPower <= 0) {
             this.autoStoppedBySteam = true;
@@ -1182,14 +1247,17 @@ export class GameState {
                 gear.angle += rotationDelta;
                 // 霧回収は1回転の完了を待たず、回転角に比例して連続的に加算する。
                 if (gear.processMode === 'FOG_COLLECTION') {
-                    this.fog += gear.teeth * 10 * Math.abs(rotationDelta) / (Math.PI * 2);
+                    this.addInventoryAmount('fog', gear.teeth * 10 * Math.abs(rotationDelta) / (Math.PI * 2));
                 }
                 if (gear.designType === 'ALCHEMICAL' && gear.processMode === 'TRANSFORM') {
                     const transformed = Math.min(this.water, gear.teeth * Math.abs(rotationDelta) / (Math.PI * 2));
-                    this.water -= transformed;
-                    this.steamPower += transformed * 10;
+                    if (transformed > 0 && this.canAddInventoryItems(['steam_power'])) {
+                        this.water -= transformed;
+                        this.addInventoryAmount('steam_power', transformed * 10);
+                    }
                 }
-                if (gear.designType === 'ALCHEMICAL' && gear.processMode === 'FOG_TO_WATER') {
+                if (gear.designType === 'ALCHEMICAL' && gear.processMode === 'FOG_TO_WATER'
+                    && this.canAddInventoryItems(['water'])) {
                     const progressKey = `${gear.id}:${gear.processMode}`;
                     const progress = (this.rotationProgress.get(progressKey) || 0) + Math.abs(rotationDelta);
                     const completedRotations = Math.floor(progress / (Math.PI * 2));
@@ -1198,7 +1266,7 @@ export class GameState {
                         const amount = completedRotations * gear.teeth;
                         const transformed = Math.min(this.fog, amount * 10);
                         this.fog -= transformed;
-                        this.water += transformed * 2.5;
+                        this.addInventoryAmount('water', transformed * 2.5);
                     }
                 }
                 this.processScrollCellGear(gear, scrollRuntimeByGearId.get(gear.id), rotationDelta);

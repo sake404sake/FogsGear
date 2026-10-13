@@ -10,7 +10,7 @@
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="icon" href="../MainSystem/icons/app-icon.jpg" type="image/jpeg">
     <link rel="apple-touch-icon" href="assets/app-icon-192.png">
-    <link rel="stylesheet" href="css/style.css?v=679">
+    <link rel="stylesheet" href="css/style.css?v=690">
 </head>
 <body>
     <div id="loadingOverlay" class="loading-overlay" role="status" aria-live="polite">
@@ -46,6 +46,7 @@
                     <button class="inventory-view-tab" type="button" data-inventory-view="buildings" aria-selected="false">建築</button>
                 </div>
                 <section id="inventory-items-view" class="inventory-view">
+                    <p id="inventory-capacity-status" class="inventory-capacity-status" role="status" aria-live="polite">所持枠 0 / 30</p>
                     <label class="inventory-search"><span>検索</span><input id="inventory-item-search" type="search" autocomplete="off" aria-label="所持品を検索"></label>
                     <div id="inventory-item-list" class="inventory-item-grid" aria-live="polite"></div>
                 </section>
@@ -88,6 +89,9 @@
             <button class="inventory-modal-close" type="button" data-action="close-building-menu" aria-label="建物メニューを閉じる">×</button>
             <div class="inventory-modal-kicker">BUILDING CONTROL</div>
             <h2 id="building-menu-title">建築物</h2>
+            <label class="building-name-field" for="building-custom-name"><span>NAMEPLATE / 建物名</span>
+                <input id="building-custom-name" type="text" maxlength="32" autocomplete="off" placeholder="名前を刻印">
+            </label>
             <p id="building-menu-details"></p>
             <section id="building-storage-controls" class="building-storage-controls" hidden>
                 <p id="building-storage-status" role="status"></p>
@@ -135,6 +139,9 @@
             <button class="inventory-modal-close" type="button" data-action="close-building-menu" aria-label="オートマトンメニューを閉じる">×</button>
             <div class="inventory-modal-kicker">FIELD AUTOMATON</div>
             <h2 id="automaton-menu-title">作業オートマトン</h2>
+            <label class="building-name-field automaton-building-name-field" for="automaton-custom-name"><span>NAMEPLATE / 建物名</span>
+                <input id="automaton-custom-name" type="text" maxlength="32" autocomplete="off" placeholder="名前を刻印">
+            </label>
             <p id="automaton-menu-details"></p>
             <div class="automaton-preview">
                 <span class="automaton-preview-badge">作業用機械人形</span>
@@ -153,62 +160,83 @@
                 <label class="inventory-modal-secondary automaton-skin-file-label" for="automaton-skin-file">画像を選択</label>
                 <input id="automaton-skin-file" type="file" accept="image/*" hidden>
             </div>
-            <label class="automaton-setting-row">巡回方向
-                <select id="automaton-axis"><option value="horizontal">左右</option><option value="vertical">上下</option></select>
-            </label>
-            <label class="automaton-setting-row">巡回距離
-                <select id="automaton-range"><option value="1">1セル</option><option value="2">2セル</option><option value="3">3セル</option><option value="4">4セル</option><option value="5">5セル</option></select>
-            </label>
-            <label class="automaton-setting-row">処理
-                <select id="automaton-action">
-                    <option value="RESOURCE_COLLECTION">資源を採取</option>
-                    <option value="TERRAIN_TRANSFORM">地形を変成</option>
-                    <option value="STORAGE_WITHDRAW">進行方向1マス先のストレージから取り出す</option>
-                    <option value="STORAGE_DEPOSIT">進行方向1マス先のストレージに収める</option>
-                    <option value="STORAGE_TRANSPORT">指定した2つの倉庫間で運搬</option>
-                </select>
-            </label>
-            <div id="automaton-transport-settings" hidden>
+            <section class="automaton-settings-group" aria-label="作業設定">
+                <h3>作業設定</h3>
+                <div id="automaton-patrol-settings">
+                    <label class="automaton-setting-row">巡回方向
+                        <select id="automaton-axis"><option value="horizontal">左右</option><option value="vertical">上下</option></select>
+                    </label>
+                    <label class="automaton-setting-row">巡回距離
+                        <select id="automaton-range"><option value="1">1セル</option><option value="2">2セル</option><option value="3">3セル</option><option value="4">4セル</option><option value="5">5セル</option></select>
+                    </label>
+                </div>
+                <label class="automaton-setting-row">処理
+                    <select id="automaton-action">
+                        <option value="RESOURCE_COLLECTION">資源を採取</option>
+                        <option value="TERRAIN_TRANSFORM">地形を変成</option>
+                        <option value="STORAGE_WITHDRAW">進行方向1マス先のストレージから取り出す</option>
+                        <option value="STORAGE_DEPOSIT">進行方向1マス先のストレージに収める</option>
+                        <option value="STORAGE_TRANSPORT">指定した2つの倉庫間で運搬</option>
+                    </select>
+                </label>
+            </section>
+            <section id="automaton-transport-settings" class="automaton-settings-group automaton-transport-settings" hidden aria-label="倉庫間運搬設定">
+                <h3>倉庫間運搬</h3>
                 <label class="automaton-setting-row">搬出元
                     <select id="automaton-source-storage"></select>
                 </label>
                 <label class="automaton-setting-row">搬入先
                     <select id="automaton-destination-storage"></select>
                 </label>
-                <p class="automaton-status">登録アイテムを最大99個持ち、搬出元から搬入先へ運びます。</p>
-            </div>
-            <label class="automaton-setting-row automaton-transform-setting">変成先
-                <select id="automaton-transform-target"></select>
-            </label>
-            <label class="automaton-setting-row">条件：セルの種類
-                <select id="automaton-condition-cell"></select>
-            </label>
-            <section id="automaton-storage-filter-settings" class="automaton-storage-filter-settings" hidden>
-                <div class="automaton-item-filter-toolbar">
-                    <div class="automaton-item-filter-mode">
-                        <span class="automaton-item-filter-label">対象アイテム</span>
-                        <div class="automaton-item-filter-options" role="group" aria-label="対象アイテムの条件">
-                            <button class="is-selected" type="button" data-item-filter-mode="include" aria-pressed="true">のみ</button>
-                            <button type="button" data-item-filter-mode="exclude" aria-pressed="false">以外</button>
-                        </div>
-                    </div>
-                    <div class="automaton-item-registration">
-                        <div class="building-storage-picker automaton-item-picker">
-                            <button id="automaton-item-button" class="building-storage-item-button" type="button" aria-expanded="false" aria-controls="automaton-item-picker">
-                                <span id="automaton-item-icon" class="building-storage-item-icon"></span>
-                                <span id="automaton-item-name"></span>
-                                <span class="building-storage-item-chevron" aria-hidden="true">▾</span>
+                <p class="automaton-status">最短経路を往復します。停止条件で「搬送個数」「往復回数」「搬出元在庫切れ」を選べます。障害物の変化時は経路を再計算します。</p>
+            </section>
+            <section class="automaton-settings-group" aria-label="処理条件">
+                <h3>処理条件</h3>
+                <label class="automaton-setting-row">停止条件
+                    <select id="automaton-stop-condition">
+                        <option value="none">なし（無制限）</option>
+                        <option value="item-count">搬送・処理した個数</option>
+                        <option value="round-trips">往復回数</option>
+                        <option value="source-empty">搬出元在庫切れ</option>
+                    </select>
+                </label>
+                <label id="automaton-stop-limit-row" class="automaton-setting-row" hidden>
+                    <span id="automaton-stop-limit-label">停止個数</span>
+                    <input id="automaton-stop-limit" type="number" min="1" max="1000000000" step="1" value="1">
+                </label>
+                <label class="automaton-setting-row automaton-transform-setting">変成先
+                    <select id="automaton-transform-target"></select>
+                </label>
+                <label class="automaton-setting-row">セルの種類
+                    <select id="automaton-condition-cell"></select>
+                </label>
+                <section id="automaton-storage-filter-settings" class="automaton-storage-filter-settings" hidden>
+                    <h3>搬送アイテム</h3>
+                    <div class="automaton-item-filter-toolbar">
+                        <div class="automaton-item-filter-mode">
+                            <span class="automaton-item-filter-label">対象アイテム</span>
+                            <button class="automaton-item-filter-toggle" type="button" data-item-filter-toggle role="switch" aria-checked="true" aria-label="対象アイテム: のみ">
+                                <span id="automaton-item-filter-toggle-label">のみ</span>
                             </button>
-                            <div id="automaton-item-picker" class="building-storage-item-picker" hidden>
-                                <input id="automaton-item-search" type="search" placeholder="アイテムを検索" autocomplete="off" aria-label="対象アイテムを検索">
-                                <div id="automaton-item-option-list" class="building-storage-item-list" role="listbox" aria-label="登録するアイテムを選択"></div>
-                            </div>
-                            <select id="automaton-item-selection" hidden aria-hidden="true" tabindex="-1"></select>
                         </div>
-                        <button id="automaton-item-register" class="inventory-modal-secondary" type="button">登録</button>
+                        <div class="automaton-item-registration">
+                            <div class="building-storage-picker automaton-item-picker">
+                                <button id="automaton-item-button" class="building-storage-item-button" type="button" aria-expanded="false" aria-controls="automaton-item-picker">
+                                    <span id="automaton-item-icon" class="building-storage-item-icon"></span>
+                                    <span id="automaton-item-name"></span>
+                                    <span class="building-storage-item-chevron" aria-hidden="true">▾</span>
+                                </button>
+                                <div id="automaton-item-picker" class="building-storage-item-picker" hidden>
+                                    <input id="automaton-item-search" type="search" placeholder="アイテムを検索" autocomplete="off" aria-label="対象アイテムを検索">
+                                    <div id="automaton-item-option-list" class="building-storage-item-list" role="listbox" aria-label="登録するアイテムを選択"></div>
+                                </div>
+                                <select id="automaton-item-selection" hidden aria-hidden="true" tabindex="-1"></select>
+                            </div>
+                            <button id="automaton-item-register" class="inventory-modal-secondary" type="button">登録</button>
+                        </div>
                     </div>
-                </div>
-                <div id="automaton-registered-items" class="automaton-registered-items" aria-label="登録済みアイテム"></div>
+                    <div id="automaton-registered-items" class="automaton-registered-items" aria-label="登録済みアイテム"></div>
+                </section>
             </section>
             <p id="automaton-status" class="automaton-status" role="status"></p>
             <div class="inventory-modal-actions">
@@ -372,7 +400,7 @@
                                 </div>
                             </div>
                         </section>
-                        <iframe src="../GearSystem/scroll-library.html?embed=1&hideMapBack=1&dashboard=external&v=35" title="保存スクロールのギアプレビュー"></iframe>
+                        <iframe src="../GearSystem/scroll-library.html?embed=1&hideMapBack=1&dashboard=external&v=36" title="保存スクロールのギアプレビュー"></iframe>
                     </section>
                 </div>
             </div>
@@ -384,6 +412,6 @@
         </div>
     </div>
 
-    <script type="module" src="js/main.js?v=759"></script>
+    <script type="module" src="js/main.js?v=779"></script>
 </body>
 </html>

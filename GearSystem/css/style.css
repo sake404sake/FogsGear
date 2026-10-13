@@ -527,14 +527,14 @@ canvas {
 .scroll-list-panel { padding: 16px 12px; border-right: 1px solid rgba(98, 194, 170, 0.28); background: rgba(98, 194, 170, 0.045); }
 .scroll-list-heading { display: flex; justify-content: space-between; margin: 0 4px 10px; color: #a7f0d9; font: 0.7rem monospace; letter-spacing: 1px; }
 .scroll-list-heading strong { color: #f7d77d; }
-.scroll-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 7px; }
-.scroll-list-item { display: grid; grid-template-columns: minmax(0, 1fr) 28px; gap: 5px; align-items: stretch; width: 100%; min-height: 38px; box-sizing: border-box; padding: 0 4px 0 0; color: #e7dfd2; background: linear-gradient(90deg, rgba(57, 43, 29, 0.82), rgba(24, 19, 15, 0.94)); border: 1px solid rgba(198, 154, 82, 0.32); border-left: 3px solid transparent; border-radius: 2px; box-shadow: inset 0 0 8px rgba(243, 198, 83, 0.035); }
+.scroll-list { display: grid; grid-auto-rows: max-content; grid-template-columns: minmax(0, 1fr); align-content: start; gap: 4px; }
+.scroll-list-item { display: grid; grid-template-columns: minmax(0, 1fr) 28px; gap: 4px; align-items: stretch; width: 100%; min-height: 34px; box-sizing: border-box; padding: 0 4px 0 0; color: #e7dfd2; background: linear-gradient(90deg, rgba(57, 43, 29, 0.82), rgba(24, 19, 15, 0.94)); border: 1px solid rgba(198, 154, 82, 0.32); border-left: 3px solid transparent; border-radius: 2px; box-shadow: inset 0 0 8px rgba(243, 198, 83, 0.035); }
 .scroll-list-item:hover, .scroll-list-item.active { color: #fff1b1; background: linear-gradient(145deg, rgba(80, 61, 35, 0.96), rgba(31, 25, 19, 0.98)); border-color: #f3c653; border-left-color: transparent; box-shadow: inset 0 0 14px rgba(243, 198, 83, 0.1), 0 0 10px rgba(243, 198, 83, 0.16); }
 .scroll-list-item.running { border-color: rgba(98, 194, 170, 0.9); border-left-color: #a7f0d9; box-shadow: inset 0 0 12px rgba(98, 194, 170, 0.13), 0 0 11px rgba(98, 194, 170, 0.34); }
-.scroll-list-select { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 9px; align-items: center; min-width: 0; padding: 5px 4px 5px 8px; color: inherit; background: transparent; border: 0; text-align: left; cursor: pointer; font: inherit; }
-.scroll-list-edit { display: grid; place-items: center; width: 24px; margin: 5px 0; padding: 0; color: #8a8f8c; background: transparent; border: 1px solid transparent; border-radius: 3px; font-size: 1.15rem; line-height: 1; cursor: pointer; }
+.scroll-list-select { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 7px; align-items: center; min-width: 0; padding: 3px 4px 3px 6px; color: inherit; background: transparent; border: 0; text-align: left; cursor: pointer; font: inherit; }
+.scroll-list-edit { display: grid; place-items: center; width: 24px; margin: 3px 0; padding: 0; color: #8a8f8c; background: transparent; border: 1px solid transparent; border-radius: 3px; font-size: 1.05rem; line-height: 1; cursor: pointer; }
 .scroll-list-edit:hover { color: #d3d7d4; background: rgba(180, 188, 184, 0.16); border-color: rgba(180, 188, 184, 0.4); }
-.scroll-list-type { display: grid; place-items: center; width: 26px; height: 26px; color: #17120f; background: linear-gradient(145deg, #f3c653, #9f7127); border: 1px solid #ffe69b; border-radius: 3px; font: bold 0.7rem monospace; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35); }
+.scroll-list-type { display: grid; place-items: center; width: 24px; height: 24px; color: #17120f; background: linear-gradient(145deg, #f3c653, #9f7127); border: 1px solid #ffe69b; border-radius: 3px; font: bold 0.68rem monospace; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35); }
 .scroll-list-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .scroll-list-empty { margin: 18px 5px; color: var(--text-muted); font-size: 0.78rem; line-height: 1.6; }
 .scroll-detail-panel { min-width: 0; padding: 18px 20px; }
@@ -629,8 +629,8 @@ canvas {
 .embedded-library .scroll-library-layout { display: flex; flex: 1 0 auto; flex-direction: column; min-height: 0; border: 0; background: #120e0c; }
 .embedded-library .scroll-list-panel { display: block; overflow: visible; padding: 8px 6px; border-right: 0; border-bottom: 1px solid rgba(98, 194, 170, 0.28); }
 .embedded-library .scroll-list-heading { margin: 0 3px 6px; font-size: 0.62rem; }
-.embedded-library .scroll-list { grid-template-columns: minmax(0, 1fr); gap: 5px; }
-.embedded-library .scroll-list-item { grid-template-columns: 23px minmax(0, 1fr); gap: 5px; min-height: 34px; padding: 4px 5px; font-size: 0.68rem; }
+.embedded-library .scroll-list { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+.embedded-library .scroll-list-item { grid-template-columns: 23px minmax(0, 1fr); gap: 5px; min-height: 32px; padding: 2px 4px; font-size: 0.68rem; }
 .embedded-library .scroll-list-type { width: 20px; height: 20px; font-size: 0.6rem; }
 .embedded-library .scroll-list-item { grid-template-columns: minmax(0, 1fr) 28px; padding-right: 4px; }
 .embedded-library .scroll-list-edit { display: grid; }
