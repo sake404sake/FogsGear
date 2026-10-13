@@ -6360,7 +6360,7 @@ function openGuideModal() {
 
     const frame = document.createElement('iframe');
     frame.title = 'ガイド';
-    frame.src = 'cell-atlas.html?modal=1&v=10';
+    frame.src = 'cell-atlas.html?modal=1&v=11';
     frame.loading = 'lazy';
     frame.setAttribute('allowfullscreen', 'false');
 

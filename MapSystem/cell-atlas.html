@@ -39,6 +39,35 @@
         .guide-tab { min-height: 36px; padding: 6px 16px; color: #c8d7cb; background: rgba(19, 26, 22, 0.82); border: 1px solid rgba(98, 194, 170, 0.25); border-radius: 4px; font: inherit; cursor: pointer; }
         .guide-tab[aria-selected="true"] { color: #17120f; background: linear-gradient(180deg, #f3c653, #b8832d); border-color: #ffe69b; font-weight: 700; }
         .guide-view[hidden] { display: none; }
+        .crafting-tree-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 12px 0; }
+        .crafting-tree-toolbar label { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
+        .crafting-tree-toolbar input[type="search"] { width: min(100%, 280px); min-height: 34px; padding: 6px 9px; color: var(--text); background: #121b18; border: 1px solid #52665b; }
+        .crafting-tree-toolbar input[type="range"] { width: min(200px, 36vw); accent-color: var(--gold); }
+        .crafting-tree-toolbar output { min-width: 38px; color: var(--gold); font: 12px monospace; }
+        .crafting-tree-toolbar button { min-height: 34px; padding: 5px 10px; color: var(--text); background: #18211e; border: 1px solid #506258; cursor: pointer; }
+        .crafting-tree-legend { display: flex; flex-wrap: wrap; gap: 8px 14px; margin: 8px 0; color: var(--muted); font-size: 11px; }
+        .crafting-tree-legend span::before { display: inline-block; width: 9px; height: 9px; margin-right: 5px; border-radius: 2px; background: var(--tree-color); content: ""; }
+        .crafting-tree-frame { height: min(72vh, 760px); min-height: 380px; overflow: auto; overscroll-behavior: contain; touch-action: pan-x pan-y; background: rgba(12, 19, 16, .84); border: 1px solid var(--line); }
+        #crafting-tree-svg { display: block; max-width: none; background-image: radial-gradient(rgba(150,177,154,.18) .7px, transparent .7px); background-size: 20px 20px; transform-origin: top left; }
+        .crafting-tree-edge { fill: none; stroke-width: 1.6; opacity: .4; marker-end: url(#crafting-tree-arrow); }
+        .crafting-tree-edge.forest { stroke: #9fb985; }
+        .crafting-tree-edge.smelting { stroke: #d4b75f; }
+        .crafting-tree-edge.ceramic { stroke: #70aeb5; }
+        .crafting-tree-edge.bio { stroke: #a7b879; }
+        .crafting-tree-edge.machine, .crafting-tree-edge.terraforming { stroke: #d18a61; }
+        .crafting-tree-edge.construction { stroke: #83c7b1; }
+        .crafting-tree-edge.dim, .crafting-tree-node.dim { opacity: .08; }
+        .crafting-tree-node { cursor: pointer; }
+        .crafting-tree-node rect { fill: #202b28; stroke: #657869; stroke-width: 1.2; }
+        .crafting-tree-node.item rect { stroke: #82966f; }
+        .crafting-tree-node.building rect { fill: #29231b; stroke: #83c7b1; }
+        .crafting-tree-node text { fill: var(--text); font: 12px "Yu Gothic UI", Meiryo, sans-serif; pointer-events: none; }
+        .crafting-tree-node .tree-meta { fill: #a7b2a8; font: 9px monospace; }
+        .crafting-tree-node.match rect { stroke: #f3d27a; stroke-width: 2.5; filter: drop-shadow(0 0 5px rgba(230,194,91,.55)); }
+        .crafting-tree-node:focus rect { stroke: #f3d27a; stroke-width: 2.5; }
+        .crafting-tree-column-title { fill: #dfbd67; font: 13px monospace; }
+        .crafting-tree-column-count { fill: #a7b2a8; font: 10px monospace; }
+        .crafting-tree-caption { margin: 8px 0 0; color: var(--muted); font-size: 11px; }
         .terraforming-goal { margin: 0 0 18px; padding: 16px; background: linear-gradient(120deg, rgba(98,194,170,.10), rgba(29,23,20,.92)); border: 1px solid rgba(98,194,170,.38); border-left: 3px solid var(--mint); }
         .terraforming-goal summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; cursor: pointer; list-style: none; }
         .terraforming-goal summary::-webkit-details-marker { display: none; }
@@ -321,6 +350,7 @@
             <button class="guide-tab" id="how-to-tab" type="button" role="tab" aria-controls="how-to-page" aria-selected="true" data-guide-view="how-to-page">遊び方</button>
             <button class="guide-tab" id="cell-guide-tab" type="button" role="tab" aria-controls="cell-guide-page" aria-selected="false" data-guide-view="cell-guide-page">セル・素材</button>
             <button class="guide-tab" id="recipe-guide-tab" type="button" role="tab" aria-controls="recipe-guide-page" aria-selected="false" data-guide-view="recipe-guide-page">加工・建築レシピ</button>
+            <button class="guide-tab" id="crafting-tree-tab" type="button" role="tab" aria-controls="crafting-tree-page" aria-selected="false" data-guide-view="crafting-tree-page">加工・建築ツリー</button>
         </nav>
 
         <section id="how-to-page" class="guide-view" role="tabpanel" aria-labelledby="how-to-tab">
@@ -481,6 +511,27 @@
             <div id="recipe-guide-content"></div>
         </section>
 
+        <section id="crafting-tree-page" class="guide-view" role="tabpanel" aria-labelledby="crafting-tree-tab" hidden>
+            <header class="group-head">
+                <h2>加工・建築ツリー</h2>
+                <p id="crafting-tree-count"></p>
+            </header>
+            <p class="recipe-guide-note">現行の加工レシピと建築コストから生成した素材の流れです。建築には真鍮資材も必要です。ノードを選ぶと登録済みの詳細を確認できます。</p>
+            <div class="crafting-tree-toolbar">
+                <label for="crafting-tree-search">検索 <input id="crafting-tree-search" type="search" autocomplete="off" placeholder="素材・加工品・建築物"></label>
+                <label for="crafting-tree-zoom">倍率 <input id="crafting-tree-zoom" type="range" min="25" max="100" step="5" value="65"><output id="crafting-tree-zoom-value" for="crafting-tree-zoom">65%</output></label>
+                <button id="crafting-tree-fit" type="button">全体を表示</button>
+            </div>
+            <div class="crafting-tree-legend" aria-label="線の種類">
+                <span style="--tree-color:#d4b75f">加工・合成</span>
+                <span style="--tree-color:#83c7b1">建築コスト</span>
+            </div>
+            <div class="crafting-tree-frame" id="crafting-tree-frame">
+                <svg id="crafting-tree-svg" role="img" aria-label="現行の加工レシピと建築コストに基づく素材依存図"></svg>
+            </div>
+            <p class="crafting-tree-caption">左から右へ加工段階が進みます。線は投入素材から成果物・建築物へつながります。検索語に関係するノードを強調表示します。</p>
+        </section>
+
         <section id="cell-guide-page" class="guide-view" role="tabpanel" aria-labelledby="cell-guide-tab" hidden>
         <header class="group-head"><h2>セルの見た目と採取の目印</h2><p>色と模様、採取物、必要動力を確認できます。地形変成には、変成先の地形から採取したサンプルが1個必要です。</p></header>
         <div class="toolbar">
@@ -566,6 +617,176 @@
             }
             return icon;
         };
+        const renderCraftingTree = () => {
+            const svg = document.getElementById('crafting-tree-svg');
+            const frame = document.getElementById('crafting-tree-frame');
+            const search = document.getElementById('crafting-tree-search');
+            const zoom = document.getElementById('crafting-tree-zoom');
+            const zoomValue = document.getElementById('crafting-tree-zoom-value');
+            const fitButton = document.getElementById('crafting-tree-fit');
+            if (!svg || !frame || !search || !zoom || !zoomValue || !fitButton) return;
+            const escapeMarkup = (value) => String(value).replace(/[&<>"']/g, (character) => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            })[character]);
+
+            const nodes = new Map(CRAFTING_ITEMS.map(([id, name, category, source]) => [
+                id, { id, name, category, meta: source, type: 'item' }
+            ]));
+            BUILDING_DEFINITIONS.forEach((building) => nodes.set(building.id, {
+                id: building.id,
+                name: building.name,
+                category: 'building',
+                meta: `建築 ${building.width}×${building.height}`,
+                type: 'building'
+            }));
+            const edges = [];
+            CRAFTING_RECIPES.forEach((recipe) => {
+                const [family, , inputs, output] = recipe;
+                if (!nodes.has(output)) throw new Error(`加工ツリーの成果物「${output}」がアイテム一覧にありません。`);
+                inputs.forEach(([input]) => {
+                    if (!nodes.has(input)) throw new Error(`加工ツリーの素材「${input}」がアイテム一覧にありません。`);
+                    edges.push({ from: input, to: output, family, type: 'recipe' });
+                });
+            });
+            BUILDING_DEFINITIONS.forEach((building) => {
+                const costs = [['brass-stock', building.brassCost], ...(building.materialCosts || [])];
+                costs.forEach(([input]) => {
+                    if (!nodes.has(input)) throw new Error(`建築ツリーの素材「${input}」がアイテム一覧にありません。`);
+                    edges.push({ from: input, to: building.id, family: 'construction', type: 'construction' });
+                });
+            });
+
+            const incoming = new Map([...nodes.keys()].map((id) => [id, 0]));
+            edges.forEach(({ to }) => incoming.set(to, (incoming.get(to) || 0) + 1));
+            const depth = new Map([...nodes.keys()].filter((id) => !incoming.get(id)).map((id) => [id, 0]));
+            for (let pass = 0; pass < nodes.size; pass++) {
+                let changed = false;
+                edges.forEach(({ from, to }) => {
+                    if (!depth.has(from)) return;
+                    const nextDepth = depth.get(from) + 1;
+                    if (nextDepth > (depth.get(to) ?? -1)) {
+                        depth.set(to, nextDepth);
+                        changed = true;
+                    }
+                });
+                if (!changed) break;
+            }
+            nodes.forEach((_, id) => { if (!depth.has(id)) depth.set(id, 0); });
+
+            const levels = new Map();
+            nodes.forEach((node, id) => {
+                const level = depth.get(id);
+                if (!levels.has(level)) levels.set(level, []);
+                levels.get(level).push(node);
+            });
+            levels.forEach((items) => items.sort((first, second) =>
+                (first.type === second.type ? 0 : first.type === 'item' ? -1 : 1)
+                || first.name.localeCompare(second.name, 'ja')));
+
+            const nodeWidth = 196;
+            const nodeHeight = 46;
+            const columnGap = 92;
+            const rowGap = 10;
+            const left = 24;
+            const top = 66;
+            const positions = new Map();
+            const levelNumbers = [...levels.keys()].sort((first, second) => first - second);
+            levelNumbers.forEach((level, column) => {
+                levels.get(level).forEach((node, row) => {
+                    positions.set(node.id, { x: left + column * (nodeWidth + columnGap), y: top + row * (nodeHeight + rowGap) });
+                });
+            });
+            const width = left * 2 + levelNumbers.length * nodeWidth + (levelNumbers.length - 1) * columnGap;
+            const maxRows = Math.max(...[...levels.values()].map((items) => items.length));
+            const height = top + maxRows * (nodeHeight + rowGap) + 20;
+            svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+            svg.setAttribute('width', String(width));
+            svg.setAttribute('height', String(height));
+
+            const columnTitles = levelNumbers.map((level, column) => {
+                const x = left + column * (nodeWidth + columnGap);
+                const entries = levels.get(level);
+                const hasBuildings = entries.some((node) => node.type === 'building');
+                const title = level === 0 ? '採取・初期資材' : hasBuildings && entries.every((node) => node.type === 'building')
+                    ? '建築物' : `加工段階 ${level}`;
+                return `<text class="crafting-tree-column-title" x="${x}" y="24">${title}</text><text class="crafting-tree-column-count" x="${x}" y="42">${entries.length}項目</text>`;
+            }).join('');
+            const edgeMarkup = edges.map(({ from, to, family, type }) => {
+                const source = positions.get(from);
+                const target = positions.get(to);
+                if (!source || !target) return '';
+                const x1 = source.x + nodeWidth;
+                const y1 = source.y + nodeHeight / 2;
+                const x2 = target.x;
+                const y2 = target.y + nodeHeight / 2;
+                const curve = Math.max(20, (x2 - x1) * .45);
+                return `<path class="crafting-tree-edge ${type === 'construction' ? 'construction' : family}" data-from="${from}" data-to="${to}" d="M${x1},${y1} C${x1 + curve},${y1} ${x2 - curve},${y2} ${x2},${y2}"/>`;
+            }).join('');
+            const nodeMarkup = [...nodes.values()].map((node) => {
+                const { x, y } = positions.get(node.id);
+                const category = node.category || 'raw';
+                const name = node.name.length > 17 ? `${node.name.slice(0, 16)}…` : node.name;
+                const accessibleName = `${node.name} / ${node.type === 'building' ? '建築物' : node.meta}`;
+                const searchText = `${node.name} ${node.id} ${node.meta}`.normalize('NFKC').toLocaleLowerCase('ja');
+                return `<g class="crafting-tree-node ${node.type}" data-node-id="${escapeMarkup(node.id)}" data-search="${escapeMarkup(searchText)}" tabindex="0" role="button" aria-label="${escapeMarkup(accessibleName)}"><title>${escapeMarkup(accessibleName)}</title><rect x="${x}" y="${y}" width="${nodeWidth}" height="${nodeHeight}" rx="4"/><text x="${x + 9}" y="${y + 19}">${escapeMarkup(name)}</text><text class="tree-meta" x="${x + 9}" y="${y + 35}">${escapeMarkup(node.type === 'building' ? '建築物' : category)} · ${escapeMarkup(node.meta)}</text></g>`;
+            }).join('');
+            svg.innerHTML = `<defs><marker id="crafting-tree-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0 0 10 5 0 10z" fill="#d8c17b"/></marker></defs>${columnTitles}${edgeMarkup}${nodeMarkup}`;
+
+            const applySearch = () => {
+                const query = search.value.normalize('NFKC').toLocaleLowerCase('ja').trim();
+                const matched = new Set();
+                svg.querySelectorAll('.crafting-tree-node').forEach((node) => {
+                    const isMatch = !query || node.dataset.search.includes(query);
+                    node.classList.toggle('match', Boolean(query && isMatch));
+                    node.classList.toggle('dim', Boolean(query && !isMatch));
+                    if (isMatch && query) matched.add(node.dataset.nodeId);
+                });
+                svg.querySelectorAll('.crafting-tree-edge').forEach((edge) => {
+                    const isRelated = !query || matched.has(edge.dataset.from) || matched.has(edge.dataset.to);
+                    edge.classList.toggle('dim', !isRelated);
+                });
+                const matchCount = query ? matched.size : nodes.size;
+                document.getElementById('crafting-tree-count').textContent =
+                    `${nodes.size}項目 / 加工・合成 ${CRAFTING_RECIPES.length}レシピ / 建築 ${BUILDING_DEFINITIONS.length}種類${query ? ` / ${matchCount}件一致` : ''}`;
+            };
+            const applyZoom = () => {
+                const scale = Number(zoom.value) / 100;
+                svg.style.width = `${width * scale}px`;
+                svg.style.height = `${height * scale}px`;
+                zoomValue.value = `${zoom.value}%`;
+                zoomValue.textContent = `${zoom.value}%`;
+            };
+            search.addEventListener('input', applySearch);
+            zoom.addEventListener('input', applyZoom);
+            fitButton.addEventListener('click', () => {
+                const scale = Math.max(25, Math.min(100, Math.floor((frame.clientWidth - 24) / width * 100)));
+                zoom.value = String(scale);
+                applyZoom();
+                frame.scrollTop = 0;
+                frame.scrollLeft = 0;
+            });
+            const showNodeDetail = (node) => {
+                const itemId = node.dataset.nodeId;
+                if (new URLSearchParams(window.location.search).get('modal') === '1') {
+                    const targetOrigin = window.location.origin === 'null' ? '*' : window.location.origin;
+                    window.parent.postMessage({ type: 'fogsgear:show-guide-item-detail', itemId }, targetOrigin);
+                }
+            };
+            svg.addEventListener('click', (event) => {
+                const node = event.target.closest('.crafting-tree-node');
+                if (node) showNodeDetail(node);
+            });
+            svg.addEventListener('keydown', (event) => {
+                if (event.key !== 'Enter' && event.key !== ' ') return;
+                const node = event.target.closest('.crafting-tree-node');
+                if (!node) return;
+                event.preventDefault();
+                showNodeDetail(node);
+            });
+            applySearch();
+            applyZoom();
+        };
+        renderCraftingTree();
         const domeIcon = document.getElementById('terraforming-dome-icon');
         if (domeIcon) domeIcon.appendChild(makeGuideIcon(terraformingDome.id));
         const appendGoalList = (title, entries) => {
@@ -1037,7 +1258,8 @@
             document.querySelectorAll('.guide-view').forEach((view) => { view.hidden = view.id !== activeView; });
         };
         document.querySelectorAll('[data-guide-view]').forEach((tab) => tab.addEventListener('click', () => selectGuideView(tab.dataset.guideView)));
-        selectGuideView('how-to-page');
+        const requestedGuideView = new URLSearchParams(window.location.search).get('view');
+        selectGuideView(document.getElementById(requestedGuideView) ? requestedGuideView : 'how-to-page');
     </script>
 </body>
 </html>
