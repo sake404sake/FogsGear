@@ -10,11 +10,11 @@
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="icon" href="../MainSystem/icons/app-icon.jpg" type="image/jpeg">
     <link rel="apple-touch-icon" href="assets/app-icon-192.png">
-    <link rel="stylesheet" href="css/style.css?v=690">
+    <link rel="stylesheet" href="css/style.css?v=701">
 </head>
 <body>
     <div id="loadingOverlay" class="loading-overlay" role="status" aria-live="polite">
-        <div class="loading-panel"><div class="loading-spinner"></div><div id="loadingMessage">マップを読み込んでいます...</div><div class="loading-progress" aria-label="マップ読み込み中"></div></div>
+        <div class="loading-panel"><div class="loading-spinner"></div><div id="loadingMessage">マップを読み込んでいます...</div><div class="loading-progress" aria-label="マップ読み込み中"></div><button id="loading-retry" type="button" hidden onclick="window.location.reload()">再読み込み</button></div>
     </div>
     <div id="app-notice" class="app-notice" role="status" aria-live="polite" hidden></div>
     <div class="landscape-main-frame">
@@ -47,6 +47,7 @@
                 </div>
                 <section id="inventory-items-view" class="inventory-view">
                     <p id="inventory-capacity-status" class="inventory-capacity-status" role="status" aria-live="polite">所持枠 0 / 30</p>
+                    <p class="shared-resource-note">共有エネルギーは、所持品・建築設備・ギアで共通の保有量です。</p>
                     <label class="inventory-search"><span>検索</span><input id="inventory-item-search" type="search" autocomplete="off" aria-label="所持品を検索"></label>
                     <div id="inventory-item-list" class="inventory-item-grid" aria-live="polite"></div>
                 </section>
@@ -93,6 +94,24 @@
                 <input id="building-custom-name" type="text" maxlength="32" autocomplete="off" placeholder="名前を刻印">
             </label>
             <p id="building-menu-details"></p>
+            <section id="building-scroll-controls" class="building-scroll-controls" hidden>
+                <label for="building-scroll-select">動力スクロール</label>
+                <div class="building-scroll-assignment">
+                    <select id="building-scroll-select" aria-label="建物にセットするスクロール">
+                        <option value="">スクロールを選択</option>
+                    </select>
+                </div>
+                <div id="building-overclock-control" class="building-overclock-control">
+                    <label for="building-overclock-select">オーバークロック</label>
+                    <select id="building-overclock-select" class="building-overclock-select" aria-label="設備のオーバークロック倍率"></select>
+                </div>
+                <p id="building-scroll-status" role="status">スクロールをセットしてください。</p>
+                <div id="building-scroll-preview" class="building-scroll-preview" hidden>
+                    <div class="building-scroll-preview-heading">動作プレビュー</div>
+                    <iframe id="building-scroll-preview-frame" title="セットしたスクロールの動作プレビュー"></iframe>
+                    <button id="building-scroll-toggle" class="building-scroll-toggle" type="button" data-action="toggle-building-scroll">スクロールを起動</button>
+                </div>
+            </section>
             <section id="building-storage-controls" class="building-storage-controls" hidden>
                 <p id="building-storage-status" role="status"></p>
                 <div id="building-storage-grid" class="building-storage-grid" role="group" aria-label="ストレージ内の資材"></div>
@@ -120,14 +139,22 @@
                 </div>
             </section>
             <button id="building-menu-rotate-rail" class="inventory-modal-secondary" type="button" data-action="rotate-selected-rail" aria-label="配置済み線路の向きを90度回転" hidden>↻ 線路を90度回転</button>
-            <section id="vehicle-menu-controls" hidden>
-                <p id="vehicle-status" role="status"></p>
-                <label>移動制御スクロール<select id="vehicle-movement-scroll"><option value="">未割当</option></select></label>
-                <p id="vehicle-resource-settings"></p>
+            <section id="vehicle-menu-controls" class="vehicle-menu-controls" hidden aria-label="機関車の運転操作">
+                <div class="vehicle-control-heading">
+                    <span class="vehicle-control-kicker">LOCOMOTIVE / CONTROL</span>
+                    <span id="vehicle-status" class="vehicle-status" role="status" aria-live="polite"></span>
+                </div>
+                <p id="vehicle-start-guide" class="vehicle-start-guide"></p>
+                <div class="vehicle-operation-guide" aria-label="運転方法">
+                    <div><span>01</span><strong>機関車を線路へ</strong></div>
+                    <div><span>02</span><strong>「出発」を押す</strong></div>
+                    <div><span>03</span><strong>貨車が追従</strong></div>
+                </div>
+                <p id="vehicle-resource-settings" class="vehicle-speed-info"></p>
             </section>
             <div class="inventory-modal-actions">
                 <button id="building-menu-craft" class="saved-scroll-use" type="button" data-action="open-building-crafting" hidden>製作</button>
-                <button id="building-menu-start-vehicle" class="saved-scroll-use" type="button" data-action="toggle-building-vehicle" hidden>起動</button>
+                <button id="building-menu-start-vehicle" class="saved-scroll-use" type="button" data-action="toggle-building-vehicle" hidden>出発</button>
             </div>
         </div>
     </div>
@@ -269,6 +296,11 @@
     </div>
     <div id="inventory-item-modal" class="inventory-modal" hidden role="dialog" aria-modal="true" aria-labelledby="inventory-modal-title">
         <div class="inventory-modal-panel">
+            <button id="inventory-modal-discard" class="inventory-modal-discard" type="button" data-action="open-inventory-discard-confirmation" aria-label="アイテムを破棄">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path d="M4 7h16M9 7V4h6v3m3 0-.8 13H6.8L6 7m4 3v7m4-7v7" />
+                </svg>
+            </button>
             <button class="inventory-modal-close" type="button" data-action="close-inventory-modal" aria-label="閉じる">×</button>
             <div id="inventory-modal-icon" class="inventory-modal-icon" aria-hidden="true"></div>
             <div class="inventory-modal-kicker">ITEM INFORMATION</div>
@@ -285,7 +317,19 @@
                 <button class="inventory-modal-secondary" type="button" data-action="close-inventory-modal">閉じる</button>
             </div>
         </div>
-        </div>
+    </div>
+    <div id="inventory-discard-confirm-modal" class="inventory-modal" hidden role="dialog" aria-modal="true" aria-labelledby="inventory-discard-confirm-title">
+        <section class="inventory-modal-panel demolition-confirm-panel">
+            <button class="inventory-modal-close" type="button" data-action="cancel-inventory-discard" aria-label="破棄確認を閉じる">×</button>
+            <div class="inventory-modal-kicker">DISCARD ITEM</div>
+            <h2 id="inventory-discard-confirm-title">アイテムを破棄</h2>
+            <p id="inventory-discard-confirm-message"></p>
+            <div class="inventory-modal-actions">
+                <button class="inventory-modal-secondary" type="button" data-action="cancel-inventory-discard">やめる</button>
+                <button class="building-demolition-confirm-button" type="button" data-action="confirm-inventory-discard">破棄する</button>
+            </div>
+        </section>
+    </div>
         <div id="recipe-detail-modal" class="inventory-modal" hidden role="dialog" aria-modal="true" aria-labelledby="recipe-detail-title">
             <section class="inventory-modal-panel recipe-detail-panel">
                 <button class="inventory-modal-close" type="button" data-action="close-recipe-detail" aria-label="レシピ詳細を閉じる">×</button>
@@ -377,6 +421,7 @@
                                     <div class="dashboard-title">LIVE ENGINE DASHBOARD</div>
                                     <span id="main-creative-mode-indicator" class="creative-mode-indicator" hidden>CREATIVE MODE: ON</span>
                                 </div>
+                                <p class="shared-resource-note">共有エネルギーは所持品・建築設備・ギアで共通の保有量です。</p>
                                 <div class="dashboard-resource-table">
                                     <div class="dashboard-resource-row dashboard-resource-header">
                                         <span>資源</span><span>保有量</span><span>生成 / 回収</span><span>消費</span>
@@ -400,7 +445,7 @@
                                 </div>
                             </div>
                         </section>
-                        <iframe src="../GearSystem/scroll-library.html?embed=1&hideMapBack=1&dashboard=external&v=36" title="保存スクロールのギアプレビュー"></iframe>
+                        <iframe src="../GearSystem/scroll-library.html?embed=1&hideMapBack=1&dashboard=external&v=37" title="保存スクロールのギアプレビュー"></iframe>
                     </section>
                 </div>
             </div>
@@ -412,6 +457,6 @@
         </div>
     </div>
 
-    <script type="module" src="js/main.js?v=780"></script>
+    <script type="module" src="js/main.js?v=806"></script>
 </body>
 </html>

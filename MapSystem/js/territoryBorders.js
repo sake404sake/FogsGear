@@ -79,39 +79,62 @@ export function getTerritoryBorderPoint(x, y, pair = '') {
     };
 }
 
-export function buildTerritoryBorderSegments(grid) {
-    if (!grid?.length || !grid[0]?.length) return [];
-    const segments = [];
+function createTerritoryBorderBuilder(grid) {
+    if (!grid?.length || !grid[0]?.length) return null;
+    const segments = new Map();
+    const addSegment = segment => {
+        segments.set(edgeKey(segment.x1, segment.y1, segment.x2, segment.y2), segment);
+    };
     const addLandBorder = (x1, y1, x2, y2, first, second) => {
         if (!isLand(first) || !isLand(second)) return;
         if (first.territoryId < 0 || second.territoryId < 0 || first.territoryId === second.territoryId) return;
-        segments.push({ x1, y1, x2, y2, pair: [first.territoryId, second.territoryId].sort((a, b) => a - b).join(':') });
+        addSegment({ x1, y1, x2, y2, pair: [first.territoryId, second.territoryId].sort((a, b) => a - b).join(':') });
     };
     const addCoast = (x1, y1, x2, y2, landTile, waterTile) => {
         if (!isLand(landTile) || !waterTile?.isSea || landTile.territoryId < 0) return;
-        segments.push({ x1, y1, x2, y2, pair: `${landTile.territoryId}:coast` });
+        addSegment({ x1, y1, x2, y2, pair: `${landTile.territoryId}:coast` });
     };
     const addLakeBorder = (x1, y1, x2, y2, landTile, lakeTile) => {
         if (!isLand(landTile) || !lakeTile?.isLake) return;
         if (landTile.territoryId < 0 || lakeTile.territoryId < 0 || landTile.territoryId === lakeTile.territoryId) return;
-        segments.push({ x1, y1, x2, y2, pair: [landTile.territoryId, lakeTile.territoryId].sort((a, b) => a - b).join(':') });
+        addSegment({ x1, y1, x2, y2, pair: [landTile.territoryId, lakeTile.territoryId].sort((a, b) => a - b).join(':') });
     };
-    for (let y = 0; y < grid.length; y++) {
-        for (let x = 0; x < grid[0].length; x++) {
-            const tile = grid[y][x];
-            addLandBorder(x + 1, y, x + 1, y + 1, tile, grid[y]?.[x + 1]);
-            addLandBorder(x, y + 1, x + 1, y + 1, tile, grid[y + 1]?.[x]);
-            addCoast(x + 1, y, x + 1, y + 1, tile, grid[y]?.[x + 1]);
-            addCoast(x, y + 1, x + 1, y + 1, tile, grid[y + 1]?.[x]);
-            addCoast(x + 1, y, x + 1, y + 1, grid[y]?.[x + 1], tile);
-            addCoast(x, y + 1, x + 1, y + 1, grid[y + 1]?.[x], tile);
-            addLakeBorder(x + 1, y, x + 1, y + 1, tile, grid[y]?.[x + 1]);
-            addLakeBorder(x, y + 1, x + 1, y + 1, tile, grid[y + 1]?.[x]);
-            addLakeBorder(x + 1, y, x + 1, y + 1, grid[y]?.[x + 1], tile);
-            addLakeBorder(x, y + 1, x + 1, y + 1, grid[y + 1]?.[x], tile);
+    const processRows = (startY, endY) => {
+        for (let y = startY; y < endY; y++) {
+            for (let x = 0; x < grid[0].length; x++) {
+                const tile = grid[y][x];
+                addLandBorder(x + 1, y, x + 1, y + 1, tile, grid[y]?.[x + 1]);
+                addLandBorder(x, y + 1, x + 1, y + 1, tile, grid[y + 1]?.[x]);
+                addCoast(x + 1, y, x + 1, y + 1, tile, grid[y]?.[x + 1]);
+                addCoast(x, y + 1, x + 1, y + 1, tile, grid[y + 1]?.[x]);
+                addCoast(x + 1, y, x + 1, y + 1, grid[y]?.[x + 1], tile);
+                addCoast(x, y + 1, x + 1, y + 1, grid[y + 1]?.[x], tile);
+                addLakeBorder(x + 1, y, x + 1, y + 1, tile, grid[y]?.[x + 1]);
+                addLakeBorder(x, y + 1, x + 1, y + 1, tile, grid[y + 1]?.[x]);
+                addLakeBorder(x + 1, y, x + 1, y + 1, grid[y]?.[x + 1], tile);
+                addLakeBorder(x, y + 1, x + 1, y + 1, grid[y + 1]?.[x], tile);
+            }
         }
+    };
+    return { processRows, segments };
+}
+
+export function buildTerritoryBorderSegments(grid) {
+    const builder = createTerritoryBorderBuilder(grid);
+    if (!builder) return [];
+    builder.processRows(0, grid.length);
+    return [...builder.segments.values()];
+}
+
+export async function buildTerritoryBorderSegmentsAsync(grid, onProgress = () => {}) {
+    const builder = createTerritoryBorderBuilder(grid);
+    if (!builder) return [];
+    const rowsPerChunk = 8;
+    for (let startY = 0; startY < grid.length; startY += rowsPerChunk) {
+        const endY = Math.min(grid.length, startY + rowsPerChunk);
+        builder.processRows(startY, endY);
+        onProgress(endY / grid.length);
+        if (endY < grid.length) await new Promise(resolve => setTimeout(resolve, 0));
     }
-    const unique = new Map();
-    for (const segment of segments) unique.set(edgeKey(segment.x1, segment.y1, segment.x2, segment.y2), segment);
-    return [...unique.values()];
+    return [...builder.segments.values()];
 }

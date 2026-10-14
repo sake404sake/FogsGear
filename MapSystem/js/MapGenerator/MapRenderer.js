@@ -1,4 +1,4 @@
-import { buildTerritoryBorderSegments } from '../territoryBorders.js?v=35';
+import { buildTerritoryBorderSegments } from '../territoryBorders.js?v=36';
 
 export const BIOME_COLORS = Object.freeze({
     PLAINS: '#8db87c',

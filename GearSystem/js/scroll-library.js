@@ -3,6 +3,7 @@ import { GEAR_CONFIG, hexToPixel } from './GearManager.js?v=runtime-8';
 import { GearNetwork } from './GearSystem.js?v=network-8';
 
 const LIBRARY_KEY = 'fogsgear_scroll_library';
+const BUILDINGS_KEY = 'fogsgear_world_buildings';
 const ACTIVE_SCROLL_KEY = 'fogsgear_active_scroll_id';
 const ACTIVE_SCROLL_RUNNING_KEY = 'fogsgear_active_scroll_running';
 const ACTIVE_SCROLL_TARGETS_KEY = 'fogsgear_active_scroll_targets';
@@ -22,6 +23,17 @@ const materialElement = document.getElementById('scroll-material-label');
 const metaElement = document.getElementById('scroll-meta');
 const statusElement = document.getElementById('scroll-status');
 const toggleButton = document.getElementById('scroll-toggle');
+const durabilityElement = document.getElementById('scroll-durability-display');
+const copyButton = document.getElementById('scroll-copy');
+const deleteButton = document.getElementById('scroll-delete');
+const copyModal = document.getElementById('scroll-copy-modal');
+const copyForm = document.getElementById('scroll-copy-form');
+const copySourceElement = document.getElementById('scroll-copy-source');
+const copyMaterialSelect = document.getElementById('scroll-copy-material');
+const copyNameInput = document.getElementById('scroll-copy-name');
+const copyCostElement = document.getElementById('scroll-copy-cost');
+const copyStatusElement = document.getElementById('scroll-copy-status');
+const copySubmitButton = document.getElementById('scroll-copy-submit');
 const previewFrame = document.querySelector('.scroll-preview-frame');
 const choiceModal = document.getElementById('scroll-choice-modal');
 const choiceTitle = document.getElementById('scroll-choice-title');
@@ -52,12 +64,16 @@ const sharedScrollParts = new Map();
 const SHARE_QR_PART_LENGTH = 1050;
 const SHARE_QR_MAX_PARTS = 32;
 const SHARE_QR_MAX_COMPRESSED_BYTES = Math.floor((SHARE_QR_PART_LENGTH * SHARE_QR_MAX_PARTS - 2) / 4) * 3;
+const SCROLL_DURABILITY_LIMITS = Object.freeze({ paper: 50, cloth: 100 });
 const pageParams = new URLSearchParams(window.location.search);
 const isEmbedded = pageParams.get('embed') === '1';
 const isScrollBook = pageParams.get('source') === 'scroll-book';
+const isPreviewOnly = pageParams.get('previewOnly') === '1';
+const followRunningState = isPreviewOnly && pageParams.get('followRunning') === '1';
 const hideMapBack = pageParams.get('hideMapBack') === '1';
 const hasExternalDashboard = pageParams.get('dashboard') === 'external';
 if (isEmbedded) document.body.classList.add('embedded-library');
+if (isPreviewOnly) document.body.classList.add('scroll-preview-only');
 if (isEmbedded && hideMapBack) document.body.classList.add('hide-embedded-map-back');
 if (isScrollBook) document.body.classList.add('scroll-book-view');
 if (isEmbedded && hasExternalDashboard) document.body.classList.add('external-engine-dashboard');
@@ -189,6 +205,7 @@ let selectedScrollId = null;
 let library = [];
 let renderedScrollId = null;
 let runtimePreviewScrollId = null;
+let pendingCopyRequestId = null;
 
 function readLibrary() {
     try {
@@ -196,6 +213,21 @@ function readLibrary() {
         return Array.isArray(value) ? value : [];
     } catch (error) {
         return [];
+    }
+}
+
+function getAvailableScrolls() {
+    if (isPreviewOnly) return library;
+    try {
+        const buildings = JSON.parse(localStorage.getItem(BUILDINGS_KEY) || '[]');
+        if (!Array.isArray(buildings)) return library;
+        const installedIds = new Set(buildings
+            .map(building => building?.craftingScrollId)
+            .filter(scrollId => typeof scrollId === 'string' && scrollId));
+        return library.filter(scroll => !installedIds.has(scroll.id));
+    } catch (error) {
+        console.error('Could not read installed building scrolls.', error);
+        return library;
     }
 }
 
@@ -208,8 +240,121 @@ function getMaterialLabel(scroll) {
     return getMaterial(scroll) === 'cloth' ? '布のスクロール' : '紙のスクロール';
 }
 
+function getDurabilityLimit(scroll) {
+    return SCROLL_DURABILITY_LIMITS[getMaterial(scroll)];
+}
+
+function getCopyMaterialCost(scroll) {
+    const gears = Array.isArray(scroll?.blueprint?.gears) ? scroll.blueprint.gears : [];
+    return gears.reduce((total, gear) => {
+        if (gear?.isCore) return total;
+        const size = String(gear?.size || '');
+        const teeth = { XXS: 4, SS: 6, S: 10, M: 14, L: 18, LL: 24, '3L': 32, '4L': 40, MAX: 48 }[size];
+        if (!teeth) throw new Error('設計図に不明なギアサイズがあります。');
+        return total + teeth;
+    }, 0);
+}
+
+function getUsedRotations(scroll) {
+    const value = Number(scroll?.usedRotations);
+    return Number.isFinite(value) ? Math.max(0, value) : 0;
+}
+
+function isExhausted(scroll) {
+    return getUsedRotations(scroll) >= getDurabilityLimit(scroll);
+}
+
+function getFilteredScrolls() {
+    return getAvailableScrolls().filter(scroll => {
+        if (currentMaterial === 'exhausted') return isExhausted(scroll);
+        if (isExhausted(scroll)) return false;
+        return currentMaterial === 'all' || getMaterial(scroll) === currentMaterial;
+    });
+}
+
 function getSelectedScroll() {
     return library.find(scroll => scroll.id === selectedScrollId) || null;
+}
+
+function getUniqueCopyName(sourceName) {
+    const base = `${String(sourceName || '名前なしスクロール').trim()}（写し）`;
+    const existingNames = new Set(library.map(scroll => String(scroll.name || '').toLocaleLowerCase()));
+    if (!existingNames.has(base.toLocaleLowerCase())) return base.slice(0, 80);
+    for (let suffix = 2; suffix < 10000; suffix++) {
+        const suffixText = `（${suffix}）`;
+        const candidate = `${base.slice(0, 80 - suffixText.length)}${suffixText}`;
+        if (!existingNames.has(candidate.toLocaleLowerCase())) return candidate;
+    }
+    throw new Error('重複しないスクロール名を作成できませんでした。');
+}
+
+function requestCopy(scrollId, name, material) {
+    if (pendingCopyRequestId) return;
+    if (!isEmbedded || window.parent === window) {
+        copyStatusElement.textContent = 'マップ画面からスクロールブックを開いてください。';
+        return;
+    }
+    pendingCopyRequestId = `copy-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+    copySubmitButton.disabled = true;
+    copyStatusElement.textContent = '写本しています...';
+    window.parent.postMessage({
+        type: 'fogsgear:copy-scroll',
+        requestId: pendingCopyRequestId,
+        scrollId,
+        name,
+        material
+    }, window.location.origin === 'null' ? '*' : window.location.origin);
+}
+
+function openCopyModal(scroll) {
+    if (!scroll || !isScrollBook || getInstalledScrollIds().has(scroll.id)) return;
+    try {
+        const cost = getCopyMaterialCost(scroll);
+        if (cost <= 0) throw new Error('メインギア以外のギアがないため写本できません。');
+        copySourceElement.textContent = `${scroll.name || '名前なしスクロール'} / 材料: 真鍮 ${cost}`;
+        copyMaterialSelect.value = getMaterial(scroll);
+        copyNameInput.value = getUniqueCopyName(scroll.name);
+        copyCostElement.textContent = `消費: 真鍮 ${cost}（メインギア以外のギアの設置コスト合計）`;
+        copyStatusElement.textContent = '';
+        copySubmitButton.disabled = false;
+        copyModal.hidden = false;
+        copyNameInput.focus();
+        copyNameInput.select();
+    } catch (error) {
+        window.alert(error instanceof Error ? error.message : String(error));
+    }
+}
+
+function closeCopyModal() {
+    copyModal.hidden = true;
+    pendingCopyRequestId = null;
+    copySubmitButton.disabled = false;
+}
+
+function deleteSelectedScroll(scroll) {
+    if (!scroll || !isScrollBook) return;
+    if (getInstalledScrollIds().has(scroll.id)) {
+        window.alert('設置中のスクロールは削除できません。先に建物から回収してください。');
+        return;
+    }
+    if (!window.confirm(`「${scroll.name || '名前なしスクロール'}」をスクロールブックから削除しますか？この操作は取り消せません。`)) return;
+    try {
+        const activeIds = getActiveScrollIds().filter(id => id !== scroll.id);
+        const targets = getActiveScrollTargets();
+        delete targets[scroll.id];
+        localStorage.setItem(ACTIVE_SCROLL_KEY, JSON.stringify(activeIds));
+        localStorage.setItem(ACTIVE_SCROLL_TARGETS_KEY, JSON.stringify(targets));
+        library = library.filter(item => item.id !== scroll.id);
+        localStorage.setItem(LIBRARY_KEY, JSON.stringify(library));
+        selectedScrollId = getFilteredScrolls()[0]?.id || null;
+        renderedScrollId = null;
+        renderList();
+        renderDetail();
+        resizePreview();
+    } catch (error) {
+        console.error('スクロールを削除できませんでした。', error);
+        window.alert('スクロールを削除できませんでした。保存容量やブラウザー設定を確認してください。');
+    }
 }
 
 function bytesToBase64Url(bytes) {
@@ -777,7 +922,7 @@ function setScrollRunning(scrollId, running) {
             const savedPlayer = JSON.parse(localStorage.getItem('steampunk_explorer_player_pos') || 'null');
             if (Number.isInteger(savedPlayer?.x) && Number.isInteger(savedPlayer?.y)) playerPosition = { x: savedPlayer.x, y: savedPlayer.y };
         } catch (error) {}
-        targets[scrollId] = playerPosition;
+        targets[scrollId] = { ...playerPosition, startedAt: Date.now() };
         ids.add(scrollId);
         localStorage.setItem(ACTIVE_SCROLL_TARGETS_KEY, JSON.stringify(targets));
         localStorage.setItem(ACTIVE_SCROLL_KEY, JSON.stringify([...ids]));
@@ -921,14 +1066,18 @@ function syncPreviewLocks(scroll) {
 }
 
 function renderList() {
-    const filtered = library.filter(scroll => currentMaterial === 'all' || getMaterial(scroll) === currentMaterial);
+    const filtered = getFilteredScrolls();
     const activeScrollIds = new Set(getActiveScrollIds());
     countElement.textContent = String(filtered.length);
     listElement.replaceChildren();
     if (!filtered.length) {
         const empty = document.createElement('p');
         empty.className = 'scroll-list-empty';
-        empty.textContent = currentMaterial === 'all' ? '保存済みスクロールはありません。' : 'この種類のスクロールはありません。';
+        empty.textContent = currentMaterial === 'exhausted'
+            ? 'レガシー設計はありません。'
+            : currentMaterial !== 'all'
+                ? 'この種類のスクロールはありません。'
+                : library.length ? 'すべて設備にセット中です。取り外すと手元に戻ります。' : '保存済みスクロールはありません。';
         listElement.appendChild(empty);
         return;
     }
@@ -937,12 +1086,26 @@ function renderList() {
         const item = document.createElement('div');
         item.className = `scroll-list-item${scroll.id === selectedScrollId ? ' active' : ''}${isRunning ? ' running' : ''}`;
         item.dataset.scrollId = scroll.id;
-        item.innerHTML = `<button class="scroll-list-select" type="button"><span class="scroll-list-type">${getMaterial(scroll) === 'cloth' ? '布' : '紙'}</span><span class="scroll-list-name"></span></button><button class="scroll-list-edit" type="button" aria-label="スクロールを編集" title="スクロールを編集"><span aria-hidden="true">⚙︎</span></button>`;
-        item.querySelector('.scroll-list-name').textContent = scroll.name || '名前なしスクロール';
-        const selectButton = item.querySelector('.scroll-list-select');
+        const selectButton = document.createElement('button');
+        selectButton.className = 'scroll-list-select';
+        selectButton.type = 'button';
+        const typeLabel = document.createElement('span');
+        typeLabel.className = 'scroll-list-type';
+        typeLabel.textContent = getMaterial(scroll) === 'cloth' ? '布' : '紙';
+        const nameLabel = document.createElement('span');
+        nameLabel.className = 'scroll-list-name';
+        nameLabel.textContent = scroll.name || '名前なしスクロール';
+        selectButton.append(typeLabel, nameLabel);
+        const editButton = document.createElement('button');
+        editButton.className = 'scroll-list-edit';
+        editButton.type = 'button';
+        editButton.setAttribute('aria-label', 'スクロールを編集');
+        editButton.title = 'スクロールを編集';
+        editButton.textContent = '⚙︎';
+        item.append(selectButton, editButton);
         selectButton.dataset.scrollId = scroll.id;
         selectButton.setAttribute('aria-label', `${getMaterialLabel(scroll)}: ${scroll.name || '名前なしスクロール'}、${isRunning ? '起動中' : '停止中'}`);
-        item.querySelector('.scroll-list-edit').dataset.scrollId = scroll.id;
+        editButton.dataset.scrollId = scroll.id;
         listElement.appendChild(item);
     });
 }
@@ -952,18 +1115,26 @@ function renderDetail() {
     const hasScroll = Boolean(scroll);
     emptyElement.hidden = hasScroll;
     detailElement.hidden = !hasScroll;
-    if (!scroll) return;
+    if (!scroll) {
+        stopPreviewAnimation();
+        previewState.running = false;
+        return;
+    }
     const gearCount = Array.isArray(scroll.blueprint?.gears) ? scroll.blueprint.gears.length : 0;
+    const durabilityLimit = getDurabilityLimit(scroll);
+    const usedRotations = Math.min(durabilityLimit, getUsedRotations(scroll));
+    const exhausted = isExhausted(scroll);
+    const installed = getInstalledScrollIds().has(scroll.id);
     const requestedRunning = getActiveScrollIds().includes(scroll.id);
     const target = getActiveScrollTargets()[scroll.id];
-    const enginePowered = hasEnginePower();
-    const isRunning = requestedRunning && enginePowered;
+    const enginePowered = isPreviewOnly && !followRunningState || hasEnginePower();
+    const isRunning = (isPreviewOnly && !followRunningState || requestedRunning && enginePowered) && !exhausted;
     previewState.running = isRunning;
     renderPreview(scroll);
-    syncPreviewLocks(scroll);
+    if (!isPreviewOnly) syncPreviewLocks(scroll);
     const effectiveRunning = isRunning && !previewState.invalid;
-    if (requestedRunning && !enginePowered) stopAllScrolls();
-    else if (requestedRunning && previewState.invalid) setScrollRunning(scroll.id, false);
+    if (!isPreviewOnly && requestedRunning && (exhausted || !enginePowered)) setScrollRunning(scroll.id, false);
+    else if (!isPreviewOnly && requestedRunning && previewState.invalid) setScrollRunning(scroll.id, false);
     previewState.running = effectiveRunning;
     if (effectiveRunning) startPreviewAnimation();
     else stopPreviewAnimation();
@@ -971,7 +1142,13 @@ function renderDetail() {
     nameElement.textContent = scroll.name || '名前なしスクロール';
     materialElement.textContent = getMaterialLabel(scroll);
     metaElement.textContent = `${gearCount}個のギア / 効果: ${scroll.effect?.label || '未設定'}`;
-    statusElement.textContent = previewState.invalid
+    durabilityElement.textContent = `${Math.floor(usedRotations + 0.000001)} / ${durabilityLimit}回転`;
+    durabilityElement.classList.toggle('is-exhausted', exhausted);
+    statusElement.textContent = isPreviewOnly
+        ? previewState.invalid ? 'ギア接続に矛盾があるため動作できません。' : '動作プレビュー中（ゲーム内の起動状態には影響しません）。'
+        : exhausted
+        ? `スクロール耐久度を使い切りました（${durabilityLimit}/${durabilityLimit}回転）。写本するか、不要なら削除できます。`
+        : previewState.invalid
         ? 'ギア接続に矛盾があるため起動できません。'
         : !enginePowered ? '動力が停止しているため起動できません。'
         : effectiveRunning ? 'このスクロールは起動中です。' : 'このスクロールは停止中です。';
@@ -979,9 +1156,12 @@ function renderDetail() {
         statusElement.textContent += ` / 対象セル (${target.x}, ${target.y})`;
     }
     toggleButton.textContent = effectiveRunning ? 'スクロールを停止' : 'スクロールを起動';
+    toggleButton.hidden = isPreviewOnly;
     toggleButton.classList.toggle('btn-reset', effectiveRunning);
     toggleButton.classList.toggle('btn-visibility', !effectiveRunning);
-    toggleButton.disabled = previewState.invalid;
+    toggleButton.disabled = previewState.invalid || exhausted;
+    copyButton.hidden = !isScrollBook || !hasScroll || installed;
+    deleteButton.hidden = !isScrollBook || !hasScroll || installed;
 }
 
 function openChoiceModal(scroll) {
@@ -993,6 +1173,18 @@ function openChoiceModal(scroll) {
 
 function closeChoiceModal() {
     if (choiceModal) choiceModal.hidden = true;
+}
+
+function getInstalledScrollIds() {
+    try {
+        const buildings = JSON.parse(localStorage.getItem(BUILDINGS_KEY) || '[]');
+        return new Set(Array.isArray(buildings)
+            ? buildings.map(building => building?.craftingScrollId).filter(id => typeof id === 'string')
+            : []);
+    } catch (error) {
+        console.error('設置中スクロールを確認できませんでした。', error);
+        return new Set(library.map(scroll => scroll.id));
+    }
 }
 
 function selectScroll(scrollId) {
@@ -1037,7 +1229,7 @@ tabs.forEach(tab => tab.addEventListener('click', () => {
         item.classList.toggle('active', active);
         item.setAttribute('aria-selected', String(active));
     });
-    const visible = library.filter(scroll => currentMaterial === 'all' || getMaterial(scroll) === currentMaterial);
+    const visible = getFilteredScrolls();
     if (!visible.some(scroll => scroll.id === selectedScrollId)) selectedScrollId = visible[0]?.id || null;
     renderList();
     renderDetail();
@@ -1063,12 +1255,59 @@ listElement.addEventListener('click', event => {
 
 toggleButton.addEventListener('click', () => {
     const scroll = getSelectedScroll();
-    if (!scroll || previewState.invalid) return;
+    if (!scroll || previewState.invalid || isExhausted(scroll)) return;
     const isRunning = getActiveScrollIds().includes(scroll.id);
     if (!isRunning) requestEngineResume();
     setScrollRunning(scroll.id, !isRunning);
     previewState.running = !isRunning;
     renderDetail();
+});
+
+copyButton?.addEventListener('click', () => openCopyModal(getSelectedScroll()));
+deleteButton?.addEventListener('click', () => deleteSelectedScroll(getSelectedScroll()));
+copyForm?.addEventListener('submit', event => {
+    event.preventDefault();
+    const scroll = getSelectedScroll();
+    const name = copyNameInput.value.trim();
+    if (!scroll || !name || pendingCopyRequestId) return;
+    requestCopy(scroll.id, name, copyMaterialSelect.value);
+});
+document.getElementById('scroll-copy-close')?.addEventListener('click', closeCopyModal);
+document.getElementById('scroll-copy-cancel')?.addEventListener('click', closeCopyModal);
+copyModal?.addEventListener('click', event => {
+    if (event.target === copyModal) closeCopyModal();
+});
+copyMaterialSelect?.addEventListener('change', () => {
+    const scroll = getSelectedScroll();
+    if (scroll) copyCostElement.textContent = `消費: 真鍮 ${getCopyMaterialCost(scroll)}（メインギア以外のギアの設置コスト合計）`;
+});
+window.addEventListener('message', event => {
+    if ((event.origin !== window.location.origin && event.origin !== 'null') || event.source !== window.parent
+        || event.data?.type !== 'fogsgear:copy-scroll-result'
+        || event.data.requestId !== pendingCopyRequestId) return;
+    pendingCopyRequestId = null;
+    copySubmitButton.disabled = false;
+    if (event.data.success) {
+        library = readLibrary();
+        selectedScrollId = event.data.scrollId;
+        currentMaterial = 'all';
+        tabs.forEach(tab => {
+            const active = tab.dataset.material === 'all';
+            tab.classList.toggle('active', active);
+            tab.setAttribute('aria-selected', String(active));
+        });
+        renderedScrollId = null;
+        copyModal.hidden = true;
+        renderList();
+        renderDetail();
+        resizePreview();
+        window.alert(`「${event.data.name}」を作成しました。消費した真鍮: ${event.data.cost}`);
+    } else {
+        copyStatusElement.textContent = event.data.message || '写本に失敗しました。';
+    }
+});
+window.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && !copyModal.hidden) closeCopyModal();
 });
 
 shareButton?.addEventListener('click', () => openShareModal(getSelectedScroll()));
@@ -1116,9 +1355,13 @@ choiceModal?.addEventListener('click', event => {
 });
 
 window.addEventListener('storage', event => {
-    if (event.key === LIBRARY_KEY || event.key === ACTIVE_SCROLL_KEY || event.key === ACTIVE_SCROLL_RUNNING_KEY || event.key === ACTIVE_SCROLL_TARGETS_KEY || event.key === ACTIVE_SCROLL_SYNC_STATE_KEY || event.key === GAME_SAVE_KEY) {
+    if (event.key === LIBRARY_KEY || event.key === BUILDINGS_KEY || event.key === ACTIVE_SCROLL_KEY || event.key === ACTIVE_SCROLL_RUNNING_KEY || event.key === ACTIVE_SCROLL_TARGETS_KEY || event.key === ACTIVE_SCROLL_SYNC_STATE_KEY || event.key === GAME_SAVE_KEY) {
         library = readLibrary();
-        if (!library.some(scroll => scroll.id === selectedScrollId)) selectedScrollId = library[0]?.id || null;
+        const availableScrolls = getAvailableScrolls();
+        if (!availableScrolls.some(scroll => scroll.id === selectedScrollId)) {
+            selectedScrollId = availableScrolls[0]?.id || null;
+            renderedScrollId = null;
+        }
         if (event.key === LIBRARY_KEY) renderedScrollId = null;
         renderList();
         renderDetail();
@@ -1136,7 +1379,11 @@ setInterval(() => {
 }, 500);
 
 library = readLibrary();
-selectedScrollId = library[0]?.id || null;
+const previewScrollId = pageParams.get('scrollId');
+const initialScrolls = getAvailableScrolls();
+selectedScrollId = initialScrolls.some(scroll => scroll.id === previewScrollId)
+    ? previewScrollId
+    : initialScrolls[0]?.id || null;
 renderList();
 renderDetail();
 resizePreview();

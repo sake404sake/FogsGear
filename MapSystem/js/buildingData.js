@@ -16,6 +16,7 @@ const definitions = [
     ['rail-signal', '信号付き直線線路', 1, 1, 'rail-signal', 'rail', 3],
     ['simple-furnace', '簡易炉', 1, 1, 'furnace', 'outpost'],
     ['simple-storage', '簡易ストレージ', 1, 1, 'storage', 'outpost'],
+    ['scroll-stand', 'スクロール台', 1, 1, 'scroll-stand', 'production', 8],
     ['hand-pump', '手回し式揚管ポンプ', 1, 1, 'pump', 'outpost'],
     ['pressure-gauge-tower', '圧力計ペデスタル塔', 1, 1, 'gauge', 'outpost'],
     ['fog-vent', '霧よけスチームベント', 1, 1, 'vent', 'outpost'],
@@ -73,6 +74,7 @@ export const BUILDING_MATERIAL_COSTS_BY_ID = Object.freeze({
     'rail-signal': [['wood', 3], ['iron-plate', 2], ['brass-sheet', 1], ['pressure-gauge', 1]],
     'simple-furnace': [['clay', 3], ['limestone', 2], ['wood', 2]],
     'simple-storage': [['lumber', 4], ['rivet', 2]],
+    'scroll-stand': [['brass-sheet', 4], ['bronze-bearing', 2], ['iron-screw', 4], ['lumber', 2]],
     'hand-pump': [['lumber', 2], ['crank-handle', 1], ['bronze-bearing', 1]],
     'pressure-gauge-tower': [['brass-sheet', 1], ['copper-capillary', 2], ['iron-plate', 1]],
     'fog-vent': [['steam-nozzle', 1], ['ceramic-barrier', 1], ['copper-capillary', 1]],
@@ -147,6 +149,7 @@ const BUILDING_REQUIREMENTS_BY_ID = Object.freeze({
 const BUILDING_DESCRIPTIONS_BY_ID = Object.freeze({
     'simple-storage': '小型の物理資材庫。建築メニューから資材を預け入れ・取り出しできます。',
     warehouse: '大容量の物理資材庫。建築メニューから資材を預け入れ・取り出しできます。',
+    'scroll-stand': 'スクロールを固定して設置セルで稼働させます。近くのストレージが収集資材を自動で取り込みます。',
     'drying-rack': '木材を乾燥させ、製材板を作るための作業設備です。',
     'settler-lodge': 'ドームへ植生を定着させる生態系培地を準備します。',
     'field-automaton': '設定した見た目を活かし、頭の歯車飾りと足元の歯車で識別できる作業人形です。鋼材、ばね、青銅軸受、圧力膜などから建築キットを組み立てます。周囲を巡回し、設定した条件に応じて採取・地形変成・ストレージとの積み下ろしを行います。',
@@ -174,6 +177,8 @@ export const BUILDING_DEFINITIONS = definitions.map(([id, name, width, height, k
     utilityStorageCapacity: { ...(BUILDING_UTILITY_CONFIG_BY_ID[id]?.storageCapacity || {}) },
     utilityRates: { ...(BUILDING_UTILITY_CONFIG_BY_ID[id]?.rates || {}) },
     storageCapacity: id === 'simple-storage' ? 50 : id === 'warehouse' ? 300 : 0,
+    collectionImportRange: id === 'simple-storage' ? 1 : id === 'warehouse' ? 3 : 0,
+    supportsStationaryScrolls: id === 'scroll-stand',
     requiredBuildings: [...(BUILDING_REQUIREMENTS_BY_ID[id] || [])],
     description: BUILDING_DESCRIPTIONS_BY_ID[id] || '',
     tileEffects: tileEffects.map(effect => ({ ...effect }))
@@ -566,6 +571,41 @@ export function drawBuilding(ctx, building, tileSize, { ghost = false, valid = t
         if (ghost && !valid) {
             drawInvalidGhostOverlay(ctx, x, y, width, height, detail, ghost, valid);
         } else if (ghost) {
+            ctx.save();
+            ctx.strokeStyle = '#91e1ba';
+            ctx.lineWidth = Math.max(1.5, detail * 1.6);
+            ctx.setLineDash([Math.max(3, tileSize * .15), Math.max(2, tileSize * .1)]);
+            ctx.strokeRect(x + pad, y + pad, width - pad * 2, height - pad * 2);
+            ctx.setLineDash([]);
+            ctx.restore();
+        }
+        return;
+    }
+
+    if (building.kind === 'scroll-stand') {
+        ctx.save();
+        ctx.globalAlpha = ghost ? .68 : 1;
+        ctx.fillStyle = '#604833';
+        ctx.strokeStyle = '#d4ad60';
+        ctx.lineWidth = Math.max(2, detail * 1.5);
+        ctx.fillRect(x + width * .12, y + height * .72, width * .76, height * .16);
+        ctx.strokeRect(x + width * .12, y + height * .72, width * .76, height * .16);
+        ctx.fillStyle = '#34473f';
+        ctx.fillRect(x + width * .2, y + height * .32, width * .6, height * .42);
+        ctx.strokeRect(x + width * .2, y + height * .32, width * .6, height * .42);
+        ctx.beginPath();
+        ctx.arc(centerX, y + height * .53, width * .15, 0, Math.PI * 2);
+        ctx.fillStyle = '#9b693c';
+        ctx.fill();
+        ctx.strokeStyle = '#edcf78';
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(centerX, y + height * .53, width * .045, 0, Math.PI * 2);
+        ctx.fillStyle = '#d9bc68';
+        ctx.fill();
+        ctx.restore();
+        if (ghost && !valid) drawInvalidGhostOverlay(ctx, x, y, width, height, detail, ghost, valid);
+        else if (ghost) {
             ctx.save();
             ctx.strokeStyle = '#91e1ba';
             ctx.lineWidth = Math.max(1.5, detail * 1.6);

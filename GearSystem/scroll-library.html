@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>スクロール書庫 | Fogs Gear</title>
-    <link rel="stylesheet" href="css/style.css?v=scroll-63">
+    <link rel="stylesheet" href="css/style.css?v=scroll-70">
 </head>
 <body class="scroll-library-page">
     <main class="scroll-library-shell">
@@ -18,9 +18,10 @@
         </header>
 
         <nav class="scroll-tabs" aria-label="スクロールの種類">
-            <button class="scroll-tab active" type="button" data-material="all" aria-selected="true">すべて</button>
+            <button class="scroll-tab active" type="button" data-material="all" aria-selected="true">紙・布</button>
             <button class="scroll-tab" type="button" data-material="paper" aria-selected="false">紙</button>
             <button class="scroll-tab" type="button" data-material="cloth" aria-selected="false">布</button>
+            <button class="scroll-tab" type="button" data-material="exhausted" aria-selected="false">レガシー</button>
             <a class="scroll-tab embedded-map-back back-to-map" href="../MapSystem/index.html" aria-label="マップへ戻る" title="マップへ戻る">← マップ</a>
         </nav>
 
@@ -44,10 +45,13 @@
                     <div class="scroll-preview-frame">
                         <canvas id="previewCanvas" width="760" height="430" aria-label="保存ギア全体のプレビュー"></canvas>
                         <div class="preview-lock-label">PREVIEW / 固定表示</div>
+                        <div id="scroll-durability-display" class="scroll-durability-display" aria-label="スクロール耐久度">0 / 50回転</div>
                     </div>
                     <div class="scroll-detail-footer">
                         <p id="scroll-status" class="scroll-status">このスクロールは停止中です。</p>
                         <div class="scroll-actions">
+                            <button id="scroll-copy" class="btn btn-action" type="button">写本</button>
+                            <button id="scroll-delete" class="btn btn-reset" type="button">削除</button>
                             <button id="scroll-share" class="btn btn-action" type="button">QRで共有</button>
                         </div>
                     </div>
@@ -60,6 +64,7 @@
                                 <div class="dashboard-title">LIVE ENGINE DASHBOARD</div>
                                 <span id="main-creative-mode-indicator" class="creative-mode-indicator" hidden>CREATIVE MODE: ON</span>
                             </div>
+                            <p class="shared-resource-note">共有エネルギーは所持品・建築設備・ギアで共通の保有量です。</p>
                             <div class="dashboard-resource-table">
                                 <div class="dashboard-resource-row dashboard-resource-header">
                                     <span>資源</span><span>保有量</span><span>生成 / 回収</span><span>消費</span>
@@ -98,6 +103,29 @@
             </div>
         </div>
     </div>
+    <div id="scroll-copy-modal" class="scroll-choice-modal" hidden role="dialog" aria-modal="true" aria-labelledby="scroll-copy-title">
+        <form id="scroll-copy-form" class="scroll-choice-panel scroll-copy-panel">
+            <button id="scroll-copy-close" class="scroll-choice-close" type="button" aria-label="閉じる">×</button>
+            <div class="scroll-library-kicker">MANUSCRIPT COPY</div>
+            <h2 id="scroll-copy-title">スクロールを写本</h2>
+            <p id="scroll-copy-source"></p>
+            <label for="scroll-copy-material">写本先
+                <select id="scroll-copy-material">
+                    <option value="paper">紙スクロール（耐久度50回転）</option>
+                    <option value="cloth">布スクロール（耐久度100回転）</option>
+                </select>
+            </label>
+            <label for="scroll-copy-name">新しいスクロール名
+                <input id="scroll-copy-name" type="text" maxlength="80" required>
+            </label>
+            <p id="scroll-copy-cost"></p>
+            <p id="scroll-copy-status" role="status" aria-live="polite"></p>
+            <div class="scroll-choice-actions">
+                <button id="scroll-copy-cancel" class="btn btn-reset" type="button">キャンセル</button>
+                <button id="scroll-copy-submit" class="btn btn-action" type="submit">写本する</button>
+            </div>
+        </form>
+    </div>
     <div id="scroll-share-modal" class="scroll-choice-modal scroll-share-modal" hidden role="dialog" aria-modal="true" aria-labelledby="scroll-share-title">
         <div class="scroll-choice-panel scroll-share-panel">
             <button id="scroll-share-close" class="scroll-choice-close" type="button" aria-label="閉じる">×</button>
@@ -128,6 +156,6 @@
     </div>
     <script src="js/vendor/qrcode-generator.min.js?v=2.0.4"></script>
     <script src="js/vendor/jsQR.js?v=1.4.0"></script>
-    <script type="module" src="js/scroll-library.js?v=53"></script>
+    <script type="module" src="js/scroll-library.js?v=59"></script>
 </body>
 </html>

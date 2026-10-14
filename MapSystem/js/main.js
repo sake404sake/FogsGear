@@ -1,21 +1,23 @@
 // js/main.js - Steampunk Explorer Game Logic
-import { MapGenerator, BIOME_COLORS, loadMapSnapshot, saveMapSnapshot } from './mapGenerator.js?v=89';
+import { MapGenerator, BIOME_COLORS, loadMapSnapshot, saveMapSnapshot } from './mapGenerator.js?v=92';
 import { SkinRenderer } from './skinRenderer.js?v=5';
 import { SkinPreview } from './skinPreview.js?v=4';
 import { CELL_DEFINITIONS, canEnterCell, getCellEntryRule, getCellTypeKey, getMosaicColor } from './cellRules.js';
 import { drawCellIcon, loadCellIconAtlas } from './cellIconRenderer.js?v=5';
 import { ACTIVE_SCROLL_TARGETS_KEY, CELL_MATERIALS, TERRAIN_TRANSFORM_RECIPES, WORLD_CELL_TYPES, applyCellChanges, chooseEraCellType, getCellCollectionPowerCost, getCellDrops, readCellChanges, saveCellChange } from './worldCells.js?v=13';
-import { CRAFTING_ITEMS, CRAFTING_ITEM_BY_ID, CRAFTING_RATE_MULTIPLIER, CRAFTING_RECIPES, CRAFTING_STATION_BUILDING_IDS, DEFERRED_CRAFTING_ITEM_IDS, HANDCRAFT_STATION } from './craftingData.js?v=13';
-import { BUILDING_BY_ID, BUILDING_DEFINITIONS, canPlaceBuildingOnTerrainCell, drawBuilding, getRailAutoRotation, getRailConnections, getTileEffectsUnderFootprint, getVehicleRailRotation, loadBuildingIconImages, normalizeBuildingUtilityState } from './buildingData.js?v=33';
+import { CRAFTING_ITEMS, CRAFTING_ITEM_BY_ID, CRAFTING_OVERCLOCK_OPTIONS, CRAFTING_RATE_MULTIPLIER, CRAFTING_RECIPES, CRAFTING_STATION_BUILDING_IDS, CRAFTING_STATION_POWER_RATES, DEFERRED_CRAFTING_ITEM_IDS, HANDCRAFT_STATION } from './craftingData.js?v=17';
+import { BUILDING_BY_ID, BUILDING_DEFINITIONS, canPlaceBuildingOnTerrainCell, drawBuilding, getRailAutoRotation, getRailConnections, getTileEffectsUnderFootprint, getVehicleRailRotation, loadBuildingIconImages, normalizeBuildingUtilityState } from './buildingData.js?v=35';
 import { getBuildingUtilityStatus, simulateBuildingUtilityNetworks } from './buildingUtilityNetworks.js?v=5';
-import { buildTerritoryBorderSegments } from './territoryBorders.js?v=35';
+import { buildTerritoryBorderSegments, buildTerritoryBorderSegmentsAsync } from './territoryBorders.js?v=36';
 import { directionToVehicleRotation, findNextRailStep, getTrackDirection, getVehicleRenderState, STATION_CONTROL_DEFAULTS, VEHICLE_DEFAULTS } from './railwayRuntime.js?v=9';
-import { GameState as EngineGameState, clearGameProgress } from '../../GearSystem/js/GameState.js?v=runtime-46';
-import { GearManager as EngineGearManager } from '../../GearSystem/js/GearManager.js?v=runtime-5';
+import { GameState as EngineGameState, clearGameProgress } from '../../GearSystem/js/GameState.js?v=runtime-53';
+import { GEAR_CONFIG as ENGINE_GEAR_CONFIG, GearManager as EngineGearManager } from '../../GearSystem/js/GearManager.js?v=runtime-5';
+import { GearNetwork as EngineGearNetwork } from '../../GearSystem/js/GearSystem.js?v=network-8';
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const vehicleAnimationLayer = document.getElementById('vehicleAnimationLayer');
+const scrollStandMagicCircles = new Map();
 const vehicleMotionSprites = new Map();
 const automatonSkinRenderers = new Map();
 const AUTOMATON_TRANSPORT_RADIUS = 12;
@@ -165,12 +167,16 @@ let lastCraftingProgressUpdateAt = 0;
 let lastCraftingNotificationSyncAt = 0;
 let lastCraftingCountdownUpdateAt = 0;
 let selectedStorageStack = null;
+let pendingInventoryDiscardItemId = null;
 
 const INVENTORY_ITEM_DEFINITIONS = {
     paper_scroll: { name: 'スクロール（紙）', description: '新しいギア設計を記録する紙の巻物。ギア編集画面で設計を作成できます。', iconId: 'paper_scroll', image: null, meta: '未使用・新規設計用' },
     cloth_scroll: { name: 'スクロール（布）', description: '新しいギア設計を記録する布の巻物。ギア編集画面で設計を作成できます。', iconId: 'cloth_scroll', image: null, meta: '未使用・新規設計用' },
     scroll_book: { name: 'スクロールブック', description: '保存済みスクロールを一覧で確認し、使用やギア編集を行える記録帳です。', iconId: 'scroll_book', image: null, meta: '保存済み設計図' },
-    steam_power: { name: 'スチーム', description: 'ギアの作動負荷を支える蒸気資源です。', iconId: 'steam_power', image: null, meta: '保有資源' }
+    water: { name: '水', description: 'ギアの稼働や資源変換に使用する共有エネルギーです。', iconId: 'water', image: null, meta: '共有エネルギー' },
+    fog: { name: '霧', description: 'ギアの処理で回収・消費される共有エネルギーです。', iconId: 'fog', image: null, meta: '共有エネルギー' },
+    power: { name: '動力', description: '採集や製作などに使用する共有エネルギーです。', iconId: 'power', image: null, meta: '共有エネルギー' },
+    steam_power: { name: 'スチーム', description: 'ギアの作動負荷を支える共有エネルギーです。', iconId: 'steam_power', image: null, meta: '共有エネルギー' }
 };
 
 const CRAFTING_ICON_IDS = Object.freeze({
@@ -226,7 +232,9 @@ function openInventoryItem(itemKey, scroll = null) {
     const useButton = document.getElementById('inventory-modal-use');
     const placementModes = document.getElementById('inventory-modal-placement-modes');
     const editButton = document.getElementById('inventory-modal-edit');
+    const discardButton = document.getElementById('inventory-modal-discard');
     if (!modal || !icon) return;
+    modal.dataset.itemKey = itemKey;
     icon.replaceChildren();
     icon.appendChild(building ? createBuildingSvgIcon(building.id) : createCraftingIcon(definition.iconId || itemKey));
     if (definition.image) {
@@ -243,6 +251,7 @@ function openInventoryItem(itemKey, scroll = null) {
     document.getElementById('inventory-modal-meta').textContent = definition.meta;
     useButton.hidden = !scroll;
     useButton.dataset.scrollId = scroll?.id || '';
+    if (discardButton) discardButton.hidden = Boolean(scroll) || getCraftingItemCount(itemKey) <= 0;
     if (placementModes) {
         placementModes.hidden = !building || getCraftingItemCount(itemKey) <= 0;
         placementModes.querySelectorAll('[data-action="place-building-from-inventory"]').forEach(button => {
@@ -263,7 +272,7 @@ function createCraftingIcon(itemId) {
     svg.setAttribute('viewBox', '0 0 64 64');
     svg.setAttribute('aria-hidden', 'true');
     const iconId = CRAFTING_ICON_IDS[itemId] || `i-${itemId.replaceAll('_', '-')}`;
-    use.setAttribute('href', `../MainSystem/icons/items/crafting-icons.svg?v=9#${iconId}`);
+    use.setAttribute('href', `../MainSystem/icons/items/crafting-icons.svg?v=10#${iconId}`);
     svg.appendChild(use);
     return svg;
 }
@@ -273,12 +282,499 @@ function closeInventoryItem() {
     if (modal) modal.hidden = true;
 }
 
+function openInventoryDiscardConfirmation() {
+    const itemKey = document.getElementById('inventory-item-modal')?.dataset.itemKey;
+    const count = itemKey ? getCraftingItemCount(itemKey) : 0;
+    if (!itemKey || count <= 0) return;
+    pendingInventoryDiscardItemId = itemKey;
+    document.getElementById('inventory-discard-confirm-message').textContent =
+        `「${getCraftingItemName(itemKey)}」を所持数 ${formatInventoryCount(itemKey, count)} すべて破棄します。この操作は取り消せません。`;
+    document.getElementById('inventory-discard-confirm-modal').hidden = false;
+}
+
+function cancelInventoryDiscard() {
+    document.getElementById('inventory-discard-confirm-modal').hidden = true;
+    pendingInventoryDiscardItemId = null;
+}
+
+function discardInventoryItem() {
+    const itemId = pendingInventoryDiscardItemId;
+    const count = itemId ? getCraftingItemCount(itemId) : 0;
+    if (!itemId || count <= 0) {
+        cancelInventoryDiscard();
+        showAppNotice('破棄するアイテムが見つかりません。');
+        return;
+    }
+    if (itemId === 'brass-stock') engineRuntimeState.brass = 0;
+    else {
+        const resourceKey = { water: 'water', fog: 'fog', power: 'power', steam_power: 'steamPower' }[itemId];
+        if (resourceKey) engineRuntimeState[resourceKey] = 0;
+        else delete engineRuntimeState.materialInventory[itemId];
+    }
+    engineRuntimeState.saveGameData();
+    engineRuntimeState.notify();
+    cancelInventoryDiscard();
+    closeInventoryItem();
+    renderCellMaterials();
+    updateEngineDashboard();
+}
+
 function getStoredSavedScrolls() {
     try {
         const saved = JSON.parse(localStorage.getItem('fogsgear_scroll_library') || '[]');
         return Array.isArray(saved) ? saved : [];
     } catch (error) {
         return [];
+    }
+}
+
+function getUniqueScrollName(name, scrolls) {
+    const baseName = String(name || '').trim().slice(0, 80);
+    if (!baseName) throw new Error('スクロール名を入力してください。');
+    const existingNames = new Set(scrolls.map(scroll => String(scroll.name || '').toLocaleLowerCase()));
+    if (!existingNames.has(baseName.toLocaleLowerCase())) return baseName;
+    for (let suffix = 2; suffix < 10000; suffix++) {
+        const suffixText = `（${suffix}）`;
+        const candidate = `${baseName.slice(0, 80 - suffixText.length)}${suffixText}`;
+        if (!existingNames.has(candidate.toLocaleLowerCase())) return candidate;
+    }
+    throw new Error('重複しないスクロール名を作成できませんでした。');
+}
+
+function getScrollDurabilityLimit(scroll) {
+    return scroll?.material === 'cloth' || scroll?.scrollType === 'cloth' ? 100 : 50;
+}
+
+function getScrollUsedRotations(scroll) {
+    const rotations = Number(scroll?.usedRotations);
+    return Number.isFinite(rotations) ? Math.max(0, rotations) : 0;
+}
+
+function isScrollExhausted(scroll) {
+    return getScrollUsedRotations(scroll) >= getScrollDurabilityLimit(scroll);
+}
+
+function getInstalledCraftingScrollIds(excludeBuildingInstanceId = null) {
+    return new Set(state.buildings
+        .filter(building => building.instanceId !== excludeBuildingInstanceId)
+        .map(building => building.craftingScrollId)
+        .filter(scrollId => typeof scrollId === 'string' && scrollId));
+}
+
+function isUsableCraftingScroll(scroll) {
+    const gears = scroll?.blueprint?.gears;
+    return Array.isArray(gears) && gears.some(gear => gear.isCore)
+        && gears.some(gear => !gear.isCore)
+        && !isScrollExhausted(scroll);
+}
+
+let cachedCraftingScrollLibraryValue = null;
+let cachedCraftingScrollIds = new Set();
+let lastCraftingPowerTickAt = Date.now();
+let lastCraftingScrollSyncAt = 0;
+let craftingWorldReady = false;
+let startupStage = '起動準備';
+
+function hasAssignedCraftingScroll(placed) {
+    return Boolean(placed?.craftingScrollId && getStoredSavedScrolls().some(scroll =>
+        scroll.id === placed.craftingScrollId && isUsableCraftingScroll(scroll)));
+}
+
+function hasRunningCraftingScroll(placed) {
+    return Boolean(hasAssignedCraftingScroll(placed)
+        && getActiveScrollIds().includes(placed.craftingScrollId)
+        && engineRuntimeState.mainGearRunning
+        && (engineRuntimeState.creativeMode || Number(engineRuntimeState.steamPower) > 0));
+}
+
+function getCraftingOverclock(placed) {
+    const selectedMultiplier = Number(placed?.craftingOverclockMultiplier) || 1;
+    return CRAFTING_OVERCLOCK_OPTIONS.find(option => option.speedMultiplier === selectedMultiplier)
+        || CRAFTING_OVERCLOCK_OPTIONS[0];
+}
+
+function getCraftingStationPowerRate(placed) {
+    const baseRate = CRAFTING_STATION_POWER_RATES[placed?.id];
+    if (!Number.isFinite(baseRate) || baseRate <= 0) {
+        console.error(`No crafting power rate configured for building "${placed?.id}".`);
+        return 0;
+    }
+    return baseRate * getCraftingOverclock(placed).powerMultiplier;
+}
+
+async function advanceOfflineCraftingJobs() {
+    const now = Date.now();
+    const savedAt = Number(engineRuntimeState.offlineCraftingStartedAt);
+    const startAt = Number.isFinite(savedAt) && savedAt > 0 ? Math.min(now, savedAt) : now;
+    const elapsedMs = Math.max(0, now - startAt);
+    const poweredJobs = engineRuntimeState.craftingJobs.filter(job => job.requiresPower);
+    engineRuntimeState.offlineCraftingStartedAt = now;
+    if (elapsedMs <= 0) {
+        lastCraftingPowerTickAt = now;
+        craftingWorldReady = true;
+        return;
+    }
+
+    const activeIds = new Set(getActiveScrollIds());
+    const targets = (() => {
+        try {
+            const stored = JSON.parse(localStorage.getItem(ACTIVE_SCROLL_TARGETS_KEY) || '{}');
+            return stored && typeof stored === 'object' && !Array.isArray(stored) ? stored : {};
+        } catch (error) {
+            console.warn('Could not read active scroll targets during offline simulation.', error);
+            return {};
+        }
+    })();
+    const motorWasRunning = engineRuntimeState.mainGearRunning
+        && (engineRuntimeState.creativeMode || Number(engineRuntimeState.steamPower) > 0);
+    const offlineScrolls = new Map();
+    const exhaustedIds = new Set();
+    if (motorWasRunning) {
+        getStoredSavedScrolls().forEach(scroll => {
+            if (!activeIds.has(scroll.id)) return;
+            const durabilityLimit = getScrollDurabilityLimit(scroll);
+            const usedRotations = Math.min(durabilityLimit, getScrollUsedRotations(scroll));
+            if (usedRotations >= durabilityLimit) {
+                exhaustedIds.add(scroll.id);
+                return;
+            }
+            const target = targets[scroll.id];
+            const targetStartedAt = Number(target?.startedAt);
+            const savedRotationAt = Number(scroll.usedRotationsUpdatedAt);
+            const startedAt = Math.max(
+                startAt,
+                Number.isFinite(targetStartedAt) && targetStartedAt > 0 ? targetStartedAt : startAt,
+                Number.isFinite(savedRotationAt) && savedRotationAt > 0 ? savedRotationAt : startAt
+            );
+            const gears = (Array.isArray(scroll.blueprint?.gears) ? scroll.blueprint.gears : [])
+                .map(gear => {
+                    const sizeKey = gear.sizeKey || gear.size || 'M';
+                    const runtimeGear = engineGearManager.createGear(
+                        gear.q, gear.r, sizeKey, gear.layer, gear.isCore, gear.angle, gear.id
+                    );
+                    runtimeGear.isLocked = gear.isLocked ?? Boolean(gear.isCore);
+                    return runtimeGear;
+                });
+            const network = new EngineGearNetwork(gears, scroll.blueprint?.belts || []);
+            network.updateRotation();
+            const core = gears.find(gear => gear.isCore);
+            if (!core?.powered || core.isDeadlocked || core.angleError) return;
+            offlineScrolls.set(scroll.id, {
+                scroll,
+                usedRotations,
+                durabilityLimit,
+                rotationsPerSecond: Math.abs(core.angularVelocity || 0) * 0.012 * 60 / (Math.PI * 2),
+                startedAt,
+                exhausted: false
+            });
+        });
+    }
+
+    getStoredSavedScrolls().forEach(scroll => {
+        if (activeIds.has(scroll.id)
+            && getScrollUsedRotations(scroll) >= getScrollDurabilityLimit(scroll)) {
+            exhaustedIds.add(scroll.id);
+        }
+    });
+    exhaustedIds.forEach(scrollId => {
+        activeIds.delete(scrollId);
+        delete targets[scrollId];
+    });
+
+    const stations = new Map();
+    poweredJobs.forEach(job => {
+        if (!stations.has(job.craftingStationId)) {
+            const placed = state.buildings.find(building => building.instanceId === job.craftingStationId);
+            const overclock = getCraftingOverclock(placed);
+            const powerRate = getCraftingStationPowerRate(placed);
+            const scrollRuntime = placed?.craftingScrollId
+                ? offlineScrolls.get(placed.craftingScrollId)
+                : null;
+            stations.set(job.craftingStationId, {
+                placed,
+                overclock,
+                powerRate,
+                scrollRuntime,
+                installed: Boolean(scrollRuntime),
+                startedAt: scrollRuntime?.startedAt ?? Infinity,
+                pausedAt: scrollRuntime ? null : startAt,
+                powerPausedAt: null
+            });
+        }
+    });
+
+    stations.forEach(({ overclock, installed, startedAt }, stationId) => {
+        const stationJobs = poweredJobs.filter(job => job.craftingStationId === stationId);
+        if (!installed) {
+            stationJobs.forEach(job => {
+                if (Number(job.startedAt) <= startAt) {
+                    const remaining = Math.max(0, Number(job.workRemainingMs) || 0);
+                    job.completesAt = now + remaining / overclock.speedMultiplier;
+                } else {
+                    job.startedAt = Number(job.startedAt) + elapsedMs;
+                    job.completesAt = Number(job.completesAt) + elapsedMs;
+                }
+                job.powerPaused = true;
+            });
+            return;
+        }
+        const delayedStartMs = Math.max(0, startedAt - startAt);
+        if (delayedStartMs > 0) {
+            stationJobs.forEach(job => {
+                if (Number(job.startedAt) <= startAt) {
+                    job.completesAt = Number(job.completesAt) + delayedStartMs;
+                } else {
+                    job.startedAt = Number(job.startedAt) + delayedStartMs;
+                    job.completesAt = Number(job.completesAt) + delayedStartMs;
+                }
+            });
+        }
+        stationJobs.forEach(job => {
+            const queuedDuration = Number(job.completesAt) - (Number(job.startedAt) || startAt);
+            const savedDuration = Number(job.workDurationMs) || Number(job.durationMs)
+                || (queuedDuration > 0 ? queuedDuration : 1);
+            const workDuration = Math.max(1, savedDuration);
+            job.workDurationMs = workDuration;
+            job.workRemainingMs = Math.max(0, Number(job.workRemainingMs) || workDuration);
+            job.durationMs = workDuration / overclock.speedMultiplier;
+            if (Number(job.startedAt) <= startAt && job.workRemainingMs > 0) {
+                job.completesAt = startAt + job.workRemainingMs / overclock.speedMultiplier;
+            }
+            job.powerPaused = false;
+        });
+        engineRuntimeState.scheduleCraftingJobs([], startAt, stationId);
+    });
+
+    let currentTime = startAt;
+    let remainingMs = elapsedMs;
+    const parallelSlots = Math.max(1, Math.floor(Number(engineRuntimeState.craftingParallelSlots) || 1));
+    let simulationSteps = 0;
+    while (remainingMs > 0) {
+        const activeStations = [];
+        stations.forEach((station, stationId) => {
+            if (!station.installed || station.powerRate <= 0 || station.startedAt > currentTime) return;
+            const activeJobs = engineRuntimeState.craftingJobs
+                .filter(job => job.requiresPower && job.craftingStationId === stationId
+                    && Number(job.startedAt) <= currentTime && Number(job.workRemainingMs) > 0)
+                .sort((first, second) => Number(first.startedAt) - Number(second.startedAt)
+                    || Number(first.batchIndex) - Number(second.batchIndex))
+                .slice(0, parallelSlots);
+            if (activeJobs.length) activeStations.push({ ...station, stationId, activeJobs });
+        });
+        const totalPowerRate = activeStations.reduce((total, station) => total + station.powerRate, 0);
+        const availablePowerMs = engineRuntimeState.creativeMode
+            ? Infinity
+            : totalPowerRate > 0 ? Math.max(0, Number(engineRuntimeState.power) || 0) / totalPowerRate * 1000 : Infinity;
+        if (!engineRuntimeState.creativeMode && availablePowerMs <= 0) {
+            activeStations.forEach(station => {
+                if (station.powerPausedAt === null) station.powerPausedAt = currentTime;
+            });
+        }
+        const nextCompletionMs = activeStations.length && availablePowerMs > 0
+            ? Math.min(...activeStations.flatMap(station => station.activeJobs.map(job =>
+                Math.max(0, Number(job.workRemainingMs) || 0) / station.overclock.speedMultiplier)))
+            : Infinity;
+        const nextScrollExhaustionMs = Math.min(Infinity, ...[...offlineScrolls.values()]
+            .filter(runtime => !runtime.exhausted && runtime.startedAt <= currentTime && runtime.rotationsPerSecond > 0)
+            .map(runtime => Math.max(0, runtime.durabilityLimit - runtime.usedRotations)
+                / runtime.rotationsPerSecond * 1000));
+        const nextScrollStartMs = Math.min(Infinity, ...[...offlineScrolls.values()]
+            .filter(runtime => !runtime.exhausted && runtime.startedAt > currentTime)
+            .map(runtime => runtime.startedAt - currentTime));
+        const nextStationStartMs = Math.min(Infinity, ...[...stations.values()]
+            .filter(station => station.installed && station.startedAt > currentTime)
+            .map(station => station.startedAt - currentTime));
+        const nextPowerDepletionMs = activeStations.length && availablePowerMs > 0
+            ? availablePowerMs
+            : Infinity;
+        const elapsedStepMs = Math.min(
+            remainingMs,
+            nextPowerDepletionMs,
+            nextCompletionMs,
+            nextScrollExhaustionMs,
+            nextScrollStartMs,
+            nextStationStartMs
+        );
+        if (!(elapsedStepMs > 0)) break;
+
+        const poweredStepMs = Math.min(elapsedStepMs, availablePowerMs);
+        const finishedStations = [];
+        activeStations.forEach(station => {
+            station.activeJobs.forEach(job => {
+                job.workRemainingMs = Math.max(0, Number(job.workRemainingMs) - poweredStepMs * station.overclock.speedMultiplier);
+                job.completesAt = currentTime + elapsedStepMs + job.workRemainingMs / station.overclock.speedMultiplier;
+                job.powerPaused = poweredStepMs < elapsedStepMs;
+                if (job.workRemainingMs <= 0) finishedStations.push(station.stationId);
+            });
+        });
+        if (!engineRuntimeState.creativeMode && poweredStepMs > 0) {
+            engineRuntimeState.power = Math.max(0, Number(engineRuntimeState.power) - totalPowerRate * poweredStepMs / 1000);
+        }
+        offlineScrolls.forEach(runtime => {
+            if (runtime.startedAt > currentTime || runtime.rotationsPerSecond <= 0) return;
+            runtime.usedRotations = Math.min(
+                runtime.durabilityLimit,
+                runtime.usedRotations + runtime.rotationsPerSecond * elapsedStepMs / 1000
+            );
+        });
+        currentTime += elapsedStepMs;
+        remainingMs -= elapsedStepMs;
+
+        const exhaustedScrollIds = [];
+        offlineScrolls.forEach((runtime, scrollId) => {
+            if (runtime.usedRotations < runtime.durabilityLimit || runtime.exhausted) return;
+            exhaustedScrollIds.push(scrollId);
+            runtime.exhausted = true;
+            stations.forEach(station => {
+                if (station.scrollRuntime?.scroll.id === scrollId) {
+                    station.installed = false;
+                    station.pausedAt = currentTime;
+                }
+            });
+        });
+        if (exhaustedScrollIds.length) {
+            exhaustedScrollIds.forEach(scrollId => {
+                activeIds.delete(scrollId);
+                delete targets[scrollId];
+            });
+        }
+
+        if (finishedStations.length) {
+            engineRuntimeState.completeCraftingJobs(currentTime, false);
+            [...new Set(finishedStations)].forEach(stationId =>
+                engineRuntimeState.scheduleCraftingJobs([], currentTime, stationId));
+        }
+        if (!engineRuntimeState.creativeMode && Number(engineRuntimeState.power) <= 0) {
+            activeStations.forEach(station => {
+                if (station.powerPausedAt === null) station.powerPausedAt = currentTime;
+            });
+        }
+        simulationSteps++;
+        if (simulationSteps % 32 === 0) {
+            const progress = elapsedMs > 0 ? Math.min(100, Math.floor((currentTime - startAt) / elapsedMs * 100)) : 100;
+            const loadingMessage = document.getElementById('loadingMessage');
+            if (loadingMessage) loadingMessage.textContent = `オフライン進行を反映しています... ${progress}%`;
+            await new Promise(resolve => window.setTimeout(resolve, 0));
+        }
+    }
+
+    stations.forEach((station, stationId) => {
+        const pausedAt = station.pausedAt
+            ?? station.powerPausedAt
+            ?? (!engineRuntimeState.creativeMode && Number(engineRuntimeState.power) <= 0 ? currentTime : null);
+        if (pausedAt === null) return;
+        const pausedMs = Math.max(0, now - pausedAt);
+        engineRuntimeState.craftingJobs
+            .filter(job => job.requiresPower && job.craftingStationId === stationId)
+            .forEach(job => {
+                if (Number(job.startedAt) > pausedAt) {
+                    job.startedAt = Number(job.startedAt) + pausedMs;
+                    job.completesAt = Number(job.completesAt) + pausedMs;
+                } else if (Number(job.workRemainingMs) > 0) {
+                    job.completesAt = now + Number(job.workRemainingMs) / station.overclock.speedMultiplier;
+                }
+                job.powerPaused = true;
+            });
+    });
+
+    const rotationsByScrollId = new Map([...offlineScrolls.values()].map(runtime => [
+        runtime.scroll.id,
+        runtime.usedRotations
+    ]));
+    if (rotationsByScrollId.size) {
+        const scrollLibrary = getStoredSavedScrolls();
+        scrollLibrary.forEach(scroll => {
+            if (!rotationsByScrollId.has(scroll.id)) return;
+            scroll.usedRotations = rotationsByScrollId.get(scroll.id);
+            scroll.usedRotationsUpdatedAt = now;
+        });
+        localStorage.setItem('fogsgear_scroll_library', JSON.stringify(scrollLibrary));
+    }
+    const previousActiveScrolls = getActiveScrollIds();
+    if (previousActiveScrolls.some(scrollId => !activeIds.has(scrollId))) {
+        localStorage.setItem('fogsgear_active_scroll_id', JSON.stringify([...activeIds]));
+        localStorage.removeItem('fogsgear_active_scroll_running');
+        localStorage.setItem(ACTIVE_SCROLL_TARGETS_KEY, JSON.stringify(targets));
+    }
+
+    engineRuntimeState.completeCraftingJobs(now, false);
+    engineRuntimeState.saveGameData();
+    engineRuntimeState.notify();
+    lastCraftingPowerTickAt = now;
+    craftingWorldReady = true;
+}
+
+function advancePoweredCraftingJobs() {
+    if (!craftingWorldReady) return;
+    const now = Date.now();
+    const elapsed = Math.min(0.25, Math.max(0, (now - lastCraftingPowerTickAt) / 1000));
+    lastCraftingPowerTickAt = now;
+    if (now - lastCraftingScrollSyncAt >= 250) {
+        const libraryValue = localStorage.getItem('fogsgear_scroll_library') || '[]';
+        if (libraryValue !== cachedCraftingScrollLibraryValue) {
+            cachedCraftingScrollLibraryValue = libraryValue;
+            try {
+                const scrolls = JSON.parse(libraryValue);
+                cachedCraftingScrollIds = new Set(Array.isArray(scrolls)
+                    ? scrolls.filter(isUsableCraftingScroll).map(scroll => scroll.id)
+                    : []);
+            } catch (error) {
+                cachedCraftingScrollIds = new Set();
+            }
+        }
+        lastCraftingScrollSyncAt = now;
+    }
+    const activeJobs = (engineRuntimeState.craftingJobs || []).filter(job => job.requiresPower
+        && Number(job.startedAt) <= now && Number(job.workRemainingMs) > 0);
+    const runningScrollIds = new Set(getActiveScrollIds());
+    const motorRunning = engineRuntimeState.mainGearRunning
+        && (engineRuntimeState.creativeMode || Number(engineRuntimeState.steamPower) > 0);
+    const jobsByStation = new Map();
+    activeJobs.forEach(job => {
+        const stationId = job.craftingStationId;
+        if (!jobsByStation.has(stationId)) jobsByStation.set(stationId, []);
+        jobsByStation.get(stationId).push(job);
+    });
+    const finishedStations = [];
+    jobsByStation.forEach((jobs, stationId) => {
+        const placed = state.buildings.find(building => building.instanceId === stationId);
+        const scrollInstalled = motorRunning
+            && placed?.craftingScrollId
+            && runningScrollIds.has(placed.craftingScrollId)
+            && cachedCraftingScrollIds.has(placed.craftingScrollId);
+        const overclock = getCraftingOverclock(placed);
+        const powerRate = getCraftingStationPowerRate(placed);
+        const creativeMode = Boolean(engineRuntimeState.creativeMode);
+        const poweredSeconds = scrollInstalled
+            ? creativeMode ? elapsed : Math.min(elapsed, powerRate > 0 ? Math.max(0, engineRuntimeState.power) / powerRate : 0)
+            : 0;
+        if (!creativeMode && poweredSeconds > 0) {
+            engineRuntimeState.power = Math.max(0, engineRuntimeState.power - powerRate * poweredSeconds);
+        }
+        const pausedMs = (elapsed - poweredSeconds) * 1000;
+        jobs.forEach(job => {
+            const workDuration = Math.max(1, Number(job.workDurationMs) || Number(job.durationMs) || 1);
+            job.workDurationMs = workDuration;
+            job.workRemainingMs = Math.max(0, (Number(job.workRemainingMs) || 0) - poweredSeconds * overclock.speedMultiplier * 1000);
+            job.durationMs = workDuration / overclock.speedMultiplier;
+            job.completesAt = now + job.workRemainingMs / overclock.speedMultiplier;
+            job.powerPaused = pausedMs > 0;
+            if (job.workRemainingMs <= 0) finishedStations.push(stationId);
+        });
+        if (pausedMs > 0) {
+            engineRuntimeState.craftingJobs.forEach(job => {
+                if (job.craftingStationId === stationId && job.requiresPower
+                    && Number(job.startedAt) > now) {
+                    job.startedAt = Number(job.startedAt) + pausedMs;
+                    job.completesAt = Number(job.completesAt) + pausedMs;
+                }
+            });
+        }
+    });
+    if (finishedStations.length) {
+        engineRuntimeState.completeCraftingJobs(now);
+        [...new Set(finishedStations)].forEach(stationId =>
+            engineRuntimeState.scheduleCraftingJobs([], now, stationId));
     }
 }
 
@@ -389,7 +885,11 @@ function validateSaveBackupValue(key, value) {
             || !Number.isInteger(building.x) || !Number.isInteger(building.y)
             || typeof building.instanceId !== 'string')) throw new Error('建築物の配置データが不正です。');
     } else if (key === ACTIVE_SCROLL_TARGETS_KEY) {
-        if (!isRecord(parsed) || Object.values(parsed).some(target => !isRecord(target) || !Number.isInteger(target.x) || !Number.isInteger(target.y))) throw new Error('スクロール対象位置が不正です。');
+        if (!isRecord(parsed) || Object.values(parsed).some(target => !isRecord(target)
+            || !Number.isInteger(target.x) || !Number.isInteger(target.y)
+            || (target.buildingInstanceId !== undefined && (typeof target.buildingInstanceId !== 'string' || !target.buildingInstanceId)))) {
+            throw new Error('スクロール対象位置が不正です。');
+        }
     } else if (key === 'fogsgear_active_scroll_sync_state') {
         if (!isRecord(parsed) || Object.values(parsed).some(locks => !isRecord(locks) || Object.values(locks).some(locked => typeof locked !== 'boolean'))) throw new Error('スクロール同期状態が不正です。');
     } else if (['fogsgear_world_unlocks', 'fogsgear_cell_entry_rules'].includes(key) && !isRecord(parsed)) {
@@ -667,7 +1167,7 @@ async function applySelectedSkinSource(source, sourceType = 'url', name = '') {
 
 function generateMapInWorker(seed) {
     return new Promise((resolve, reject) => {
-        const worker = new Worker('./js/mapWorker.js?v=89', { type: 'module' });
+        const worker = new Worker('./js/mapWorker.js?v=90', { type: 'module' });
         worker.onmessage = (event) => {
             if (event.data?.type === 'complete') {
                 worker.terminate();
@@ -686,6 +1186,11 @@ function generateMapInWorker(seed) {
 }
 
 async function init() {
+    const setStartupStage = (stage, message) => {
+        startupStage = stage;
+        const loadingMessage = document.getElementById('loadingMessage');
+        if (loadingMessage && message) loadingMessage.textContent = message;
+    };
     const createRandomSeed = () => {
         const values = new Uint32Array(4);
         crypto.getRandomValues(values);
@@ -713,15 +1218,25 @@ async function init() {
     state.rows = mapSize.height;
     state.generator = new MapGenerator({ ...mapSize, seed: state.worldSeed, coastalOnly: !mainlandUnlocked });
     const loadingMessage = document.getElementById('loadingMessage');
-    if (loadingMessage) loadingMessage.textContent = '保存済みのマップを読み込んでいます...';
-    let generated = await loadMapSnapshot(state.worldSeed, mapSize.width, mapSize.height);
+    setStartupStage('保存マップ読み込み', '保存済みのマップを読み込んでいます...');
+    let generated = await loadMapSnapshot(state.worldSeed, mapSize.width, mapSize.height, progress => {
+        if (loadingMessage) {
+            loadingMessage.textContent = `保存済みマップを展開しています... ${Math.round(progress * 100)}%`;
+        }
+    });
     if (!generated) {
-        if (loadingMessage) loadingMessage.textContent = 'マップを生成しています...';
+        setStartupStage('マップ生成', 'マップを生成しています...');
         generated = await generateMapInWorker(state.worldSeed).catch(() => state.generator.generate(state.worldSeed));
         saveMapSnapshot(generated, state.worldSeed, mapSize.width, mapSize.height).catch(() => {});
     }
     state.map = generated.grid;
+    setStartupStage('建築データ復元', '建築データを読み込んでいます...');
+    await new Promise(resolve => window.setTimeout(resolve, 0));
     loadBuildings();
+    setStartupStage('オフライン進行復元', '製作とスクロールのオフライン進行を反映しています...');
+    await new Promise(resolve => window.setTimeout(resolve, 0));
+    await advanceOfflineCraftingJobs();
+    setStartupStage('地形変更復元', '地形の変更を反映しています...');
     state.cellChanges = applyCellChanges(state.map, state.worldSeed);
     try {
         const targets = JSON.parse(localStorage.getItem(ACTIVE_SCROLL_TARGETS_KEY) || '{}');
@@ -733,10 +1248,22 @@ async function init() {
     state.rivers = generated.rivers || [];
     state.ruins = generated.ruins || [];
     state.routes = generated.routes || [];
-    state.territoryBorderSegments = state.generator.coastalOnly ? [] : buildTerritoryBorderSegments(state.map);
+    if (!state.generator.coastalOnly) {
+        setStartupStage('領土境界生成', '領土境界を準備しています...');
+        state.territoryBorderSegments = await buildTerritoryBorderSegmentsAsync(state.map, progress => {
+            if (loadingMessage) {
+                loadingMessage.textContent = `領土境界を準備しています... ${Math.round(progress * 100)}%`;
+            }
+        });
+    } else {
+        state.territoryBorderSegments = [];
+    }
     state.labels = buildLabelEntries();
 
+    setStartupStage('開始位置計算', 'プレイヤーの開始位置を確認しています...');
+    await new Promise(resolve => window.setTimeout(resolve, 0));
     findSafeSpawn(generated.playerPos);
+    stopPlayerTargetedScrolls();
 
     let savedSkin = './5504543579.png';
     let savedSkinName = '5504543579.png';
@@ -747,6 +1274,7 @@ async function init() {
         if (storedName && savedSkin !== './5504543579.png') savedSkinName = storedName;
     } catch(e) {}
 
+    setStartupStage('画面初期化', 'ゲーム画面を準備しています...');
     resize();
     centerCameraOnPlayer();
     updateUI();
@@ -926,6 +1454,14 @@ function handleWorldCellOperation(operation) {
     if (!canPersistGameProgress()) return { success: false, error: 'ゲームデータがリセットされました。画面を再読み込みしてください。' };
     const { x, y } = operation.target || {};
     if (!Number.isInteger(x) || !Number.isInteger(y)) return { success: false };
+    const targetStand = operation.target?.buildingInstanceId
+        ? state.buildings.find(building => building.instanceId === operation.target.buildingInstanceId
+            && supportsStationaryScrolls(building) && building.craftingScrollId === operation.scrollId)
+        : null;
+    if (operation.target?.buildingInstanceId && !targetStand) {
+        return { success: false };
+    }
+    if (!targetStand && (state.player.x !== x || state.player.y !== y)) return { success: false };
     const directions = {
         TARGET_SHIFT_UP: [0, -1],
         TARGET_SHIFT_DOWN: [0, 1],
@@ -984,14 +1520,57 @@ function handleWorldCellOperation(operation) {
     if (operation.mode === 'RESOURCE_COLLECTION') {
         const drops = getCellDrops(currentType, collectionCount);
         if (!drops.length) return { success: false };
-        if (!canAddInventoryItems(drops)) {
+        const storageTargets = targetStand ? getNearbyScrollStorageTargets(targetStand) : [];
+        const storageAllocations = [];
+        const projectedStorage = new Map();
+        const remainingDrops = [];
+        for (const itemId of drops) {
+            let remaining = 1;
+            for (const { storage, definition } of storageTargets) {
+                if (!projectedStorage.has(storage)) {
+                    projectedStorage.set(storage, { ...storage.storedMaterials });
+                }
+                const projectedMaterials = projectedStorage.get(storage);
+                const storedCount = Math.floor(Math.max(0, Number(projectedMaterials[itemId]) || 0));
+                const usedSlots = Object.values(projectedMaterials).reduce((total, amount) =>
+                    total + Math.ceil(Math.max(0, Number(amount) || 0) / 99), 0);
+                const freeSlots = Math.max(0, definition.storageCapacity - usedSlots);
+                const stackSpace = storedCount > 0 ? Math.ceil(storedCount / 99) * 99 - storedCount : 0;
+                const amount = Math.min(remaining, stackSpace + freeSlots * 99);
+                if (amount > 0) {
+                    storageAllocations.push({ storage, itemId, amount });
+                    projectedMaterials[itemId] = storedCount + amount;
+                    remaining -= amount;
+                }
+                if (remaining <= 0) break;
+            }
+            if (remaining > 0) remainingDrops.push(itemId);
+        }
+        if (!canAddInventoryItems(remainingDrops)) {
             notifyInventoryFull();
             return { success: false, error: 'inventory-full' };
         }
         const consumedPower = getCellCollectionPowerCost(currentType, collectionCount);
         if ((Number(operation.power) || 0) < consumedPower) return { success: false };
+        new Set(storageAllocations.map(allocation => allocation.storage)).forEach(storage => {
+            storage.storedMaterials = projectedStorage.get(storage);
+        });
+        if (storageAllocations.length) {
+            saveBuildings();
+            const selectedBuilding = state.buildings.find(building => building.instanceId === selectedBuildingInstanceId);
+            if (selectedBuilding?.id === 'simple-storage' || selectedBuilding?.id === 'warehouse') {
+                renderBuildingStorage(selectedBuilding, BUILDING_BY_ID.get(selectedBuilding.id));
+                updateBuildingMenuDetails(selectedBuilding, BUILDING_BY_ID.get(selectedBuilding.id));
+            }
+        }
         persistChange(currentType, transformCount, collectionCount + 1);
-        return { success: true, consumedPower, producedItems: Object.fromEntries(drops.map(item => [item, 1])) };
+        return {
+            success: true,
+            consumedPower,
+            producedItems: remainingDrops.length
+                ? Object.fromEntries(remainingDrops.map(item => [item, 1]))
+                : {}
+        };
     }
 
     return { success: false };
@@ -1186,7 +1765,8 @@ function isLargeBuilding(building) {
 
 function isBuildingConstructionStation(buildingId) {
     const building = BUILDING_BY_ID.get(buildingId);
-    return Boolean(building && (BUILDING_CONSTRUCTION_STARTER_STATIONS.has(buildingId)
+    return Boolean(building && !building.supportsStationaryScrolls
+        && (BUILDING_CONSTRUCTION_STARTER_STATIONS.has(buildingId)
         || BUILDING_CONSTRUCTION_STATION_GROUPS.has(building.group)));
 }
 
@@ -1209,6 +1789,36 @@ function getStorageUsedSlots(storage) {
         const count = Number(amount);
         return total + (Number.isFinite(count) ? Math.ceil(Math.max(0, count) / 99) : 0);
     }, 0);
+}
+
+function getGridDistanceBetweenBuildings(first, firstDefinition, second, secondDefinition) {
+    let distance = Number.POSITIVE_INFINITY;
+    for (let firstY = first.y; firstY < first.y + firstDefinition.height; firstY++) {
+        for (let firstX = first.x; firstX < first.x + firstDefinition.width; firstX++) {
+            for (let secondY = second.y; secondY < second.y + secondDefinition.height; secondY++) {
+                for (let secondX = second.x; secondX < second.x + secondDefinition.width; secondX++) {
+                    distance = Math.min(distance, Math.max(Math.abs(firstX - secondX), Math.abs(firstY - secondY)));
+                }
+            }
+        }
+    }
+    return distance;
+}
+
+function getNearbyScrollStorageTargets(sourceBuilding) {
+    const sourceDefinition = BUILDING_BY_ID.get(sourceBuilding?.id);
+    if (!sourceDefinition?.supportsStationaryScrolls) return [];
+    return state.buildings
+        .map(storage => {
+            const definition = BUILDING_BY_ID.get(storage.id);
+            const range = Number(definition?.collectionImportRange) || 0;
+            if (!definition?.storageCapacity || range === 0) return null;
+            const distance = getGridDistanceBetweenBuildings(sourceBuilding, sourceDefinition, storage, definition);
+            return distance <= range ? { storage, definition, distance } : null;
+        })
+        .filter(Boolean)
+        .sort((first, second) => first.distance - second.distance
+            || String(first.storage.instanceId).localeCompare(String(second.storage.instanceId)));
 }
 
 function getStorageInventoryCount(itemId) {
@@ -1460,6 +2070,14 @@ function getCraftingRecipesForBuilding(buildingId) {
         .map(({ recipe, index }) => ({ recipe: getCraftingRecipeForBuilding(recipe, buildingId), index }));
 }
 
+function supportsStationaryScrolls(building) {
+    return Boolean(BUILDING_BY_ID.get(building?.id)?.supportsStationaryScrolls);
+}
+
+function canInstallScrollInBuilding(building) {
+    return Boolean(building && (supportsStationaryScrolls(building) || getCraftingRecipesForBuilding(building.id).length));
+}
+
 function createBuildingSvgIcon(buildingId) {
     const namespace = 'http://www.w3.org/2000/svg';
     const svg = document.createElementNS(namespace, 'svg');
@@ -1467,6 +2085,10 @@ function createBuildingSvgIcon(buildingId) {
     svg.classList.add('building-item-icon-svg');
     svg.setAttribute('viewBox', '0 0 96 96');
     svg.setAttribute('aria-hidden', 'true');
+    if (buildingId === 'scroll-stand') {
+        svg.innerHTML = '<rect x="12" y="69" width="72" height="15" rx="3" fill="#604833" stroke="#d4ad60" stroke-width="4"/><path d="M22 70V34h52v36" fill="#34473f" stroke="#b98b4e" stroke-width="5"/><path d="M30 43h36v26H30z" fill="#1e2d28" stroke="#718b7e" stroke-width="3"/><circle cx="48" cy="55" r="12" fill="#9b693c" stroke="#edcf78" stroke-width="4"/><circle cx="48" cy="55" r="4" fill="#d9bc68"/><path d="M48 39v5m0 22v5M32 55h5m22 0h5" stroke="#e6ca7a" stroke-width="4"/>';
+        return svg;
+    }
     const iconSprite = buildingId === 'field-automaton'
         ? 'assets/field-automaton-icon.svg?v=3#building-field-automaton'
         : `assets/building-icons.svg?v=1#building-${buildingId}`;
@@ -1958,7 +2580,7 @@ function getInventoryCategory(itemId) {
 
 const INVENTORY_CATEGORY_LABELS = Object.freeze({
     scrolls: 'スクロール・設計図',
-    resources: 'エネルギー資源',
+    resources: '共有エネルギー',
     'raw-materials': '採集素材',
     'processed-materials': '加工素材',
     parts: '部品',
@@ -2591,6 +3213,21 @@ function craftRecipe(recipeIndex, buildingInstanceId = '', requestedCount) {
         showAppNotice('このレシピに対応する製作設備が必要です。');
         return;
     }
+    const craftingBuilding = buildingInstanceId
+        ? state.buildings.find(building => building.instanceId === buildingInstanceId)
+        : null;
+    if (craftingBuilding && !hasAssignedCraftingScroll(craftingBuilding)) {
+        showAppNotice('製作設備に有効なスクロールをセットしてください。');
+        return;
+    }
+    if (craftingBuilding && !hasRunningCraftingScroll(craftingBuilding)) {
+        showAppNotice('製作設備にセットしたスクロールを起動してください。');
+        return;
+    }
+    if (craftingBuilding && !engineRuntimeState.creativeMode && Number(engineRuntimeState.power) <= 0) {
+        showAppNotice('製作設備に動力が供給されていません。');
+        return;
+    }
     const maxCraftCount = getMaximumCraftCount(recipe[2], creative);
     const quantity = requestedCount === 'max' ? maxCraftCount : Math.floor(Number(requestedCount));
     if (!Number.isFinite(quantity) || quantity < 1 || quantity > maxCraftCount) {
@@ -2617,7 +3254,9 @@ function craftRecipe(recipeIndex, buildingInstanceId = '', requestedCount) {
         else engineRuntimeState.materialInventory[itemId] = Math.max(0, getCraftingItemCount(itemId) - totalAmount);
     });
     const outputAmount = Number(recipe[6]) || 1;
-    const duration = Math.max(1000, Math.round((Number(recipe[7]) || 90) / CRAFTING_RATE_MULTIPLIER * 1000));
+    const workDuration = Math.max(1000, Math.round((Number(recipe[7]) || 90) / CRAFTING_RATE_MULTIPLIER * 1000));
+    const overclock = getCraftingOverclock(craftingBuilding);
+    const duration = Math.max(1, Math.round(workDuration / overclock.speedMultiplier));
     const now = Date.now();
     const batchGroupId = `${recipeKey}:${now}:${Math.random().toString(36).slice(2)}`;
     const newJobs = [];
@@ -2634,6 +3273,12 @@ function craftRecipe(recipeIndex, buildingInstanceId = '', requestedCount) {
             outputItem: recipe[3],
             outputAmount,
             inputCosts: creative ? [] : recipe[2].map(([itemId, amount]) => [itemId, amount]),
+            ...(craftingBuilding ? {
+                requiresPower: true,
+                workDurationMs: workDuration,
+                workRemainingMs: workDuration,
+                powerPaused: false
+            } : {}),
             startedAt: now,
             completesAt: now + duration
         });
@@ -2943,13 +3588,18 @@ function syncCraftingNotifications(force = false) {
     const startedAt = Number(job.startedAt);
     const completesAt = Number(job.completesAt);
     const start = Number.isFinite(startedAt) ? startedAt : syncAt;
-    const duration = Math.max(1, completesAt - start);
-    const progress = Math.max(0, Math.min(100, ((syncAt - start) / duration) * 100));
+    const duration = Math.max(1, Number(job.workDurationMs) || completesAt - start);
+    const remainingWork = job.requiresPower ? Math.max(0, Number(job.workRemainingMs) || 0) : null;
+    const progress = job.requiresPower
+        ? Math.max(0, Math.min(100, ((duration - remainingWork) / duration) * 100))
+        : Math.max(0, Math.min(100, ((syncAt - start) / duration) * 100));
     const secondsLeft = Math.max(0, Math.ceil((completesAt - syncAt) / 1000));
     const queued = syncAt < start;
     entry.title.textContent = `${outputName}${outputAmount > 1 ? ` ×${outputAmount}` : ''}`;
     const batchLabel = `製作中 ${batchIndex}/${batchCount} 待機 ${Math.max(0, selectedQueue.jobs.length - 1)}件`;
-    const remainingLabel = queued
+    const remainingLabel = job.requiresPower && job.powerPaused && !queued
+        ? `動力待ち / 残り ${Math.ceil(remainingWork / 1000)}秒`
+        : queued
         ? `着手まで ${Math.max(0, Math.ceil((start - syncAt) / 1000))}秒`
         : `残り ${secondsLeft}秒`;
     entry.card.toggleAttribute('data-queued', queued);
@@ -2970,6 +3620,14 @@ function syncCraftingNotifications(force = false) {
 function openBuildingCrafting() {
     const placed = state.buildings.find(building => building.instanceId === selectedBuildingInstanceId);
     if (!placed || !getCraftingRecipesForBuilding(placed.id).length) return;
+    if (!hasAssignedCraftingScroll(placed)) {
+        showAppNotice('製作を始めるには、有効なスクロールを設備にセットしてください。');
+        return;
+    }
+    if (!hasRunningCraftingScroll(placed)) {
+        showAppNotice('製作を始めるには、設備にセットしたスクロールを起動してください。');
+        return;
+    }
     activeCraftingBuildingInstanceId = placed.instanceId;
     document.getElementById('building-crafting-search').value = '';
     document.getElementById('building-crafting-modal').hidden = false;
@@ -3125,7 +3783,7 @@ function getVehicleMotionSprite(placed) {
     element.className = 'vehicle-motion-sprite';
     element.setAttribute('aria-hidden', 'true');
     vehicleAnimationLayer.appendChild(element);
-    sprite = { element, animation: null, movementKey: '', viewKey: '' };
+    sprite = { element, renderedRotation: null };
     vehicleMotionSprites.set(placed.instanceId, sprite);
     return sprite;
 }
@@ -3148,37 +3806,25 @@ function drawVehicleAnimation(now) {
         const sprite = getVehicleMotionSprite(placed);
         const pixelRatio = Math.max(1, window.devicePixelRatio || 1);
         const spriteSize = Math.round(state.tileSize * pixelRatio);
+        let spriteSizeChanged = false;
         if (sprite.element.width !== spriteSize || sprite.element.height !== spriteSize) {
             sprite.element.width = spriteSize;
             sprite.element.height = spriteSize;
+            spriteSizeChanged = true;
         }
-        const spriteContext = sprite.element.getContext('2d');
-        spriteContext.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
-        spriteContext.clearRect(0, 0, state.tileSize, state.tileSize);
-        drawBuilding(spriteContext, { ...definition, x: 0, y: 0, rotation: frame.rotation }, state.tileSize, { zoom: 1 });
+        if (spriteSizeChanged || sprite.renderedRotation === null
+            || Math.abs(frame.rotation - sprite.renderedRotation) >= 0.01) {
+            const spriteContext = sprite.element.getContext('2d');
+            spriteContext.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+            spriteContext.clearRect(0, 0, state.tileSize, state.tileSize);
+            drawBuilding(spriteContext, { ...definition, x: 0, y: 0, rotation: frame.rotation }, state.tileSize, { zoom: 1 });
+            sprite.renderedRotation = frame.rotation;
+        }
         sprite.element.style.width = `${state.tileSize * state.zoom}px`;
         sprite.element.style.height = `${state.tileSize * state.zoom}px`;
-        const movement = placed.vehicle.movement;
-        const movementKey = `${movement.startedAt}:${movement.from.x},${movement.from.y}:${movement.to.x},${movement.to.y}:${movement.durationMs}`;
-        const viewKey = `${state.camera.x},${state.camera.y},${state.zoom},${canvas.width},${canvas.height}`;
-        if (sprite.movementKey !== movementKey || sprite.viewKey !== viewKey) {
-            sprite.animation?.cancel();
-            const fromLeft = (movement.from.x * state.tileSize - state.camera.x) * state.zoom + canvas.width / 2;
-            const fromTop = (movement.from.y * state.tileSize - state.camera.y) * state.zoom + canvas.height / 2;
-            const toLeft = (movement.to.x * state.tileSize - state.camera.x) * state.zoom + canvas.width / 2;
-            const toTop = (movement.to.y * state.tileSize - state.camera.y) * state.zoom + canvas.height / 2;
-            const startTransform = `translate3d(${fromLeft}px, ${fromTop}px, 0)`;
-            const endTransform = `translate3d(${toLeft}px, ${toTop}px, 0)`;
-            const duration = Math.max(1, Number(movement.durationMs) || 1);
-            sprite.element.style.transform = startTransform;
-            sprite.animation = sprite.element.animate([
-                { transform: startTransform },
-                { transform: endTransform }
-            ], { duration, easing: 'linear', fill: 'both' });
-            sprite.animation.currentTime = Math.max(0, Math.min(duration, now - movement.startedAt));
-            sprite.movementKey = movementKey;
-            sprite.viewKey = viewKey;
-        }
+        const left = (frame.x * state.tileSize - state.camera.x) * state.zoom + canvas.width / 2;
+        const top = (frame.y * state.tileSize - state.camera.y) * state.zoom + canvas.height / 2;
+        sprite.element.style.transform = `translate3d(${left}px, ${top}px, 0)`;
     });
     vehicleMotionSprites.forEach((sprite, instanceId) => {
         if (activeSprites.has(instanceId)) return;
@@ -3608,6 +4254,76 @@ function updateBuildingPlacementFromEvent(event) {
     updateBuildingPlacementControls();
 }
 
+function updateScrollStandMagicCircles() {
+    const activeScrollIds = new Set(getActiveScrollIds());
+    const activeStands = state.buildings.filter(building => {
+        if (!supportsStationaryScrolls(building) || !building.craftingScrollId
+            || !activeScrollIds.has(building.craftingScrollId)) return false;
+        const target = state.activeScrollTargets[building.craftingScrollId];
+        return target?.buildingInstanceId === building.instanceId
+            && target.x === building.x && target.y === building.y;
+    });
+    const activeStandIds = new Set(activeStands.map(building => building.instanceId));
+    scrollStandMagicCircles.forEach((circle, instanceId) => {
+        if (activeStandIds.has(instanceId)) return;
+        circle.remove();
+        scrollStandMagicCircles.delete(instanceId);
+    });
+
+    const viewLeft = state.camera.x - canvas.width / (2 * state.zoom);
+    const viewTop = state.camera.y - canvas.height / (2 * state.zoom);
+    activeStands.forEach(building => {
+        const definition = BUILDING_BY_ID.get(building.id);
+        if (!definition) return;
+        const worldCenterX = (building.x + definition.width / 2) * state.tileSize;
+        const worldCenterY = (building.y + definition.height / 2) * state.tileSize;
+        const radius = state.tileSize * Math.max(definition.width, definition.height) * .62;
+        if (worldCenterX + radius < viewLeft || worldCenterX - radius > viewLeft + canvas.width / state.zoom
+            || worldCenterY + radius < viewTop || worldCenterY - radius > viewTop + canvas.height / state.zoom) return;
+
+        let circle = scrollStandMagicCircles.get(building.instanceId);
+        if (!circle) {
+            const svgId = building.instanceId.replace(/[^a-zA-Z0-9_-]/g, '-');
+            const gearPath = Array.from({ length: 72 }, (_, index) => {
+                const tooth = Math.floor(index / 6);
+                const point = index % 6;
+                const offsets = [0, .12, .12, .3, .3, .5];
+                const radii = [35, 35, 43, 43, 35, 35];
+                const angle = (tooth + offsets[point]) * Math.PI / 6 - Math.PI / 2;
+                return `${index ? 'L' : 'M'}${(60 + Math.cos(angle) * radii[point]).toFixed(2)} ${(60 + Math.sin(angle) * radii[point]).toFixed(2)}`;
+            }).join(' ') + ' Z';
+            circle = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            circle.classList.add('scroll-stand-magic-circle');
+            circle.setAttribute('viewBox', '0 0 120 120');
+            circle.setAttribute('aria-hidden', 'true');
+            circle.innerHTML = `<defs><radialGradient id="scroll-stand-aura-${svgId}"><stop offset="0" stop-color="#b9ffff" stop-opacity=".24"/><stop offset=".7" stop-color="#82eaff" stop-opacity=".09"/><stop offset="1" stop-color="#82eaff" stop-opacity="0"/></radialGradient><filter id="scroll-stand-glow-${svgId}" x="-.25" y="-.25" width="1.5" height="1.5"><feGaussianBlur stdDeviation="1.8" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs><circle cx="60" cy="60" r="55" fill="url(#scroll-stand-aura-${svgId})"/><g class="scroll-stand-magic-gear" filter="url(#scroll-stand-glow-${svgId})"><path d="${gearPath}" fill="#91f3ff" fill-opacity=".15" stroke="#b8fbff" stroke-width="2"/><circle cx="60" cy="60" r="34" fill="none" stroke="#8be9ff" stroke-width="1.7"/><circle cx="60" cy="60" r="29" fill="none" stroke="#c0ffff" stroke-opacity=".8" stroke-width="1.3" stroke-dasharray="2 3"/><path d="M60 27v7m0 52v7M27 60h7m52 0h7M36.7 36.7l5 5m36.6 36.6 5 5m0-46.6-5 5m-36.6 36.6-5 5" stroke="#d0ffff" stroke-width="2.2" stroke-linecap="round"/><circle cx="60" cy="20" r="2.5" fill="#efffff"/><circle cx="60" cy="100" r="2.5" fill="#efffff"/><circle cx="20" cy="60" r="2.5" fill="#efffff"/><circle cx="100" cy="60" r="2.5" fill="#efffff"/><circle cx="60" cy="60" r="18" fill="none" stroke="#d7ffff" stroke-width="2"/><path d="M60 45 64 56 75 60 64 64 60 75 56 64 45 60 56 56Z" fill="#dbffff" fill-opacity=".85"/><circle cx="60" cy="60" r="4" fill="#efffff"/></g><g class="scroll-stand-magic-orbit"><circle cx="60" cy="60" r="48" fill="none" stroke="#77dcff" stroke-opacity=".82" stroke-width="1.5" stroke-dasharray="9 4 2 4"/><path d="m60 10 3 7-6 0zM110 60l-7 3v-6zM60 110l-3-7h6zM10 60l7-3v6z" fill="#e4ffff"/></g>`;
+            vehicleAnimationLayer.appendChild(circle);
+            scrollStandMagicCircles.set(building.instanceId, circle);
+        }
+        const diameter = radius * 2 * state.zoom;
+        const screenCenterX = (worldCenterX - state.camera.x) * state.zoom + canvas.width / 2;
+        const screenCenterY = (worldCenterY - state.camera.y) * state.zoom + canvas.height / 2;
+        circle.style.width = `${diameter}px`;
+        circle.style.height = `${diameter}px`;
+        circle.style.transform = `translate3d(${screenCenterX - diameter / 2}px, ${screenCenterY - diameter / 2}px, 0)`;
+        circle.style.display = 'block';
+    });
+    activeStands.forEach(building => {
+        const definition = BUILDING_BY_ID.get(building.id);
+        const circle = scrollStandMagicCircles.get(building.instanceId);
+        if (!circle || !definition) return;
+        const worldCenterX = (building.x + definition.width / 2) * state.tileSize;
+        const worldCenterY = (building.y + definition.height / 2) * state.tileSize;
+        const viewLeft = state.camera.x - canvas.width / (2 * state.zoom);
+        const viewTop = state.camera.y - canvas.height / (2 * state.zoom);
+        const radius = state.tileSize * Math.max(definition.width, definition.height) * .62;
+        circle.style.display = worldCenterX + radius < viewLeft || worldCenterX - radius > viewLeft + canvas.width / state.zoom
+            || worldCenterY + radius < viewTop || worldCenterY - radius > viewTop + canvas.height / state.zoom
+            ? 'none'
+            : 'block';
+    });
+}
+
 function draw() {
     const now = performance.now();
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -3683,6 +4399,7 @@ function draw() {
     });
 
     ctx.restore();
+    updateScrollStandMagicCircles();
     if (state.buildings.some(placed => placed.vehicle?.movement || placed.automaton?.movement)) scheduleVehicleAnimation();
 }
 
@@ -5215,17 +5932,12 @@ function toggleSelectedAutomaton() {
     scheduleVehicleAnimation();
 }
 
-function vehicleStopLabel(vehicle) {
-    if (vehicle.running) return '運行中';
-    return vehicle.stopReason ? `停止: ${vehicle.stopReason}` : '停止中';
-}
-
 function renderVehicleMenu(placed, definition) {
     const controls = document.getElementById('vehicle-menu-controls');
     const start = document.getElementById('building-menu-start-vehicle');
     const status = document.getElementById('vehicle-status');
+    const guide = document.getElementById('vehicle-start-guide');
     const resourceSettings = document.getElementById('vehicle-resource-settings');
-    const scrollSelect = document.getElementById('vehicle-movement-scroll');
     const isLocomotive = definition.kind === 'locomotive';
     if (controls) controls.hidden = !isLocomotive;
     if (!isLocomotive) {
@@ -5233,27 +5945,32 @@ function renderVehicleMenu(placed, definition) {
         return;
     }
     const vehicle = getVehicleState(placed);
+    const firstStep = vehicle.running ? null : getVehicleNextStep(placed, { ...vehicle, previousRail: null });
     if (start) {
         start.hidden = false;
-        start.textContent = vehicle.running ? '停止' : '起動';
+        start.textContent = vehicle.running ? '停止' : '出発';
         start.classList.toggle('inventory-modal-secondary', vehicle.running);
         start.classList.toggle('saved-scroll-use', !vehicle.running);
+        start.setAttribute('aria-label', vehicle.running ? '機関車を停止' : '機関車を出発');
     }
-    if (status) status.textContent = `${vehicleStopLabel(vehicle)} / 将来消費枠: 動力 ${vehicle.powerPerCell}・蒸気 ${vehicle.steamPerCell} / セル`;
-    if (resourceSettings) resourceSettings.textContent = `車載在庫: 動力 ${vehicle.resources.power} / 蒸気 ${vehicle.resources.steam} (未接続) / 速度 ${vehicle.speedCellsPerSecond}セル/秒`;
-    if (!scrollSelect) return;
-    const selectedScrollId = vehicle.movementScrollId || '';
-    let scrolls = [];
-    try {
-        const saved = JSON.parse(localStorage.getItem('fogsgear_scroll_library') || '[]');
-        scrolls = Array.isArray(saved) ? saved.filter(scroll => typeof scroll?.id === 'string') : [];
-    } catch (error) {}
-    scrollSelect.replaceChildren(new Option('未割当', ''));
-    scrolls.forEach(scroll => scrollSelect.add(new Option(scroll.name || scroll.id, scroll.id)));
-    if (selectedScrollId && !scrolls.some(scroll => scroll.id === selectedScrollId)) {
-        scrollSelect.add(new Option(`未登録 (${selectedScrollId})`, selectedScrollId));
+    if (status) {
+        status.textContent = vehicle.running ? '運行中' : firstStep?.error ? '出発できません' : '停車中';
+        status.classList.toggle('is-running', vehicle.running);
+        status.classList.toggle('is-blocked', Boolean(!vehicle.running && firstStep?.error));
     }
-    scrollSelect.value = selectedScrollId;
+    if (guide) {
+        if (vehicle.running) {
+            guide.textContent = '運行中です。「停止」を押すと、現在の移動を確定して停車します。';
+        } else if (firstStep?.error) {
+            const reason = VEHICLE_STOP_MESSAGES[firstStep.error] || '線路の接続を確認してください';
+            guide.textContent = `出発できません：${reason}。線路を確認してください。`;
+        } else if (vehicle.stopReason && vehicle.stopReason !== '手動停止') {
+            guide.textContent = `前回の停止理由：${vehicle.stopReason}。線路を確認して「出発」を押してください。`;
+        } else {
+            guide.textContent = '出発準備完了。「出発」を押すと線路に沿って進みます。連結した貨車は自動で追従し、分岐では駅舎で進路を指定します。';
+        }
+    }
+    if (resourceSettings) resourceSettings.textContent = `速度：${vehicle.speedCellsPerSecond}マス / 秒`;
 }
 
 function formatUtilityAmount(amount) {
@@ -5267,6 +5984,224 @@ function getBuildingTitle(placed, definition = BUILDING_BY_ID.get(placed.id)) {
 function getBuildingSelectionName(placed) {
     const definition = BUILDING_BY_ID.get(placed.id);
     return placed.customName ? `${placed.customName} / ${definition.name}` : definition.name;
+}
+
+function updateBuildingScrollStatus(placed) {
+    const controls = document.getElementById('building-scroll-controls');
+    const select = document.getElementById('building-scroll-select');
+    const overclockSelect = document.getElementById('building-overclock-select');
+    const status = document.getElementById('building-scroll-status');
+    const craftButton = document.getElementById('building-menu-craft');
+    if (!controls || !select || !status) return;
+    const hasRecipes = Boolean(placed && getCraftingRecipesForBuilding(placed.id).length);
+    const canInstallScroll = canInstallScrollInBuilding(placed);
+    controls.hidden = !canInstallScroll;
+    const overclockControl = document.getElementById('building-overclock-control');
+    if (overclockControl) overclockControl.hidden = !hasRecipes;
+    if (!canInstallScroll) return;
+    const overclock = getCraftingOverclock(placed);
+    const basePowerRate = hasRecipes ? CRAFTING_STATION_POWER_RATES[placed.id] : 0;
+    const powerRate = hasRecipes ? getCraftingStationPowerRate(placed) : 0;
+    const formatRate = rate => Number.isFinite(rate) ? String(Number(rate.toFixed(2))) : '不明';
+    if (overclockSelect && hasRecipes) overclockSelect.value = String(overclock.speedMultiplier);
+    const selectedScroll = getStoredSavedScrolls().find(scroll => scroll.id === placed.craftingScrollId);
+    const assigned = hasAssignedCraftingScroll(placed);
+    const running = assigned && hasRunningCraftingScroll(placed);
+    updateBuildingScrollPreview(selectedScroll || null);
+    updateBuildingScrollToggle(assigned ? selectedScroll : null);
+    if (selectedScroll && isScrollExhausted(selectedScroll)) {
+        status.textContent = `${selectedScroll.name || 'スクロール'} は耐久度を使い切りました（${getScrollDurabilityLimit(selectedScroll)}/${getScrollDurabilityLimit(selectedScroll)}回転）。取り外すとスクロールブックから写本できます。`;
+    } else if (!assigned) {
+        status.textContent = hasRecipes
+            ? `スクロール未設定。セットすると製作設備を起動できます。基本動力 ${formatRate(basePowerRate)} 動力/秒`
+            : 'スクロールをセットすると、この台の設置セルで稼働します。';
+    } else if (!running) {
+        status.textContent = `${selectedScroll.name || 'スクロール'} セット済み / 停止中。起動すると製作できます。`;
+    } else if (!engineRuntimeState.creativeMode && Number(engineRuntimeState.steamPower) <= 0) {
+        status.textContent = `${selectedScroll.name || 'スクロール'} セット済み / 蒸気動力待ち`;
+    } else if (!engineRuntimeState.creativeMode && hasRecipes && Number(engineRuntimeState.power) <= 0) {
+        status.textContent = `${selectedScroll.name || 'スクロール'} セット済み / 動力待ち / オーバークロック ${overclock.speedMultiplier}倍 / ${formatRate(powerRate)} 動力/秒`;
+    } else {
+        status.textContent = hasRecipes
+            ? `${selectedScroll.name || 'スクロール'} セット済み / 稼働可能 / オーバークロック ${overclock.speedMultiplier}倍 / ${formatRate(powerRate)} 動力/秒`
+            : `${selectedScroll.name || 'スクロール'} セット済み / 稼働可能`;
+    }
+    if (craftButton && hasRecipes) {
+        craftButton.disabled = !running || !engineRuntimeState.creativeMode && Number(engineRuntimeState.power) <= 0;
+    }
+}
+
+function getActiveScrollIds() {
+    try {
+        const stored = JSON.parse(localStorage.getItem('fogsgear_active_scroll_id') || '[]');
+        if (Array.isArray(stored)) return stored.filter(scrollId => typeof scrollId === 'string');
+        return typeof stored === 'string' && stored && localStorage.getItem('fogsgear_active_scroll_running') === 'true'
+            ? [stored]
+            : [];
+    } catch (error) {
+        const legacyId = localStorage.getItem('fogsgear_active_scroll_id');
+        return localStorage.getItem('fogsgear_active_scroll_running') === 'true' && legacyId ? [legacyId] : [];
+    }
+}
+
+function stopPlayerTargetedScrolls(playerMoved = false) {
+    const activeIds = new Set(getActiveScrollIds());
+    if (!activeIds.size) return;
+    let targets;
+    try {
+        const stored = JSON.parse(localStorage.getItem(ACTIVE_SCROLL_TARGETS_KEY) || '{}');
+        targets = stored && typeof stored === 'object' && !Array.isArray(stored) ? stored : {};
+    } catch (error) {
+        console.warn('Could not read active scroll targets after player movement.', error);
+        return;
+    }
+    const stoppedIds = [...activeIds].filter(scrollId => {
+        const target = targets[scrollId];
+        const anchoredBuilding = state.buildings.find(building => building.instanceId === target?.buildingInstanceId
+            && building.craftingScrollId === scrollId);
+        return !supportsStationaryScrolls(anchoredBuilding)
+            && (playerMoved || target?.x !== state.player.x || target?.y !== state.player.y);
+    });
+    if (!stoppedIds.length) return;
+    stoppedIds.forEach(scrollId => {
+        activeIds.delete(scrollId);
+        delete targets[scrollId];
+    });
+    localStorage.setItem('fogsgear_active_scroll_id', JSON.stringify([...activeIds]));
+    localStorage.removeItem('fogsgear_active_scroll_running');
+    localStorage.setItem(ACTIVE_SCROLL_TARGETS_KEY, JSON.stringify(targets));
+    refreshActiveScrollTargets(targets);
+    renderSavedScrolls();
+    const selectedBuilding = state.buildings.find(building => building.instanceId === selectedBuildingInstanceId);
+    if (selectedBuilding) updateBuildingScrollStatus(selectedBuilding);
+}
+
+function updateBuildingScrollToggle(scroll) {
+    const button = document.getElementById('building-scroll-toggle');
+    if (!button) return;
+    const isRunning = Boolean(scroll && getActiveScrollIds().includes(scroll.id));
+    button.textContent = isRunning ? 'スクロールを停止' : 'スクロールを起動';
+    button.classList.toggle('is-running', isRunning);
+    button.disabled = !scroll || !isRunning
+        && !engineRuntimeState.creativeMode
+        && Number(engineRuntimeState.steamPower) <= 0;
+    button.setAttribute('aria-pressed', String(isRunning));
+}
+
+function updateBuildingScrollPreview(scroll) {
+    const preview = document.getElementById('building-scroll-preview');
+    const frame = document.getElementById('building-scroll-preview-frame');
+    if (!preview || !frame) return;
+    preview.hidden = !scroll;
+    if (!scroll) {
+        if (frame.dataset.scrollId) {
+            frame.src = 'about:blank';
+            delete frame.dataset.scrollId;
+        }
+        return;
+    }
+    frame.title = `${scroll.name || 'スクロール'}の動作プレビュー`;
+    if (frame.dataset.scrollId === scroll.id) return;
+    const previewUrl = new URL('../GearSystem/scroll-library.html', window.location.href);
+    previewUrl.searchParams.set('previewOnly', '1');
+    previewUrl.searchParams.set('followRunning', '1');
+    previewUrl.searchParams.set('scrollId', scroll.id);
+    previewUrl.searchParams.set('v', '58');
+    frame.src = previewUrl.href;
+    frame.dataset.scrollId = scroll.id;
+}
+
+function renderBuildingScrollControls(placed) {
+    const controls = document.getElementById('building-scroll-controls');
+    const select = document.getElementById('building-scroll-select');
+    const overclockSelect = document.getElementById('building-overclock-select');
+    if (!controls || !select) return;
+    const hasRecipes = Boolean(getCraftingRecipesForBuilding(placed.id).length);
+    const canInstallScroll = canInstallScrollInBuilding(placed);
+    controls.hidden = !canInstallScroll;
+    const overclockControl = document.getElementById('building-overclock-control');
+    if (overclockControl) overclockControl.hidden = !hasRecipes;
+    if (!canInstallScroll) return;
+    if (overclockSelect && hasRecipes) {
+        overclockSelect.replaceChildren(...CRAFTING_OVERCLOCK_OPTIONS.map(option =>
+            new Option(`${option.label}（速度${option.speedMultiplier}倍・動力${option.powerMultiplier}倍）`, String(option.speedMultiplier))));
+        overclockSelect.value = String(getCraftingOverclock(placed).speedMultiplier);
+    }
+    const installedScrollIds = getInstalledCraftingScrollIds(placed.instanceId);
+    const scrolls = getStoredSavedScrolls().filter(scroll => typeof scroll?.id === 'string'
+        && isUsableCraftingScroll(scroll)
+        && !installedScrollIds.has(scroll.id)
+        && scroll.id !== placed.craftingScrollId);
+    const assignedScroll = getStoredSavedScrolls().find(scroll => scroll.id === placed.craftingScrollId);
+    if (assignedScroll && isUsableCraftingScroll(assignedScroll)) scrolls.unshift(assignedScroll);
+    select.replaceChildren(new Option('スクロールを選択', ''));
+    scrolls.forEach(scroll => select.add(new Option(scroll.name || scroll.id, scroll.id)));
+    if (placed.craftingScrollId && !scrolls.some(scroll => scroll.id === placed.craftingScrollId)) {
+        const label = assignedScroll && isScrollExhausted(assignedScroll)
+            ? `${assignedScroll.name || 'スクロール'}（使い切った・回収して写本）`
+            : '登録解除されたスクロール';
+        select.add(new Option(label, placed.craftingScrollId));
+    }
+    select.value = placed.craftingScrollId || '';
+    updateBuildingScrollStatus(placed);
+}
+
+function toggleBuildingScroll() {
+    const placed = state.buildings.find(building => building.instanceId === selectedBuildingInstanceId);
+    if (!canInstallScrollInBuilding(placed) || !hasAssignedCraftingScroll(placed)) return;
+    const scrollId = placed.craftingScrollId;
+    const activeIds = new Set(getActiveScrollIds());
+    const targets = (() => {
+        try {
+            const stored = JSON.parse(localStorage.getItem(ACTIVE_SCROLL_TARGETS_KEY) || '{}');
+            return stored && typeof stored === 'object' && !Array.isArray(stored) ? stored : {};
+        } catch (error) {
+            return {};
+        }
+    })();
+    if (activeIds.has(scrollId)) {
+        activeIds.delete(scrollId);
+        delete targets[scrollId];
+    } else {
+        if (!engineRuntimeState.creativeMode && Number(engineRuntimeState.steamPower) <= 0) {
+            showAppNotice('蒸気動力がないためスクロールを起動できません。');
+            return;
+        }
+        targets[scrollId] = supportsStationaryScrolls(placed)
+            ? { x: placed.x, y: placed.y, buildingInstanceId: placed.instanceId, startedAt: Date.now() }
+            : { x: state.player.x, y: state.player.y, startedAt: Date.now() };
+        activeIds.add(scrollId);
+        if (engineRuntimeState.mainGearRunning === false) {
+            engineRuntimeState.mainGearRunning = true;
+            engineRuntimeState.userStoppedMainGear = false;
+            engineRuntimeState.autoStoppedBySteam = false;
+            engineRuntimeState.updatedAt = Date.now();
+            engineRuntimeState.saveGameData();
+        }
+    }
+    localStorage.setItem('fogsgear_active_scroll_id', JSON.stringify([...activeIds]));
+    localStorage.removeItem('fogsgear_active_scroll_running');
+    localStorage.setItem(ACTIVE_SCROLL_TARGETS_KEY, JSON.stringify(targets));
+    refreshActiveScrollTargets(targets);
+    updateBuildingScrollStatus(placed);
+}
+
+function stopScrollIfRunning(scrollId) {
+    if (!scrollId) return;
+    const activeIds = new Set(getActiveScrollIds());
+    if (!activeIds.delete(scrollId)) return;
+    let targets = {};
+    try {
+        const stored = JSON.parse(localStorage.getItem(ACTIVE_SCROLL_TARGETS_KEY) || '{}');
+        if (stored && typeof stored === 'object' && !Array.isArray(stored)) targets = stored;
+    } catch (error) {
+        console.warn('Could not read active scroll targets while removing an installed scroll.', error);
+    }
+    delete targets[scrollId];
+    localStorage.setItem('fogsgear_active_scroll_id', JSON.stringify([...activeIds]));
+    localStorage.removeItem('fogsgear_active_scroll_running');
+    localStorage.setItem(ACTIVE_SCROLL_TARGETS_KEY, JSON.stringify(targets));
+    refreshActiveScrollTargets(targets);
 }
 
 function updateBuildingMenuDetails(placed, definition) {
@@ -5295,7 +6230,6 @@ function updateBuildingMenuDetails(placed, definition) {
     const vehicleNote = definition.role === 'vehicle' ? ' / 線路配置済みの車両' : '';
     const foundationNote = definition.requiresFoundation ? ' / 基礎上に建設' : '';
     const railOrientation = definition.role === 'rail' ? ` / 向き ${getBuildingRotationLabel(definition, placed.rotation || 0)}` : '';
-    document.getElementById('building-custom-name').value = placed.customName || '';
     document.getElementById('building-menu-details').textContent = `${definition.width}×${definition.height}セル / 座標 (${placed.x}, ${placed.y}) / 建設真鍮 ${definition.brassCost}${railOrientation}${foundationNote}${vehicleNote}${effectSummary}${utilityNote}${storageNote}`;
 }
 
@@ -5314,6 +6248,8 @@ function openBuildingMenu(instanceId) {
     }
     document.getElementById('automaton-menu-modal').hidden = true;
     document.getElementById('building-menu-title').textContent = getBuildingTitle(placed, definition);
+    document.getElementById('building-custom-name').value = placed.customName || '';
+    renderBuildingScrollControls(placed);
     renderVehicleMenu(placed, definition);
     updateBuildingMenuDetails(placed, definition);
     renderBuildingStorage(placed, definition);
@@ -5773,6 +6709,7 @@ function demolishSelectedBuilding() {
         return;
     }
     const historyBefore = captureBuildingHistoryState();
+    stopScrollIfRunning(placed.craftingScrollId);
     state.buildings.splice(index, 1);
     refunds.forEach(({ itemId, amount }) => {
         const resourceKey = { water: 'water', fog: 'fog', power: 'power', steam_power: 'steamPower' }[itemId];
@@ -5787,6 +6724,7 @@ function demolishSelectedBuilding() {
     cancelBuildingDemolition();
     closeBuildingMenu();
     buildingRenderSignature = '';
+    renderSavedScrolls();
     renderCellMaterials();
     scheduleDraw();
 }
@@ -6053,6 +6991,7 @@ function movePlayer(dx, dy) {
             && !isBuildingCellBlocked(newX, newY)) {
             state.player.x = newX;
             state.player.y = newY;
+            stopPlayerTargetedScrolls(true);
             savePlayerPos();
             state.skin.setDirection(dx, dy);
             centerCameraOnPlayer();
@@ -6125,6 +7064,13 @@ function updateEngineDashboard() {
     const collectedMaterialRates = new Map();
     if (save.mainGearRunning && (save.creativeMode || save.steamPower > 0) && state.map.length) {
         save.getActiveScrollRuntimes(performance.now()).forEach(runtime => {
+            const targetStand = runtime.target.buildingInstanceId
+                ? state.buildings.find(building => building.instanceId === runtime.target.buildingInstanceId
+                    && supportsStationaryScrolls(building) && building.craftingScrollId === runtime.scrollId)
+                : null;
+            if (runtime.target.buildingInstanceId
+                ? !targetStand || targetStand.x !== runtime.target.x || targetStand.y !== runtime.target.y
+                : runtime.target.x !== state.player.x || runtime.target.y !== state.player.y) return;
             const tile = state.map[runtime.target.y]?.[runtime.target.x];
             if (!tile) return;
             const collectionCount = Number(tile.collectionCount) || 0;
@@ -6360,7 +7306,7 @@ function openGuideModal() {
 
     const frame = document.createElement('iframe');
     frame.title = 'ガイド';
-    frame.src = 'cell-atlas.html?modal=1&v=11';
+    frame.src = 'cell-atlas.html?modal=1&v=13';
     frame.loading = 'lazy';
     frame.setAttribute('allowfullscreen', 'false');
 
@@ -6547,7 +7493,7 @@ document.addEventListener('click', (event) => {
     }
     if (button.dataset.action === 'inspect-inventory-item') {
         if (button.dataset.itemKey === 'scroll_book') {
-            openAppPage('../GearSystem/scroll-library.html?embed=1&source=scroll-book&v=11', 'スクロール書庫');
+            openAppPage('../GearSystem/scroll-library.html?embed=1&source=scroll-book&v=13', 'スクロール書庫');
             return;
         }
         openInventoryItem(button.dataset.itemKey);
@@ -6560,6 +7506,18 @@ document.addEventListener('click', (event) => {
     }
     if (button.dataset.action === 'close-inventory-modal') {
         closeInventoryItem();
+        return;
+    }
+    if (button.dataset.action === 'open-inventory-discard-confirmation') {
+        openInventoryDiscardConfirmation();
+        return;
+    }
+    if (button.dataset.action === 'cancel-inventory-discard') {
+        cancelInventoryDiscard();
+        return;
+    }
+    if (button.dataset.action === 'confirm-inventory-discard') {
+        discardInventoryItem();
         return;
     }
     if (button.dataset.action === 'use-scroll-from-modal') {
@@ -6595,13 +7553,6 @@ document.addEventListener('click', (event) => {
     if (button.dataset.action === 'toggle-orientation-lock') {
         toggleOrientationLock().catch(() => showAppNotice('画面方向を固定できませんでした。'));
     }
-});
-
-document.getElementById('vehicle-movement-scroll')?.addEventListener('change', event => {
-    const placed = state.buildings.find(building => building.instanceId === selectedBuildingInstanceId);
-    if (!placed || BUILDING_BY_ID.get(placed.id)?.kind !== 'locomotive') return;
-    getVehicleState(placed).movementScrollId = event.target.value;
-    saveBuildings();
 });
 
 [
@@ -6738,7 +7689,59 @@ document.getElementById('building-crafting-search')?.addEventListener('input', r
 document.getElementById('building-crafting-modal')?.addEventListener('click', event => {
     if (event.target === event.currentTarget) closeBuildingCrafting();
 });
+document.getElementById('building-scroll-select')?.addEventListener('change', event => {
+    const placed = state.buildings.find(building => building.instanceId === selectedBuildingInstanceId);
+    if (!placed) return;
+    const scrollId = event.currentTarget.value;
+    if (scrollId && !getStoredSavedScrolls().some(scroll =>
+        scroll.id === scrollId && isUsableCraftingScroll(scroll)
+        && !getInstalledCraftingScrollIds(placed.instanceId).has(scroll.id))) {
+        event.currentTarget.value = '';
+        showAppNotice('未使用の有効な保存スクロールを選択してください。');
+        return;
+    }
+    if (placed.craftingScrollId !== scrollId) stopScrollIfRunning(placed.craftingScrollId);
+    if (scrollId) placed.craftingScrollId = scrollId;
+    else delete placed.craftingScrollId;
+    saveBuildings();
+    renderSavedScrolls();
+    renderBuildingScrollControls(placed);
+});
+document.getElementById('building-overclock-select')?.addEventListener('change', event => {
+    const placed = state.buildings.find(building => building.instanceId === selectedBuildingInstanceId);
+    if (!placed) return;
+    const selectedMultiplier = Number(event.currentTarget.value);
+    const overclock = CRAFTING_OVERCLOCK_OPTIONS.find(option => option.speedMultiplier === selectedMultiplier);
+    if (!overclock) {
+        event.currentTarget.value = String(getCraftingOverclock(placed).speedMultiplier);
+        showAppNotice('オーバークロック倍率を選択できませんでした。');
+        return;
+    }
+    if (getCraftingOverclock(placed).speedMultiplier === overclock.speedMultiplier) return;
+    placed.craftingOverclockMultiplier = overclock.speedMultiplier;
+    saveBuildings();
 
+    const now = Date.now();
+    engineRuntimeState.craftingJobs
+        .filter(job => job.requiresPower && job.craftingStationId === placed.instanceId)
+        .forEach(job => {
+            const workDuration = Math.max(1, Number(job.workDurationMs) || Number(job.durationMs) || 1);
+            const workRemaining = Number(job.workRemainingMs);
+            job.workDurationMs = workDuration;
+            job.workRemainingMs = Number.isFinite(workRemaining) ? Math.max(0, workRemaining) : workDuration;
+            job.durationMs = workDuration / overclock.speedMultiplier;
+            if (Number(job.startedAt) <= now && job.workRemainingMs > 0) {
+                job.completesAt = now + job.workRemainingMs / overclock.speedMultiplier;
+            }
+        });
+    engineRuntimeState.scheduleCraftingJobs([], now, placed.instanceId);
+    engineRuntimeState.saveGameData();
+    engineRuntimeState.notify();
+    updateBuildingScrollStatus(placed);
+    updateEngineDashboard();
+    syncCraftingNotifications(true);
+});
+document.getElementById('building-scroll-toggle')?.addEventListener('click', toggleBuildingScroll);
 document.getElementById('building-item-search')?.addEventListener('input', () => {
     buildingRenderSignature = '';
     renderBuildingInventory();
@@ -6820,6 +7823,75 @@ window.addEventListener('message', event => {
         showRecipeDetail(itemId);
         return;
     }
+    if (scrollLibraryFrame && event.data?.type === 'fogsgear:copy-scroll') {
+        const requestId = typeof event.data.requestId === 'string' ? event.data.requestId.slice(0, 100) : '';
+        const respond = result => event.source.postMessage({
+            type: 'fogsgear:copy-scroll-result',
+            requestId,
+            ...result
+        }, event.origin === 'null' ? '*' : window.location.origin);
+        try {
+            if (!requestId) throw new Error('写本リクエストを識別できません。');
+            if ((localStorage.getItem(GAME_PROGRESS_EPOCH_KEY) || '') !== gameProgressEpochAtStart) {
+                throw new Error('ゲームデータがリセットされました。画面を再読み込みしてください。');
+            }
+            const scrollId = String(event.data.scrollId || '');
+            const sourceScroll = getStoredSavedScrolls().find(scroll => scroll.id === scrollId);
+            if (!sourceScroll) throw new Error('写本する設計図が見つかりません。');
+            if (state.buildings.some(building => building.craftingScrollId === scrollId)) {
+                throw new Error('設置中のスクロールは、建物から回収してから写本してください。');
+            }
+            const material = event.data.material === 'cloth' ? 'cloth'
+                : event.data.material === 'paper' ? 'paper' : null;
+            if (!material) throw new Error('写本先の種類を選択してください。');
+            if (!Array.isArray(sourceScroll.blueprint?.gears)
+                || sourceScroll.blueprint.gears.filter(gear => gear.isCore).length !== 1) {
+                throw new Error('この設計図のギア構成は写本できません。');
+            }
+            const copyCost = sourceScroll.blueprint.gears.reduce((total, gear) => {
+                if (gear.isCore) return total;
+                const cost = ENGINE_GEAR_CONFIG[gear.size]?.cost;
+                if (!Number.isFinite(cost)) throw new Error('設計図に不明なギアサイズがあります。');
+                return total + cost;
+            }, 0);
+            if (copyCost <= 0) throw new Error('メインギア以外のギアがないため写本できません。');
+            const chargedCost = engineRuntimeState.creativeMode ? 0 : copyCost;
+            if (engineRuntimeState.brass < chargedCost) {
+                throw new Error(`真鍮資材が不足しています（必要 ${chargedCost} / 所持 ${Math.floor(engineRuntimeState.brass)}）。`);
+            }
+            const library = getStoredSavedScrolls();
+            const name = getUniqueScrollName(event.data.name, library);
+            const now = Date.now();
+            const copy = {
+                ...sourceScroll,
+                id: `scroll-${now}-${Math.random().toString(16).slice(2, 8)}`,
+                name,
+                createdAt: now,
+                material,
+                usedRotations: 0,
+                effect: JSON.parse(JSON.stringify(sourceScroll.effect || { type: 'custom', label: '未設定', config: {} })),
+                blueprint: JSON.parse(JSON.stringify(sourceScroll.blueprint)),
+                metadata: { ...(sourceScroll.metadata || {}), source: 'scroll-copy', version: 1 }
+            };
+            const previousLibrary = localStorage.getItem('fogsgear_scroll_library');
+            const previousBrass = engineRuntimeState.brass;
+            try {
+                library.unshift(copy);
+                localStorage.setItem('fogsgear_scroll_library', JSON.stringify(library));
+                engineRuntimeState.brass -= chargedCost;
+                engineRuntimeState.saveGameData();
+            } catch (error) {
+                engineRuntimeState.brass = previousBrass;
+                if (previousLibrary === null) localStorage.removeItem('fogsgear_scroll_library');
+                else localStorage.setItem('fogsgear_scroll_library', previousLibrary);
+                throw error;
+            }
+            respond({ success: true, name, cost: chargedCost, scrollId: copy.id });
+        } catch (error) {
+            respond({ success: false, message: error instanceof Error ? error.message : String(error) });
+        }
+        return;
+    }
     if (scrollLibraryFrame && event.data?.type === 'fogsgear:edit-scroll') {
         const scrollId = String(event.data.scrollId || '');
         if (!getStoredSavedScrolls().some(scroll => scroll.id === scrollId)) return;
@@ -6834,6 +7906,9 @@ window.addEventListener('message', event => {
 
 document.getElementById('inventory-item-modal')?.addEventListener('click', (event) => {
     if (event.target.id === 'inventory-item-modal') closeInventoryItem();
+});
+document.getElementById('inventory-discard-confirm-modal')?.addEventListener('click', event => {
+    if (event.target.id === 'inventory-discard-confirm-modal') cancelInventoryDiscard();
 });
 
 document.getElementById('recipe-detail-modal')?.addEventListener('click', (event) => {
@@ -6994,6 +8069,12 @@ document.addEventListener('pointerup', (event) => {
 
 window.addEventListener('keydown', (event) => {
     if (event.key !== 'Escape') return;
+    const discardModal = document.getElementById('inventory-discard-confirm-modal');
+    if (discardModal && !discardModal.hidden) {
+        cancelInventoryDiscard();
+        event.preventDefault();
+        return;
+    }
     const demolitionModal = document.getElementById('building-demolition-confirm-modal');
     if (demolitionModal && !demolitionModal.hidden) {
         cancelBuildingDemolition();
@@ -7029,6 +8110,12 @@ document.addEventListener('fullscreenchange', () => {
 window.addEventListener('storage', (event) => {
     renderSavedScrolls();
     updateEngineDashboard();
+    const selectedBuilding = state.buildings.find(building => building.instanceId === selectedBuildingInstanceId);
+    if (event.key === 'fogsgear_scroll_library' && selectedBuilding) renderBuildingScrollControls(selectedBuilding);
+    if (event.key === 'fogsgear_active_scroll_id') {
+        if (selectedBuilding) updateBuildingScrollStatus(selectedBuilding);
+        scheduleDraw();
+    }
     if (event.key === ACTIVE_SCROLL_TARGETS_KEY) refreshActiveScrollTargets();
 });
 
@@ -7036,7 +8123,7 @@ window.addEventListener('fogsgear:scroll-targets-changed', event => refreshActiv
 
 const engineRuntimeState = new EngineGameState();
 migrateLegacyMaterialIds();
-new EngineGearManager(engineRuntimeState);
+const engineGearManager = new EngineGearManager(engineRuntimeState);
 engineRuntimeState.worldCellHandler = handleWorldCellOperation;
 let activeCraftingBuildingsSignature = getActiveCraftingBuildingSignature();
 engineRuntimeState.subscribe(() => {
@@ -7047,6 +8134,8 @@ engineRuntimeState.subscribe(() => {
     if (!document.getElementById('building-crafting-modal')?.hidden) renderBuildingCrafting();
     updateCraftingCountdowns();
     updateEngineDashboard();
+    const selectedBuilding = state.buildings.find(building => building.instanceId === selectedBuildingInstanceId);
+    if (selectedBuilding) updateBuildingScrollStatus(selectedBuilding);
     const nextActiveCraftingBuildingsSignature = getActiveCraftingBuildingSignature();
     if (nextActiveCraftingBuildingsSignature !== activeCraftingBuildingsSignature) {
         activeCraftingBuildingsSignature = nextActiveCraftingBuildingsSignature;
@@ -7055,7 +8144,11 @@ engineRuntimeState.subscribe(() => {
 });
 syncCraftingNotifications();
 updateEngineDashboard();
-engineTickIntervalId = window.setInterval(() => engineRuntimeState.tick(), 16);
+engineTickIntervalId = window.setInterval(() => {
+    if (!craftingWorldReady) return;
+    advancePoweredCraftingJobs();
+    engineRuntimeState.tick();
+}, 16);
 buildingUtilityIntervalId = window.setInterval(updateBuildingUtilityNetworks, 1000);
 
 window.addEventListener('keydown', (e) => {
@@ -7319,6 +8412,7 @@ function setupDashboardToggle(toggleButton, panel) {
     toggleButtons.forEach(button => button.addEventListener('click', () => {
         const isOpen = panel.hidden;
         panel.hidden = !isOpen;
+        if (isOpen && panel.id === 'inventory-panel') renderSavedScrolls();
         toggleButtons.forEach(toggle => {
             toggle.setAttribute('aria-expanded', String(isOpen));
             const span = toggle.querySelector('span');
@@ -7358,4 +8452,13 @@ if ('serviceWorker' in navigator) {
     });
 }
 
-init();
+init().catch(error => {
+    console.error('Game initialization failed.', error);
+    const panel = document.querySelector('.loading-panel');
+    panel?.classList.add('is-error');
+    const loadingMessage = document.getElementById('loadingMessage');
+    const detail = error instanceof Error ? error.message : String(error);
+    if (loadingMessage) loadingMessage.textContent = `起動失敗［${startupStage}］: ${detail}`;
+    const retryButton = document.getElementById('loading-retry');
+    if (retryButton) retryButton.hidden = false;
+});

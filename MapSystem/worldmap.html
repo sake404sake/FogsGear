@@ -153,9 +153,9 @@
     </div>
 
     <script type="module">
-        import { MapGenerator, loadMapSnapshot, saveMapSnapshot } from './js/mapGenerator.js?v=88';
+        import { MapGenerator, loadMapSnapshot, saveMapSnapshot } from './js/mapGenerator.js?v=92';
         import { CELL_DEFINITIONS, getMosaicColor } from './js/cellRules.js?v=4';
-        import { buildTerritoryBorderSegments } from './js/territoryBorders.js?v=35';
+        import { buildTerritoryBorderSegments } from './js/territoryBorders.js?v=36';
         import { applyCellChanges, WORLD_CELL_TYPES } from './js/worldCells.js?v=12';
         import { drawCellIcon, loadCellIconAtlas } from './js/cellIconRenderer.js?v=5';
 
@@ -224,7 +224,11 @@
         });
         const loadingMessage = document.getElementById('loadingMessage');
         if (loadingMessage) loadingMessage.textContent = '保存済みの全体マップを読み込んでいます...';
-        let generated = await loadMapSnapshot(settings.seed, mapSize.width, mapSize.height);
+        let generated = await loadMapSnapshot(settings.seed, mapSize.width, mapSize.height, progress => {
+            if (loadingMessage) {
+                loadingMessage.textContent = `保存済みマップを展開しています... ${Math.round(progress * 100)}%`;
+            }
+        });
         if (!generated) {
             if (loadingMessage) loadingMessage.textContent = '全体マップを生成しています...';
             generated = await generateMapInWorker(settings.seed).catch(() => generator.generate(settings.seed));

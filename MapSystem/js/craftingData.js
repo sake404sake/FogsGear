@@ -1,4 +1,29 @@
 export const CRAFTING_RATE_MULTIPLIER = 1.5;
+export const CRAFTING_STATION_POWER_RATES = Object.freeze({
+    'craft-bench': 0.5,
+    'drying-rack': 0.25,
+    'simple-furnace': 1.5,
+    'charcoal-kiln': 1,
+    'boiler-forge': 1.25,
+    'ore-washer': 1,
+    'ceramic-kiln': 1.5,
+    'machine-lathe': 1,
+    'alchemical-distillery': 1.75,
+    'pressure-gauge-tower': 0.75,
+    'gear-forge': 1.5,
+    'resin-workshop': 1.25,
+    'brass-workshop': 1.25,
+    'difference-tower': 2,
+    'relic-reactor': 2,
+    'filter-tower': 2.5
+});
+export const CRAFTING_OVERCLOCK_OPTIONS = Object.freeze([
+    { speedMultiplier: 1, powerMultiplier: 1, label: '通常' },
+    { speedMultiplier: 1.5, powerMultiplier: 2, label: '1.5倍' },
+    { speedMultiplier: 2, powerMultiplier: 3, label: '2倍' },
+    { speedMultiplier: 3, powerMultiplier: 5, label: '3倍' },
+    { speedMultiplier: 5, powerMultiplier: 8, label: '5倍' }
+]);
 
 export const CRAFTING_ITEMS = [
     ["water", "水", "raw", "採取", "霧から回収。加工・冷却の基礎素材。"], ["wood", "木材", "raw", "森林", "板材、容器、作業設備の基礎。"], ["resin", "樹脂", "raw", "森林", "防水板の封止、接着、耐霧処理に使う。"], ["iron-ore", "鉄鉱石", "raw", "鉱脈", "鉄材、ねじ、構造部品。"], ["copper-ore", "銅鉱石", "raw", "初期鉱脈", "序盤から採掘でき、選鉱後に真鍮や導管の原料となる。"], ["zinc-ore", "亜鉛鉱石", "raw", "初期鉱脈", "序盤から採掘でき、選鉱後に真鍮の副成分となる。"], ["tin-ore", "錫鉱石", "raw", "鉱脈", "銅と合わせて青銅を作る。"], ["coal", "石炭", "raw", "鉱脈", "製錬燃料、コークスの原料。"], ["clay", "粘土", "raw", "地形", "薬液容器や耐熱陶材の基材。"], ["limestone", "石灰岩", "raw", "地形", "製錬助剤、ガラス・陶材の調整材。"], ["sand", "砂", "raw", "地形", "ガラス地、研磨材。"], ["sulfur", "硫黄", "raw", "鉱床", "胞子保存剤、錬金工程の試薬。"], ["peat", "泥炭", "raw", "湿地", "燃料・炭化材、堆肥の炭素源。"], ["salt", "塩", "raw", "塩沼", "保存、陶材の表面処理。"], ["herbs", "薬草", "raw", "草地", "抽出液、回復薬などの基材。"], ["spores", "胞子", "raw", "菌糸群落", "菌糸堆肥、保存培地。"], ["relic-fragment", "遺物片", "raw", "遺跡", "古代部品の核材。"], ["salvage", "部品くず", "raw", "残骸", "再生部品、古代装置の構造材。"], ["navigation-crystal", "航法結晶片", "raw", "墜落跡", "方位の揺らぎを読む錬金共振材。"],
@@ -19,10 +44,16 @@ export const CRAFTING_ITEMS = [
     ["ancient_seed", "古種", "raw", "飛行船の墜落跡", "墜落跡から回収し、薬草地への地形変成に使う。"],
     ["climate-control-core", "気候制御核", "finished", "階差演算台", "遺物の情報を解析し、ドームの気候制御を担う中核部品。"],
     ["closed-loop-unit", "閉鎖循環ユニット", "finished", "浄化設備", "水と空気を循環・浄化し、ドーム内環境を維持する装置。"],
-    ["ecosystem-starter", "生態系スターター", "finished", "培養設備", "保存胞子・堆肥・抽出液から生態系の初期培地を準備する。"]
+    ["ecosystem-starter", "生態系スターター", "finished", "培養設備", "保存胞子・堆肥・抽出液から生態系の初期培地を準備する。"],
+    ["cloth", "布", "processed", "裁縫台", "麻繊維を織り上げた、布スクロールの基材。"],
+    ["paper_scroll", "スクロール（紙）", "finished", "手作業", "ギア設計を記録する紙のスクロール。"],
+    ["cloth_scroll", "スクロール（布）", "finished", "手作業", "ギア設計を記録する布のスクロール。"]
 ];
 
 export const CRAFTING_RECIPES = [
+    ["forest", "布を織る", [["fiber", 5]], "cloth", "裁縫台", "麻繊維を織り、スクロール用の布を作る。", 1, 45],
+    ["forest", "紙スクロールを仕立てる", [["reed-paper", 2]], "paper_scroll", "手作業", "葦紙を巻き、ギア設計用の紙スクロールにする。", 1, 25],
+    ["forest", "布スクロールを仕立てる", [["cloth", 1]], "cloth_scroll", "手作業", "布を巻き、ギア設計用の布スクロールにする。", 1, 25],
     ["forest", "木材を板に挽く", [["wood", 10], ["water", 5]], "lumber", "木工作業台", "初期の工作材を確保する。", 2, 40], ["forest", "板を防水する", [["lumber", 5], ["resin", 5]], "sealed-board", "木工作業台", "霧・湿地で使う構造材。", 1, 35], ["smelting", "鉄を製錬する", [["iron-ore", 10], ["coal", 5]], "iron-ingot", "炉", "ねじや鋼材の基礎。", 2, 75], ["smelting", "銅精鉱を製錬する", [["copper-concentrate", 5], ["coal", 5]], "copper-ingot", "炉", "合金や導管の基礎。", 2, 70],     ["smelting", "亜鉛精鉱を製錬する", [["zinc-concentrate", 5], ["coal", 5]], "zinc-ingot", "炉", "真鍮の副成分。", 2, 70],
     ["terraforming", "気候制御核を組み立てる", [["relic-core", 1], ["navigation-crystal", 3], ["crystal-shard", 5], ["glass-lens", 2], ["pressure-diaphragm", 2]], "climate-control-core", "階差演算台", "古代遺物の情報を気候制御用の計算機構へ変換する。", 1, 180],
     ["terraforming", "閉鎖循環ユニットを組み立てる", [["filter-cartridge", 4], ["ceramic-barrier", 3], ["copper-capillary", 4], ["pressure-case", 2], ["resin-gasket", 4]], "closed-loop-unit", "浄化設備", "濾過・耐熱・導管部品をまとめ、ドームの循環系を構成する。", 1, 180],

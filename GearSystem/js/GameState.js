@@ -15,7 +15,18 @@ const INITIAL_MATERIAL_INVENTORY = Object.freeze({ paper_scroll: 10, cloth_scrol
 const MATERIAL_INVENTORY_VERSION = 4;
 const MATERIAL_INVENTORY_SLOT_LIMIT = 30;
 const LEGACY_INITIAL_MATERIAL_INVENTORY = Object.freeze({ 'iron-screw': 12, 'pressure-gauge': 1 });
+const SCROLL_DURABILITY_LIMITS = Object.freeze({ paper: 50, cloth: 100 });
 let gameProgressResetInProgress = false;
+
+function getScrollDurabilityLimit(scroll) {
+    const material = scroll?.material === 'cloth' || scroll?.scrollType === 'cloth' ? 'cloth' : 'paper';
+    return SCROLL_DURABILITY_LIMITS[material];
+}
+
+function getScrollUsedRotations(scroll) {
+    const value = Number(scroll?.usedRotations);
+    return Number.isFinite(value) ? Math.max(0, value) : 0;
+}
 
 export function clearGameProgress(keepSavedGears = false) {
     gameProgressResetInProgress = true;
@@ -115,6 +126,7 @@ export class GameState {
         this.lastTickElapsed = 1 / 60;
         this.lastStorageSaveAt = 0;
         this.lastExternalSaveAt = 0;
+        this.offlineCraftingStartedAt = Date.now();
         
         this.selectedSize = null;
         this.selectedLayer = 0;
@@ -146,8 +158,10 @@ export class GameState {
         this.runtimeNetwork = null;
         this.activeScrollRuntimes = [];
         this.activeScrollSignature = '';
+        this.lastScrollDurabilitySaveAt = 0;
         this.worldCellHandler = null;
         this.lastActiveScrollSyncAt = 0;
+        window.addEventListener('pagehide', () => this.persistScrollDurability(true));
         window.addEventListener('storage', event => {
             if (event.key === ACTIVE_SCROLL_TARGETS_KEY) {
                 this.syncActiveScrollTargets(event.newValue);
@@ -205,8 +219,7 @@ export class GameState {
         this.activeScrollRuntimes.forEach(runtime => {
             const target = targets[runtime.scrollId];
             if (!Number.isInteger(target?.x) || !Number.isInteger(target?.y)) return;
-            runtime.target.x = target.x;
-            runtime.target.y = target.y;
+            runtime.target = { ...target };
         });
     }
 
@@ -227,10 +240,6 @@ export class GameState {
         } catch (error) {
             return [];
         }
-        const signature = `${activeScrollValue}\n${libraryValue}\n${legacyRunning}`;
-        if (signature === this.activeScrollSignature) return this.activeScrollRuntimes;
-        this.activeScrollSignature = signature;
-
         let activeIds = [];
         let library = [];
         let targets = {};
@@ -245,11 +254,28 @@ export class GameState {
             activeIds = legacyRunning ? [activeScrollValue] : [];
         }
 
+        const librarySignature = JSON.stringify(library.map(scroll => [
+            scroll.id,
+            scroll.material,
+            scroll.scrollType,
+            scroll.blueprint
+        ]));
+        const signature = `${activeScrollValue}\n${librarySignature}\n${targetValue}\n${legacyRunning}`;
+        if (signature === this.activeScrollSignature) return this.activeScrollRuntimes;
+        this.activeScrollSignature = signature;
+
         const activeIdSet = new Set(activeIds);
         this.activeScrollRuntimes = [];
         let targetsChanged = false;
+        const exhaustedScrollIds = [];
         library.forEach(scroll => {
             if (!activeIdSet.has(scroll.id)) return;
+            const durabilityLimit = getScrollDurabilityLimit(scroll);
+            const usedRotations = Math.min(durabilityLimit, getScrollUsedRotations(scroll));
+            if (usedRotations >= durabilityLimit) {
+                exhaustedScrollIds.push(scroll.id);
+                return;
+            }
             const blueprintGears = Array.isArray(scroll.blueprint?.gears) ? scroll.blueprint.gears : [];
             if (!blueprintGears.some(gear => gear.isCore)) return;
 
@@ -281,14 +307,71 @@ export class GameState {
                 targets[scroll.id] = playerPosition;
                 targetsChanged = true;
             }
-            this.activeScrollRuntimes.push({ scrollId: scroll.id, target: { ...targets[scroll.id] }, gears, belts, network });
+            this.activeScrollRuntimes.push({
+                scrollId: scroll.id,
+                target: { ...targets[scroll.id] },
+                gears,
+                belts,
+                network,
+                usedRotations,
+                durabilityLimit
+            });
         });
+        if (exhaustedScrollIds.length) this.stopActiveScrolls(exhaustedScrollIds);
         if (targetsChanged) {
             localStorage.setItem(ACTIVE_SCROLL_TARGETS_KEY, JSON.stringify(targets));
             window.dispatchEvent(new CustomEvent('fogsgear:scroll-targets-changed', { detail: targets }));
         }
         this.publishActiveScrollSyncState(this.activeScrollRuntimes);
         return this.activeScrollRuntimes;
+    }
+
+    stopActiveScrolls(scrollIds) {
+        const exhaustedIds = new Set(scrollIds);
+        try {
+            const stored = JSON.parse(localStorage.getItem('fogsgear_active_scroll_id') || '[]');
+            const activeIds = Array.isArray(stored) ? stored : typeof stored === 'string' && stored ? [stored] : [];
+            const nextIds = activeIds.filter(scrollId => !exhaustedIds.has(scrollId));
+            if (nextIds.length === activeIds.length) return;
+            const targets = JSON.parse(localStorage.getItem(ACTIVE_SCROLL_TARGETS_KEY) || '{}');
+            exhaustedIds.forEach(scrollId => { delete targets[scrollId]; });
+            localStorage.setItem('fogsgear_active_scroll_id', JSON.stringify(nextIds));
+            localStorage.removeItem('fogsgear_active_scroll_running');
+            localStorage.setItem(ACTIVE_SCROLL_TARGETS_KEY, JSON.stringify(targets));
+        } catch (error) {
+            console.error('使い切ったスクロールを停止できませんでした。', error);
+        }
+    }
+
+    persistScrollDurability(force = false) {
+        const now = Date.now();
+        if (!force && now - this.lastScrollDurabilitySaveAt < 500) return;
+        const updates = new Map(this.activeScrollRuntimes
+            .filter(runtime => runtime.scrollId && Number.isFinite(runtime.usedRotations))
+            .map(runtime => [runtime.scrollId, runtime.usedRotations]));
+        if (!updates.size) return;
+        try {
+            const library = JSON.parse(localStorage.getItem(SAVED_SCROLL_LIBRARY_KEY) || '[]');
+            if (!Array.isArray(library)) throw new Error('保存スクロール一覧が配列ではありません。');
+            let changed = false;
+            library.forEach(scroll => {
+                if (!updates.has(scroll.id)) return;
+                const usedRotations = updates.get(scroll.id);
+                const nextTimestamp = now;
+                if (Math.abs(getScrollUsedRotations(scroll) - usedRotations) >= 0.000001) {
+                    scroll.usedRotations = usedRotations;
+                    changed = true;
+                }
+                if (Number(scroll.usedRotationsUpdatedAt) !== nextTimestamp) {
+                    scroll.usedRotationsUpdatedAt = nextTimestamp;
+                    changed = true;
+                }
+            });
+            if (changed) localStorage.setItem(SAVED_SCROLL_LIBRARY_KEY, JSON.stringify(library));
+            this.lastScrollDurabilitySaveAt = now;
+        } catch (error) {
+            console.error('スクロール耐久度を保存できませんでした。', error);
+        }
     }
 
     publishActiveScrollSyncState(runtimeGroups) {
@@ -497,6 +580,9 @@ export class GameState {
             ? (savedManualStop ? false : (data.autoStoppedBySteam === true || (savedMainGearRunning === false && this.steamPower > 0)))
             : (savedManualStop ? false : (data.autoStoppedBySteam === true || (savedMainGearRunning === false && this.steamPower > 0)));
         this.lastExternalSaveAt = Number(data.updatedAt) || 0;
+        this.offlineCraftingStartedAt = Number.isFinite(Number(data.updatedAt)) && Number(data.updatedAt) > 0
+            ? Math.min(Date.now(), Number(data.updatedAt))
+            : Date.now();
         this.creativeMode = data.creativeMode ?? false;
         this.creativeSnapshot = data.creativeSnapshot ?? null;
         this.craftingJobs = Array.isArray(data.craftingJobs) ? data.craftingJobs.filter(job =>
@@ -728,7 +814,12 @@ export class GameState {
             ? library.findIndex(scroll => scroll.id === this.currentScrollId)
             : library.findIndex(scroll => String(scroll.name).toLowerCase() === trimmedName.toLowerCase());
         if (index >= 0) {
-            library[index] = { ...library[index], ...entry, id: library[index].id || entry.id };
+            library[index] = {
+                ...library[index],
+                ...entry,
+                id: library[index].id || entry.id,
+                usedRotations: getScrollUsedRotations(library[index])
+            };
         } else {
             library.unshift(entry);
         }
@@ -748,6 +839,10 @@ export class GameState {
         if (saved) {
             try {
                 const data = JSON.parse(saved);
+                const savedAt = Number(data.updatedAt);
+                this.offlineCraftingStartedAt = Number.isFinite(savedAt) && savedAt > 0
+                    ? Math.min(Date.now(), savedAt)
+                    : Date.now();
                 const inventoryVersion = Number(data.materialInventoryVersion) || 1;
                 initialInventoryMigrated = inventoryVersion < MATERIAL_INVENTORY_VERSION;
                 this.steamPower = Number.isFinite(data.steamPower) ? data.steamPower : 100;
@@ -773,7 +868,18 @@ export class GameState {
                     job && typeof job.recipeKey === 'string' && typeof job.outputItem === 'string'
                     && Number.isFinite(Number(job.outputAmount)) && Number.isFinite(Number(job.completesAt))) : [];
                 craftingJobsCompleted = this.completeCraftingJobs(Date.now(), false);
+                const poweredJobsBeforeNormalization = this.craftingJobs
+                    .filter(job => job.requiresPower)
+                    .map(job => ({ ...job }));
                 craftingQueueNormalized = this.normalizeCraftingQueue();
+                if (poweredJobsBeforeNormalization.length) {
+                    const poweredJobIds = new Set(poweredJobsBeforeNormalization.map(job => job.jobId));
+                    this.craftingJobs = this.craftingJobs
+                        .filter(job => !poweredJobIds.has(job.jobId))
+                        .concat(poweredJobsBeforeNormalization)
+                        .sort((first, second) => Number(first.startedAt) - Number(second.startedAt)
+                            || Number(first.completesAt) - Number(second.completesAt));
+                }
                 this.belts = Array.isArray(data.belts) ? data.belts.filter(belt => Array.isArray(belt?.gearIds) && belt.gearIds.length >= 2) : [];
                 this.placedGears = (data.gears || data.placedGears || []).map(createGear);
                 if (this.placedGears.length > 0 && !this.placedGears.some(gear => gear.isCore)) {
@@ -976,7 +1082,8 @@ export class GameState {
     }
 
     completeCraftingJobs(now = Date.now(), persist = true) {
-        const completed = this.craftingJobs.filter(job => Number(job.completesAt) <= now);
+        const completed = this.craftingJobs.filter(job => Number(job.completesAt) <= now
+            && (!job.requiresPower || Number(job.workRemainingMs) <= 0));
         if (!completed.length) return false;
         const completedIds = new Set();
         completed.forEach(job => {
@@ -997,10 +1104,13 @@ export class GameState {
             .filter(([, count]) => Number(count) > 0)
             .map(([itemId]) => itemId));
         if (Number(this.brass) > 0) itemIds.add('brass-stock');
-        [['water', this.water], ['fog', this.fog], ['power', this.power], ['steam_power', this.steamPower]]
+        [['water', this.water], ['fog', this.fog], ['power', this.power]]
             .forEach(([itemId, count]) => {
                 if (Number(count) > 0) itemIds.add(itemId);
             });
+        // Keep recovery resources reserved at zero so a full inventory cannot block their regeneration.
+        itemIds.add('water');
+        itemIds.add('steam_power');
         if (this.creativeMode && this.creativeSnapshot) {
             if (Number(this.creativeSnapshot.brass) > 0) itemIds.add('brass-stock');
             [['water', this.creativeSnapshot.water], ['fog', this.creativeSnapshot.fog],
@@ -1040,7 +1150,9 @@ export class GameState {
     cancelCraftingJob(jobId, refundItems = [], now = Date.now()) {
         const jobIndex = this.craftingJobs.findIndex(job => job.jobId === jobId);
         if (jobIndex < 0) return false;
-        if (Number(this.craftingJobs[jobIndex].completesAt) <= now) {
+        const job = this.craftingJobs[jobIndex];
+        if ((!job.requiresPower && Number(job.completesAt) <= now)
+            || (job.requiresPower && Number(job.workRemainingMs) <= 0)) {
             this.completeCraftingJobs(now);
             return false;
         }
@@ -1238,12 +1350,26 @@ export class GameState {
                 gear.angularVelocity = 0;
             }));
         }
+        const scrollRotationScales = new Map();
+        activeScrollRuntimes.forEach(group => {
+            const mainGear = group.gears.find(gear => gear.isCore);
+            if (!mainGear || !mainGear.powered || !this.mainGearRunning || this.steamPower <= 0) {
+                scrollRotationScales.set(group.scrollId, 1);
+                return;
+            }
+            const remainingRotations = Math.max(0, group.durabilityLimit - group.usedRotations);
+            const expectedAngle = 0.012 * 60 * Math.abs(mainGear.angularVelocity || 0) * elapsed;
+            const maxAngle = remainingRotations * Math.PI * 2;
+            scrollRotationScales.set(group.scrollId, expectedAngle > 0 ? Math.min(1, maxAngle / expectedAngle) : 1);
+        });
         // 回転中の各ギアを個別に処理する。同じ軸でも資源処理は共有しない。
         const rotationDeltas = new Map();
         activeGears.forEach(gear => {
             if (gear.powered && !gear.isDeadlocked && this.steamPower > 0 && this.mainGearRunning) {
-                const rotationDelta = 0.012 * 60 * (gear.angularVelocity || 1) * elapsed * gear.rotationDir;
-            rotationDeltas.set(gear.id, rotationDelta);
+                const group = runtimeGroupByGearId.get(gear.id);
+                const rotationScale = group?.scrollId ? scrollRotationScales.get(group.scrollId) ?? 1 : 1;
+                const rotationDelta = 0.012 * 60 * (gear.angularVelocity || 1) * elapsed * gear.rotationDir * rotationScale;
+                rotationDeltas.set(gear.id, rotationDelta);
                 gear.angle += rotationDelta;
                 // 霧回収は1回転の完了を待たず、回転角に比例して連続的に加算する。
                 if (gear.processMode === 'FOG_COLLECTION') {
@@ -1272,6 +1398,26 @@ export class GameState {
                 this.processScrollCellGear(gear, scrollRuntimeByGearId.get(gear.id), rotationDelta);
             }
         });
+        const exhaustedScrollIds = [];
+        activeScrollRuntimes.forEach(group => {
+            const mainGear = group.gears.find(gear => gear.isCore);
+            const rotationDelta = mainGear ? Math.abs(rotationDeltas.get(mainGear.id) || 0) : 0;
+            if (!rotationDelta) return;
+            group.usedRotations = Math.min(
+                group.durabilityLimit,
+                group.usedRotations + rotationDelta / (Math.PI * 2)
+            );
+            if (group.usedRotations >= group.durabilityLimit) {
+                exhaustedScrollIds.push(group.scrollId);
+                group.gears.forEach(gear => {
+                    gear.powered = false;
+                    gear.rotationDir = 0;
+                    gear.angularVelocity = 0;
+                });
+            }
+        });
+        if (exhaustedScrollIds.length) this.stopActiveScrolls(exhaustedScrollIds);
+        this.persistScrollDurability(exhaustedScrollIds.length > 0);
         this.powerConsumptionRate = elapsed > 0 ? this.powerConsumedThisTick / elapsed : 0;
         let controlNetworkChanged = false;
         activeGears.forEach(gear => {

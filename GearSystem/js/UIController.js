@@ -24,6 +24,9 @@ export class UIController {
         this.longPressTimer = null;
         this.noticeTimer = null;
         this.initEvents();
+        document.getElementById('named-scroll-name')?.addEventListener('input', event => {
+            event.currentTarget.dataset.userEdited = 'true';
+        });
         this.state.subscribe(() => this.updateUI());
     }
 
@@ -601,7 +604,8 @@ export class UIController {
             const scrollEffectSelect = document.getElementById('scroll-effect-select');
             const editId = new URLSearchParams(window.location.search).get('editScroll');
             const scrollId = this.state.currentScrollId || editId;
-            if (scrollId && scrollNameInput && !scrollNameInput.value) {
+            if (scrollId && scrollNameInput && !scrollNameInput.value
+                && scrollNameInput.dataset.userEdited !== 'true') {
                 const scroll = this.state.getNamedScrollLibrary().find(item => item.id === scrollId);
                 if (scroll) {
                     scrollNameInput.value = scroll.name || '';

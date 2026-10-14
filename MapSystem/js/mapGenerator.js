@@ -1,4 +1,4 @@
-import { MapManager as MapManagerClass, BIOME_COLORS as SharedBiomeColors } from './MapGenerator/index.js?v=80';
+import { MapManager as MapManagerClass, BIOME_COLORS as SharedBiomeColors } from './MapGenerator/index.js?v=81';
 
 export { SharedBiomeColors as BIOME_COLORS };
 export const MapManager = MapManagerClass;
@@ -14,11 +14,35 @@ function openMapCache() {
             return;
         }
         const request = indexedDB.open(MAP_CACHE_DB, 1);
+        let settled = false;
+        const timeoutId = window.setTimeout(() => {
+            settled = true;
+            reject(new Error('Map cache open timed out'));
+        }, 5000);
         request.onupgradeneeded = () => {
             request.result.createObjectStore(MAP_CACHE_STORE);
         };
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error || new Error('Map cache could not be opened'));
+        request.onsuccess = () => {
+            if (settled) {
+                request.result.close();
+                return;
+            }
+            settled = true;
+            window.clearTimeout(timeoutId);
+            resolve(request.result);
+        };
+        request.onerror = () => {
+            if (settled) return;
+            settled = true;
+            window.clearTimeout(timeoutId);
+            reject(request.error || new Error('Map cache could not be opened'));
+        };
+        request.onblocked = () => {
+            if (settled) return;
+            settled = true;
+            window.clearTimeout(timeoutId);
+            reject(new Error('Map cache open was blocked by another tab'));
+        };
     });
 }
 
@@ -82,47 +106,70 @@ export async function saveMapSnapshot(generated, seed, width = 2000, height = 10
     }
 }
 
-export async function loadMapSnapshot(seed, width = 2000, height = 1000) {
+export async function loadMapSnapshot(seed, width = 2000, height = 1000, onProgress = () => {}) {
+    let database = null;
     try {
-        const database = await openMapCache();
+        database = await openMapCache();
         const snapshot = await new Promise((resolve, reject) => {
-            const request = database.transaction(MAP_CACHE_STORE).objectStore(MAP_CACHE_STORE).get(`${MAP_CACHE_VERSION}:${String(seed)}:${width}:${height}`);
-            request.onsuccess = () => resolve(request.result);
-            request.onerror = () => reject(request.error);
+            const transaction = database.transaction(MAP_CACHE_STORE);
+            const request = transaction.objectStore(MAP_CACHE_STORE).get(`${MAP_CACHE_VERSION}:${String(seed)}:${width}:${height}`);
+            const timeoutId = window.setTimeout(() => {
+                transaction.abort();
+                reject(new Error('Map snapshot read timed out'));
+            }, 5000);
+            const finish = callback => value => {
+                window.clearTimeout(timeoutId);
+                callback(value);
+            };
+            request.onsuccess = () => finish(resolve)(request.result);
+            request.onerror = () => finish(reject)(request.error);
         });
         database.close();
-        if (!snapshot?.types || snapshot.width !== width || snapshot.height !== height) return null;
+        database = null;
+        if (!snapshot?.types || snapshot.width !== width || snapshot.height !== height
+            || snapshot.types.length !== width * height
+            || snapshot.territories?.length !== width * height) return null;
 
-        const grid = Array.from({ length: height }, (_, y) => {
-            const row = new Array(width);
-            for (let x = 0; x < width; x++) {
-                const index = y * width + x;
-                const packedType = snapshot.types[index];
-                const typeCode = packedType >> 4;
-                const isMainland = Boolean(packedType & 1);
-                const isIsland = Boolean(packedType & 2);
-                const isLake = typeCode === 4;
-                const isSea = typeCode === 0;
-                row[x] = {
-                    x,
-                    y,
-                    type: ['SEA', 'PLAINS', 'FOREST', 'MOUNTAIN', 'LAKE', 'RUIN', 'SAND'][typeCode] || 'SEA',
-                    typeCode: isSea || isLake ? 3 : typeCode === 3 ? 1 : typeCode === 2 ? 2 : 0,
-                    isSea,
-                    isOcean: isSea,
-                    isLake,
-                    isLand: !isSea && !isLake,
-                    isMainland,
-                    isIsland,
-                    territoryId: snapshot.territories[index],
-                    color: colorForType(typeCode)
-                };
+        const grid = new Array(height);
+        const rowsPerChunk = 8;
+        for (let chunkStart = 0; chunkStart < height; chunkStart += rowsPerChunk) {
+            const chunkEnd = Math.min(height, chunkStart + rowsPerChunk);
+            for (let y = chunkStart; y < chunkEnd; y++) {
+                const row = new Array(width);
+                for (let x = 0; x < width; x++) {
+                    const index = y * width + x;
+                    const packedType = snapshot.types[index];
+                    const typeCode = packedType >> 4;
+                    const isMainland = Boolean(packedType & 1);
+                    const isIsland = Boolean(packedType & 2);
+                    const isLake = typeCode === 4;
+                    const isSea = typeCode === 0;
+                    row[x] = {
+                        x,
+                        y,
+                        type: ['SEA', 'PLAINS', 'FOREST', 'MOUNTAIN', 'LAKE', 'RUIN', 'SAND'][typeCode] || 'SEA',
+                        typeCode: isSea || isLake ? 3 : typeCode === 3 ? 1 : typeCode === 2 ? 2 : 0,
+                        isSea,
+                        isOcean: isSea,
+                        isLake,
+                        isLand: !isSea && !isLake,
+                        isMainland,
+                        isIsland,
+                        territoryId: snapshot.territories[index],
+                        color: colorForType(typeCode)
+                    };
+                }
+                grid[y] = row;
             }
-            return row;
-        });
+            onProgress(chunkEnd / height);
+            if (chunkEnd < height) await new Promise(resolve => window.setTimeout(resolve, 0));
+        }
         return { grid, worldMap: grid, territories: snapshot.territoryList || [], ruins: [], playerPos: snapshot.playerPos || null };
     } catch (error) {
+        console.warn('Saved map cache could not be read; generating the map instead.', error);
         return null;
+    } finally {
+        database?.close();
     }
 }
 

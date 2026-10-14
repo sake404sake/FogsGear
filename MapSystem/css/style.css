@@ -127,6 +127,10 @@ body {
     border-radius: inherit;
     animation: loading-progress 1.2s ease-in-out infinite;
 }
+.loading-panel.is-error { width: min(420px, calc(100vw - 36px)); box-sizing: border-box; overflow-wrap: anywhere; text-align: center; }
+.loading-panel.is-error .loading-spinner, .loading-panel.is-error .loading-progress { display: none; }
+#loading-retry { margin-top: 18px; padding: 8px 18px; color: #17120f; border: 1px solid #ffe69b; border-radius: 5px; background: linear-gradient(180deg, #f3c653, #b8832d); font: 700 .8rem system-ui, sans-serif; cursor: pointer; }
+#loading-retry[hidden] { display: none; }
 
 @keyframes loading-progress {
     0% { transform: translateX(-110%); }
@@ -382,6 +386,8 @@ h1 {
 .inventory-view-tab.active { color: #fff1b1; border-color: #62c2aa; background: rgba(98, 194, 170, 0.12); }
 .inventory-search { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 8px; flex: 0 0 auto; min-width: 0; box-sizing: border-box; padding-right: 4px; margin-bottom: 7px; color: #d8c17b; font-size: .7rem; }
 .inventory-capacity-status { flex: 0 0 auto; margin: 0 0 5px; color: #d8c17b; font-size: .68rem; text-align: right; }
+.shared-resource-note { margin: 0 0 6px; color: var(--text-muted); font-size: .58rem; line-height: 1.35; }
+.engine-dashboard-page > .dashboard > .shared-resource-note { margin: -2px 0 6px; }
 .inventory-search input { min-width: 0; width: 100%; min-height: 34px; box-sizing: border-box; padding: 6px 9px; color: var(--text-main); background: #1c1511; border: 1px solid var(--border-sub); }
 #inventory-panel .inventory-search input { min-height: 30px; padding: 4px 7px; font-size: .72rem; }
 .inventory-search input:focus-visible { outline: 2px solid #62c2aa; outline-offset: 1px; }
@@ -452,6 +458,43 @@ h1 {
 .building-name-field:focus-within input { border-bottom-color: rgba(224, 188, 105, .78); }
 .automaton-building-name-field { margin: 7px auto; }
 .building-menu-panel #building-menu-details { margin: 0 auto 7px; color: #c5bbab; font-size: .64rem; line-height: 1.35; }
+.building-scroll-controls { display: grid; gap: 5px; width: min(100%, 320px); box-sizing: border-box; margin: 8px auto; padding: 8px; border: 1px solid rgba(198, 154, 82, .38); border-radius: 6px; background: linear-gradient(145deg, rgba(31, 25, 20, .94), rgba(17, 15, 13, .9)); color: #d8c9a4; font-size: .68rem; }
+.building-scroll-controls[hidden] { display: none; }
+.building-scroll-controls > label { color: #d8c17b; font-weight: 700; }
+.building-scroll-assignment { display: grid; grid-template-columns: minmax(0, 1fr); gap: 5px; }
+.building-scroll-assignment select { min-width: 0; padding: 6px; color: #f1e7d4; border: 1px solid rgba(198, 154, 82, .42); border-radius: 4px; background: #17120f; font-size: .7rem; }
+.building-overclock-select { min-width: 0; padding: 6px; color: #f1e7d4; border: 1px solid rgba(198, 154, 82, .42); border-radius: 4px; background: #17120f; font-size: .7rem; }
+.building-overclock-control { display: grid; gap: 5px; }
+.building-overclock-control[hidden] { display: none; }
+.building-overclock-control label { color: #d8c17b; font-weight: 700; }
+.building-scroll-controls p { min-height: 1.3em; margin: 0; color: #c5bbab; line-height: 1.35; }
+.building-scroll-preview { position: relative; display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 4px; width: 100%; height: min(46dvh, 360px); min-height: 260px; }
+.building-scroll-preview[hidden] { display: none; }
+.building-scroll-preview-heading { color: #d8c17b; font-size: .64rem; font-weight: 700; }
+.building-scroll-preview iframe { width: 100%; height: 100%; min-height: 0; border: 1px solid rgba(198, 154, 82, .32); border-radius: 4px; background: #120e0c; }
+.building-scroll-toggle { position: absolute; right: 10px; bottom: 10px; z-index: 1; min-height: 32px; padding: 5px 10px; color: #a7f0d9; border: 1px solid rgba(98, 194, 170, .6); border-radius: 4px; background: rgba(18, 14, 12, .88); font-size: .66rem; cursor: pointer; }
+.building-scroll-toggle.is-running { color: #ffe69b; border-color: rgba(243, 198, 83, .72); }
+.building-scroll-toggle:hover:not(:disabled) { color: #fff1b1; border-color: #e0bc69; }
+.building-scroll-toggle:disabled { opacity: .5; cursor: not-allowed; }
+.vehicle-menu-controls { display: grid; gap: 10px; width: min(100%, 360px); box-sizing: border-box; margin: 10px auto; padding: 12px; border: 1px solid rgba(198, 154, 82, .4); border-radius: 9px; background: radial-gradient(ellipse at 50% 0, rgba(190, 142, 62, .14), transparent 65%), linear-gradient(150deg, rgba(35, 28, 22, .98), rgba(17, 15, 13, .96)); box-shadow: inset 0 1px 0 rgba(255, 236, 184, .07), 0 5px 16px rgba(0, 0, 0, .2); text-align: left; }
+.vehicle-menu-controls[hidden] { display: none; }
+.vehicle-control-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-bottom: 8px; border-bottom: 1px solid rgba(198, 154, 82, .2); }
+.vehicle-control-kicker { color: #c6a75e; font: 700 .56rem/1.2 system-ui, sans-serif; letter-spacing: .14em; }
+.vehicle-status { display: inline-flex; align-items: center; gap: 5px; min-height: 23px; padding: 2px 8px; color: #e5c989; border: 1px solid rgba(198, 154, 82, .34); border-radius: 20px; background: rgba(198, 154, 82, .08); font: 700 .66rem/1 system-ui, sans-serif; }
+.vehicle-status::before { width: 6px; height: 6px; border-radius: 50%; background: currentColor; content: ""; }
+.vehicle-status.is-running { color: #a7f0d9; border-color: rgba(98, 194, 170, .45); background: rgba(49, 123, 101, .12); }
+.vehicle-status.is-blocked { color: #f0a99a; border-color: rgba(206, 104, 82, .48); background: rgba(120, 39, 30, .16); }
+.vehicle-start-guide { margin: 0; color: #e2d9cd; font-size: .72rem; line-height: 1.55; }
+.vehicle-operation-guide { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; }
+.vehicle-operation-guide > div { display: grid; justify-items: center; gap: 5px; min-width: 0; padding: 8px 4px; border: 1px solid rgba(198, 154, 82, .2); border-radius: 6px; background: rgba(255, 236, 184, .025); text-align: center; }
+.vehicle-operation-guide span { display: grid; place-items: center; width: 20px; height: 20px; color: #f3d27a; border: 1px solid rgba(243, 198, 83, .38); border-radius: 50%; font: 700 .58rem/1 system-ui, sans-serif; }
+.vehicle-operation-guide strong { color: #d8c9a4; font: 600 .6rem/1.3 system-ui, sans-serif; }
+.vehicle-speed-info { margin: 0; padding-top: 7px; color: #9c8e80; border-top: 1px solid rgba(198, 154, 82, .16); font: 600 .62rem/1.3 system-ui, sans-serif; text-align: right; }
+.vehicle-menu-controls:not([hidden]) ~ .inventory-modal-actions #building-menu-start-vehicle { width: min(100%, 360px); min-height: 40px; font-size: .82rem; font-weight: 700; letter-spacing: .04em; }
+.vehicle-menu-controls:not([hidden]) ~ .inventory-modal-actions #building-menu-start-vehicle.inventory-modal-secondary { color: #f0b7a9; border-color: rgba(206, 104, 82, .5); background: linear-gradient(180deg, rgba(120, 39, 30, .28), rgba(45, 23, 20, .92)); }
+@media (max-height: 520px) {
+    .building-scroll-preview { height: min(42dvh, 260px); min-height: 190px; }
+}
 .building-storage-controls { display: grid; gap: 7px; width: min(100%, 290px); box-sizing: border-box; margin: 7px auto; padding: 8px; border: 1px solid rgba(198, 154, 82, .3); border-radius: 6px; background: linear-gradient(145deg, rgba(31, 25, 20, .94), rgba(17, 15, 13, .9)); box-shadow: inset 0 1px 0 rgba(255, 236, 184, .04); }
 .building-storage-controls[hidden] { display: none; }
 .building-storage-controls p { margin: 0; }
@@ -666,6 +709,10 @@ body.guide-item-detail-open #recipe-detail-modal { z-index: 1300; }
 .guide-modal-panel { width: min(100%, 900px); padding: 8px; }
 .guide-modal-panel iframe { display: block; width: 100%; height: min(72vh, 700px); border: 0; border-radius: 8px; background: #101814; }
 .inventory-modal-close { position: absolute; top: 8px; right: 10px; width: 30px; height: 30px; color: var(--text-muted); background: transparent; border: 0; font-size: 1.5rem; line-height: 1; cursor: pointer; }
+.inventory-modal-discard { position: absolute; top: 10px; left: 10px; display: grid; place-items: center; width: 30px; height: 30px; padding: 5px; color: #f0a18d; background: rgba(119, 43, 33, .24); border: 1px solid rgba(213, 104, 82, .5); border-radius: 5px; cursor: pointer; }
+.inventory-modal-discard[hidden] { display: none; }
+.inventory-modal-discard:hover { color: #ffd7cb; background: rgba(137, 55, 39, .55); border-color: rgba(213, 104, 82, .85); }
+.inventory-modal-discard svg { width: 100%; height: 100%; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .inventory-modal-icon { display: grid; place-items: center; width: 54px; height: 54px; margin: 0 auto 7px; color: #f3c653; background: radial-gradient(circle, rgba(243, 198, 83, 0.2), rgba(98, 194, 170, 0.06)); border: 1px solid rgba(243, 198, 83, 0.55); border-radius: 6px; font-size: 1.8rem; }
 .inventory-modal-icon img { width: 100%; height: 100%; object-fit: contain; }
 .inventory-modal-kicker { color: #a7f0d9; font: 0.58rem monospace; letter-spacing: 1.5px; }
@@ -924,6 +971,11 @@ body.guide-item-detail-open #recipe-detail-modal { z-index: 1300; }
 .engine-runtime-canvas { position: fixed; left: -10000px; top: -10000px; width: 1px; height: 1px; pointer-events: none; opacity: 0; }
 .vehicle-animation-layer { position: absolute; inset: 0; z-index: 2; overflow: hidden; pointer-events: none; }
 .vehicle-motion-sprite { position: absolute; left: 0; top: 0; display: block; image-rendering: auto; will-change: transform; }
+.scroll-stand-magic-circle { position: absolute; left: 0; top: 0; overflow: visible; opacity: .92; pointer-events: none; will-change: transform; }
+.scroll-stand-magic-gear { transform-box: fill-box; transform-origin: center; animation: scroll-stand-gear-spin 18s linear infinite, scroll-stand-magic-pulse 2.4s ease-in-out infinite alternate; }
+.scroll-stand-magic-orbit { transform-box: fill-box; transform-origin: center; animation: scroll-stand-gear-spin 32s linear infinite reverse; }
+@keyframes scroll-stand-gear-spin { to { transform: rotate(360deg); } }
+@keyframes scroll-stand-magic-pulse { from { opacity: .65; } to { opacity: 1; } }
 
 canvas {
     display: block;

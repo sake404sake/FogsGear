@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Steampunk Explorer - Settings</title>
-    <link rel="stylesheet" href="css/style.css?v=690">
+    <link rel="stylesheet" href="css/style.css?v=697">
     <style>
         .settings-danger-zone { margin-top: 32px; padding: 14px; border: 1px solid rgba(210, 83, 65, .65); border-left: 3px solid #d25341; background: rgba(90, 24, 19, .18); }
         .settings-danger-zone h2 { margin: 0 0 6px; color: #f08a78; font-size: 16px; }
@@ -88,7 +88,7 @@
             <p id="testSaveMessage" class="rule-text" aria-live="polite"></p>
         </section>
         <p id="appDisplayModeStatus" class="rule-text" aria-live="polite"></p>
-        <p class="app-version">アプリバージョン v205</p>
+        <p class="app-version">アプリバージョン v207</p>
     </main>
     <dialog class="game-reset-dialog" id="gameResetDialog" aria-labelledby="game-reset-dialog-title">
         <h2 id="game-reset-dialog-title">リセット方法を選択</h2>
@@ -107,9 +107,9 @@
     </dialog>
     <script type="module">
         import { SkinPreview } from './js/skinPreview.js?v=4';
-        import { clearGameProgress } from '../GearSystem/js/GameState.js?v=runtime-46';
-        import { CRAFTING_ITEMS, DEFERRED_CRAFTING_ITEM_IDS } from './js/craftingData.js?v=13';
-        import { BUILDING_DEFINITIONS } from './js/buildingData.js?v=33';
+        import { clearGameProgress } from '../GearSystem/js/GameState.js?v=runtime-53';
+        import { CRAFTING_ITEMS, DEFERRED_CRAFTING_ITEM_IDS } from './js/craftingData.js?v=17';
+        import { BUILDING_DEFINITIONS } from './js/buildingData.js?v=35';
         import { CELL_MATERIALS } from './js/worldCells.js?v=13';
 
         const TEST_SAVE_BACKUP_KEY = '__fogsgear_test_save_backup_v1';
