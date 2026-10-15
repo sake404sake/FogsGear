@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>スクロール書庫 | Fogs Gear</title>
-    <link rel="stylesheet" href="css/style.css?v=scroll-70">
+    <link rel="stylesheet" href="css/style.css?v=scroll-71">
 </head>
 <body class="scroll-library-page">
     <main class="scroll-library-shell">
@@ -18,9 +18,7 @@
         </header>
 
         <nav class="scroll-tabs" aria-label="スクロールの種類">
-            <button class="scroll-tab active" type="button" data-material="all" aria-selected="true">紙・布</button>
-            <button class="scroll-tab" type="button" data-material="paper" aria-selected="false">紙</button>
-            <button class="scroll-tab" type="button" data-material="cloth" aria-selected="false">布</button>
+            <button class="scroll-tab active" type="button" data-material="all" aria-selected="true">すべて</button>
             <button class="scroll-tab" type="button" data-material="exhausted" aria-selected="false">レガシー</button>
             <a class="scroll-tab embedded-map-back back-to-map" href="../MapSystem/index.html" aria-label="マップへ戻る" title="マップへ戻る">← マップ</a>
         </nav>
@@ -112,7 +110,10 @@
             <label for="scroll-copy-material">写本先
                 <select id="scroll-copy-material">
                     <option value="paper">紙スクロール（耐久度50回転）</option>
+                    <option value="reinforced-paper">強化紙スクロール（耐久度100回転）</option>
                     <option value="cloth">布スクロール（耐久度100回転）</option>
+                    <option value="pressure-cloth">耐圧布スクロール（耐久度250回転）</option>
+                    <option value="alloy-alchemy-cloth">合金錬成布スクロール（耐久度500回転）</option>
                 </select>
             </label>
             <label for="scroll-copy-name">新しいスクロール名
@@ -156,6 +157,6 @@
     </div>
     <script src="js/vendor/qrcode-generator.min.js?v=2.0.4"></script>
     <script src="js/vendor/jsQR.js?v=1.4.0"></script>
-    <script type="module" src="js/scroll-library.js?v=59"></script>
+    <script type="module" src="js/scroll-library.js?v=65"></script>
 </body>
 </html>

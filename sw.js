@@ -1,4 +1,4 @@
-const CACHE_NAME = 'steampunk-explorer-v238';
+const CACHE_NAME = 'steampunk-explorer-v262';
 const APP_SHELL = [
     './',
     './MainSystem/index.html',
@@ -21,7 +21,7 @@ const APP_SHELL = [
     './MapSystem/js/cellRules.js',
     './MapSystem/js/cellIconRenderer.js',
     './MapSystem/js/worldCells.js',
-    './MapSystem/js/craftingData.js',
+    './MapSystem/js/craftingData.js?v=19',
     './MapSystem/js/territoryBorders.js',
     './MapSystem/js/railwayRuntime.js',
     './MapSystem/js/MapGenerator/index.js',
@@ -53,10 +53,10 @@ const APP_SHELL = [
     './MapSystem/assets/guide-screenshots/10b-cell-catalog.png',
     './MapSystem/assets/guide-screenshots/11-settings.png',
     './GearSystem/index.html',
-    './GearSystem/scroll-library.html',
+    './GearSystem/scroll-library.html?v=62',
     './GearSystem/css/style.css',
     './GearSystem/js/main.js',
-    './GearSystem/js/scroll-library.js',
+    './GearSystem/js/scroll-library.js?v=62',
     './GearSystem/js/GearSystem.js',
     './GearSystem/js/GearManager.js',
     './GearSystem/js/GameState.js',

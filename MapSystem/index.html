@@ -10,7 +10,7 @@
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="icon" href="../MainSystem/icons/app-icon.jpg" type="image/jpeg">
     <link rel="apple-touch-icon" href="assets/app-icon-192.png">
-    <link rel="stylesheet" href="css/style.css?v=701">
+    <link rel="stylesheet" href="css/style.css?v=708">
 </head>
 <body>
     <div id="loadingOverlay" class="loading-overlay" role="status" aria-live="polite">
@@ -128,12 +128,10 @@
                         </div>
                         <select id="building-storage-item" hidden aria-hidden="true" tabindex="-1"></select>
                     </div>
-                    <div class="building-storage-amount-picker">
-                        <button id="building-storage-amount-button" class="building-storage-amount" type="button" aria-expanded="false" aria-controls="building-storage-amount-list"><span id="building-storage-amount-value">1</span><span aria-hidden="true">▾</span></button>
-                        <div id="building-storage-amount-popup" class="building-storage-amount-popup" hidden>
-                            <div id="building-storage-amount-list" class="building-storage-amount-list" role="listbox" aria-label="数量を選択"></div>
-                        </div>
-                        <select id="building-storage-amount" hidden aria-hidden="true" tabindex="-1"></select>
+                    <div class="quantity-dial building-storage-amount-picker" role="group" aria-label="預ける・取り出す数量">
+                        <button class="quantity-dial-step" type="button" data-quantity-target="building-storage-amount-display" data-step="-1" aria-label="数量を1減らす">▼</button>
+                        <input id="building-storage-amount-display" class="quantity-dial-input" type="number" min="1" max="1" step="1" value="1" aria-label="数量">
+                        <button class="quantity-dial-step" type="button" data-quantity-target="building-storage-amount-display" data-step="1" aria-label="数量を1増やす">▲</button>
                     </div>
                     <button id="building-storage-transfer-button" class="inventory-modal-secondary" type="button" data-action="building-storage-transfer" data-direction="deposit" aria-label="選択した資材を預ける">預ける</button>
                 </div>
@@ -160,19 +158,25 @@
     </div>
     <div id="automaton-menu-modal" class="inventory-modal" hidden role="dialog" aria-modal="true" aria-labelledby="automaton-menu-title">
         <section class="inventory-modal-panel automaton-menu-panel">
-            <button class="building-menu-demolish" type="button" data-action="demolish-building" aria-label="このオートマトンを解体">
+            <button class="building-menu-demolish" type="button" data-action="demolish-building" aria-label="このオートマタを解体">
                 <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7h16M9 7V4h6v3m3 0-.8 13H6.8L6 7m4 3v7m4-7v7" /></svg>
             </button>
-            <button class="inventory-modal-close" type="button" data-action="close-building-menu" aria-label="オートマトンメニューを閉じる">×</button>
+            <button class="inventory-modal-close" type="button" data-action="close-building-menu" aria-label="オートマタメニューを閉じる">×</button>
             <div class="inventory-modal-kicker">FIELD AUTOMATON</div>
-            <h2 id="automaton-menu-title">作業オートマトン</h2>
+            <h2 id="automaton-menu-title">作業オートマタ</h2>
             <label class="building-name-field automaton-building-name-field" for="automaton-custom-name"><span>NAMEPLATE / 建物名</span>
                 <input id="automaton-custom-name" type="text" maxlength="32" autocomplete="off" placeholder="名前を刻印">
             </label>
             <p id="automaton-menu-details"></p>
+            <label class="automaton-setting-row" for="automaton-movement-scroll-select">動作スクロール
+                <select id="automaton-movement-scroll-select" aria-label="オートマタにセットする動作スクロール">
+                    <option value="">スクロールを選択</option>
+                </select>
+            </label>
+            <p id="automaton-movement-scroll-status" class="automaton-status" role="status" aria-live="polite"></p>
             <div class="automaton-preview">
                 <span class="automaton-preview-badge">作業用機械人形</span>
-                <canvas id="automaton-skin-preview" width="300" height="340" aria-label="オートマトンの見た目。ドラッグして回転"></canvas>
+                <canvas id="automaton-skin-preview" width="300" height="340" aria-label="オートマタの見た目。ドラッグして回転"></canvas>
                 <div class="automaton-preview-rotation">
                     <button class="inventory-modal-secondary" type="button" id="automaton-skin-rotate-left" aria-label="左へ15度回転">↶</button>
                     <input id="automaton-skin-rotation" type="range" min="0" max="359" step="1" value="0" aria-label="立ち絵の回転">
@@ -324,6 +328,13 @@
             <div class="inventory-modal-kicker">DISCARD ITEM</div>
             <h2 id="inventory-discard-confirm-title">アイテムを破棄</h2>
             <p id="inventory-discard-confirm-message"></p>
+            <label class="inventory-discard-quantity">破棄する数量
+                <span class="quantity-dial">
+                    <button class="quantity-dial-step" type="button" data-quantity-target="inventory-discard-amount" data-step="-1" aria-label="破棄数を減らす">▼</button>
+                    <input id="inventory-discard-amount" class="quantity-dial-input" type="number" min="1" step="1" inputmode="decimal" aria-describedby="inventory-discard-confirm-message">
+                    <button class="quantity-dial-step" type="button" data-quantity-target="inventory-discard-amount" data-step="1" aria-label="破棄数を増やす">▲</button>
+                </span>
+            </label>
             <div class="inventory-modal-actions">
                 <button class="inventory-modal-secondary" type="button" data-action="cancel-inventory-discard">やめる</button>
                 <button class="building-demolition-confirm-button" type="button" data-action="confirm-inventory-discard">破棄する</button>
@@ -445,7 +456,7 @@
                                 </div>
                             </div>
                         </section>
-                        <iframe src="../GearSystem/scroll-library.html?embed=1&hideMapBack=1&dashboard=external&v=37" title="保存スクロールのギアプレビュー"></iframe>
+                        <iframe src="../GearSystem/scroll-library.html?embed=1&hideMapBack=1&dashboard=external&v=39" title="保存スクロールのギアプレビュー"></iframe>
                     </section>
                 </div>
             </div>
@@ -457,6 +468,6 @@
         </div>
     </div>
 
-    <script type="module" src="js/main.js?v=806"></script>
+    <script type="module" src="js/main.js?v=826"></script>
 </body>
 </html>

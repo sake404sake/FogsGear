@@ -1,6 +1,7 @@
 import { CanvasRenderer } from './CanvasRenderer.js?v=render-2';
 import { GEAR_CONFIG, hexToPixel } from './GearManager.js?v=runtime-8';
 import { GearNetwork } from './GearSystem.js?v=network-8';
+import { SCROLL_MATERIALS, SCROLL_MATERIAL_BY_TYPE } from '../../MapSystem/js/craftingData.js?v=19';
 
 const LIBRARY_KEY = 'fogsgear_scroll_library';
 const BUILDINGS_KEY = 'fogsgear_world_buildings';
@@ -13,7 +14,22 @@ const GAME_PROGRESS_EPOCH_KEY = 'fogsgear_game_progress_epoch';
 const gameProgressEpoch = localStorage.getItem(GAME_PROGRESS_EPOCH_KEY) || '';
 const canvas = document.getElementById('previewCanvas');
 const ctx = canvas.getContext('2d');
-const tabs = [...document.querySelectorAll('.scroll-tab')];
+const scrollTabs = document.querySelector('.scroll-tabs');
+const exhaustedTab = scrollTabs?.querySelector('[data-material="exhausted"]');
+const materialFamilies = new Map();
+SCROLL_MATERIALS.forEach(material => {
+    if (!materialFamilies.has(material.family)) materialFamilies.set(material.family, material.label);
+});
+materialFamilies.forEach((label, family) => {
+    const button = document.createElement('button');
+    button.className = 'scroll-tab';
+    button.type = 'button';
+    button.dataset.material = family;
+    button.setAttribute('aria-selected', 'false');
+    button.textContent = label;
+    scrollTabs?.insertBefore(button, exhaustedTab || null);
+});
+const tabs = [...document.querySelectorAll('.scroll-tab[data-material]')];
 const listElement = document.getElementById('scroll-list');
 const countElement = document.getElementById('scroll-count');
 const emptyElement = document.getElementById('scroll-empty');
@@ -30,6 +46,11 @@ const copyModal = document.getElementById('scroll-copy-modal');
 const copyForm = document.getElementById('scroll-copy-form');
 const copySourceElement = document.getElementById('scroll-copy-source');
 const copyMaterialSelect = document.getElementById('scroll-copy-material');
+if (copyMaterialSelect) {
+    copyMaterialSelect.replaceChildren(...SCROLL_MATERIALS.map(material => new Option(
+        `${material.label}スクロール（耐久度${material.durability}回転）`, material.type
+    )));
+}
 const copyNameInput = document.getElementById('scroll-copy-name');
 const copyCostElement = document.getElementById('scroll-copy-cost');
 const copyStatusElement = document.getElementById('scroll-copy-status');
@@ -64,7 +85,6 @@ const sharedScrollParts = new Map();
 const SHARE_QR_PART_LENGTH = 1050;
 const SHARE_QR_MAX_PARTS = 32;
 const SHARE_QR_MAX_COMPRESSED_BYTES = Math.floor((SHARE_QR_PART_LENGTH * SHARE_QR_MAX_PARTS - 2) / 4) * 3;
-const SCROLL_DURABILITY_LIMITS = Object.freeze({ paper: 50, cloth: 100 });
 const pageParams = new URLSearchParams(window.location.search);
 const isEmbedded = pageParams.get('embed') === '1';
 const isScrollBook = pageParams.get('source') === 'scroll-book';
@@ -222,7 +242,12 @@ function getAvailableScrolls() {
         const buildings = JSON.parse(localStorage.getItem(BUILDINGS_KEY) || '[]');
         if (!Array.isArray(buildings)) return library;
         const installedIds = new Set(buildings
-            .map(building => building?.craftingScrollId)
+            .flatMap(building => [
+                building?.craftingScrollId,
+                building?.vehicle?.movementScrollId,
+                building?.automaton?.movementScrollId,
+                building?.stationControl?.movementScrollId
+            ])
             .filter(scrollId => typeof scrollId === 'string' && scrollId));
         return library.filter(scroll => !installedIds.has(scroll.id));
     } catch (error) {
@@ -231,17 +256,24 @@ function getAvailableScrolls() {
     }
 }
 
-function getMaterial(scroll) {
+function getScrollMaterialType(scroll) {
     const value = String(scroll?.material || scroll?.scrollType || '').toLowerCase();
-    return value === 'cloth' || value === 'fabric' ? 'cloth' : 'paper';
+    if (SCROLL_MATERIAL_BY_TYPE.has(value)) return value;
+    return value === 'fabric' ? 'cloth' : 'paper';
+}
+
+function getMaterial(scroll) {
+    return SCROLL_MATERIAL_BY_TYPE.get(getScrollMaterialType(scroll))?.family || 'paper';
 }
 
 function getMaterialLabel(scroll) {
-    return getMaterial(scroll) === 'cloth' ? '布のスクロール' : '紙のスクロール';
+    const material = SCROLL_MATERIAL_BY_TYPE.get(getScrollMaterialType(scroll)) || SCROLL_MATERIALS[0];
+    return `${material.label}スクロール`;
 }
 
 function getDurabilityLimit(scroll) {
-    return SCROLL_DURABILITY_LIMITS[getMaterial(scroll)];
+    return SCROLL_MATERIAL_BY_TYPE.get(getScrollMaterialType(scroll))?.durability
+        || SCROLL_MATERIALS[0].durability;
 }
 
 function getCopyMaterialCost(scroll) {
@@ -312,7 +344,7 @@ function openCopyModal(scroll) {
         const cost = getCopyMaterialCost(scroll);
         if (cost <= 0) throw new Error('メインギア以外のギアがないため写本できません。');
         copySourceElement.textContent = `${scroll.name || '名前なしスクロール'} / 材料: 真鍮 ${cost}`;
-        copyMaterialSelect.value = getMaterial(scroll);
+        copyMaterialSelect.value = getScrollMaterialType(scroll);
         copyNameInput.value = getUniqueCopyName(scroll.name);
         copyCostElement.textContent = `消費: 真鍮 ${cost}（メインギア以外のギアの設置コスト合計）`;
         copyStatusElement.textContent = '';
@@ -399,7 +431,7 @@ async function encodeSharedScroll(scroll) {
     const payload = {
         version: 1,
         name: scroll.name || '共有スクロール',
-        material: getMaterial(scroll),
+        material: getScrollMaterialType(scroll),
         effect: scroll.effect || { type: 'custom', label: '未設定', config: {} },
         blueprint: scroll.blueprint
     };
@@ -501,7 +533,7 @@ function validateSharedScroll(payload) {
     };
     return {
         name: safeSharedText(payload.name, '共有スクロール', 80),
-        material: payload.material === 'cloth' ? 'cloth' : 'paper',
+        material: SCROLL_MATERIAL_BY_TYPE.has(payload.material) ? payload.material : 'paper',
         effect: {
             type: effectType,
             label: effectLabels[effectType],
@@ -1091,7 +1123,7 @@ function renderList() {
         selectButton.type = 'button';
         const typeLabel = document.createElement('span');
         typeLabel.className = 'scroll-list-type';
-        typeLabel.textContent = getMaterial(scroll) === 'cloth' ? '布' : '紙';
+        typeLabel.textContent = SCROLL_MATERIAL_BY_TYPE.get(getScrollMaterialType(scroll))?.label || '紙';
         const nameLabel = document.createElement('span');
         nameLabel.className = 'scroll-list-name';
         nameLabel.textContent = scroll.name || '名前なしスクロール';
@@ -1179,7 +1211,12 @@ function getInstalledScrollIds() {
     try {
         const buildings = JSON.parse(localStorage.getItem(BUILDINGS_KEY) || '[]');
         return new Set(Array.isArray(buildings)
-            ? buildings.map(building => building?.craftingScrollId).filter(id => typeof id === 'string')
+            ? buildings.flatMap(building => [
+                building?.craftingScrollId,
+                building?.vehicle?.movementScrollId,
+                building?.automaton?.movementScrollId,
+                building?.stationControl?.movementScrollId
+            ]).filter(id => typeof id === 'string' && id)
             : []);
     } catch (error) {
         console.error('設置中スクロールを確認できませんでした。', error);

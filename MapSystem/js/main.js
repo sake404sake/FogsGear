@@ -5,22 +5,28 @@ import { SkinPreview } from './skinPreview.js?v=4';
 import { CELL_DEFINITIONS, canEnterCell, getCellEntryRule, getCellTypeKey, getMosaicColor } from './cellRules.js';
 import { drawCellIcon, loadCellIconAtlas } from './cellIconRenderer.js?v=5';
 import { ACTIVE_SCROLL_TARGETS_KEY, CELL_MATERIALS, TERRAIN_TRANSFORM_RECIPES, WORLD_CELL_TYPES, applyCellChanges, chooseEraCellType, getCellCollectionPowerCost, getCellDrops, readCellChanges, saveCellChange } from './worldCells.js?v=13';
-import { CRAFTING_ITEMS, CRAFTING_ITEM_BY_ID, CRAFTING_OVERCLOCK_OPTIONS, CRAFTING_RATE_MULTIPLIER, CRAFTING_RECIPES, CRAFTING_STATION_BUILDING_IDS, CRAFTING_STATION_POWER_RATES, DEFERRED_CRAFTING_ITEM_IDS, HANDCRAFT_STATION } from './craftingData.js?v=17';
-import { BUILDING_BY_ID, BUILDING_DEFINITIONS, canPlaceBuildingOnTerrainCell, drawBuilding, getRailAutoRotation, getRailConnections, getTileEffectsUnderFootprint, getVehicleRailRotation, loadBuildingIconImages, normalizeBuildingUtilityState } from './buildingData.js?v=35';
+import { CRAFTING_ITEMS, CRAFTING_ITEM_BY_ID, CRAFTING_OVERCLOCK_OPTIONS, CRAFTING_RATE_MULTIPLIER, CRAFTING_RECIPES, CRAFTING_STATION_BUILDING_IDS, CRAFTING_STATION_POWER_RATES, DEFERRED_CRAFTING_ITEM_IDS, HANDCRAFT_STATION, SCROLL_MATERIAL_BY_ITEM, SCROLL_MATERIAL_BY_TYPE } from './craftingData.js?v=19';
+import { BUILDING_BY_ID, BUILDING_DEFINITIONS, canPlaceBuildingOnTerrainCell, drawBuilding, getRailAutoRotation, getRailConnections, getTileEffectsUnderFootprint, getVehicleRailRotation, loadBuildingIconImages, normalizeBuildingUtilityState } from './buildingData.js?v=36';
 import { getBuildingUtilityStatus, simulateBuildingUtilityNetworks } from './buildingUtilityNetworks.js?v=5';
 import { buildTerritoryBorderSegments, buildTerritoryBorderSegmentsAsync } from './territoryBorders.js?v=36';
 import { directionToVehicleRotation, findNextRailStep, getTrackDirection, getVehicleRenderState, STATION_CONTROL_DEFAULTS, VEHICLE_DEFAULTS } from './railwayRuntime.js?v=9';
-import { GameState as EngineGameState, clearGameProgress } from '../../GearSystem/js/GameState.js?v=runtime-53';
+import { GameState as EngineGameState, clearGameProgress } from '../../GearSystem/js/GameState.js?v=runtime-55';
 import { GEAR_CONFIG as ENGINE_GEAR_CONFIG, GearManager as EngineGearManager } from '../../GearSystem/js/GearManager.js?v=runtime-5';
 import { GearNetwork as EngineGearNetwork } from '../../GearSystem/js/GearSystem.js?v=network-8';
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const vehicleAnimationLayer = document.getElementById('vehicleAnimationLayer');
+const vehicleAnimationCanvas = document.createElement('canvas');
+vehicleAnimationCanvas.className = 'vehicle-animation-canvas';
+vehicleAnimationLayer.prepend(vehicleAnimationCanvas);
+const vehicleAnimationContext = vehicleAnimationCanvas.getContext('2d');
+let vehicleAnimationLayerActive = false;
+const vehicleAnimationPoses = new Map();
 const scrollStandMagicCircles = new Map();
-const vehicleMotionSprites = new Map();
 const automatonSkinRenderers = new Map();
 const AUTOMATON_TRANSPORT_RADIUS = 12;
+const AUTOMATON_CARRY_STACK_SIZE = 99;
 const automatonTransportRoutes = new Map();
 const automatonTransportPlanCache = new Map();
 const automatonTransportReachabilityCache = new Map();
@@ -210,7 +216,10 @@ const CRAFTING_ICON_IDS = Object.freeze({
     'closed-loop-unit': 'i-filter-cartridge',
     'ecosystem-starter': 'i-compost',
     paper_scroll: 'i-paper_scroll',
+    reinforced_paper_scroll: 'i-paper_scroll',
     cloth_scroll: 'i-cloth_scroll',
+    pressure_cloth_scroll: 'i-cloth_scroll',
+    alloy_alchemy_cloth_scroll: 'i-cloth_scroll',
     scroll_book: 'i-scroll_book',
     steam_power: 'i-steam_power'
 });
@@ -259,8 +268,9 @@ function openInventoryItem(itemKey, scroll = null) {
         });
     }
     if (editButton) {
-        editButton.hidden = !['paper_scroll', 'cloth_scroll'].includes(itemKey);
-        editButton.dataset.material = itemKey === 'cloth_scroll' ? 'cloth' : 'paper';
+        const scrollMaterial = SCROLL_MATERIAL_BY_ITEM.get(itemKey);
+        editButton.hidden = !scrollMaterial;
+        editButton.dataset.material = scrollMaterial?.type || 'paper';
     }
     modal.hidden = false;
 }
@@ -287,9 +297,31 @@ function openInventoryDiscardConfirmation() {
     const count = itemKey ? getCraftingItemCount(itemKey) : 0;
     if (!itemKey || count <= 0) return;
     pendingInventoryDiscardItemId = itemKey;
-    document.getElementById('inventory-discard-confirm-message').textContent =
-        `「${getCraftingItemName(itemKey)}」を所持数 ${formatInventoryCount(itemKey, count)} すべて破棄します。この操作は取り消せません。`;
+    const amountInput = document.getElementById('inventory-discard-amount');
+    const continuous = ['water', 'fog', 'power', 'steam_power'].includes(itemKey);
+    const available = continuous ? count : Math.floor(count);
+    amountInput.step = continuous ? '0.01' : '1';
+    amountInput.min = continuous ? '0.000001' : '1';
+    amountInput.max = String(available);
+    amountInput.value = String(available);
+    updateInventoryDiscardConfirmation();
     document.getElementById('inventory-discard-confirm-modal').hidden = false;
+}
+
+function updateInventoryDiscardConfirmation() {
+    const itemId = pendingInventoryDiscardItemId;
+    const amountInput = document.getElementById('inventory-discard-amount');
+    const confirmButton = document.querySelector('[data-action="confirm-inventory-discard"]');
+    const continuous = ['water', 'fog', 'power', 'steam_power'].includes(itemId);
+    const count = itemId ? getCraftingItemCount(itemId) : 0;
+    const amount = Number(amountInput?.value);
+    const available = continuous ? count : Math.floor(count);
+    const valid = Number.isFinite(amount) && amount > 0 && amount <= available
+        && (continuous || Number.isInteger(amount));
+    if (confirmButton) confirmButton.disabled = !valid;
+    document.getElementById('inventory-discard-confirm-message').textContent = itemId
+        ? `「${getCraftingItemName(itemId)}」の所持数 ${formatInventoryCount(itemId, count)} 個から指定数を破棄します。この操作は取り消せません。`
+        : '破棄するアイテムがありません。';
 }
 
 function cancelInventoryDiscard() {
@@ -300,16 +332,30 @@ function cancelInventoryDiscard() {
 function discardInventoryItem() {
     const itemId = pendingInventoryDiscardItemId;
     const count = itemId ? getCraftingItemCount(itemId) : 0;
-    if (!itemId || count <= 0) {
+    const continuous = ['water', 'fog', 'power', 'steam_power'].includes(itemId);
+    const amountInput = document.getElementById('inventory-discard-amount');
+    const amount = Number(amountInput?.value);
+    const discardAmount = amount;
+    const available = continuous ? count : Math.floor(count);
+    if (!itemId || !Number.isFinite(discardAmount) || discardAmount <= 0 || discardAmount > available) {
         cancelInventoryDiscard();
-        showAppNotice('破棄するアイテムが見つかりません。');
+        showAppNotice('破棄する数量を確認してください。');
         return;
     }
-    if (itemId === 'brass-stock') engineRuntimeState.brass = 0;
+    if (!continuous && !Number.isInteger(discardAmount)) {
+        cancelInventoryDiscard();
+        showAppNotice('破棄する数量は整数で指定してください。');
+        return;
+    }
+    if (itemId === 'brass-stock') engineRuntimeState.brass = Math.max(0, count - discardAmount);
     else {
         const resourceKey = { water: 'water', fog: 'fog', power: 'power', steam_power: 'steamPower' }[itemId];
-        if (resourceKey) engineRuntimeState[resourceKey] = 0;
-        else delete engineRuntimeState.materialInventory[itemId];
+        if (resourceKey) engineRuntimeState[resourceKey] = Math.max(0, count - discardAmount);
+        else {
+            const remaining = Math.max(0, count - discardAmount);
+            if (remaining > 0) engineRuntimeState.materialInventory[itemId] = remaining;
+            else delete engineRuntimeState.materialInventory[itemId];
+        }
     }
     engineRuntimeState.saveGameData();
     engineRuntimeState.notify();
@@ -342,7 +388,10 @@ function getUniqueScrollName(name, scrolls) {
 }
 
 function getScrollDurabilityLimit(scroll) {
-    return scroll?.material === 'cloth' || scroll?.scrollType === 'cloth' ? 100 : 50;
+    const materialType = SCROLL_MATERIAL_BY_TYPE.has(scroll?.material)
+        ? scroll.material
+        : SCROLL_MATERIAL_BY_TYPE.has(scroll?.scrollType) ? scroll.scrollType : 'paper';
+    return SCROLL_MATERIAL_BY_TYPE.get(materialType)?.durability || 50;
 }
 
 function getScrollUsedRotations(scroll) {
@@ -354,10 +403,15 @@ function isScrollExhausted(scroll) {
     return getScrollUsedRotations(scroll) >= getScrollDurabilityLimit(scroll);
 }
 
-function getInstalledCraftingScrollIds(excludeBuildingInstanceId = null) {
+function getInstalledScrollIds(excludeBuildingInstanceId = null) {
     return new Set(state.buildings
         .filter(building => building.instanceId !== excludeBuildingInstanceId)
-        .map(building => building.craftingScrollId)
+        .flatMap(building => [
+            building.craftingScrollId,
+            building.vehicle?.movementScrollId,
+            building.automaton?.movementScrollId,
+            building.stationControl?.movementScrollId
+        ])
         .filter(scrollId => typeof scrollId === 'string' && scrollId));
 }
 
@@ -378,6 +432,38 @@ let startupStage = '起動準備';
 function hasAssignedCraftingScroll(placed) {
     return Boolean(placed?.craftingScrollId && getStoredSavedScrolls().some(scroll =>
         scroll.id === placed.craftingScrollId && isUsableCraftingScroll(scroll)));
+}
+
+function requiresMovementScroll(placed) {
+    const kind = BUILDING_BY_ID.get(placed?.id)?.kind;
+    return kind === 'locomotive' || kind === 'automaton';
+}
+
+function getMovementScrollId(placed) {
+    const kind = BUILDING_BY_ID.get(placed?.id)?.kind;
+    if (kind === 'locomotive') return placed.vehicle?.movementScrollId || '';
+    if (kind === 'automaton') return placed.automaton?.movementScrollId || '';
+    return '';
+}
+
+function setMovementScrollId(placed, scrollId) {
+    const kind = BUILDING_BY_ID.get(placed?.id)?.kind;
+    if (kind === 'locomotive') {
+        const vehicle = getVehicleState(placed);
+        if (scrollId) vehicle.movementScrollId = scrollId;
+        else delete vehicle.movementScrollId;
+    } else if (kind === 'automaton') {
+        const automaton = getAutomatonState(placed);
+        if (scrollId) automaton.movementScrollId = scrollId;
+        else delete automaton.movementScrollId;
+    }
+}
+
+function hasAssignedMovementScroll(placed) {
+    const scrollId = getMovementScrollId(placed);
+    return Boolean(scrollId
+        && getStoredSavedScrolls().some(scroll => scroll.id === scrollId && isUsableCraftingScroll(scroll))
+        && !getInstalledScrollIds(placed.instanceId).has(scrollId));
 }
 
 function hasRunningCraftingScroll(placed) {
@@ -1828,6 +1914,13 @@ function getStorageInventoryCount(itemId) {
     return getCraftingItemCount(itemId);
 }
 
+function getStorageTransferCandidates(placed) {
+    const storedMaterials = placed?.storedMaterials || {};
+    return CRAFTING_ITEMS.filter(([itemId]) => selectedStorageStack
+        ? Number(storedMaterials[itemId]) > 0
+        : getStorageInventoryCount(itemId) > 0);
+}
+
 function createBuildingStorageIcon(itemId) {
     const icon = document.createElement('span');
     icon.className = 'inventory-item-icon';
@@ -1838,13 +1931,20 @@ function createBuildingStorageIcon(itemId) {
 function renderBuildingStorageItemPicker() {
     const itemSelect = document.getElementById('building-storage-item');
     const selectedItemId = itemSelect.value;
+    const placed = state.buildings.find(building => building.instanceId === selectedBuildingInstanceId);
+    const candidates = getStorageTransferCandidates(placed);
     const button = document.getElementById('building-storage-item-button');
-    const selectedName = getCraftingItemName(selectedItemId);
+    const selectedName = candidates.some(([id]) => id === selectedItemId)
+        ? getCraftingItemName(selectedItemId)
+        : '';
     const selectedNameElement = document.getElementById('building-storage-item-name');
-    document.getElementById('building-storage-item-icon').replaceChildren(createBuildingStorageIcon(selectedItemId));
-    selectedNameElement.textContent = selectedName;
+    const selectedIcon = document.getElementById('building-storage-item-icon');
+    selectedIcon.replaceChildren();
+    if (selectedName) selectedIcon.appendChild(createBuildingStorageIcon(selectedItemId));
+    selectedNameElement.textContent = selectedName || '資材を選択';
     selectedNameElement.style.fontSize = '';
-    button.setAttribute('aria-label', `資材: ${selectedName}。タップして変更`);
+    button.disabled = candidates.length === 0;
+    button.setAttribute('aria-label', selectedName ? `資材: ${selectedName}。タップして変更` : '選択できる資材がありません');
     const textCanvas = document.createElement('canvas');
     const context = textCanvas.getContext('2d');
     if (context) {
@@ -1859,7 +1959,7 @@ function renderBuildingStorageItemPicker() {
 
     const search = normalizeInventorySearch(document.getElementById('building-storage-item-search').value);
     const itemList = document.getElementById('building-storage-item-list');
-    const options = CRAFTING_ITEMS.filter(([itemId, name]) =>
+    const options = candidates.filter(([itemId, name]) =>
         !search || normalizeInventorySearch(`${name} ${itemId}`).includes(search));
     const items = options.map(([itemId, name]) => {
         const option = document.createElement('button');
@@ -1875,29 +1975,19 @@ function renderBuildingStorageItemPicker() {
         itemName.textContent = name;
         const quantity = document.createElement('span');
         quantity.className = 'building-storage-item-option-count';
-        quantity.textContent = formatInventoryCount(itemId, getStorageInventoryCount(itemId));
+        const itemCount = selectedStorageStack
+            ? getStorageMaterialCount(placed, itemId)
+            : getStorageInventoryCount(itemId);
+        quantity.textContent = formatInventoryCount(itemId, itemCount);
         option.append(itemName, quantity);
         return option;
     });
     itemList.replaceChildren(...items);
-    const selectedOption = [...itemList.children].find(option => option.dataset.itemId === selectedItemId);
-    if (!selectedOption && !search) {
-        const selectedName = getCraftingItemName(selectedItemId);
-        const option = document.createElement('button');
-        option.type = 'button';
-        option.className = 'building-storage-item-option is-selected';
-        option.dataset.itemId = selectedItemId;
-        option.setAttribute('role', 'option');
-        option.setAttribute('aria-selected', 'true');
-        option.appendChild(createBuildingStorageIcon(selectedItemId));
-        const itemName = document.createElement('span');
-        itemName.className = 'building-storage-item-option-name';
-        itemName.textContent = selectedName;
-        const quantity = document.createElement('span');
-        quantity.className = 'building-storage-item-option-count';
-        quantity.textContent = formatInventoryCount(selectedItemId, getStorageInventoryCount(selectedItemId));
-        option.append(itemName, quantity);
-        itemList.prepend(option);
+    if (!items.length) {
+        const empty = document.createElement('span');
+        empty.className = 'building-storage-item-empty';
+        empty.textContent = candidates.length ? '該当する資材はありません' : '移動できる資材はありません';
+        itemList.appendChild(empty);
     }
 }
 
@@ -1911,19 +2001,25 @@ function renderBuildingStorage(placed, definition) {
     if (!isRecord(placed.storedMaterials)) placed.storedMaterials = {};
     if (selectedStorageStack && !placed.storedMaterials[selectedStorageStack.itemId]) selectedStorageStack = null;
     const transferButton = document.getElementById('building-storage-transfer-button');
+    const amountDisplay = document.getElementById('building-storage-amount-display');
     const transferDirection = selectedStorageStack ? 'withdraw' : 'deposit';
     transferButton.dataset.direction = transferDirection;
     transferButton.textContent = transferDirection === 'withdraw' ? '取り出す' : '預ける';
     transferButton.setAttribute('aria-label', transferDirection === 'withdraw' ? '選択した資材を取り出す' : '選択した資材を預ける');
     const currentItemId = itemSelect.value;
-    itemSelect.replaceChildren(...CRAFTING_ITEMS.map(([id, name]) => new Option(name, id)));
-    itemSelect.value = CRAFTING_ITEM_BY_ID.has(currentItemId) ? currentItemId : CRAFTING_ITEMS[0]?.[0] || '';
+    const candidates = getStorageTransferCandidates(placed);
+    itemSelect.replaceChildren(...candidates.map(([id, name]) => new Option(name, id)));
+    itemSelect.value = candidates.some(([id]) => id === currentItemId) ? currentItemId : candidates[0]?.[0] || '';
     renderBuildingStorageItemPicker();
     const usedSlots = getStorageUsedSlots(placed);
     const selectedItemId = itemSelect.value;
     const selectedItemCount = getStorageMaterialCount(placed, selectedItemId);
+    const amountMaximum = getBuildingStorageTransferMaximum(placed, definition, selectedItemId, transferDirection);
+    setBuildingStorageAmount(amountMaximum);
     document.getElementById('building-storage-status').textContent =
         `保管枠 ${usedSlots} / ${capacity}　${getCraftingItemName(selectedItemId)} ${formatInventoryCount(selectedItemId, selectedItemCount)}`;
+    transferButton.disabled = candidates.length === 0 || amountMaximum < 1;
+    amountDisplay.disabled = candidates.length === 0 || amountMaximum < 1;
     const grid = document.getElementById('building-storage-grid');
     const cells = [];
     Object.entries(placed.storedMaterials)
@@ -1960,39 +2056,34 @@ function renderBuildingStorage(placed, definition) {
     grid.replaceChildren(...cells);
 }
 
-function setBuildingStorageAmountOptions(maximum, selectedValue = 1) {
-    const amountSelect = document.getElementById('building-storage-amount');
-    if (!amountSelect) return;
-    const optionCount = Math.min(99, Math.max(1, Math.floor(Number(maximum)) || 99));
-    const options = Array.from({ length: optionCount }, (_, index) => {
-        const value = String(index + 1);
-        return new Option(value, value);
-    });
-    amountSelect.replaceChildren(...options);
-    amountSelect.value = String(Math.min(optionCount, Math.max(1, Math.floor(Number(selectedValue)) || 1)));
-    document.getElementById('building-storage-amount-value').textContent = amountSelect.value;
-    const list = document.getElementById('building-storage-amount-list');
-    list.replaceChildren(...options.map(option => {
-        const item = document.createElement('button');
-        item.className = 'building-storage-amount-option';
-        item.type = 'button';
-        item.role = 'option';
-        item.dataset.amount = option.value;
-        item.setAttribute('aria-selected', String(option.value === amountSelect.value));
-        item.textContent = option.value;
-        return item;
-    }));
+function getBuildingStorageTransferMaximum(placed, definition, itemId, direction) {
+    if (!CRAFTING_ITEM_BY_ID.has(itemId)) return 0;
+    const storedCount = Math.max(0, Math.floor(Number(getStorageMaterialCount(placed, itemId)) || 0));
+    if (direction === 'withdraw') return storedCount;
+    const freeSlots = Math.max(0, definition.storageCapacity - getStorageUsedSlots(placed));
+    const stackSpace = Math.ceil(storedCount / 99) * 99 - storedCount;
+    const capacityLeft = stackSpace + freeSlots * 99;
+    return Math.max(0, Math.floor(Math.min(capacityLeft, getStorageInventoryCount(itemId))));
 }
 
-setBuildingStorageAmountOptions(99);
+function setBuildingStorageAmount(maximum) {
+    const display = document.getElementById('building-storage-amount-display');
+    if (!display) return;
+    const maxAmount = Math.max(1, Math.floor(Number(maximum)) || 0);
+    display.max = String(maxAmount);
+    display.value = String(maxAmount);
+}
+
+setBuildingStorageAmount(1);
 
 function transferBuildingStorage(direction) {
     const placed = state.buildings.find(building => building.instanceId === selectedBuildingInstanceId);
     const definition = BUILDING_BY_ID.get(placed?.id);
     const itemId = document.getElementById('building-storage-item')?.value;
-    const amountInput = document.getElementById('building-storage-amount');
+    const amountInput = document.getElementById('building-storage-amount-display');
     const amount = Math.floor(Number(amountInput?.value));
-    if (!placed || !definition?.storageCapacity || !CRAFTING_ITEM_BY_ID.has(itemId) || !Number.isFinite(amount) || amount < 1) {
+    if (!placed || !definition?.storageCapacity || !amountInput || !CRAFTING_ITEM_BY_ID.has(itemId)
+        || !(amount > 0) || amount > Number(amountInput.max)) {
         showAppNotice('資材と数量を正しく指定してください。');
         return;
     }
@@ -2021,8 +2112,7 @@ function transferBuildingStorage(direction) {
             notifyInventoryFull();
             return;
         }
-        const selectedStackLimit = selectedStorageStack?.itemId === itemId ? selectedStorageStack.count : 99;
-        const moved = Math.min(amount, storedCount, selectedStackLimit, 99);
+        const moved = Math.min(amount, storedCount);
         if (moved < 1) {
             showAppNotice('ストレージに選択した資材がありません。');
             return;
@@ -2033,7 +2123,6 @@ function transferBuildingStorage(direction) {
         else engineRuntimeState.materialInventory[itemId] = inventoryCount + moved;
     }
     selectedStorageStack = null;
-    setBuildingStorageAmountOptions(99);
     recordBuildingHistory(before);
     saveBuildings();
     engineRuntimeState.saveGameData();
@@ -2075,7 +2164,9 @@ function supportsStationaryScrolls(building) {
 }
 
 function canInstallScrollInBuilding(building) {
-    return Boolean(building && (supportsStationaryScrolls(building) || getCraftingRecipesForBuilding(building.id).length));
+    return Boolean(building && (supportsStationaryScrolls(building)
+        || requiresMovementScroll(building)
+        || getCraftingRecipesForBuilding(building.id).length));
 }
 
 function createBuildingSvgIcon(buildingId) {
@@ -2540,6 +2631,11 @@ function loadBuildings() {
                     if (placed.automaton.running) placed.automaton.stopReason = '';
                     migrated = true;
                 }
+                if (placed.automaton.running && !hasAssignedMovementScroll(placed)) {
+                    placed.automaton.running = false;
+                    placed.automaton.stopReason = '動作スクロール未設定';
+                    migrated = true;
+                }
             } else if (definition.kind === 'station' && !isRecord(placed.stationControl)) {
                 placed.stationControl = { ...STATION_CONTROL_DEFAULTS, destinations: [], conditions: [] };
                 migrated = true;
@@ -2565,7 +2661,7 @@ function createInventoryIcon(itemId) {
 }
 
 function getInventoryCategory(itemId) {
-    if (['paper_scroll', 'cloth_scroll', 'scroll_book'].includes(itemId)) return 'scrolls';
+    if (SCROLL_MATERIAL_BY_ITEM.has(itemId) || itemId === 'scroll_book') return 'scrolls';
     if (['water', 'fog', 'power', 'steam_power'].includes(itemId)) return 'resources';
     if (BUILDING_BY_ID.has(itemId)) return 'building-kits';
     const item = CRAFTING_ITEM_BY_ID.get(itemId);
@@ -3760,9 +3856,13 @@ function scheduleVehicleAnimation() {
     const animate = now => {
         vehicleAnimationTimer = null;
         vehicleFrameQueued = false;
-        if (hasVehicleRuntime || vehicleMotionSprites.size) tickVehicleRuntime(now);
+        if (hasVehicleRuntime) tickVehicleRuntime(now);
         tickAutomatons(now);
-        if (hasVehicleRuntime || vehicleMotionSprites.size) drawVehicleAnimation(now);
+        if (hasVehicleRuntime) {
+            const hasActiveVehicle = state.buildings.some(placed => placed.vehicle?.running || placed.vehicle?.movement);
+            if (hasActiveVehicle !== vehicleAnimationLayerActive) draw();
+            else if (hasActiveVehicle) drawVehicleAnimationLayer(now);
+        }
         if (state.buildings.some(placed => placed.vehicle?.running || placed.vehicle?.movement
             || placed.automaton?.running || placed.automaton?.movement)) scheduleVehicleAnimation();
     };
@@ -3774,63 +3874,6 @@ function scheduleVehicleAnimation() {
         return;
     }
     requestAnimationFrame(animate);
-}
-
-function getVehicleMotionSprite(placed) {
-    let sprite = vehicleMotionSprites.get(placed.instanceId);
-    if (sprite) return sprite;
-    const element = document.createElement('canvas');
-    element.className = 'vehicle-motion-sprite';
-    element.setAttribute('aria-hidden', 'true');
-    vehicleAnimationLayer.appendChild(element);
-    sprite = { element, renderedRotation: null };
-    vehicleMotionSprites.set(placed.instanceId, sprite);
-    return sprite;
-}
-
-function drawVehicleAnimation(now) {
-    const viewW = canvas.width / state.zoom;
-    const viewH = canvas.height / state.zoom;
-    const left = state.camera.x - viewW / 2;
-    const top = state.camera.y - viewH / 2;
-    const startCol = Math.max(0, Math.floor(left / state.tileSize));
-    const endCol = Math.min(state.cols, Math.ceil((left + viewW) / state.tileSize));
-    const startRow = Math.max(0, Math.floor(top / state.tileSize));
-    const endRow = Math.min(state.rows, Math.ceil((top + viewH) / state.tileSize));
-    const activeSprites = new Set();
-    state.buildings.forEach(placed => {
-        const definition = BUILDING_BY_ID.get(placed.id);
-        if (definition?.role !== 'vehicle' || !placed.vehicle?.movement) return;
-        activeSprites.add(placed.instanceId);
-        const frame = getVehicleRenderState(placed, now);
-        const sprite = getVehicleMotionSprite(placed);
-        const pixelRatio = Math.max(1, window.devicePixelRatio || 1);
-        const spriteSize = Math.round(state.tileSize * pixelRatio);
-        let spriteSizeChanged = false;
-        if (sprite.element.width !== spriteSize || sprite.element.height !== spriteSize) {
-            sprite.element.width = spriteSize;
-            sprite.element.height = spriteSize;
-            spriteSizeChanged = true;
-        }
-        if (spriteSizeChanged || sprite.renderedRotation === null
-            || Math.abs(frame.rotation - sprite.renderedRotation) >= 0.01) {
-            const spriteContext = sprite.element.getContext('2d');
-            spriteContext.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
-            spriteContext.clearRect(0, 0, state.tileSize, state.tileSize);
-            drawBuilding(spriteContext, { ...definition, x: 0, y: 0, rotation: frame.rotation }, state.tileSize, { zoom: 1 });
-            sprite.renderedRotation = frame.rotation;
-        }
-        sprite.element.style.width = `${state.tileSize * state.zoom}px`;
-        sprite.element.style.height = `${state.tileSize * state.zoom}px`;
-        const left = (frame.x * state.tileSize - state.camera.x) * state.zoom + canvas.width / 2;
-        const top = (frame.y * state.tileSize - state.camera.y) * state.zoom + canvas.height / 2;
-        sprite.element.style.transform = `translate3d(${left}px, ${top}px, 0)`;
-    });
-    vehicleMotionSprites.forEach((sprite, instanceId) => {
-        if (activeSprites.has(instanceId)) return;
-        sprite.element.remove();
-        vehicleMotionSprites.delete(instanceId);
-    });
 }
 
 function drawGridOverlay(startCol, endCol, startRow, endRow) {
@@ -4075,18 +4118,23 @@ function drawPlacedBuildings(startCol, endCol, startRow, endRow, now) {
     orderedBuildingDrawCache.forEach(placed => {
         const building = BUILDING_BY_ID.get(placed.id);
         if (!building) return;
-        if (building.role === 'vehicle' && placed.vehicle?.movement) return;
+        const activeVehicle = building.role === 'vehicle' && (placed.vehicle?.running || placed.vehicle?.movement);
+        if (activeVehicle) return;
+        const vehicleRender = building.role === 'vehicle' ? getVehicleRenderState(placed, now) : null;
         const automatonMovement = building.kind === 'automaton' ? placed.automaton?.movement : null;
-        const minX = Math.min(placed.x, automatonMovement?.from.x ?? placed.x, automatonMovement?.to.x ?? placed.x);
-        const maxX = Math.max(placed.x, automatonMovement?.from.x ?? placed.x, automatonMovement?.to.x ?? placed.x);
-        const minY = Math.min(placed.y, automatonMovement?.from.y ?? placed.y, automatonMovement?.to.y ?? placed.y);
-        const maxY = Math.max(placed.y, automatonMovement?.from.y ?? placed.y, automatonMovement?.to.y ?? placed.y);
+        const drawX = vehicleRender?.x ?? placed.x;
+        const drawY = vehicleRender?.y ?? placed.y;
+        const minX = Math.min(drawX, automatonMovement?.from.x ?? placed.x, automatonMovement?.to.x ?? placed.x);
+        const maxX = Math.max(drawX, automatonMovement?.from.x ?? placed.x, automatonMovement?.to.x ?? placed.x);
+        const minY = Math.min(drawY, automatonMovement?.from.y ?? placed.y, automatonMovement?.to.y ?? placed.y);
+        const maxY = Math.max(drawY, automatonMovement?.from.y ?? placed.y, automatonMovement?.to.y ?? placed.y);
         if (maxX + building.width < startCol || minX > endCol || maxY + building.height < startRow || minY > endRow) return;
         if (building.kind === 'automaton') {
             drawAutomaton(placed, now);
             return;
         }
-        drawBuilding(ctx, { ...building, x: placed.x, y: placed.y, rotation: placed.rotation || 0 }, state.tileSize, { zoom: state.zoom });
+        const drawRotation = vehicleRender ? vehicleRender.rotation : placed.rotation || 0;
+        drawBuilding(ctx, { ...building, x: drawX, y: drawY, rotation: drawRotation }, state.tileSize, { zoom: state.zoom });
         if (activeCraftingStationIds.has(placed.instanceId)) {
             const zoom = Math.max(0.5, state.zoom);
             const x = placed.x * state.tileSize;
@@ -4400,7 +4448,44 @@ function draw() {
 
     ctx.restore();
     updateScrollStandMagicCircles();
-    if (state.buildings.some(placed => placed.vehicle?.movement || placed.automaton?.movement)) scheduleVehicleAnimation();
+    const hasActiveVehicle = state.buildings.some(placed => placed.vehicle?.running || placed.vehicle?.movement);
+    vehicleAnimationLayerActive = hasActiveVehicle;
+    if (hasActiveVehicle) drawVehicleAnimationLayer(now);
+    else {
+        vehicleAnimationContext.clearRect(0, 0, vehicleAnimationCanvas.width, vehicleAnimationCanvas.height);
+        vehicleAnimationPoses.clear();
+    }
+    if (state.buildings.some(placed => placed.vehicle?.running || placed.vehicle?.movement
+        || placed.automaton?.movement)) scheduleVehicleAnimation();
+}
+
+function drawVehicleAnimationLayer(now) {
+    if (vehicleAnimationCanvas.width !== canvas.width || vehicleAnimationCanvas.height !== canvas.height) {
+        vehicleAnimationCanvas.width = canvas.width;
+        vehicleAnimationCanvas.height = canvas.height;
+    }
+    vehicleAnimationContext.setTransform(1, 0, 0, 1, 0, 0);
+    vehicleAnimationContext.clearRect(0, 0, vehicleAnimationCanvas.width, vehicleAnimationCanvas.height);
+
+    const viewW = canvas.width / state.zoom;
+    const viewH = canvas.height / state.zoom;
+    const left = state.camera.x - viewW / 2;
+    const top = state.camera.y - viewH / 2;
+    vehicleAnimationContext.save();
+    vehicleAnimationContext.scale(state.zoom, state.zoom);
+    vehicleAnimationContext.translate(-left, -top);
+    state.buildings.forEach(placed => {
+        const vehicle = placed.vehicle;
+        if (!vehicle?.running && !vehicle?.movement) return;
+        const building = BUILDING_BY_ID.get(placed.id);
+        if (!building) return;
+        const render = vehicle.movement
+            ? getVehicleRenderState(placed, now)
+            : vehicleAnimationPoses.get(placed.instanceId) || { x: placed.x, y: placed.y, rotation: placed.rotation || 0 };
+        vehicleAnimationPoses.set(placed.instanceId, render);
+        drawBuilding(vehicleAnimationContext, { ...building, x: render.x, y: render.y, rotation: render.rotation }, state.tileSize, { zoom: state.zoom });
+    });
+    vehicleAnimationContext.restore();
 }
 
 function drawWaterCoastline(startCol, endCol, startRow, endRow) {
@@ -4600,6 +4685,7 @@ function getAutomatonState(placed) {
         sourceStorageInstanceId: '',
         destinationStorageInstanceId: '',
         transportTargetStorageInstanceId: '',
+        movementScrollId: '',
         cargo: {},
         facingDirection: { x: 1, y: 0 },
         skinUrl: skin.url,
@@ -4644,7 +4730,7 @@ function getAutomatonState(placed) {
     );
     placed.automaton.deliveredAtDestination = Boolean(placed.automaton.deliveredAtDestination);
     const cargo = isRecord(placed.automaton.cargo) ? placed.automaton.cargo : {};
-    let cargoSpace = 99;
+    let cargoSpace = AUTOMATON_CARRY_STACK_SIZE;
     placed.automaton.cargo = {};
     for (const [itemId] of CRAFTING_ITEMS) {
         const amount = Math.min(cargoSpace, Math.max(0, Math.floor(Number(cargo[itemId]) || 0)));
@@ -4839,8 +4925,10 @@ function renderAutomatonMenu(placed) {
     document.getElementById('automaton-item-filter-toggle-label').textContent =
         isIncludingOnly ? 'のみ' : '以外';
     if (isStorageAction) renderAutomatonItemFilter(automaton);
+    renderAutomatonMovementScrollControl(placed);
     const toggle = document.getElementById('automaton-toggle');
     toggle.textContent = automaton.running ? '停止' : '起動';
+    toggle.disabled = !automaton.running && !hasAssignedMovementScroll(placed);
     toggle.classList.toggle('inventory-modal-secondary', automaton.running);
     toggle.classList.toggle('saved-scroll-use', !automaton.running);
     const cargoCount = Object.values(automaton.cargo).reduce((total, amount) => total + amount, 0);
@@ -4852,11 +4940,12 @@ function renderAutomatonMenu(placed) {
                 ? `処理個数 ${automaton.processedItemCount} / 搬出元在庫切れで停止`
                 : `処理個数 ${automaton.processedItemCount}`;
     const transportStatus = isTransportAction
-        ? `25×25移動範囲 / 倉庫間の点線が経路 / 積荷 ${cargoCount}/99`
+        ? `25×25移動範囲 / 倉庫間の点線が経路 / 積荷 ${cargoCount}/${AUTOMATON_CARRY_STACK_SIZE}`
         : '';
+    const movementScrollStatus = hasAssignedMovementScroll(placed) ? '' : '動作スクロール未設定 / ';
     document.getElementById('automaton-status').textContent = automaton.running
-        ? `稼働中 / ${{ RESOURCE_COLLECTION: '資源を採取', TERRAIN_TRANSFORM: '地形を変成', STORAGE_WITHDRAW: '前方から取り出し', STORAGE_DEPOSIT: '前方へ収納', STORAGE_TRANSPORT: `倉庫間運搬 (${cargoCount}/99)` }[automaton.action]} / ${itemProgressStatus}${isTransportAction ? ' / ' + transportStatus : ''}`
-        : `${automaton.stopReason || '停止中'} / ${itemProgressStatus}${transportStatus ? ` / ${transportStatus}` : ''}`;
+        ? `稼働中 / ${{ RESOURCE_COLLECTION: '資源を採取', TERRAIN_TRANSFORM: '地形を変成', STORAGE_WITHDRAW: '前方から取り出し', STORAGE_DEPOSIT: '前方へ収納', STORAGE_TRANSPORT: `倉庫間運搬 (${cargoCount}/${AUTOMATON_CARRY_STACK_SIZE})` }[automaton.action]} / ${itemProgressStatus}${isTransportAction ? ' / ' + transportStatus : ''}`
+        : `${movementScrollStatus}${automaton.stopReason || '停止中'} / ${itemProgressStatus}${transportStatus ? ` / ${transportStatus}` : ''}`;
     document.getElementById('automaton-skin-name').textContent = `適用中: ${automaton.skinName || 'プレイヤーの見た目'}`;
     const previewSource = automaton.skinUrl || getPlayerSkinConfig().url;
     if (automatonPreviewSource !== previewSource) {
@@ -5467,7 +5556,7 @@ function transferAutomatonStorage(placed, automaton) {
             : !selectedItems.has(itemId));
     let changed = false;
     let movedTotal = 0;
-    let remainingQuota = getAutomatonItemCountRemaining(automaton);
+    let remainingQuota = Math.min(AUTOMATON_CARRY_STACK_SIZE, getAutomatonItemCountRemaining(automaton));
     for (const itemId of itemIds) {
         const resourceKey = { water: 'water', fog: 'fog', power: 'power', steam_power: 'steamPower' }[itemId];
         const storedCount = Math.floor(getStorageMaterialCount(storage, itemId));
@@ -5499,7 +5588,7 @@ function transferAutomatonStorage(placed, automaton) {
             movedTotal += moved;
         }
         changed = true;
-        if (remainingQuota <= 0) break;
+        break;
     }
     if (!changed) return false;
     const reachedItemLimit = recordAutomatonItemProgress(automaton, movedTotal);
@@ -5529,7 +5618,7 @@ function transferAutomatonBetweenStorages(placed, automaton) {
     let movedTotal = 0;
 
     if (cargoCount === 0 && storage.instanceId === automaton.sourceStorageInstanceId) {
-        let remainingCapacity = Math.min(99, getAutomatonItemCountRemaining(automaton));
+        let remainingCapacity = Math.min(AUTOMATON_CARRY_STACK_SIZE, getAutomatonItemCountRemaining(automaton));
         for (const itemId of itemIds) {
             const storedCount = Math.floor(getStorageMaterialCount(storage, itemId));
             const moved = Math.min(storedCount, remainingCapacity);
@@ -5538,7 +5627,7 @@ function transferAutomatonBetweenStorages(placed, automaton) {
             automaton.cargo[itemId] = moved;
             remainingCapacity -= moved;
             changed = true;
-            if (remainingCapacity === 0) break;
+            break;
         }
     } else if (cargoCount > 0 && storage.instanceId === automaton.destinationStorageInstanceId) {
         for (const itemId of Object.keys(automaton.cargo)) {
@@ -5729,6 +5818,10 @@ function tickAutomatonTransport(placed, automaton, now) {
         }
         placed.x = automaton.movement.to.x;
         placed.y = automaton.movement.to.y;
+        automaton.facingDirection = {
+            x: automaton.movement.to.x - automaton.movement.from.x,
+            y: automaton.movement.to.y - automaton.movement.from.y
+        };
         route.index += 1;
         automaton.movement = null;
         if (route.index >= route.path.length) {
@@ -5778,6 +5871,14 @@ function tickAutomatons(now) {
         if (BUILDING_BY_ID.get(placed.id)?.kind !== 'automaton') continue;
         const automaton = getAutomatonState(placed);
         if (!automaton.running) continue;
+        if (!hasAssignedMovementScroll(placed)) {
+            automaton.running = false;
+            automaton.movement = null;
+            automaton.stopReason = '動作スクロール未設定';
+            automatonTransportRoutes.delete(placed.instanceId);
+            buildingsChanged = true;
+            continue;
+        }
         if (automaton.action === 'STORAGE_TRANSPORT') {
             buildingsChanged = tickAutomatonTransport(placed, automaton, now) || buildingsChanged;
             continue;
@@ -5869,6 +5970,10 @@ function toggleSelectedAutomaton() {
         automaton.stopReason = '手動停止';
         automatonTransportRoutes.delete(placed.instanceId);
     } else {
+        if (!hasAssignedMovementScroll(placed)) {
+            showAppNotice('動作スクロールをセットしてください。');
+            return;
+        }
         let transportPlan = null;
         if (automaton.action === 'STORAGE_TRANSPORT') {
             const sourceExists = state.buildings.some(storage =>
@@ -5945,22 +6050,26 @@ function renderVehicleMenu(placed, definition) {
         return;
     }
     const vehicle = getVehicleState(placed);
+    const hasMovementScroll = hasAssignedMovementScroll(placed);
     const firstStep = vehicle.running ? null : getVehicleNextStep(placed, { ...vehicle, previousRail: null });
     if (start) {
         start.hidden = false;
+        start.disabled = !vehicle.running && !hasMovementScroll;
         start.textContent = vehicle.running ? '停止' : '出発';
         start.classList.toggle('inventory-modal-secondary', vehicle.running);
         start.classList.toggle('saved-scroll-use', !vehicle.running);
         start.setAttribute('aria-label', vehicle.running ? '機関車を停止' : '機関車を出発');
     }
     if (status) {
-        status.textContent = vehicle.running ? '運行中' : firstStep?.error ? '出発できません' : '停車中';
+        status.textContent = vehicle.running ? '運行中' : !hasMovementScroll ? '動作スクロール未設定' : firstStep?.error ? '出発できません' : '停車中';
         status.classList.toggle('is-running', vehicle.running);
         status.classList.toggle('is-blocked', Boolean(!vehicle.running && firstStep?.error));
     }
     if (guide) {
         if (vehicle.running) {
             guide.textContent = '運行中です。「停止」を押すと、現在の移動を確定して停車します。';
+        } else if (!hasMovementScroll) {
+            guide.textContent = '出発前に動作スクロールをセットしてください。';
         } else if (firstStep?.error) {
             const reason = VEHICLE_STOP_MESSAGES[firstStep.error] || '線路の接続を確認してください';
             guide.textContent = `出発できません：${reason}。線路を確認してください。`;
@@ -5999,6 +6108,23 @@ function updateBuildingScrollStatus(placed) {
     const overclockControl = document.getElementById('building-overclock-control');
     if (overclockControl) overclockControl.hidden = !hasRecipes;
     if (!canInstallScroll) return;
+    const toggle = document.getElementById('building-scroll-toggle');
+    const movementScrollRequired = requiresMovementScroll(placed);
+    if (toggle) toggle.hidden = movementScrollRequired;
+    if (movementScrollRequired) {
+        const scrollId = getMovementScrollId(placed);
+        const selectedScroll = getStoredSavedScrolls().find(scroll => scroll.id === scrollId);
+        updateBuildingScrollPreview(null);
+        updateBuildingScrollToggle(null);
+        if (!scrollId) status.textContent = '動作スクロール未設定。セットすると運転できます。';
+        else if (!hasAssignedMovementScroll(placed)) {
+            status.textContent = selectedScroll && isScrollExhausted(selectedScroll)
+                ? `${selectedScroll.name || 'スクロール'} は使い切りました。別のスクロールをセットしてください。`
+                : 'セットしたスクロールが使えません。別のスクロールをセットしてください。';
+        } else status.textContent = `${selectedScroll.name || 'スクロール'} セット済み / 運転可能`;
+        return;
+    }
+    if (toggle) toggle.hidden = false;
     const overclock = getCraftingOverclock(placed);
     const basePowerRate = hasRecipes ? CRAFTING_STATION_POWER_RATES[placed.id] : 0;
     const powerRate = hasRecipes ? getCraftingStationPowerRate(placed) : 0;
@@ -6127,23 +6253,59 @@ function renderBuildingScrollControls(placed) {
             new Option(`${option.label}（速度${option.speedMultiplier}倍・動力${option.powerMultiplier}倍）`, String(option.speedMultiplier))));
         overclockSelect.value = String(getCraftingOverclock(placed).speedMultiplier);
     }
-    const installedScrollIds = getInstalledCraftingScrollIds(placed.instanceId);
+    const movementScrollRequired = requiresMovementScroll(placed);
+    const assignedScrollId = movementScrollRequired ? getMovementScrollId(placed) : placed.craftingScrollId;
+    const installedScrollIds = getInstalledScrollIds(placed.instanceId);
     const scrolls = getStoredSavedScrolls().filter(scroll => typeof scroll?.id === 'string'
         && isUsableCraftingScroll(scroll)
         && !installedScrollIds.has(scroll.id)
-        && scroll.id !== placed.craftingScrollId);
-    const assignedScroll = getStoredSavedScrolls().find(scroll => scroll.id === placed.craftingScrollId);
+        && scroll.id !== assignedScrollId);
+    const assignedScroll = getStoredSavedScrolls().find(scroll => scroll.id === assignedScrollId);
     if (assignedScroll && isUsableCraftingScroll(assignedScroll)) scrolls.unshift(assignedScroll);
     select.replaceChildren(new Option('スクロールを選択', ''));
     scrolls.forEach(scroll => select.add(new Option(scroll.name || scroll.id, scroll.id)));
-    if (placed.craftingScrollId && !scrolls.some(scroll => scroll.id === placed.craftingScrollId)) {
+    if (assignedScrollId && !scrolls.some(scroll => scroll.id === assignedScrollId)) {
         const label = assignedScroll && isScrollExhausted(assignedScroll)
             ? `${assignedScroll.name || 'スクロール'}（使い切った・回収して写本）`
             : '登録解除されたスクロール';
-        select.add(new Option(label, placed.craftingScrollId));
+        select.add(new Option(label, assignedScrollId));
     }
-    select.value = placed.craftingScrollId || '';
+    select.value = assignedScrollId || '';
+    const scrollLabel = select.labels?.[0];
+    if (scrollLabel) scrollLabel.textContent = movementScrollRequired ? '動作スクロール' : '動力スクロール';
+    if (movementScrollRequired) {
+        select.setAttribute('aria-label', BUILDING_BY_ID.get(placed.id)?.kind === 'locomotive'
+            ? '汽車にセットする動作スクロール' : 'オートマタにセットする動作スクロール');
+    } else select.setAttribute('aria-label', '建物にセットするスクロール');
     updateBuildingScrollStatus(placed);
+}
+
+function renderAutomatonMovementScrollControl(placed) {
+    const select = document.getElementById('automaton-movement-scroll-select');
+    if (!select) return;
+    const assignedScrollId = getMovementScrollId(placed);
+    const installedScrollIds = getInstalledScrollIds(placed.instanceId);
+    const scrolls = getStoredSavedScrolls().filter(scroll => typeof scroll?.id === 'string'
+        && isUsableCraftingScroll(scroll)
+        && (!installedScrollIds.has(scroll.id) || scroll.id === assignedScrollId));
+    if (assignedScrollId && !scrolls.some(scroll => scroll.id === assignedScrollId)) {
+        const assigned = getStoredSavedScrolls().find(scroll => scroll.id === assignedScrollId);
+        scrolls.unshift(assigned || { id: assignedScrollId, name: '登録解除されたスクロール' });
+    }
+    select.replaceChildren(new Option('スクロールを選択', ''));
+    scrolls.forEach(scroll => select.add(new Option(scroll.name || scroll.id, scroll.id)));
+    select.value = assignedScrollId;
+    const status = document.getElementById('automaton-movement-scroll-status');
+    const assigned = getStoredSavedScrolls().find(scroll => scroll.id === assignedScrollId);
+    if (status) {
+        status.textContent = !assignedScrollId
+            ? '動作スクロールをセットすると起動できます。'
+            : hasAssignedMovementScroll(placed)
+                ? `${assigned?.name || 'スクロール'} セット済み / 稼働可能`
+                : assigned && isScrollExhausted(assigned)
+                    ? 'スクロールを使い切りました。別のスクロールをセットしてください。'
+                    : 'セットしたスクロールが使えません。別のスクロールをセットしてください。';
+    }
 }
 
 function toggleBuildingScroll() {
@@ -6321,7 +6483,7 @@ function settleVehicleMovement(placed, vehicle, now) {
 
 function settleCoupledWagonMovements(locomotive, now) {
     for (const wagon of state.buildings) {
-        if (BUILDING_BY_ID.get(wagon.id)?.role !== 'vehicle') continue;
+        if (wagon === locomotive || BUILDING_BY_ID.get(wagon.id)?.role !== 'vehicle') continue;
         const vehicle = getVehicleState(wagon);
         if (vehicle.movement?.locomotiveInstanceId !== locomotive.instanceId) continue;
         settleVehicleMovement(wagon, vehicle, now);
@@ -6339,6 +6501,12 @@ function startSelectedVehicle() {
         vehicle.stopReason = '手動停止';
         vehicle.nextMoveAt = 0;
     } else {
+        if (!hasAssignedMovementScroll(placed)) {
+            vehicle.stopReason = '動作スクロール未設定';
+            showAppNotice('出発前に動作スクロールをセットしてください。');
+            renderVehicleMenu(placed, BUILDING_BY_ID.get(placed.id));
+            return;
+        }
         const rail = getRailAt(placed.x, placed.y);
         if (!rail) {
             vehicle.stopReason = VEHICLE_STOP_MESSAGES['missing-track'];
@@ -6385,11 +6553,21 @@ function tickVehicleRuntime(now) {
     if (!state.map.length) return;
     let changed = false;
     let startedVehicleMotion = false;
+    let stoppedVehicle = false;
     const settledVehicles = new Set();
     const locomotives = state.buildings.filter(placed => BUILDING_BY_ID.get(placed.id)?.kind === 'locomotive');
     for (const placed of locomotives) {
         const vehicle = getVehicleState(placed);
         if (!vehicle.running) continue;
+        if (!hasAssignedMovementScroll(placed)) {
+            vehicle.running = false;
+            vehicle.movement = null;
+            vehicle.stopReason = '動作スクロール未設定';
+            vehicle.nextMoveAt = 0;
+            stoppedVehicle = true;
+            changed = true;
+            continue;
+        }
         const wasMoving = Boolean(vehicle.movement);
         let segmentStartAt = now;
         if (vehicle.movement) {
@@ -6410,6 +6588,7 @@ function tickVehicleRuntime(now) {
             vehicle.running = false;
             vehicle.stopReason = VEHICLE_STOP_MESSAGES[step.error] || '線路を確認してください';
             vehicle.nextMoveAt = 0;
+            stoppedVehicle = true;
             changed = true;
             continue;
         }
@@ -6424,6 +6603,7 @@ function tickVehicleRuntime(now) {
             vehicle.running = false;
             vehicle.stopReason = VEHICLE_STOP_MESSAGES.collision;
             vehicle.nextMoveAt = 0;
+            stoppedVehicle = true;
             if (BUILDING_BY_ID.get(blockingVehicle.id)?.kind === 'locomotive') {
                 const otherVehicle = getVehicleState(blockingVehicle);
                 settleVehicleMovement(blockingVehicle, otherVehicle, now);
@@ -6432,6 +6612,7 @@ function tickVehicleRuntime(now) {
                 otherVehicle.running = false;
                 otherVehicle.stopReason = VEHICLE_STOP_MESSAGES.collision;
                 otherVehicle.nextMoveAt = 0;
+                stoppedVehicle = true;
             }
             changed = true;
             continue;
@@ -6467,14 +6648,26 @@ function tickVehicleRuntime(now) {
         changed = true;
     }
     if (!changed) return;
-    saveBuildings();
-    if (selectedBuildingInstanceId) {
+    const vehicleStillMoving = state.buildings.some(placed => placed.vehicle?.movement);
+    if (stoppedVehicle || !vehicleStillMoving) saveBuildings();
+    if (selectedBuildingInstanceId && (stoppedVehicle || !vehicleStillMoving)) {
         const selected = state.buildings.find(placed => placed.instanceId === selectedBuildingInstanceId);
         if (selected && BUILDING_BY_ID.get(selected.id)?.kind === 'locomotive') renderVehicleMenu(selected, BUILDING_BY_ID.get(selected.id));
     }
     if (startedVehicleMotion || [...settledVehicles].some(placed => !placed.vehicle?.movement)) scheduleDraw();
     if (state.buildings.some(placed => placed.vehicle?.movement)) scheduleVehicleAnimation();
 }
+
+window.addEventListener('pagehide', () => {
+    const now = performance.now();
+    const locomotives = state.buildings.filter(placed => BUILDING_BY_ID.get(placed.id)?.kind === 'locomotive');
+    for (const locomotive of locomotives) {
+        const vehicle = getVehicleState(locomotive);
+        settleVehicleMovement(locomotive, vehicle, now);
+        settleCoupledWagonMovements(locomotive, now);
+    }
+    if (locomotives.some(placed => placed.vehicle?.running || placed.vehicle?.movement)) saveBuildings();
+});
 
 function startBuildingPlacement(buildingId, fromInventory = false) {
     const building = BUILDING_BY_ID.get(buildingId);
@@ -7501,7 +7694,12 @@ document.addEventListener('click', (event) => {
     }
     if (button.dataset.action === 'inspect-scroll') {
         const scroll = getStoredSavedScrolls().find(item => item.id === button.dataset.scrollId);
-        if (scroll) openInventoryItem(scroll.material === 'cloth' ? 'cloth_scroll' : 'paper_scroll', scroll);
+        if (scroll) {
+            const materialType = SCROLL_MATERIAL_BY_TYPE.has(scroll.material)
+                ? scroll.material
+                : SCROLL_MATERIAL_BY_TYPE.has(scroll.scrollType) ? scroll.scrollType : 'paper';
+            openInventoryItem(SCROLL_MATERIAL_BY_TYPE.get(materialType)?.itemId || 'paper_scroll', scroll);
+        }
         return;
     }
     if (button.dataset.action === 'close-inventory-modal') {
@@ -7693,19 +7891,44 @@ document.getElementById('building-scroll-select')?.addEventListener('change', ev
     const placed = state.buildings.find(building => building.instanceId === selectedBuildingInstanceId);
     if (!placed) return;
     const scrollId = event.currentTarget.value;
+    const movementScrollRequired = requiresMovementScroll(placed);
     if (scrollId && !getStoredSavedScrolls().some(scroll =>
         scroll.id === scrollId && isUsableCraftingScroll(scroll)
-        && !getInstalledCraftingScrollIds(placed.instanceId).has(scroll.id))) {
+        && !getInstalledScrollIds(placed.instanceId).has(scroll.id))) {
         event.currentTarget.value = '';
         showAppNotice('未使用の有効な保存スクロールを選択してください。');
         return;
     }
-    if (placed.craftingScrollId !== scrollId) stopScrollIfRunning(placed.craftingScrollId);
-    if (scrollId) placed.craftingScrollId = scrollId;
+    const previousScrollId = movementScrollRequired ? getMovementScrollId(placed) : placed.craftingScrollId;
+    if (previousScrollId !== scrollId) stopScrollIfRunning(previousScrollId);
+    if (movementScrollRequired) setMovementScrollId(placed, scrollId);
+    else if (scrollId) placed.craftingScrollId = scrollId;
     else delete placed.craftingScrollId;
     saveBuildings();
     renderSavedScrolls();
     renderBuildingScrollControls(placed);
+    const kind = BUILDING_BY_ID.get(placed.id)?.kind;
+    if (kind === 'automaton') renderAutomatonMenu(placed);
+    else if (kind === 'locomotive') renderVehicleMenu(placed, BUILDING_BY_ID.get(placed.id));
+});
+document.getElementById('automaton-movement-scroll-select')?.addEventListener('change', event => {
+    const placed = state.buildings.find(building => building.instanceId === selectedBuildingInstanceId
+        && BUILDING_BY_ID.get(building.id)?.kind === 'automaton');
+    if (!placed) return;
+    const scrollId = event.currentTarget.value;
+    if (scrollId && !getStoredSavedScrolls().some(scroll =>
+        scroll.id === scrollId && isUsableCraftingScroll(scroll)
+        && !getInstalledScrollIds(placed.instanceId).has(scroll.id))) {
+        event.currentTarget.value = '';
+        showAppNotice('未使用の有効な保存スクロールを選択してください。');
+        return;
+    }
+    const previousScrollId = getMovementScrollId(placed);
+    if (previousScrollId !== scrollId) stopScrollIfRunning(previousScrollId);
+    setMovementScrollId(placed, scrollId);
+    saveBuildings();
+    renderSavedScrolls();
+    renderAutomatonMenu(placed);
 });
 document.getElementById('building-overclock-select')?.addEventListener('change', event => {
     const placed = state.buildings.find(building => building.instanceId === selectedBuildingInstanceId);
@@ -7838,11 +8061,10 @@ window.addEventListener('message', event => {
             const scrollId = String(event.data.scrollId || '');
             const sourceScroll = getStoredSavedScrolls().find(scroll => scroll.id === scrollId);
             if (!sourceScroll) throw new Error('写本する設計図が見つかりません。');
-            if (state.buildings.some(building => building.craftingScrollId === scrollId)) {
+            if (getInstalledScrollIds().has(scrollId)) {
                 throw new Error('設置中のスクロールは、建物から回収してから写本してください。');
             }
-            const material = event.data.material === 'cloth' ? 'cloth'
-                : event.data.material === 'paper' ? 'paper' : null;
+            const material = SCROLL_MATERIAL_BY_TYPE.get(event.data.material);
             if (!material) throw new Error('写本先の種類を選択してください。');
             if (!Array.isArray(sourceScroll.blueprint?.gears)
                 || sourceScroll.blueprint.gears.filter(gear => gear.isCore).length !== 1) {
@@ -7859,6 +8081,10 @@ window.addEventListener('message', event => {
             if (engineRuntimeState.brass < chargedCost) {
                 throw new Error(`真鍮資材が不足しています（必要 ${chargedCost} / 所持 ${Math.floor(engineRuntimeState.brass)}）。`);
             }
+            const materialCount = Math.floor(Number(engineRuntimeState.materialInventory[material.itemId]) || 0);
+            if (!engineRuntimeState.creativeMode && materialCount < 1) {
+                throw new Error(`${material.label}スクロール素材がありません。合成してから写本してください。`);
+            }
             const library = getStoredSavedScrolls();
             const name = getUniqueScrollName(event.data.name, library);
             const now = Date.now();
@@ -7867,7 +8093,7 @@ window.addEventListener('message', event => {
                 id: `scroll-${now}-${Math.random().toString(16).slice(2, 8)}`,
                 name,
                 createdAt: now,
-                material,
+                material: material.type,
                 usedRotations: 0,
                 effect: JSON.parse(JSON.stringify(sourceScroll.effect || { type: 'custom', label: '未設定', config: {} })),
                 blueprint: JSON.parse(JSON.stringify(sourceScroll.blueprint)),
@@ -7879,9 +8105,18 @@ window.addEventListener('message', event => {
                 library.unshift(copy);
                 localStorage.setItem('fogsgear_scroll_library', JSON.stringify(library));
                 engineRuntimeState.brass -= chargedCost;
+                if (!engineRuntimeState.creativeMode) {
+                    const remaining = materialCount - 1;
+                    if (remaining > 0) engineRuntimeState.materialInventory[material.itemId] = remaining;
+                    else delete engineRuntimeState.materialInventory[material.itemId];
+                }
                 engineRuntimeState.saveGameData();
             } catch (error) {
                 engineRuntimeState.brass = previousBrass;
+                if (!engineRuntimeState.creativeMode) {
+                    if (materialCount > 0) engineRuntimeState.materialInventory[material.itemId] = materialCount;
+                    else delete engineRuntimeState.materialInventory[material.itemId];
+                }
                 if (previousLibrary === null) localStorage.removeItem('fogsgear_scroll_library');
                 else localStorage.setItem('fogsgear_scroll_library', previousLibrary);
                 throw error;
@@ -7910,6 +8145,7 @@ document.getElementById('inventory-item-modal')?.addEventListener('click', (even
 document.getElementById('inventory-discard-confirm-modal')?.addEventListener('click', event => {
     if (event.target.id === 'inventory-discard-confirm-modal') cancelInventoryDiscard();
 });
+document.getElementById('inventory-discard-amount')?.addEventListener('input', updateInventoryDiscardConfirmation);
 
 document.getElementById('recipe-detail-modal')?.addEventListener('click', (event) => {
     if (event.target.id === 'recipe-detail-modal') closeRecipeDetail();
@@ -7937,7 +8173,6 @@ document.getElementById('building-storage-grid')?.addEventListener('click', even
     if (!cell) {
         if (!placed || !definition || !selectedStorageStack) return;
         selectedStorageStack = null;
-        setBuildingStorageAmountOptions(99);
         renderBuildingStorage(placed, definition);
         return;
     }
@@ -7949,7 +8184,6 @@ document.getElementById('building-storage-grid')?.addEventListener('click', even
     const isAlreadySelected = selectedStorageStack?.itemId === itemId && selectedStorageStack.stackIndex === stackIndex;
     if (isAlreadySelected) {
         selectedStorageStack = null;
-        setBuildingStorageAmountOptions(99);
         renderBuildingStorage(placed, definition);
         return;
     }
@@ -7960,16 +8194,12 @@ document.getElementById('building-storage-grid')?.addEventListener('click', even
     itemSelect.value = itemId;
     itemPicker.hidden = true;
     itemPickerButton.setAttribute('aria-expanded', 'false');
-    setBuildingStorageAmountOptions(stackCount, stackCount);
     renderBuildingStorage(placed, definition);
 });
 
 document.getElementById('building-storage-item-button')?.addEventListener('click', () => {
     const picker = document.getElementById('building-storage-item-picker');
     const button = document.getElementById('building-storage-item-button');
-    const amountPicker = document.getElementById('building-storage-amount-popup');
-    amountPicker.hidden = true;
-    document.getElementById('building-storage-amount-button').setAttribute('aria-expanded', 'false');
     picker.hidden = !picker.hidden;
     button.setAttribute('aria-expanded', String(!picker.hidden));
     if (!picker.hidden) {
@@ -7980,32 +8210,36 @@ document.getElementById('building-storage-item-button')?.addEventListener('click
     }
 });
 
-document.getElementById('building-storage-amount-button')?.addEventListener('click', () => {
-    const popup = document.getElementById('building-storage-amount-popup');
-    const button = document.getElementById('building-storage-amount-button');
-    const itemPicker = document.getElementById('building-storage-item-picker');
-    itemPicker.hidden = true;
-    document.getElementById('building-storage-item-button').setAttribute('aria-expanded', 'false');
-    popup.hidden = !popup.hidden;
-    button.setAttribute('aria-expanded', String(!popup.hidden));
-    if (!popup.hidden) {
-        const selected = popup.querySelector('[aria-selected="true"]');
-        if (selected) popup.scrollTop = selected.offsetTop - popup.offsetTop;
+document.getElementById('building-storage-amount-display')?.addEventListener('input', event => {
+    const input = event.currentTarget;
+    const amount = Number(input.value);
+    const transferButton = document.getElementById('building-storage-transfer-button');
+    transferButton.disabled = !Number.isInteger(amount) || amount < 1 || amount > Number(input.max);
+});
+
+document.getElementById('building-storage-amount-display')?.addEventListener('change', event => {
+    const input = event.currentTarget;
+    const maximum = Number(input.max);
+    const amount = Math.floor(Number(input.value));
+    if (Number.isInteger(amount)) {
+        input.value = String(Math.min(maximum, Math.max(1, amount)));
+        input.dispatchEvent(new Event('input', { bubbles: true }));
     }
 });
 
-document.getElementById('building-storage-amount-list')?.addEventListener('click', event => {
-    const option = event.target.closest('.building-storage-amount-option');
-    if (!option) return;
-    const amountSelect = document.getElementById('building-storage-amount');
-    amountSelect.value = option.dataset.amount;
-    document.getElementById('building-storage-amount-value').textContent = amountSelect.value;
-    document.getElementById('building-storage-amount-popup').hidden = true;
-    document.getElementById('building-storage-amount-button').setAttribute('aria-expanded', 'false');
-    document.querySelectorAll('.building-storage-amount-option[aria-selected="true"]').forEach(selected => {
-        selected.setAttribute('aria-selected', 'false');
-    });
-    option.setAttribute('aria-selected', 'true');
+document.addEventListener('click', event => {
+    const stepButton = event.target.closest('.quantity-dial-step');
+    if (!stepButton) return;
+    const input = document.getElementById(stepButton.dataset.quantityTarget);
+    if (!(input instanceof HTMLInputElement) || input.disabled) return;
+    const direction = Number(stepButton.dataset.step);
+    const min = Number(input.min) || 0;
+    const max = Number(input.max);
+    const step = Number(input.step) || 1;
+    const current = Number(input.value) || min;
+    const precision = step < 1 ? 2 : 0;
+    input.value = String(Math.min(max, Math.max(min, Number((current + direction * step).toFixed(precision)))));
+    input.dispatchEvent(new Event('input', { bubbles: true }));
 });
 
 document.getElementById('building-storage-item-search')?.addEventListener('input', () => {
@@ -8021,14 +8255,12 @@ document.getElementById('building-storage-item-list')?.addEventListener('click',
     document.getElementById('building-storage-item').value = option.dataset.itemId;
     document.getElementById('building-storage-item-picker').hidden = true;
     document.getElementById('building-storage-item-button').setAttribute('aria-expanded', 'false');
-    setBuildingStorageAmountOptions(99);
     if (placed && definition) renderBuildingStorage(placed, definition);
 });
 
 document.addEventListener('pointerdown', event => {
     const picker = document.getElementById('building-storage-item-picker');
     const automatonPicker = document.getElementById('automaton-item-picker');
-    const amountPopup = document.getElementById('building-storage-amount-popup');
     if (!(event.target instanceof Element)) return;
     if (picker && !picker.hidden && !event.target.closest('.building-storage-picker')) {
         picker.hidden = true;
@@ -8037,10 +8269,6 @@ document.addEventListener('pointerdown', event => {
     if (automatonPicker && !automatonPicker.hidden && !event.target.closest('.automaton-item-picker')) {
         automatonPicker.hidden = true;
         document.getElementById('automaton-item-button').setAttribute('aria-expanded', 'false');
-    }
-    if (amountPopup && !amountPopup.hidden && !event.target.closest('.building-storage-amount-picker')) {
-        amountPopup.hidden = true;
-        document.getElementById('building-storage-amount-button').setAttribute('aria-expanded', 'false');
     }
 });
 

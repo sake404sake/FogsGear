@@ -47,13 +47,29 @@ export const CRAFTING_ITEMS = [
     ["ecosystem-starter", "生態系スターター", "finished", "培養設備", "保存胞子・堆肥・抽出液から生態系の初期培地を準備する。"],
     ["cloth", "布", "processed", "裁縫台", "麻繊維を織り上げた、布スクロールの基材。"],
     ["paper_scroll", "スクロール（紙）", "finished", "手作業", "ギア設計を記録する紙のスクロール。"],
-    ["cloth_scroll", "スクロール（布）", "finished", "手作業", "ギア設計を記録する布のスクロール。"]
+    ["reinforced_paper_scroll", "スクロール（強化紙）", "finished", "手作業", "樹脂塗料で補強した、耐久100回転の紙スクロール。"],
+    ["cloth_scroll", "スクロール（布）", "finished", "手作業", "ギア設計を記録する布のスクロール。"],
+    ["pressure_cloth_scroll", "スクロール（耐圧布）", "finished", "裁縫台", "青銅細条と樹脂パッキンで補強した、耐久250回転の布スクロール。"],
+    ["alloy_alchemy_cloth_scroll", "スクロール（合金錬成布）", "finished", "錬金作業台", "真鍮板と樹脂塗料で錬成した、耐久500回転の布スクロール。"]
 ];
+
+export const SCROLL_MATERIALS = Object.freeze([
+    { type: 'paper', family: 'paper', label: '紙', itemId: 'paper_scroll', durability: 50 },
+    { type: 'reinforced-paper', family: 'paper', label: '強化紙', itemId: 'reinforced_paper_scroll', durability: 100 },
+    { type: 'cloth', family: 'cloth', label: '布', itemId: 'cloth_scroll', durability: 100 },
+    { type: 'pressure-cloth', family: 'cloth', label: '耐圧布', itemId: 'pressure_cloth_scroll', durability: 250 },
+    { type: 'alloy-alchemy-cloth', family: 'cloth', label: '合金錬成布', itemId: 'alloy_alchemy_cloth_scroll', durability: 500 }
+]);
+export const SCROLL_MATERIAL_BY_TYPE = new Map(SCROLL_MATERIALS.map(material => [material.type, material]));
+export const SCROLL_MATERIAL_BY_ITEM = new Map(SCROLL_MATERIALS.map(material => [material.itemId, material]));
 
 export const CRAFTING_RECIPES = [
     ["forest", "布を織る", [["fiber", 5]], "cloth", "裁縫台", "麻繊維を織り、スクロール用の布を作る。", 1, 45],
     ["forest", "紙スクロールを仕立てる", [["reed-paper", 2]], "paper_scroll", "手作業", "葦紙を巻き、ギア設計用の紙スクロールにする。", 1, 25],
+    ["forest", "強化紙スクロールを仕立てる", [["paper_scroll", 1], ["resin-lacquer", 1]], "reinforced_paper_scroll", "手作業", "紙スクロールに樹脂塗料を塗り、耐久性を高める。", 1, 35],
     ["forest", "布スクロールを仕立てる", [["cloth", 1]], "cloth_scroll", "手作業", "布を巻き、ギア設計用の布スクロールにする。", 1, 25],
+    ["forest", "耐圧布スクロールを仕立てる", [["cloth_scroll", 1], ["bronze-strip", 2], ["resin-gasket", 1]], "pressure_cloth_scroll", "裁縫台", "布スクロールに青銅細条と樹脂パッキンを縫い込み、耐圧性を高める。", 1, 65],
+    ["machine", "合金錬成布スクロールを仕立てる", [["pressure_cloth_scroll", 1], ["brass-sheet", 2], ["resin-lacquer", 2]], "alloy_alchemy_cloth_scroll", "錬金作業台", "耐圧布に真鍮板と樹脂塗料を錬成し、長期運転に耐える芯材を加える。", 1, 110],
     ["forest", "木材を板に挽く", [["wood", 10], ["water", 5]], "lumber", "木工作業台", "初期の工作材を確保する。", 2, 40], ["forest", "板を防水する", [["lumber", 5], ["resin", 5]], "sealed-board", "木工作業台", "霧・湿地で使う構造材。", 1, 35], ["smelting", "鉄を製錬する", [["iron-ore", 10], ["coal", 5]], "iron-ingot", "炉", "ねじや鋼材の基礎。", 2, 75], ["smelting", "銅精鉱を製錬する", [["copper-concentrate", 5], ["coal", 5]], "copper-ingot", "炉", "合金や導管の基礎。", 2, 70],     ["smelting", "亜鉛精鉱を製錬する", [["zinc-concentrate", 5], ["coal", 5]], "zinc-ingot", "炉", "真鍮の副成分。", 2, 70],
     ["terraforming", "気候制御核を組み立てる", [["relic-core", 1], ["navigation-crystal", 3], ["crystal-shard", 5], ["glass-lens", 2], ["pressure-diaphragm", 2]], "climate-control-core", "階差演算台", "古代遺物の情報を気候制御用の計算機構へ変換する。", 1, 180],
     ["terraforming", "閉鎖循環ユニットを組み立てる", [["filter-cartridge", 4], ["ceramic-barrier", 3], ["copper-capillary", 4], ["pressure-case", 2], ["resin-gasket", 4]], "closed-loop-unit", "浄化設備", "濾過・耐熱・導管部品をまとめ、ドームの循環系を構成する。", 1, 180],

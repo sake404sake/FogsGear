@@ -120,7 +120,7 @@ export class UIController {
                     } catch (error) {}
                     this.showNotice(`「${result.name}」として保存しました。`);
                 } else {
-                    this.showNotice('保存名を入力してください。');
+                    this.showNotice(this.state.lastScrollSaveError || '保存名を入力してください。');
                 }
             } else if (button.dataset.action === 'delete-gear') {
                 const gear = this.gearManager.findGearById(this.state.selectedGearId);

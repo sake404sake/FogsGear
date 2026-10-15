@@ -1,4 +1,5 @@
 import { GearNetwork } from './GearSystem.js?v=network-8';
+import { SCROLL_MATERIALS, SCROLL_MATERIAL_BY_TYPE } from '../../MapSystem/js/craftingData.js?v=19';
 import { ACTIVE_SCROLL_TARGETS_KEY, CELL_MATERIALS, TERRAIN_TRANSFORM_RECIPES, WORLD_CELL_TYPES } from '../../MapSystem/js/worldCells.js?v=12';
 
 const ACTIVE_SCROLL_SYNC_STATE_KEY = 'fogsgear_active_scroll_sync_state';
@@ -15,12 +16,18 @@ const INITIAL_MATERIAL_INVENTORY = Object.freeze({ paper_scroll: 10, cloth_scrol
 const MATERIAL_INVENTORY_VERSION = 4;
 const MATERIAL_INVENTORY_SLOT_LIMIT = 30;
 const LEGACY_INITIAL_MATERIAL_INVENTORY = Object.freeze({ 'iron-screw': 12, 'pressure-gauge': 1 });
-const SCROLL_DURABILITY_LIMITS = Object.freeze({ paper: 50, cloth: 100 });
 let gameProgressResetInProgress = false;
 
 function getScrollDurabilityLimit(scroll) {
-    const material = scroll?.material === 'cloth' || scroll?.scrollType === 'cloth' ? 'cloth' : 'paper';
-    return SCROLL_DURABILITY_LIMITS[material];
+    const materialType = normalizeScrollMaterialType(scroll?.material || scroll?.scrollType);
+    return SCROLL_MATERIAL_BY_TYPE.get(materialType)?.durability
+        || SCROLL_MATERIAL_BY_TYPE.get('paper').durability;
+}
+
+function normalizeScrollMaterialType(value) {
+    if (SCROLL_MATERIAL_BY_TYPE.has(value)) return value;
+    if (value === 'fabric') return 'cloth';
+    return 'paper';
 }
 
 function getScrollUsedRotations(scroll) {
@@ -715,7 +722,7 @@ export class GameState {
     }
 
     getScrollDraftKey(material) {
-        return `fogsgear_scroll_draft_${material === 'cloth' ? 'cloth' : 'paper'}`;
+        return `fogsgear_scroll_draft_${normalizeScrollMaterialType(material)}`;
     }
 
     isGameProgressEpochCurrent() {
@@ -732,13 +739,13 @@ export class GameState {
     loadScrollEditorSession(createGear) {
         const params = new URLSearchParams(window.location.search);
         const editId = params.get('editScroll');
-        const requestedMaterial = params.get('newScroll') === 'cloth' ? 'cloth' : 'paper';
+        const requestedMaterial = normalizeScrollMaterialType(params.get('newScroll'));
         const library = this.getNamedScrollLibrary();
         const savedScroll = editId ? library.find(scroll => scroll.id === editId) : null;
         this.currentScrollId = savedScroll?.id || null;
-        this.currentScrollMaterial = savedScroll?.material === 'cloth' || savedScroll?.scrollType === 'cloth'
-            ? 'cloth'
-            : savedScroll ? 'paper' : params.has('newScroll') ? requestedMaterial : null;
+        this.currentScrollMaterial = savedScroll
+            ? normalizeScrollMaterialType(savedScroll.material || savedScroll.scrollType)
+            : params.has('newScroll') ? requestedMaterial : null;
         this.isScrollEditing = Boolean(this.currentScrollMaterial);
         if (!this.isScrollEditing) return;
         this.runtimeGears = this.placedGears;
@@ -783,6 +790,15 @@ export class GameState {
         if (!this.isGameProgressEpochCurrent()) return null;
         const trimmedName = String(name || '').trim();
         if (!trimmedName) return null;
+        this.lastScrollSaveError = '';
+        const scrollMaterial = SCROLL_MATERIAL_BY_TYPE.get(normalizeScrollMaterialType(this.currentScrollMaterial))
+            || SCROLL_MATERIALS[0];
+        const consumesMaterial = !this.currentScrollId && !this.creativeMode;
+        const materialCount = Math.floor(Number(this.materialInventory[scrollMaterial.itemId]) || 0);
+        if (consumesMaterial && materialCount < 1) {
+            this.lastScrollSaveError = `${scrollMaterial.label}スクロール素材がありません。合成してから保存してください。`;
+            return null;
+        }
         const library = this.getNamedScrollLibrary();
         const now = Date.now();
         const finalBlueprint = blueprint || this.getScrollBlueprint();
@@ -804,7 +820,7 @@ export class GameState {
                 config: effectConfig
             },
             blueprint: finalBlueprint,
-            material: this.currentScrollMaterial || 'paper',
+            material: scrollMaterial.type,
             metadata: {
                 source: 'gear-editor',
                 version: 1
@@ -823,7 +839,13 @@ export class GameState {
         } else {
             library.unshift(entry);
         }
+        if (consumesMaterial) {
+            const remaining = materialCount - 1;
+            if (remaining > 0) this.materialInventory[scrollMaterial.itemId] = remaining;
+            else delete this.materialInventory[scrollMaterial.itemId];
+        }
         localStorage.setItem('fogsgear_scroll_library', JSON.stringify(library));
+        if (consumesMaterial) this.saveGameData();
         this.currentScrollId = library[index >= 0 ? index : 0]?.id || entry.id;
         localStorage.removeItem(this.getScrollDraftKey(this.currentScrollMaterial));
         return entry;

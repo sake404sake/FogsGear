@@ -505,7 +505,7 @@ h1 {
 .building-storage-cell:active { transform: translateY(1px); }
 .building-storage-cell .inventory-item-icon { width: 100%; height: 100%; }
 .building-storage-cell-count { position: absolute; right: 2px; bottom: 1px; padding: 1px 3px; color: #ffe69a; border-radius: 3px; background: rgba(18, 14, 12, .92); font: 700 .62rem/1.15 monospace; }
-.building-storage-transfer-fields { display: grid; grid-template-columns: minmax(0, 1fr) 42px 62px; align-items: center; gap: 4px; width: 100%; min-width: 0; box-sizing: border-box; margin-top: 2px; padding: 7px 0 0; border-top: 1px solid rgba(198, 154, 82, .2); }
+.building-storage-transfer-fields { display: grid; grid-template-columns: minmax(0, 1fr) 84px 62px; align-items: center; gap: 4px; width: 100%; min-width: 0; box-sizing: border-box; margin-top: 2px; padding: 7px 0 0; border-top: 1px solid rgba(198, 154, 82, .2); }
 .building-storage-picker { position: relative; min-width: 0; }
 .building-storage-item-button { display: grid; grid-template-columns: 18px minmax(0, 1fr) 8px; align-items: center; gap: 3px; min-width: 0; width: 100%; min-height: 32px; padding: 2px 4px; color: #f1e7d4; border: 1px solid rgba(198, 154, 82, .34); border-radius: 5px; background: linear-gradient(145deg, rgba(55, 44, 32, .92), rgba(22, 19, 16, .96)); text-align: left; font-size: .7rem; cursor: pointer; }
 .building-storage-item-button #building-storage-item-name, .building-storage-item-button #automaton-item-name { display: block; min-width: 0; overflow: visible; white-space: nowrap; }
@@ -522,16 +522,18 @@ h1 {
 .building-storage-item-option > .inventory-item-icon, .building-storage-item-option > .inventory-item-icon svg { width: 20px; height: 20px; }
 .building-storage-item-option-name { min-width: 0; overflow: hidden; font-size: .68rem; line-height: 1.15; text-overflow: ellipsis; white-space: nowrap; }
 .building-storage-item-option-count { color: #d9bf7d; font: .62rem monospace; white-space: nowrap; }
-.building-storage-amount-picker { position: relative; min-width: 0; }
-.building-storage-amount { display: flex; align-items: center; justify-content: center; gap: 4px; min-width: 0; width: 100%; min-height: 32px; padding: 3px 4px; box-sizing: border-box; color: #f1e7d4; border: 1px solid rgba(198, 154, 82, .42); border-radius: 4px; background: linear-gradient(145deg, rgba(55, 44, 32, .92), rgba(22, 19, 16, .96)); font: 600 .78rem/1 system-ui, sans-serif; text-align: center; cursor: pointer; }
-.building-storage-amount > span:last-child { color: #d6bd7f; font-size: .62rem; }
-.building-storage-amount-popup { position: absolute; z-index: 8; top: calc(100% + 4px); right: 0; width: 100%; max-height: min(22dvh, 150px); overflow-y: auto; overscroll-behavior: contain; padding: 3px; box-sizing: border-box; border: 1px solid rgba(198, 154, 82, .5); border-radius: 5px; background: rgba(20, 17, 14, .99); box-shadow: 0 6px 18px rgba(0, 0, 0, .65); }
-.building-storage-amount-popup[hidden] { display: none; }
-.building-storage-amount-list { display: grid; gap: 2px; }
-.building-storage-amount-option { min-height: 26px; padding: 3px 5px; color: #f1e7d4; border: 1px solid transparent; border-radius: 3px; background: transparent; font: 600 .76rem/1 system-ui, sans-serif; text-align: center; cursor: pointer; }
-.building-storage-amount-option:hover, .building-storage-amount-option[aria-selected="true"] { color: #ffe69a; border-color: rgba(198, 154, 82, .42); background: rgba(122, 91, 43, .34); }
-.building-storage-amount-option:focus-visible { outline: 1px solid #c5a059; }
-.building-storage-amount:focus { border-color: #c5a059; outline: 1px solid rgba(197, 160, 89, .22); }
+.building-storage-item-empty { padding: 8px 5px; color: #b9aa8a; font-size: .68rem; text-align: center; }
+.building-storage-item-button:disabled, .quantity-dial button:disabled, .quantity-dial-input:disabled, .building-storage-transfer-fields > button:disabled { opacity: .45; cursor: not-allowed; }
+.building-storage-amount-picker { min-width: 0; }
+.quantity-dial { display: grid; grid-template-columns: minmax(0, 1fr) 23px; grid-template-rows: repeat(2, minmax(16px, 1fr)); align-items: stretch; gap: 2px; min-width: 0; }
+.quantity-dial-step { display: grid; place-items: center; min-width: 23px; min-height: 16px; padding: 0; color: #f0d58c; border: 1px solid rgba(198, 154, 82, .48); border-radius: 3px; background: linear-gradient(180deg, rgba(88, 67, 38, .94), rgba(36, 28, 21, .98)); font: 700 .55rem/1 system-ui, sans-serif; cursor: pointer; text-shadow: 0 1px 2px #000; }
+.quantity-dial-step[data-step="-1"] { grid-column: 2; grid-row: 2; }
+.quantity-dial-step[data-step="1"] { grid-column: 2; grid-row: 1; }
+.quantity-dial-step:hover:not(:disabled) { color: #fff0bd; border-color: #e9bf62; background: linear-gradient(180deg, rgba(135, 98, 43, .98), rgba(58, 43, 26, .98)); }
+.quantity-dial-input { grid-column: 1; grid-row: 1 / span 2; width: 100%; min-width: 0; min-height: 35px; box-sizing: border-box; padding: 3px 4px; color: #f1e7d4; border: 1px solid rgba(198, 154, 82, .52); border-radius: 4px; background: linear-gradient(145deg, rgba(55, 44, 32, .96), rgba(22, 19, 16, .98)); font: 600 .84rem/1 monospace; text-align: center; }
+.quantity-dial-input:focus { border-color: #e3bd68; outline: 1px solid rgba(243, 198, 83, .28); }
+.quantity-dial-input::-webkit-inner-spin-button, .quantity-dial-input::-webkit-outer-spin-button { margin: 0; appearance: none; }
+.quantity-dial-input { appearance: textfield; }
 .building-storage-controls input { min-width: 0; width: 100%; box-sizing: border-box; min-height: 38px; padding: 4px; color: #f1e7d4; border: 1px solid rgba(198, 154, 82, .3); border-radius: 4px; background: rgba(12, 11, 10, .82); font-size: .82rem; }
 .building-storage-controls input:focus { border-color: #c5a059; outline: 1px solid rgba(197, 160, 89, .22); }
 .building-storage-transfer-fields > button { width: 100%; min-width: 0; min-height: 32px; padding: 3px 2px; box-sizing: border-box; color: #e8d7ad; border-color: rgba(198, 154, 82, .32); background: linear-gradient(180deg, rgba(73, 56, 34, .58), rgba(31, 25, 20, .9)); font-size: .76rem; white-space: nowrap; }
@@ -713,6 +715,9 @@ body.guide-item-detail-open #recipe-detail-modal { z-index: 1300; }
 .inventory-modal-discard[hidden] { display: none; }
 .inventory-modal-discard:hover { color: #ffd7cb; background: rgba(137, 55, 39, .55); border-color: rgba(213, 104, 82, .85); }
 .inventory-modal-discard svg { width: 100%; height: 100%; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.inventory-discard-quantity { display: grid; gap: 5px; width: min(100%, 240px); margin: 12px auto 0; color: #d8c9a4; font-size: .75rem; text-align: left; }
+.inventory-discard-quantity .quantity-dial { width: min(100%, 180px); }
+.inventory-discard-quantity .quantity-dial-input { min-height: 38px; padding: 6px 8px; font: 600 .9rem monospace; }
 .inventory-modal-icon { display: grid; place-items: center; width: 54px; height: 54px; margin: 0 auto 7px; color: #f3c653; background: radial-gradient(circle, rgba(243, 198, 83, 0.2), rgba(98, 194, 170, 0.06)); border: 1px solid rgba(243, 198, 83, 0.55); border-radius: 6px; font-size: 1.8rem; }
 .inventory-modal-icon img { width: 100%; height: 100%; object-fit: contain; }
 .inventory-modal-kicker { color: #a7f0d9; font: 0.58rem monospace; letter-spacing: 1.5px; }
@@ -970,7 +975,7 @@ body.guide-item-detail-open #recipe-detail-modal { z-index: 1300; }
 
 .engine-runtime-canvas { position: fixed; left: -10000px; top: -10000px; width: 1px; height: 1px; pointer-events: none; opacity: 0; }
 .vehicle-animation-layer { position: absolute; inset: 0; z-index: 2; overflow: hidden; pointer-events: none; }
-.vehicle-motion-sprite { position: absolute; left: 0; top: 0; display: block; image-rendering: auto; will-change: transform; }
+.vehicle-animation-canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 .scroll-stand-magic-circle { position: absolute; left: 0; top: 0; overflow: visible; opacity: .92; pointer-events: none; will-change: transform; }
 .scroll-stand-magic-gear { transform-box: fill-box; transform-origin: center; animation: scroll-stand-gear-spin 18s linear infinite, scroll-stand-magic-pulse 2.4s ease-in-out infinite alternate; }
 .scroll-stand-magic-orbit { transform-box: fill-box; transform-origin: center; animation: scroll-stand-gear-spin 32s linear infinite reverse; }
