@@ -35,6 +35,7 @@ let buildingDrawOrderCacheRevision = -1;
 let orderedBuildingDrawCache = [];
 const AUTOMATON_TRANSPORT_STEP_DURATION_MS = 300;
 const AUTOMATON_SPEED_MULTIPLIERS = [1, 1.25, 1.5, 2, 3];
+const TRAIN_BASE_POWER_PER_CELL = 1;
 const AUTOMATON_CARRY_MULTIPLIERS = [1, 2, 3, 5, 10];
 let automatonSkinPreview = null;
 let automatonPreviewSource = '';
@@ -4668,8 +4669,8 @@ function getVehicleState(placed) {
     };
     placed.vehicle.speedMultiplier = Math.max(1, Math.min(3, Number(placed.vehicle.speedMultiplier) || 1));
     placed.vehicle.maxWagons = Math.max(0, Math.min(32, Math.floor(Number(placed.vehicle.maxWagons) || 0)));
-    placed.vehicle.powerPerCell = Math.max(0, Math.min(1000, Number(placed.vehicle.powerPerCell) || 0));
-    placed.vehicle.powerWagonExponent = Math.max(1, Math.min(4, Number(placed.vehicle.powerWagonExponent) || 2));
+    delete placed.vehicle.powerPerCell;
+    delete placed.vehicle.powerWagonExponent;
     return placed.vehicle;
 }
 
@@ -4790,7 +4791,9 @@ function getAutomatonActionDuration(automaton, baseDuration) {
 }
 
 function getTrainPowerPerCell(vehicle, wagonCount) {
-    return vehicle.powerPerCell * Math.pow(wagonCount + 1, vehicle.powerWagonExponent);
+    const consistSize = Math.max(1, wagonCount + 1);
+    const speedMultiplier = Math.max(1, Number(vehicle.speedMultiplier) || 1);
+    return TRAIN_BASE_POWER_PER_CELL * speedMultiplier * consistSize * consistSize;
 }
 
 function getRailAt(x, y) {
@@ -6133,14 +6136,11 @@ function renderVehicleMenu(placed, definition) {
         return;
     }
     const vehicle = getVehicleState(placed);
+    renderVehicleMovementScrollControl(placed);
     const speedSelect = document.getElementById('vehicle-speed-multiplier');
     const maxWagonsInput = document.getElementById('vehicle-max-wagons');
-    const powerPerCellInput = document.getElementById('vehicle-power-per-cell');
-    const powerExponentInput = document.getElementById('vehicle-power-wagon-exponent');
     if (speedSelect) speedSelect.value = String(vehicle.speedMultiplier);
     if (maxWagonsInput) maxWagonsInput.value = String(vehicle.maxWagons);
-    if (powerPerCellInput) powerPerCellInput.value = String(vehicle.powerPerCell);
-    if (powerExponentInput) powerExponentInput.value = String(vehicle.powerWagonExponent);
     const firstStep = vehicle.running ? null : getVehicleNextStep(placed, { ...vehicle, previousRail: null });
     const coupledWagonCount = getConnectedWagonCount(placed, vehicle, firstStep);
     const segmentPower = getTrainPowerPerCell(vehicle, coupledWagonCount);
@@ -6181,7 +6181,40 @@ function renderVehicleMenu(placed, definition) {
     if (resourceSettings) resourceSettings.textContent =
         `速度：${formatUtilityAmount(vehicle.speedCellsPerSecond * vehicle.speedMultiplier)}マス / 秒` +
         ` / 連結貨車 ${coupledWagonCount}/${vehicle.maxWagons}台` +
-        ` / 消費動力 ${engineRuntimeState.creativeMode ? 'なし' : `${formatUtilityAmount(segmentPower)} / マス`}`;
+        ` / 消費動力 ${engineRuntimeState.creativeMode ? 'なし' : `${formatUtilityAmount(segmentPower)} / マス（実連結数・速度倍率で増加）`}`;
+}
+
+function renderVehicleMovementScrollControl(placed) {
+    const select = document.getElementById('vehicle-movement-scroll-select');
+    if (!select) return;
+    const assignedScrollId = getMovementScrollId(placed);
+    const installedScrollIds = getInstalledScrollIds(placed.instanceId);
+    const scrolls = getStoredSavedScrolls().filter(scroll => typeof scroll?.id === 'string'
+        && isUsableCraftingScroll(scroll)
+        && (!installedScrollIds.has(scroll.id) || scroll.id === assignedScrollId));
+    if (assignedScrollId && !scrolls.some(scroll => scroll.id === assignedScrollId)) {
+        const assigned = getStoredSavedScrolls().find(scroll => scroll.id === assignedScrollId);
+        scrolls.unshift(assigned || { id: assignedScrollId, name: '登録解除されたスクロール' });
+    }
+    select.replaceChildren(new Option('スクロールを選択', ''));
+    scrolls.forEach(scroll => select.add(new Option(scroll.name || scroll.id, scroll.id)));
+    select.value = assignedScrollId;
+    const assigned = getStoredSavedScrolls().find(scroll => scroll.id === assignedScrollId);
+    updateScrollPreviewElements(assigned || null, 'vehicle-scroll-preview', 'vehicle-scroll-preview-frame');
+    updateBuildingScrollToggle(
+        hasAssignedMovementScroll(placed) ? assigned : null,
+        'vehicle-scroll-toggle'
+    );
+    const status = document.getElementById('vehicle-movement-scroll-status');
+    if (status) {
+        status.textContent = !assignedScrollId
+            ? '動作スクロールをセットすると起動できます。'
+            : hasAssignedMovementScroll(placed)
+                ? `${assigned?.name || 'スクロール'} セット済み / ${getActiveScrollIds().includes(assignedScrollId) ? '稼働中' : '停止中'}`
+                : assigned && isScrollExhausted(assigned)
+                    ? 'スクロールを使い切りました。別のスクロールをセットしてください。'
+                    : 'セットしたスクロールが使えません。別のスクロールをセットしてください。';
+    }
 }
 
 function changeVehicleSetting(setting, value) {
@@ -6197,10 +6230,6 @@ function changeVehicleSetting(setting, value) {
         vehicle.speedMultiplier = AUTOMATON_SPEED_MULTIPLIERS.includes(numericValue) ? numericValue : 1;
     } else if (setting === 'maxWagons') {
         vehicle.maxWagons = Math.max(0, Math.min(32, Math.floor(numericValue)));
-    } else if (setting === 'powerPerCell') {
-        vehicle.powerPerCell = Math.max(0, Math.min(1000, numericValue));
-    } else if (setting === 'powerWagonExponent') {
-        vehicle.powerWagonExponent = Math.max(1, Math.min(4, numericValue));
     }
     saveBuildings();
     renderVehicleMenu(placed, BUILDING_BY_ID.get(placed.id));
@@ -6228,29 +6257,44 @@ function updateBuildingScrollStatus(placed) {
     if (!controls || !select || !status) return;
     const hasRecipes = Boolean(placed && getCraftingRecipesForBuilding(placed.id).length);
     const canInstallScroll = canInstallScrollInBuilding(placed);
-    controls.hidden = !canInstallScroll;
+    const isLocomotive = BUILDING_BY_ID.get(placed?.id)?.kind === 'locomotive';
+    controls.hidden = !canInstallScroll || isLocomotive;
     const overclockControl = document.getElementById('building-overclock-control');
     if (overclockControl) overclockControl.hidden = !hasRecipes;
     if (!canInstallScroll) return;
-    const toggle = document.getElementById('building-scroll-toggle');
     const movementScrollRequired = requiresMovementScroll(placed);
-    if (toggle) toggle.hidden = movementScrollRequired;
+    const toggle = document.getElementById('building-scroll-toggle');
+    if (toggle) toggle.hidden = false;
     if (movementScrollRequired) {
         const scrollId = getMovementScrollId(placed);
         const selectedScroll = getStoredSavedScrolls().find(scroll => scroll.id === scrollId);
         updateBuildingScrollPreview(
             BUILDING_BY_ID.get(placed.id)?.kind === 'locomotive' ? selectedScroll || null : null
         );
-        updateBuildingScrollToggle(null);
+        const assigned = hasAssignedMovementScroll(placed);
+        updateBuildingScrollToggle(assigned ? selectedScroll : null);
+        if (BUILDING_BY_ID.get(placed.id)?.kind === 'locomotive') {
+            updateScrollPreviewElements(selectedScroll || null, 'vehicle-scroll-preview', 'vehicle-scroll-preview-frame');
+            updateBuildingScrollToggle(assigned ? selectedScroll : null, 'vehicle-scroll-toggle');
+            const vehicleStatus = document.getElementById('vehicle-movement-scroll-status');
+            if (vehicleStatus) {
+                vehicleStatus.textContent = !scrollId
+                    ? '動作スクロールをセットすると起動できます。'
+                    : assigned
+                        ? `${selectedScroll?.name || 'スクロール'} セット済み / ${getActiveScrollIds().includes(scrollId) ? '稼働中' : '停止中'}`
+                        : selectedScroll && isScrollExhausted(selectedScroll)
+                            ? 'スクロールを使い切りました。別のスクロールをセットしてください。'
+                            : 'セットしたスクロールが使えません。別のスクロールをセットしてください。';
+            }
+        }
         if (!scrollId) status.textContent = '動作スクロール未設定。セットすると運転できます。';
         else if (!hasAssignedMovementScroll(placed)) {
             status.textContent = selectedScroll && isScrollExhausted(selectedScroll)
                 ? `${selectedScroll.name || 'スクロール'} は使い切りました。別のスクロールをセットしてください。`
                 : 'セットしたスクロールが使えません。別のスクロールをセットしてください。';
-        } else status.textContent = `${selectedScroll.name || 'スクロール'} セット済み / 運転可能`;
+        } else status.textContent = `${selectedScroll.name || 'スクロール'} セット済み / ${getActiveScrollIds().includes(scrollId) ? '稼働中' : '停止中'} / 運転可能`;
         return;
     }
-    if (toggle) toggle.hidden = false;
     const overclock = getCraftingOverclock(placed);
     const basePowerRate = hasRecipes ? CRAFTING_STATION_POWER_RATES[placed.id] : 0;
     const powerRate = hasRecipes ? getCraftingStationPowerRate(placed) : 0;
@@ -6310,8 +6354,9 @@ function stopPlayerTargetedScrolls(playerMoved = false) {
     const stoppedIds = [...activeIds].filter(scrollId => {
         const target = targets[scrollId];
         const anchoredBuilding = state.buildings.find(building => building.instanceId === target?.buildingInstanceId
-            && building.craftingScrollId === scrollId);
-        return !supportsStationaryScrolls(anchoredBuilding)
+            && (supportsStationaryScrolls(building) && building.craftingScrollId === scrollId
+                || requiresMovementScroll(building) && getMovementScrollId(building) === scrollId));
+        return !anchoredBuilding
             && (playerMoved || target?.x !== state.player.x || target?.y !== state.player.y);
     });
     if (!stoppedIds.length) return;
@@ -6328,8 +6373,8 @@ function stopPlayerTargetedScrolls(playerMoved = false) {
     if (selectedBuilding) updateBuildingScrollStatus(selectedBuilding);
 }
 
-function updateBuildingScrollToggle(scroll) {
-    const button = document.getElementById('building-scroll-toggle');
+function updateBuildingScrollToggle(scroll, buttonId = 'building-scroll-toggle') {
+    const button = document.getElementById(buttonId);
     if (!button) return;
     const isRunning = Boolean(scroll && getActiveScrollIds().includes(scroll.id));
     button.textContent = isRunning ? 'スクロールを停止' : 'スクロールを起動';
@@ -6378,7 +6423,8 @@ function renderBuildingScrollControls(placed) {
     if (!controls || !select) return;
     const hasRecipes = Boolean(getCraftingRecipesForBuilding(placed.id).length);
     const canInstallScroll = canInstallScrollInBuilding(placed);
-    controls.hidden = !canInstallScroll;
+    const isLocomotive = BUILDING_BY_ID.get(placed.id)?.kind === 'locomotive';
+    controls.hidden = !canInstallScroll || isLocomotive;
     const overclockControl = document.getElementById('building-overclock-control');
     if (overclockControl) overclockControl.hidden = !hasRecipes;
     if (!canInstallScroll) return;
@@ -6424,7 +6470,6 @@ function renderAutomatonMovementScrollControl(placed) {
         && (!installedScrollIds.has(scroll.id) || scroll.id === assignedScrollId));
     if (assignedScrollId && !scrolls.some(scroll => scroll.id === assignedScrollId)) {
         const assigned = getStoredSavedScrolls().find(scroll => scroll.id === assignedScrollId);
-        updateAutomatonScrollPreview(assigned || null);
         scrolls.unshift(assigned || { id: assignedScrollId, name: '登録解除されたスクロール' });
     }
     select.replaceChildren(new Option('スクロールを選択', ''));
@@ -6432,11 +6477,14 @@ function renderAutomatonMovementScrollControl(placed) {
     select.value = assignedScrollId;
     const status = document.getElementById('automaton-movement-scroll-status');
     const assigned = getStoredSavedScrolls().find(scroll => scroll.id === assignedScrollId);
+    updateAutomatonScrollPreview(assigned || null);
+    const movementScrollAssigned = hasAssignedMovementScroll(placed);
+    updateBuildingScrollToggle(movementScrollAssigned ? assigned : null, 'automaton-scroll-toggle');
     if (status) {
         status.textContent = !assignedScrollId
             ? '動作スクロールをセットすると起動できます。'
             : hasAssignedMovementScroll(placed)
-                ? `${assigned?.name || 'スクロール'} セット済み / 稼働可能`
+                ? `${assigned?.name || 'スクロール'} セット済み / ${getActiveScrollIds().includes(assignedScrollId) ? '稼働中' : '停止中'} / 稼働可能`
                 : assigned && isScrollExhausted(assigned)
                     ? 'スクロールを使い切りました。別のスクロールをセットしてください。'
                     : 'セットしたスクロールが使えません。別のスクロールをセットしてください。';
@@ -6445,8 +6493,10 @@ function renderAutomatonMovementScrollControl(placed) {
 
 function toggleBuildingScroll() {
     const placed = state.buildings.find(building => building.instanceId === selectedBuildingInstanceId);
-    if (!canInstallScrollInBuilding(placed) || !hasAssignedCraftingScroll(placed)) return;
-    const scrollId = placed.craftingScrollId;
+    if (!canInstallScrollInBuilding(placed)) return;
+    const movementScrollRequired = requiresMovementScroll(placed);
+    if (movementScrollRequired ? !hasAssignedMovementScroll(placed) : !hasAssignedCraftingScroll(placed)) return;
+    const scrollId = movementScrollRequired ? getMovementScrollId(placed) : placed.craftingScrollId;
     const activeIds = new Set(getActiveScrollIds());
     const targets = (() => {
         try {
@@ -6464,7 +6514,7 @@ function toggleBuildingScroll() {
             showAppNotice('蒸気動力がないためスクロールを起動できません。');
             return;
         }
-        targets[scrollId] = supportsStationaryScrolls(placed)
+        targets[scrollId] = supportsStationaryScrolls(placed) || movementScrollRequired
             ? { x: placed.x, y: placed.y, buildingInstanceId: placed.instanceId, startedAt: Date.now() }
             : { x: state.player.x, y: state.player.y, startedAt: Date.now() };
         activeIds.add(scrollId);
@@ -6480,7 +6530,9 @@ function toggleBuildingScroll() {
     localStorage.removeItem('fogsgear_active_scroll_running');
     localStorage.setItem(ACTIVE_SCROLL_TARGETS_KEY, JSON.stringify(targets));
     refreshActiveScrollTargets(targets);
-    updateBuildingScrollStatus(placed);
+    if (BUILDING_BY_ID.get(placed.id)?.kind === 'automaton') renderAutomatonMovementScrollControl(placed);
+    else if (BUILDING_BY_ID.get(placed.id)?.kind === 'locomotive') renderVehicleMovementScrollControl(placed);
+    else updateBuildingScrollStatus(placed);
 }
 
 function stopScrollIfRunning(scrollId) {
@@ -7060,6 +7112,7 @@ function demolishSelectedBuilding() {
     }
     const historyBefore = captureBuildingHistoryState();
     stopScrollIfRunning(placed.craftingScrollId);
+    stopScrollIfRunning(getMovementScrollId(placed));
     state.buildings.splice(index, 1);
     refunds.forEach(({ itemId, amount }) => {
         const resourceKey = { water: 'water', fog: 'fog', power: 'power', steam_power: 'steamPower' }[itemId];
@@ -7929,9 +7982,7 @@ document.addEventListener('click', (event) => {
 
 [
     ['vehicle-speed-multiplier', 'speedMultiplier'],
-    ['vehicle-max-wagons', 'maxWagons'],
-    ['vehicle-power-per-cell', 'powerPerCell'],
-    ['vehicle-power-wagon-exponent', 'powerWagonExponent']
+    ['vehicle-max-wagons', 'maxWagons']
 ].forEach(([id, setting]) => {
     document.getElementById(id)?.addEventListener('change', event =>
         changeVehicleSetting(setting, event.currentTarget.value));
@@ -8081,6 +8132,26 @@ document.getElementById('building-scroll-select')?.addEventListener('change', ev
     if (kind === 'automaton') renderAutomatonMenu(placed);
     else if (kind === 'locomotive') renderVehicleMenu(placed, BUILDING_BY_ID.get(placed.id));
 });
+document.getElementById('vehicle-movement-scroll-select')?.addEventListener('change', event => {
+    const placed = state.buildings.find(building => building.instanceId === selectedBuildingInstanceId
+        && BUILDING_BY_ID.get(building.id)?.kind === 'locomotive');
+    if (!placed) return;
+    const scrollId = event.currentTarget.value;
+    if (scrollId && !getStoredSavedScrolls().some(scroll =>
+        scroll.id === scrollId && isUsableCraftingScroll(scroll)
+        && !getInstalledScrollIds(placed.instanceId).has(scroll.id))) {
+        event.currentTarget.value = getMovementScrollId(placed);
+        showAppNotice('未使用の有効な保存スクロールを選択してください。');
+        return;
+    }
+    const previousScrollId = getMovementScrollId(placed);
+    if (previousScrollId !== scrollId) stopScrollIfRunning(previousScrollId);
+    setMovementScrollId(placed, scrollId);
+    saveBuildings();
+    renderSavedScrolls();
+    renderBuildingScrollControls(placed);
+    renderVehicleMenu(placed, BUILDING_BY_ID.get(placed.id));
+});
 document.getElementById('automaton-movement-scroll-select')?.addEventListener('change', event => {
     const placed = state.buildings.find(building => building.instanceId === selectedBuildingInstanceId
         && BUILDING_BY_ID.get(building.id)?.kind === 'automaton');
@@ -8135,6 +8206,8 @@ document.getElementById('building-overclock-select')?.addEventListener('change',
     syncCraftingNotifications(true);
 });
 document.getElementById('building-scroll-toggle')?.addEventListener('click', toggleBuildingScroll);
+document.getElementById('automaton-scroll-toggle')?.addEventListener('click', toggleBuildingScroll);
+document.getElementById('vehicle-scroll-toggle')?.addEventListener('click', toggleBuildingScroll);
 document.getElementById('building-item-search')?.addEventListener('input', () => {
     buildingRenderSignature = '';
     renderBuildingInventory();

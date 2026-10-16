@@ -445,7 +445,7 @@ h1 {
 .building-placement-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .building-placement-actions .btn { min-height: 40px; }
 .building-placement-actions .btn:disabled { opacity: .45; cursor: not-allowed; }
-.building-menu-panel { max-width: 430px; }
+.building-menu-panel { max-width: 430px; max-height: min(92dvh, 900px); overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; }
 .building-menu-panel h2 { margin: 3px 0 5px; font-size: 1rem; }
 .building-name-field { position: relative; display: grid; gap: 3px; width: min(100%, 290px); box-sizing: border-box; margin: 7px auto; padding: 6px 12px 7px; color: #d8c17b; border: 1px solid rgba(190, 150, 78, .72); border-radius: 4px; background: linear-gradient(115deg, rgba(75, 57, 34, .48), rgba(24, 20, 16, .92) 24%, rgba(24, 20, 16, .92) 76%, rgba(75, 57, 34, .48)); box-shadow: inset 0 1px 0 rgba(255, 231, 174, .1), inset 0 0 12px rgba(0, 0, 0, .46), 0 2px 5px rgba(0, 0, 0, .25); text-align: center; }
 .building-name-field::before, .building-name-field::after { position: absolute; top: 50%; width: 4px; height: 4px; border: 1px solid rgba(224, 188, 105, .72); border-radius: 50%; background: #382a1b; content: ""; transform: translateY(-50%); }
@@ -478,6 +478,9 @@ h1 {
 .building-scroll-toggle:disabled { opacity: .5; cursor: not-allowed; }
 .vehicle-menu-controls { display: grid; gap: 10px; width: min(100%, 360px); box-sizing: border-box; margin: 10px auto; padding: 12px; border: 1px solid rgba(198, 154, 82, .4); border-radius: 9px; background: radial-gradient(ellipse at 50% 0, rgba(190, 142, 62, .14), transparent 65%), linear-gradient(150deg, rgba(35, 28, 22, .98), rgba(17, 15, 13, .96)); box-shadow: inset 0 1px 0 rgba(255, 236, 184, .07), 0 5px 16px rgba(0, 0, 0, .2); text-align: left; }
 .vehicle-menu-controls[hidden] { display: none; }
+#vehicle-menu-controls input[type="number"] { appearance: textfield; -moz-appearance: textfield; }
+#vehicle-menu-controls input[type="number"]::-webkit-inner-spin-button,
+#vehicle-menu-controls input[type="number"]::-webkit-outer-spin-button { margin: 0; -webkit-appearance: none; }
 .vehicle-control-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-bottom: 8px; border-bottom: 1px solid rgba(198, 154, 82, .2); }
 .vehicle-control-kicker { color: #c6a75e; font: 700 .56rem/1.2 system-ui, sans-serif; letter-spacing: .14em; }
 .vehicle-status { display: inline-flex; align-items: center; gap: 5px; min-height: 23px; padding: 2px 8px; color: #e5c989; border: 1px solid rgba(198, 154, 82, .34); border-radius: 20px; background: rgba(198, 154, 82, .08); font: 700 .66rem/1 system-ui, sans-serif; }
@@ -623,10 +626,13 @@ h1 {
 .saved-scroll-empty { color: var(--text-muted); font-size: 0.72rem; }
 .inventory-modal { position: fixed; inset: 0; z-index: 1100; display: grid; place-items: center; padding: 18px; background: rgba(8, 7, 6, 0.58); }
 .inventory-modal[hidden] { display: none; }
+#building-menu-modal:has(#vehicle-menu-controls:not([hidden])) { padding: 10px; }
+#building-menu-modal:has(#vehicle-menu-controls:not([hidden])) .building-menu-panel { width: min(500px, 100%); max-width: 500px; }
 body.guide-item-detail-open #recipe-detail-modal { z-index: 1300; }
 .inventory-modal-panel { position: relative; width: min(100%, 360px); box-sizing: border-box; padding: 18px 24px 12px; color: var(--text-main); background: linear-gradient(145deg, #30251d, #17120f); border: 1px solid var(--border-gold); border-radius: 8px; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.72), inset 0 0 20px rgba(243, 198, 83, 0.06); text-align: center; }
 .building-menu-panel { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
 .building-menu-panel { padding-top: 18px; }
+.building-menu-panel .building-scroll-preview iframe { pointer-events: none; }
 .building-menu-demolish { position: absolute; top: 8px; left: 10px; display: grid; place-items: center; width: 30px; height: 30px; padding: 6px; color: #d58a78; border: 1px solid rgba(213, 138, 120, .35); border-radius: 5px; background: rgba(72, 31, 25, .35); cursor: pointer; }
 .building-menu-demolish:hover { color: #ffc0ac; border-color: rgba(240, 138, 120, .75); background: rgba(115, 42, 31, .55); }
 .building-menu-demolish svg { display: block; width: 100%; height: 100%; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.7; }
@@ -1133,6 +1139,7 @@ canvas.engine-runtime-canvas { display: none; }
         padding: 12px 10px;
     }
     .button-row { gap: 7px; }
+    #building-menu-modal:has(#vehicle-menu-controls:not([hidden])) { padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left)); }
     .btn { min-height: 42px; padding: 9px 8px; font-size: 0.76rem; line-height: 1.2; }
     .btn-action, .btn-reset { min-height: 44px; padding: 9px 7px; }
     .dashboard-shortcuts { gap: 7px; }

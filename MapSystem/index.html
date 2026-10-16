@@ -143,6 +143,17 @@
                     <span id="vehicle-status" class="vehicle-status" role="status" aria-live="polite"></span>
                 </div>
                 <p id="vehicle-start-guide" class="vehicle-start-guide"></p>
+                <label class="automaton-setting-row" for="vehicle-movement-scroll-select">動作スクロール
+                    <select id="vehicle-movement-scroll-select" aria-label="汽車にセットする動作スクロール">
+                        <option value="">スクロールを選択</option>
+                    </select>
+                </label>
+                <p id="vehicle-movement-scroll-status" class="automaton-status" role="status" aria-live="polite"></p>
+                <div id="vehicle-scroll-preview" class="building-scroll-preview" hidden>
+                    <div class="building-scroll-preview-heading">セットしたスクロールの動作プレビュー</div>
+                    <iframe id="vehicle-scroll-preview-frame" title="汽車にセットしたスクロールの動作プレビュー"></iframe>
+                    <button id="vehicle-scroll-toggle" class="building-scroll-toggle" type="button" data-action="toggle-building-scroll">スクロールを起動</button>
+                </div>
                 <div class="vehicle-operation-guide" aria-label="運転方法">
                     <div><span>01</span><strong>機関車を線路へ</strong></div>
                     <div><span>02</span><strong>「出発」を押す</strong></div>
@@ -155,12 +166,6 @@
                 </label>
                 <label class="automaton-setting-row" for="vehicle-max-wagons">最大連結貨車数
                     <input id="vehicle-max-wagons" type="number" min="0" max="32" step="1" value="4">
-                </label>
-                <label class="automaton-setting-row" for="vehicle-power-per-cell">基本消費動力 / マス
-                    <input id="vehicle-power-per-cell" type="number" min="0" max="1000" step="0.1" value="1">
-                </label>
-                <label class="automaton-setting-row" for="vehicle-power-wagon-exponent">貨車数による増加指数
-                    <input id="vehicle-power-wagon-exponent" type="number" min="1" max="4" step="0.1" value="2">
                 </label>
                 <p id="vehicle-resource-settings" class="vehicle-speed-info"></p>
             </section>
@@ -191,6 +196,7 @@
             <div id="automaton-scroll-preview" class="building-scroll-preview automaton-scroll-preview" hidden>
                 <div class="building-scroll-preview-heading">セットしたスクロールの動作プレビュー</div>
                 <iframe id="automaton-scroll-preview-frame" title="オートマタにセットしたスクロールの動作プレビュー"></iframe>
+                <button id="automaton-scroll-toggle" class="building-scroll-toggle" type="button" data-action="toggle-building-scroll">スクロールを起動</button>
             </div>
             <div class="automaton-preview">
                 <span class="automaton-preview-badge">作業用機械人形</span>
@@ -499,6 +505,6 @@
         </div>
     </div>
 
-    <script type="module" src="js/main.js?v=832"></script>
+    <script type="module" src="js/main.js?v=838"></script>
 </body>
 </html>

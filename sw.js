@@ -1,4 +1,4 @@
-const CACHE_NAME = 'steampunk-explorer-v280';
+const CACHE_NAME = 'steampunk-explorer-v288';
 const APP_SHELL = [
     './',
     './MainSystem/index.html',
@@ -12,7 +12,7 @@ const APP_SHELL = [
     './MapSystem/manifest.webmanifest',
     './MapSystem/css/style.css',
     './MapSystem/cell-icons.svg',
-    './MapSystem/js/main.js?v=832',
+    './MapSystem/js/main.js?v=838',
     './MapSystem/js/mapGenerator.js',
     './MapSystem/js/skinRenderer.js',
     './MapSystem/js/skinPreview.js',
