@@ -320,6 +320,7 @@ export class GameState {
                 gears,
                 belts,
                 network,
+                rotationActive: true,
                 usedRotations,
                 durabilityLimit
             });
@@ -1267,10 +1268,12 @@ export class GameState {
             || Number(job.completesAt) !== Number(before[index]?.[2]));
     }
 
-    tick() {
-        // 1フレーム分の時間を基準に、回転・資源変換・UI表示値を更新する。
+    tick(fixedElapsed = null) {
+        // 回転・資源変換・UI表示値を更新し、指定された場合は固定時間刻みで進行する。
         const now = performance.now();
-        const elapsed = Math.min(0.25, Math.max(0, (now - this.lastTickAt) / 1000));
+        const elapsed = fixedElapsed === null
+            ? Math.min(0.25, Math.max(0, (now - this.lastTickAt) / 1000))
+            : Math.min(0.25, Math.max(0, fixedElapsed));
         this.lastTickAt = now;
         this.lastTickElapsed = elapsed;
         this.completeCraftingJobs();
@@ -1284,14 +1287,19 @@ export class GameState {
             ...activeScrollRuntimes
         ];
         runtimeGroups.forEach(group => {
-            if (group.network && this.mainGearRunning && (this.creativeMode || this.steamPower > 0)) {
-                group.network.updateRotation({ rebuildConnections: false });
+            const canRun = this.mainGearRunning && (this.creativeMode || this.steamPower > 0);
+            if (group.network && canRun) {
+                if (!group.scrollId || !group.rotationActive) {
+                    group.network.updateRotation({ rebuildConnections: false });
+                    if (group.scrollId) group.rotationActive = true;
+                }
             } else {
                 group.gears.forEach(gear => {
                     gear.powered = false;
                     gear.rotationDir = 0;
                     gear.angularVelocity = 0;
                 });
+                if (group.scrollId) group.rotationActive = false;
             }
         });
         // 連結していても、処理設定は各ギア自身の値だけを参照する。
@@ -1365,12 +1373,15 @@ export class GameState {
             this.mainGearRunning = false;
             this.autoStoppedBySteam = false;
         }
-        if (!this.mainGearRunning) {
-            runtimeGroups.forEach(group => group.gears.forEach(gear => {
-                gear.powered = false;
-                gear.rotationDir = 0;
-                gear.angularVelocity = 0;
-            }));
+        if (!this.mainGearRunning || (!this.creativeMode && this.steamPower <= 0)) {
+            runtimeGroups.forEach(group => {
+                group.gears.forEach(gear => {
+                    gear.powered = false;
+                    gear.rotationDir = 0;
+                    gear.angularVelocity = 0;
+                });
+                if (group.scrollId) group.rotationActive = false;
+            });
         }
         const scrollRotationScales = new Map();
         activeScrollRuntimes.forEach(group => {
@@ -1456,11 +1467,13 @@ export class GameState {
         if (controlNetworkChanged) {
             runtimeGroups.forEach(group => {
                 group.network?.rebuild(group.gears, group.belts).updateRotation();
-                if (!this.mainGearRunning) group.gears.forEach(gear => {
+                const canRun = this.mainGearRunning && (this.creativeMode || this.steamPower > 0);
+                if (!canRun) group.gears.forEach(gear => {
                     gear.powered = false;
                     gear.rotationDir = 0;
                     gear.angularVelocity = 0;
                 });
+                if (group.scrollId) group.rotationActive = canRun;
             });
             this.publishActiveScrollSyncState(runtimeGroups);
         }

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'steampunk-explorer-v262';
+const CACHE_NAME = 'steampunk-explorer-v280';
 const APP_SHELL = [
     './',
     './MainSystem/index.html',
@@ -12,7 +12,7 @@ const APP_SHELL = [
     './MapSystem/manifest.webmanifest',
     './MapSystem/css/style.css',
     './MapSystem/cell-icons.svg',
-    './MapSystem/js/main.js',
+    './MapSystem/js/main.js?v=832',
     './MapSystem/js/mapGenerator.js',
     './MapSystem/js/skinRenderer.js',
     './MapSystem/js/skinPreview.js',
@@ -53,10 +53,10 @@ const APP_SHELL = [
     './MapSystem/assets/guide-screenshots/10b-cell-catalog.png',
     './MapSystem/assets/guide-screenshots/11-settings.png',
     './GearSystem/index.html',
-    './GearSystem/scroll-library.html?v=62',
+    './GearSystem/scroll-library.html?v=68',
     './GearSystem/css/style.css',
-    './GearSystem/js/main.js',
-    './GearSystem/js/scroll-library.js?v=62',
+    './GearSystem/js/main.js?v=gear-art-4',
+    './GearSystem/js/scroll-library.js?v=71',
     './GearSystem/js/GearSystem.js',
     './GearSystem/js/GearManager.js',
     './GearSystem/js/GameState.js',
@@ -64,12 +64,12 @@ const APP_SHELL = [
     './GearSystem/js/UIController.js',
     './GearSystem/js/vendor/qrcode-generator.min.js',
     './GearSystem/js/vendor/jsQR.js',
-    './GearSystem/assets/gear-production.png',
-    './GearSystem/assets/gear-logistics.png',
-    './GearSystem/assets/gear-industrial.png',
+    './GearSystem/assets/gear-production.svg',
+    './GearSystem/assets/gear-logistics.svg',
+    './GearSystem/assets/gear-industrial.svg',
     './GearSystem/assets/gear-core.png',
-    './GearSystem/assets/gear-clockwork.png',
-    './GearSystem/assets/gear-alchemical.png'
+    './GearSystem/assets/gear-clockwork.svg',
+    './GearSystem/assets/gear-alchemical.svg'
 ];
 
 self.addEventListener('install', (event) => {

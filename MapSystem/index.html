@@ -148,6 +148,20 @@
                     <div><span>02</span><strong>「出発」を押す</strong></div>
                     <div><span>03</span><strong>貨車が追従</strong></div>
                 </div>
+                <label class="automaton-setting-row" for="vehicle-speed-multiplier">動作速度
+                    <select id="vehicle-speed-multiplier">
+                        <option value="1">1倍</option><option value="1.25">1.25倍</option><option value="1.5">1.5倍</option><option value="2">2倍</option><option value="3">3倍</option>
+                    </select>
+                </label>
+                <label class="automaton-setting-row" for="vehicle-max-wagons">最大連結貨車数
+                    <input id="vehicle-max-wagons" type="number" min="0" max="32" step="1" value="4">
+                </label>
+                <label class="automaton-setting-row" for="vehicle-power-per-cell">基本消費動力 / マス
+                    <input id="vehicle-power-per-cell" type="number" min="0" max="1000" step="0.1" value="1">
+                </label>
+                <label class="automaton-setting-row" for="vehicle-power-wagon-exponent">貨車数による増加指数
+                    <input id="vehicle-power-wagon-exponent" type="number" min="1" max="4" step="0.1" value="2">
+                </label>
                 <p id="vehicle-resource-settings" class="vehicle-speed-info"></p>
             </section>
             <div class="inventory-modal-actions">
@@ -174,6 +188,10 @@
                 </select>
             </label>
             <p id="automaton-movement-scroll-status" class="automaton-status" role="status" aria-live="polite"></p>
+            <div id="automaton-scroll-preview" class="building-scroll-preview automaton-scroll-preview" hidden>
+                <div class="building-scroll-preview-heading">セットしたスクロールの動作プレビュー</div>
+                <iframe id="automaton-scroll-preview-frame" title="オートマタにセットしたスクロールの動作プレビュー"></iframe>
+            </div>
             <div class="automaton-preview">
                 <span class="automaton-preview-badge">作業用機械人形</span>
                 <canvas id="automaton-skin-preview" width="300" height="340" aria-label="オートマタの見た目。ドラッグして回転"></canvas>
@@ -193,6 +211,19 @@
             </div>
             <section class="automaton-settings-group" aria-label="作業設定">
                 <h3>作業設定</h3>
+                <label class="automaton-setting-row" for="automaton-speed-multiplier">動作速度
+                    <select id="automaton-speed-multiplier">
+                        <option value="1">1倍</option><option value="1.25">1.25倍</option><option value="1.5">1.5倍</option><option value="2">2倍</option><option value="3">3倍</option>
+                    </select>
+                </label>
+                <label class="automaton-setting-row" for="automaton-carry-capacity">搬送量
+                    <select id="automaton-carry-capacity">
+                        <option value="1">基本量（99個）</option><option value="2">2倍（198個）</option><option value="3">3倍（297個）</option><option value="5">5倍（495個）</option><option value="10">10倍（990個）</option>
+                    </select>
+                </label>
+                <label class="automaton-setting-row" for="automaton-power-per-operation">消費動力 / 作業
+                    <input id="automaton-power-per-operation" type="number" min="0" max="1000" step="0.1" value="1">
+                </label>
                 <div id="automaton-patrol-settings">
                     <label class="automaton-setting-row">巡回方向
                         <select id="automaton-axis"><option value="horizontal">左右</option><option value="vertical">上下</option></select>
@@ -468,6 +499,6 @@
         </div>
     </div>
 
-    <script type="module" src="js/main.js?v=826"></script>
+    <script type="module" src="js/main.js?v=832"></script>
 </body>
 </html>

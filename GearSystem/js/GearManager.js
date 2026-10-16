@@ -269,8 +269,9 @@ export class GearManager {
             return;
         }
         const adjustedMouseY = mouseY - pointerOffsetY;
-        const x = (mouseX - this.canvas.width / 2) / this.state.zoomScale - this.state.offsetX;
-        const y = (adjustedMouseY - this.canvas.height / 2) / this.state.zoomScale - this.state.offsetY;
+        const rect = this.canvas.getBoundingClientRect();
+        const x = (mouseX - rect.width / 2) / this.state.zoomScale - this.state.offsetX;
+        const y = (adjustedMouseY - rect.height / 2) / this.state.zoomScale - this.state.offsetY;
         const config = GEAR_CONFIG[sizeKey];
         const layer = this.state.selectedLayer;
         let valid = layer < 3 && (this.state.creativeMode || this.state.brass >= config.cost);

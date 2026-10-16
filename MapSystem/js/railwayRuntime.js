@@ -10,8 +10,11 @@ export const VEHICLE_DEFAULTS = Object.freeze({
     movement: null,
     movementScrollId: '',
     speedCellsPerSecond: 1,
+    speedMultiplier: 1,
+    maxWagons: 4,
     resources: { power: 0, steam: 0 },
     powerPerCell: 1,
+    powerWagonExponent: 2,
     steamPerCell: 0.2,
     nextMoveAt: 0
 });

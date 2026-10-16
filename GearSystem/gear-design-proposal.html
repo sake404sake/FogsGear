@@ -1,0 +1,470 @@
+<!doctype html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ギアデザイン案 | Fogs Gear</title>
+    <style>
+        :root {
+            color-scheme: dark;
+            font-family: "Yu Gothic UI", "Meiryo", sans-serif;
+            background: #100e0c;
+            color: #f2e4c7;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            min-width: 740px;
+            padding: 34px clamp(20px, 4vw, 64px) 42px;
+            background:
+                radial-gradient(ellipse at 50% 35%, rgba(100, 68, 35, .22), transparent 62%),
+                #100e0c;
+        }
+        header { max-width: 1200px; margin: 0 auto 22px; }
+        .eyebrow {
+            color: #d4af68;
+            font: 700 12px/1.4 ui-monospace, monospace;
+            letter-spacing: .22em;
+        }
+        h1 { margin: 8px 0; font-size: clamp(23px, 3vw, 34px); }
+        header p { margin: 0; color: #b9aa92; font-size: 14px; }
+        .sheet {
+            max-width: 1280px;
+            margin: 0 auto;
+            overflow: hidden;
+            border: 1px solid #57452e;
+            border-radius: 16px;
+            background: linear-gradient(155deg, rgba(43, 34, 25, .96), rgba(22, 19, 16, .98));
+            box-shadow: 0 22px 70px #0009, inset 0 1px #ffffff0a;
+        }
+        svg { display: block; width: 100%; height: auto; }
+        .gear { color: #b9b4aa; }
+        .rim-outer { fill: none; stroke: #fff; stroke-width: 7; }
+        .rim-inner { fill: none; stroke: #fff; stroke-width: 2; opacity: 1; }
+        .spoke-edge { stroke: #fff; stroke-linecap: round; }
+        .spoke { stroke: #fff; stroke-linecap: round; }
+        .hub { fill: #fff; stroke: #fff; stroke-width: 3; }
+        .axle { fill: #fff; stroke: #fff; stroke-width: 3; }
+        .bolt { fill: #fff; stroke: #fff; stroke-width: 2; }
+        .screw-head { fill: #fff; stroke: #fff; stroke-width: 2; }
+        .caption { fill: #f1e5cc; font-size: 19px; font-weight: 700; text-anchor: middle; }
+        .tag { fill: #d2aa60; font: 700 10px ui-monospace, monospace; letter-spacing: .16em; text-anchor: middle; }
+        .detail { fill: #b9aa92; font-size: 11px; text-anchor: middle; }
+        .guide { fill: none; stroke: #ffffff12; stroke-width: 1; }
+        .chain-link { fill: none; stroke: #fff; stroke-width: 2.6; }
+        .chain-pin { fill: none; stroke: #fff; stroke-width: 2; }
+        .alchemy-plate { fill: #fff; stroke: #fff; stroke-width: 2; }
+        .alchemy-etch { fill: none; stroke: #fff; stroke-width: 1.4; stroke-linejoin: round; stroke-linecap: round; }
+        .gear-tooth { fill: #fff; stroke: none; }
+        .clock-ring { fill: none; stroke: #fff; stroke-width: 2; }
+        .clock-face { fill: none; fill-rule: evenodd; stroke: #fff; stroke-width: 2; }
+        .clock-mark { stroke: #fff; stroke-width: 1.8; stroke-linecap: round; }
+        .clock-minute-mark { stroke: #fff; stroke-width: 1; stroke-linecap: round; }
+        .clock-hand { fill: #fff; stroke: #fff; stroke-width: 1.5; stroke-linejoin: round; }
+        .clock-hour-hand { fill: #fff; stroke: #fff; stroke-width: 1.5; stroke-linejoin: round; }
+        .clock-hand-inlay { fill: none; stroke: #fff; stroke-width: 1.2; stroke-linecap: round; }
+        .clock-numeral { fill: #fff; font-family: Georgia, "Times New Roman", serif; font-size: 10px; font-weight: 700; text-anchor: middle; }
+        .layer-gold { fill: #d4af37; stroke: #f3df91; }
+        .layer-silver { fill: #b5b8b1; stroke: #e6eae3; }
+        .layer-copper { fill: #b87333; stroke: #f3b06c; }
+        .gear { color: #fff; }
+        .gear * { fill: #fff; stroke: #fff; }
+        .gear [fill="none"] { fill: none !important; }
+        .gear .rim-outer { fill: none; stroke: #fff; }
+        .gear .rim-inner { fill: none; stroke: #fff; opacity: 1; }
+        .gear .spoke-edge { stroke: #fff; }
+        .gear .spoke { stroke: #fff; }
+        .gear .hub { fill: #fff; stroke: #fff; }
+        .gear .axle { fill: #fff; stroke: #fff; }
+        .gear .chain-link { fill: none; stroke: #fff; }
+        .gear .chain-pin { fill: none; stroke: #fff; }
+        .gear .gear-tooth { fill: #fff; stroke: none; }
+        .gear .alchemy-plate { fill: #fff; fill-opacity: 1; stroke: #fff; }
+        .gear .alchemy-etch,
+        .gear .clock-hand-inlay { fill: none; stroke: #fff; }
+        .gear .clock-ring { fill: none; stroke: #fff; }
+        .gear .clock-face { fill: none; stroke: #fff; }
+        .gear .clock-ring,
+        .gear .clock-mark,
+        .gear .clock-minute-mark { stroke: #fff; }
+        .gear .clock-numeral { fill: #fff; }
+        .gear .clock-hand,
+        .gear .clock-hour-hand { fill: #fff; stroke: #fff; stroke-width: 2; }
+        .gear .clock-hand-inlay,
+        .gear .screw-slot { fill: none; stroke: #fff; }
+        .gear .alpha-preview { fill: url(#alpha-checker) !important; stroke: none !important; }
+        @media (max-width: 760px) {
+            body { min-width: 0; padding: 20px 10px; }
+            .sheet { overflow-x: auto; }
+            svg { min-width: 900px; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="eyebrow">FOGS GEAR / CONCEPT STUDY</div>
+        <h1>ギア種ごとのデザイン案</h1>
+        <p>白い形状と透過部分だけで構成した、歯なしベース画像案です。格子は透過確認用の背景です。</p>
+    </header>
+    <main class="sheet">
+        <svg viewBox="0 0 1200 500" role="img" aria-labelledby="title description">
+            <title id="title">5種類の無歯ベースギアデザイン案</title>
+            <desc id="description">工業、錬金、物流、精密・制御、生産の白いベース形状。格子背景は透過確認用で、外周の歯はソフト側で追加。</desc>
+            <defs>
+                <pattern id="alpha-checker" width="8" height="8" patternUnits="userSpaceOnUse">
+                    <rect width="8" height="8" fill="#777"/>
+                    <rect width="4" height="4" fill="#aaa"/>
+                    <rect x="4" y="4" width="4" height="4" fill="#aaa"/>
+                </pattern>
+                <mask id="screw-slot-cutout" maskUnits="userSpaceOnUse" x="-9" y="-60" width="18" height="18">
+                    <circle cy="-50.5" r="7.2" fill="white"/>
+                    <path d="M0-55V-46M-4.5-50.5H4.5" stroke="black" stroke-width="2" stroke-linecap="round"/>
+                </mask>
+                <g id="wheel-base">
+                    <circle class="rim-outer" r="67"/>
+                    <circle class="rim-inner" r="59"/>
+                </g>
+                <g id="hub-base">
+                    <circle class="hub" r="20"/>
+                    <circle class="axle" r="8"/>
+                    <path d="M-4 0H4M0-4V4" stroke="#fff" stroke-width="1.5"/>
+                </g>
+                <g id="cross-screw">
+                    <circle class="screw-head" cx="0" cy="-50.5" r="7.2" mask="url(#screw-slot-cutout)"/>
+                </g>
+                <g id="industrial-bolts">
+                    <use href="#cross-screw"/>
+                    <use href="#cross-screw" transform="rotate(30)"/>
+                    <use href="#cross-screw" transform="rotate(60)"/>
+                    <use href="#cross-screw" transform="rotate(90)"/>
+                    <use href="#cross-screw" transform="rotate(120)"/>
+                    <use href="#cross-screw" transform="rotate(150)"/>
+                    <use href="#cross-screw" transform="rotate(180)"/>
+                    <use href="#cross-screw" transform="rotate(210)"/>
+                    <use href="#cross-screw" transform="rotate(240)"/>
+                    <use href="#cross-screw" transform="rotate(270)"/>
+                    <use href="#cross-screw" transform="rotate(300)"/>
+                    <use href="#cross-screw" transform="rotate(330)"/>
+                </g>
+                <g id="outer-chain-link">
+                    <rect class="chain-link" x="-13.5" y="-58.5" width="27" height="9" rx="4.5"/>
+                    <circle class="chain-pin" cx="-9" cy="-54" r="3.7"/>
+                    <circle class="chain-pin" cx="9" cy="-54" r="3.7"/>
+                </g>
+                <mask id="alchemy-perforations" maskUnits="userSpaceOnUse" x="-60" y="-60" width="120" height="120">
+                    <circle r="57" fill="white"/>
+                    <circle r="8" fill="black"/>
+                    <circle cx="0" cy="-39" r="12.5" fill="black" transform="rotate(60)"/>
+                    <circle cx="0" cy="-39" r="12.5" fill="black" transform="rotate(180)"/>
+                    <circle cx="0" cy="-39" r="12.5" fill="black" transform="rotate(300)"/>
+                    <path d="M-1.8-7L-2.3-25Q-2.5-28 0-30Q2.5-28 2.3-25L1.8-7Z"
+                          fill="black" transform="rotate(60)"/>
+                    <path d="M-1.8-7L-2.3-25Q-2.5-28 0-30Q2.5-28 2.3-25L1.8-7Z"
+                          fill="black" transform="rotate(180)"/>
+                    <path d="M-1.8-7L-2.3-25Q-2.5-28 0-30Q2.5-28 2.3-25L1.8-7Z"
+                          fill="black" transform="rotate(300)"/>
+                    <path d="M-3 14V7L-8.5-5Q-11-10-7-13Q-5-15 0-15Q5-15 7-13Q11-10 8.5-5L3 7V14M-4.5 14H4.5M-5.5-3Q0-5.5 5.5-3"
+                          fill="none" stroke="black" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"
+                          transform="rotate(0) translate(0 -39)"/>
+                    <path d="M-3 14V7L-8.5-5Q-11-10-7-13Q-5-15 0-15Q5-15 7-13Q11-10 8.5-5L3 7V14M-4.5 14H4.5M-5.5-3Q0-5.5 5.5-3"
+                          fill="none" stroke="black" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"
+                          transform="rotate(120) translate(0 -39)"/>
+                    <path d="M-3 14V7L-8.5-5Q-11-10-7-13Q-5-15 0-15Q5-15 7-13Q11-10 8.5-5L3 7V14M-4.5 14H4.5M-5.5-3Q0-5.5 5.5-3"
+                          fill="none" stroke="black" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"
+                          transform="rotate(240) translate(0 -39)"/>
+                </mask>
+                <mask id="industrial-spoke-windows" maskUnits="userSpaceOnUse" x="-52" y="-52" width="104" height="104">
+                    <circle r="50" fill="white"/>
+                    <path d="M7-18C10-25 13-38 19-43C27-42 35-37 40-30C32-27 24-18 16-12C12-12 8-14 7-18Z" fill="black"/>
+                    <path d="M7-18C10-25 13-38 19-43C27-42 35-37 40-30C32-27 24-18 16-12C12-12 8-14 7-18Z" fill="black" transform="rotate(60)"/>
+                    <path d="M7-18C10-25 13-38 19-43C27-42 35-37 40-30C32-27 24-18 16-12C12-12 8-14 7-18Z" fill="black" transform="rotate(120)"/>
+                    <path d="M7-18C10-25 13-38 19-43C27-42 35-37 40-30C32-27 24-18 16-12C12-12 8-14 7-18Z" fill="black" transform="rotate(180)"/>
+                    <path d="M7-18C10-25 13-38 19-43C27-42 35-37 40-30C32-27 24-18 16-12C12-12 8-14 7-18Z" fill="black" transform="rotate(240)"/>
+                    <path d="M7-18C10-25 13-38 19-43C27-42 35-37 40-30C32-27 24-18 16-12C12-12 8-14 7-18Z" fill="black" transform="rotate(300)"/>
+                </mask>
+                <mask id="planet-gear-hole" maskUnits="userSpaceOnUse" x="-16" y="-16" width="32" height="32">
+                    <circle r="15" fill="white"/>
+                    <circle r="5" fill="black"/>
+                </mask>
+                <mask id="sun-gear-hole" maskUnits="userSpaceOnUse" x="-19" y="-19" width="38" height="38">
+                    <circle r="18" fill="white"/>
+                    <circle r="5.5" fill="black"/>
+                </mask>
+                <g id="planet-gear" mask="url(#planet-gear-hole)">
+                    <circle r="10.5" fill="#fff"/>
+                    <rect class="gear-tooth" x="-2" y="-15" width="4" height="5"/>
+                    <rect class="gear-tooth" x="-2" y="-15" width="4" height="5" transform="rotate(45)"/>
+                    <rect class="gear-tooth" x="-2" y="-15" width="4" height="5" transform="rotate(90)"/>
+                    <rect class="gear-tooth" x="-2" y="-15" width="4" height="5" transform="rotate(135)"/>
+                    <rect class="gear-tooth" x="-2" y="-15" width="4" height="5" transform="rotate(180)"/>
+                    <rect class="gear-tooth" x="-2" y="-15" width="4" height="5" transform="rotate(225)"/>
+                    <rect class="gear-tooth" x="-2" y="-15" width="4" height="5" transform="rotate(270)"/>
+                    <rect class="gear-tooth" x="-2" y="-15" width="4" height="5" transform="rotate(315)"/>
+                </g>
+                <g id="sun-gear" mask="url(#sun-gear-hole)">
+                    <circle r="13" fill="#fff"/>
+                    <rect class="gear-tooth" x="-2" y="-18" width="4" height="6"/>
+                    <rect class="gear-tooth" x="-2" y="-18" width="4" height="6" transform="rotate(30)"/>
+                    <rect class="gear-tooth" x="-2" y="-18" width="4" height="6" transform="rotate(60)"/>
+                    <rect class="gear-tooth" x="-2" y="-18" width="4" height="6" transform="rotate(90)"/>
+                    <rect class="gear-tooth" x="-2" y="-18" width="4" height="6" transform="rotate(120)"/>
+                    <rect class="gear-tooth" x="-2" y="-18" width="4" height="6" transform="rotate(150)"/>
+                    <rect class="gear-tooth" x="-2" y="-18" width="4" height="6" transform="rotate(180)"/>
+                    <rect class="gear-tooth" x="-2" y="-18" width="4" height="6" transform="rotate(210)"/>
+                    <rect class="gear-tooth" x="-2" y="-18" width="4" height="6" transform="rotate(240)"/>
+                    <rect class="gear-tooth" x="-2" y="-18" width="4" height="6" transform="rotate(270)"/>
+                    <rect class="gear-tooth" x="-2" y="-18" width="4" height="6" transform="rotate(300)"/>
+                    <rect class="gear-tooth" x="-2" y="-18" width="4" height="6" transform="rotate(330)"/>
+                </g>
+                <g id="internal-ring-teeth" class="gear-tooth">
+                    <rect x="-1.5" y="-50" width="3" height="7"/>
+                    <rect x="-1.5" y="-50" width="3" height="7" transform="rotate(15)"/>
+                    <rect x="-1.5" y="-50" width="3" height="7" transform="rotate(30)"/>
+                    <rect x="-1.5" y="-50" width="3" height="7" transform="rotate(45)"/>
+                    <rect x="-1.5" y="-50" width="3" height="7" transform="rotate(60)"/>
+                    <rect x="-1.5" y="-50" width="3" height="7" transform="rotate(75)"/>
+                    <rect x="-1.5" y="-50" width="3" height="7" transform="rotate(90)"/>
+                    <rect x="-1.5" y="-50" width="3" height="7" transform="rotate(105)"/>
+                    <rect x="-1.5" y="-50" width="3" height="7" transform="rotate(120)"/>
+                    <rect x="-1.5" y="-50" width="3" height="7" transform="rotate(135)"/>
+                    <rect x="-1.5" y="-50" width="3" height="7" transform="rotate(150)"/>
+                    <rect x="-1.5" y="-50" width="3" height="7" transform="rotate(165)"/>
+                    <rect x="-1.5" y="-50" width="3" height="7" transform="rotate(180)"/>
+                    <rect x="-1.5" y="-50" width="3" height="7" transform="rotate(195)"/>
+                    <rect x="-1.5" y="-50" width="3" height="7" transform="rotate(210)"/>
+                    <rect x="-1.5" y="-50" width="3" height="7" transform="rotate(225)"/>
+                    <rect x="-1.5" y="-50" width="3" height="7" transform="rotate(240)"/>
+                    <rect x="-1.5" y="-50" width="3" height="7" transform="rotate(255)"/>
+                    <rect x="-1.5" y="-50" width="3" height="7" transform="rotate(270)"/>
+                    <rect x="-1.5" y="-50" width="3" height="7" transform="rotate(285)"/>
+                    <rect x="-1.5" y="-50" width="3" height="7" transform="rotate(300)"/>
+                    <rect x="-1.5" y="-50" width="3" height="7" transform="rotate(315)"/>
+                    <rect x="-1.5" y="-50" width="3" height="7" transform="rotate(330)"/>
+                    <rect x="-1.5" y="-50" width="3" height="7" transform="rotate(345)"/>
+                </g>
+            </defs>
+
+            <path class="guide" d="M240 46V424M480 46V424M720 46V424M960 46V424"/>
+
+            <g class="gear" transform="translate(120 178)">
+                <circle class="alpha-preview" r="67"/>
+                <use href="#wheel-base"/>
+                <g transform="scale(0.82)">
+                    <circle r="50" fill="#fff" stroke="#fff" stroke-width="2" mask="url(#industrial-spoke-windows)"/>
+                    <circle r="50" fill="none" stroke="#fff" stroke-width="2"/>
+                    <use href="#hub-base"/>
+                </g>
+                <use href="#industrial-bolts"/>
+            </g>
+            <text class="tag" x="120" y="292">CAST / HEAVY</text>
+            <text class="caption" x="120" y="324">工業</text>
+            <text class="detail" x="120" y="348">曲線でつないだ6本の太いスポーク</text>
+            <text class="detail" x="120" y="365">参考画像風の大きな抜き窓</text>
+
+            <g class="gear" transform="translate(360 178)">
+                <circle class="alpha-preview" r="67"/>
+                <use href="#wheel-base"/>
+                <circle class="alchemy-plate" r="57" mask="url(#alchemy-perforations)"/>
+                <circle class="rim-inner" r="52" stroke-width="2"/>
+            </g>
+            <text class="tag" x="360" y="292">RETORT / REAGENT</text>
+            <text class="caption" x="360" y="324">錬金</text>
+            <text class="detail" x="360" y="348">外側へ広がる胴と丸底のフラスコ刻印を大型化</text>
+            <text class="detail" x="360" y="365">3つの口は中心向き、中央は刻印なし</text>
+
+            <g class="gear" transform="translate(600 178)">
+                <circle class="alpha-preview" r="67"/>
+                <use href="#wheel-base"/>
+                <g class="spoke" stroke-width="3">
+                    <path d="M0-17V-48"/>
+                    <path d="M0-17V-48" transform="rotate(72)"/>
+                    <path d="M0-17V-48" transform="rotate(144)"/>
+                    <path d="M0-17V-48" transform="rotate(216)"/>
+                    <path d="M0-17V-48" transform="rotate(288)"/>
+                </g>
+                <circle class="rim-inner" r="47" stroke-width="2"/>
+                <use href="#outer-chain-link"/>
+                <use href="#outer-chain-link" transform="rotate(36)"/>
+                <use href="#outer-chain-link" transform="rotate(72)"/>
+                <use href="#outer-chain-link" transform="rotate(108)"/>
+                <use href="#outer-chain-link" transform="rotate(144)"/>
+                <use href="#outer-chain-link" transform="rotate(180)"/>
+                <use href="#outer-chain-link" transform="rotate(216)"/>
+                <use href="#outer-chain-link" transform="rotate(252)"/>
+                <use href="#outer-chain-link" transform="rotate(288)"/>
+                <use href="#outer-chain-link" transform="rotate(324)"/>
+                <use href="#hub-base"/>
+            </g>
+            <text class="tag" x="600" y="292">CHAIN / HAUL</text>
+            <text class="caption" x="600" y="324">物流</text>
+            <text class="detail" x="600" y="348">大きなローラーとリンクプレートのチェーン</text>
+            <text class="detail" x="600" y="365">5本の細いスポークでハブにつなぐ</text>
+
+            <g class="gear" transform="translate(840 178)">
+                <circle class="alpha-preview" r="67"/>
+                <use href="#wheel-base"/>
+                <g class="spoke" stroke-width="1.8">
+                    <path d="M0-8V-58" transform="rotate(45)"/>
+                    <path d="M0-8V-58" transform="rotate(135)"/>
+                    <path d="M0-8V-58" transform="rotate(225)"/>
+                    <path d="M0-8V-58" transform="rotate(315)"/>
+                </g>
+                <path class="clock-face" d="M0-60A60 60 0 1 1 0 60A60 60 0 1 1 0-60ZM0-33A33 33 0 1 0 0 33A33 33 0 1 0 0-33Z"/>
+                <circle class="clock-ring" r="34"/>
+                <g class="clock-minute-mark">
+                    <g>
+                        <path d="M0-58V-56" transform="rotate(6)"/>
+                        <path d="M0-58V-56" transform="rotate(12)"/>
+                        <path d="M0-58V-56" transform="rotate(18)"/>
+                        <path d="M0-58V-56" transform="rotate(24)"/>
+                    </g>
+                    <g transform="rotate(30)">
+                        <path d="M0-58V-56" transform="rotate(6)"/>
+                        <path d="M0-58V-56" transform="rotate(12)"/>
+                        <path d="M0-58V-56" transform="rotate(18)"/>
+                        <path d="M0-58V-56" transform="rotate(24)"/>
+                    </g>
+                    <g transform="rotate(60)">
+                        <path d="M0-58V-56" transform="rotate(6)"/>
+                        <path d="M0-58V-56" transform="rotate(12)"/>
+                        <path d="M0-58V-56" transform="rotate(18)"/>
+                        <path d="M0-58V-56" transform="rotate(24)"/>
+                    </g>
+                    <g transform="rotate(90)">
+                        <path d="M0-58V-56" transform="rotate(6)"/>
+                        <path d="M0-58V-56" transform="rotate(12)"/>
+                        <path d="M0-58V-56" transform="rotate(18)"/>
+                        <path d="M0-58V-56" transform="rotate(24)"/>
+                    </g>
+                    <g transform="rotate(120)">
+                        <path d="M0-58V-56" transform="rotate(6)"/>
+                        <path d="M0-58V-56" transform="rotate(12)"/>
+                        <path d="M0-58V-56" transform="rotate(18)"/>
+                        <path d="M0-58V-56" transform="rotate(24)"/>
+                    </g>
+                    <g transform="rotate(150)">
+                        <path d="M0-58V-56" transform="rotate(6)"/>
+                        <path d="M0-58V-56" transform="rotate(12)"/>
+                        <path d="M0-58V-56" transform="rotate(18)"/>
+                        <path d="M0-58V-56" transform="rotate(24)"/>
+                    </g>
+                    <g transform="rotate(180)">
+                        <path d="M0-58V-56" transform="rotate(6)"/>
+                        <path d="M0-58V-56" transform="rotate(12)"/>
+                        <path d="M0-58V-56" transform="rotate(18)"/>
+                        <path d="M0-58V-56" transform="rotate(24)"/>
+                    </g>
+                    <g transform="rotate(210)">
+                        <path d="M0-58V-56" transform="rotate(6)"/>
+                        <path d="M0-58V-56" transform="rotate(12)"/>
+                        <path d="M0-58V-56" transform="rotate(18)"/>
+                        <path d="M0-58V-56" transform="rotate(24)"/>
+                    </g>
+                    <g transform="rotate(240)">
+                        <path d="M0-58V-56" transform="rotate(6)"/>
+                        <path d="M0-58V-56" transform="rotate(12)"/>
+                        <path d="M0-58V-56" transform="rotate(18)"/>
+                        <path d="M0-58V-56" transform="rotate(24)"/>
+                    </g>
+                    <g transform="rotate(270)">
+                        <path d="M0-58V-56" transform="rotate(6)"/>
+                        <path d="M0-58V-56" transform="rotate(12)"/>
+                        <path d="M0-58V-56" transform="rotate(18)"/>
+                        <path d="M0-58V-56" transform="rotate(24)"/>
+                    </g>
+                    <g transform="rotate(300)">
+                        <path d="M0-58V-56" transform="rotate(6)"/>
+                        <path d="M0-58V-56" transform="rotate(12)"/>
+                        <path d="M0-58V-56" transform="rotate(18)"/>
+                        <path d="M0-58V-56" transform="rotate(24)"/>
+                    </g>
+                    <g transform="rotate(330)">
+                        <path d="M0-58V-56" transform="rotate(6)"/>
+                        <path d="M0-58V-56" transform="rotate(12)"/>
+                        <path d="M0-58V-56" transform="rotate(18)"/>
+                        <path d="M0-58V-56" transform="rotate(24)"/>
+                    </g>
+                </g>
+                <g class="clock-mark">
+                    <path d="M0-58V-53"/>
+                    <path d="M0-58V-53" transform="rotate(30)"/>
+                    <path d="M0-58V-53" transform="rotate(60)"/>
+                    <path d="M0-58V-53" transform="rotate(90)"/>
+                    <path d="M0-58V-53" transform="rotate(120)"/>
+                    <path d="M0-58V-53" transform="rotate(150)"/>
+                    <path d="M0-58V-53" transform="rotate(180)"/>
+                    <path d="M0-58V-53" transform="rotate(210)"/>
+                    <path d="M0-58V-53" transform="rotate(240)"/>
+                    <path d="M0-58V-53" transform="rotate(270)"/>
+                    <path d="M0-58V-53" transform="rotate(300)"/>
+                    <path d="M0-58V-53" transform="rotate(330)"/>
+                </g>
+                <text class="clock-numeral" x="0" y="-42">XII</text>
+                <text class="clock-numeral" x="21" y="-36">I</text>
+                <text class="clock-numeral" x="36" y="-20">II</text>
+                <text class="clock-numeral" x="42" y="3">III</text>
+                <text class="clock-numeral" x="36" y="26">IV</text>
+                <text class="clock-numeral" x="21" y="42">V</text>
+                <text class="clock-numeral" x="0" y="46">VI</text>
+                <text class="clock-numeral" x="-21" y="42">VII</text>
+                <text class="clock-numeral" x="-36" y="26">VIII</text>
+                <text class="clock-numeral" x="-42" y="3">IX</text>
+                <text class="clock-numeral" x="-36" y="-20">X</text>
+                <text class="clock-numeral" x="-21" y="-36">XI</text>
+                <g transform="rotate(-60)">
+                    <path class="clock-hand" d="M-2.2 11C-3.4 7-3.3 1-2.4-4L-2.4-39L-6-43L0-54L6-43L2.4-39L2.4-4C3.3 1 3.4 7 2.2 11Z"/>
+                    <path class="clock-hand-inlay" d="M0-10V-38L0-46"/>
+                    <path class="clock-hand" d="M-1.5 11V-50L0-54L1.5-50V11Z"/>
+                    <path class="clock-hand-inlay" d="M0-10V-46"/>
+                </g>
+                <g transform="rotate(55)">
+                    <path class="clock-hour-hand" d="M-2.3 11C-3.4 7-3 3-2-1L-2-26L-5-29L0-38L5-29L2-26L2-1C3 3 3.4 7 2.3 11Z"/>
+                    <path class="clock-hand-inlay" d="M0-8V-25L0-32"/>
+                    <path class="clock-hour-hand" d="M-1.5 11V-34L0-38L1.5-34V11Z"/>
+                    <path class="clock-hand-inlay" d="M0-8V-32"/>
+                </g>
+                <circle r="7" fill="#fff" stroke="#fff" stroke-width="2"/>
+                <circle r="3.5" fill="#fff" stroke="#fff" stroke-width="1.5"/>
+                <circle r="1.2" fill="#fff"/>
+            </g>
+            <text class="tag" x="840" y="292">CONTROL / PRECISION</text>
+            <text class="caption" x="840" y="324">精密・制御</text>
+            <text class="detail" x="840" y="348">制御ギアを時計文字盤の意匠に</text>
+            <text class="detail" x="840" y="365">ローマ数字の文字盤と装飾針で13:50</text>
+
+            <g class="gear" transform="translate(1080 178)">
+                <circle class="alpha-preview" r="67"/>
+                <use href="#wheel-base"/>
+                <circle class="rim-inner" r="52" stroke-width="3"/>
+                <use href="#internal-ring-teeth"/>
+                <g fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round">
+                    <path d="M0 0V-30"/>
+                    <path d="M0 0V-30" transform="rotate(120)"/>
+                    <path d="M0 0V-30" transform="rotate(240)"/>
+                </g>
+                <use href="#sun-gear"/>
+                <use href="#planet-gear" transform="translate(0 -30)"/>
+                <use href="#planet-gear" transform="rotate(120) translate(0 -30)"/>
+                <use href="#planet-gear" transform="rotate(240) translate(0 -30)"/>
+                <circle r="3" fill="#fff" stroke="#fff" stroke-width="1.5"/>
+            </g>
+            <text class="tag" x="1080" y="292">CAM / WORK</text>
+            <text class="caption" x="1080" y="324">生産</text>
+            <text class="detail" x="1080" y="348">中央太陽ギアと3つの遊星ギア</text>
+            <text class="detail" x="1080" y="365">内歯リング・キャリアも見える構成</text>
+
+            <path d="M42 400H1158" stroke="#7b6342" stroke-width="1"/>
+            <circle cx="56" cy="429" r="8" fill="#17120e" stroke="#d8b66f" stroke-width="2"/>
+            <circle cx="56" cy="429" r="3" fill="#d8b66f"/>
+            <text x="74" y="433" fill="#c9b99e" font-size="12">描画部分は白のみ。格子背景に見える部分は透過で、歯はソフト側で追加します。</text>
+            <text x="74" y="474" fill="#c9b99e" font-size="12">ベース色は金・銀・銅へ差し替え可能：</text>
+            <circle class="layer-gold" cx="424" cy="469" r="9" stroke-width="2"/>
+            <text x="440" y="474" fill="#e4d4ae" font-size="12">金段</text>
+            <circle class="layer-silver" cx="512" cy="469" r="9" stroke-width="2"/>
+            <text x="528" y="474" fill="#e4d4ae" font-size="12">銀段</text>
+            <circle class="layer-copper" cx="600" cy="469" r="9" stroke-width="2"/>
+            <text x="616" y="474" fill="#e4d4ae" font-size="12">銅段</text>
+        </svg>
+    </main>
+</body>
+</html>

@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-71 -71 142 142">
+  <defs>
+    <mask id="spoke-windows" maskUnits="userSpaceOnUse" x="-52" y="-52" width="104" height="104">
+      <circle r="50" fill="#fff"/>
+      <path d="M7-18C10-25 13-38 19-43C27-42 35-37 40-30C32-27 24-18 16-12C12-12 8-14 7-18Z" fill="#000"/>
+      <path d="M7-18C10-25 13-38 19-43C27-42 35-37 40-30C32-27 24-18 16-12C12-12 8-14 7-18Z" fill="#000" transform="rotate(60)"/>
+      <path d="M7-18C10-25 13-38 19-43C27-42 35-37 40-30C32-27 24-18 16-12C12-12 8-14 7-18Z" fill="#000" transform="rotate(120)"/>
+      <path d="M7-18C10-25 13-38 19-43C27-42 35-37 40-30C32-27 24-18 16-12C12-12 8-14 7-18Z" fill="#000" transform="rotate(180)"/>
+      <path d="M7-18C10-25 13-38 19-43C27-42 35-37 40-30C32-27 24-18 16-12C12-12 8-14 7-18Z" fill="#000" transform="rotate(240)"/>
+      <path d="M7-18C10-25 13-38 19-43C27-42 35-37 40-30C32-27 24-18 16-12C12-12 8-14 7-18Z" fill="#000" transform="rotate(300)"/>
+    </mask>
+    <mask id="screw-slot" maskUnits="userSpaceOnUse" x="-9" y="-60" width="18" height="18">
+      <circle cy="-50.5" r="7.2" fill="#fff"/>
+      <path d="M0-55V-46M-4.5-50.5H4.5" stroke="#000" stroke-width="2" stroke-linecap="round"/>
+    </mask>
+    <g id="screw">
+      <circle cy="-50.5" r="7.2" fill="#fff" mask="url(#screw-slot)"/>
+    </g>
+    <g id="screws">
+      <use href="#screw"/>
+      <use href="#screw" transform="rotate(30)"/>
+      <use href="#screw" transform="rotate(60)"/>
+      <use href="#screw" transform="rotate(90)"/>
+      <use href="#screw" transform="rotate(120)"/>
+      <use href="#screw" transform="rotate(150)"/>
+      <use href="#screw" transform="rotate(180)"/>
+      <use href="#screw" transform="rotate(210)"/>
+      <use href="#screw" transform="rotate(240)"/>
+      <use href="#screw" transform="rotate(270)"/>
+      <use href="#screw" transform="rotate(300)"/>
+      <use href="#screw" transform="rotate(330)"/>
+    </g>
+  </defs>
+  <g fill="none" stroke="#fff">
+    <circle r="67" stroke-width="7"/>
+    <circle r="59" stroke-width="2"/>
+  </g>
+  <g transform="scale(.82)">
+    <circle r="50" fill="#fff" mask="url(#spoke-windows)"/>
+    <circle r="50" fill="none" stroke="#fff" stroke-width="2"/>
+    <circle r="20" fill="#fff"/>
+    <circle r="8" fill="none" stroke="#fff" stroke-width="2"/>
+  </g>
+  <use href="#screws"/>
+</svg>

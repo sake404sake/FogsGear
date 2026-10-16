@@ -1,4 +1,4 @@
-import { CanvasRenderer } from './CanvasRenderer.js?v=render-2';
+import { CanvasRenderer } from './CanvasRenderer.js?v=render-6';
 import { GEAR_CONFIG, hexToPixel } from './GearManager.js?v=runtime-8';
 import { GearNetwork } from './GearSystem.js?v=network-8';
 import { SCROLL_MATERIALS, SCROLL_MATERIAL_BY_TYPE } from '../../MapSystem/js/craftingData.js?v=19';
@@ -192,31 +192,48 @@ const previewState = {
     }
 };
 const renderer = new CanvasRenderer('previewCanvas', previewState, false);
-let lastPreviewFrame = 0;
+const PREVIEW_SIMULATION_INTERVAL = 1 / 30;
+let previewAccumulator = 0;
+let lastPreviewFrame = null;
 let previewFrameId = null;
 function animatePreview(now) {
     previewFrameId = null;
     if (!previewState.running || previewState.invalid) {
         previewState.tick(0);
         renderer.render();
-        lastPreviewFrame = 0;
+        previewAccumulator = 0;
+        lastPreviewFrame = null;
         return;
     }
     previewFrameId = requestAnimationFrame(animatePreview);
-    const elapsed = lastPreviewFrame ? Math.min(0.1, Math.max(0, (now - lastPreviewFrame) / 1000)) : 1 / 60;
+    if (lastPreviewFrame === null) {
+        previewState.tick(0);
+        renderer.previousGearAngles = new Map(previewState.placedGears.map(gear => [gear.id, gear.angle]));
+        lastPreviewFrame = now;
+        renderer.render(0);
+        return;
+    }
+    const elapsed = Math.min(0.1, Math.max(0, (now - lastPreviewFrame) / 1000));
     lastPreviewFrame = now;
-    previewState.tick(elapsed);
-    renderer.render();
+    previewAccumulator += elapsed;
+    while (previewAccumulator >= PREVIEW_SIMULATION_INTERVAL) {
+        renderer.previousGearAngles = new Map(previewState.placedGears.map(gear => [gear.id, gear.angle]));
+        previewState.tick(PREVIEW_SIMULATION_INTERVAL);
+        previewAccumulator -= PREVIEW_SIMULATION_INTERVAL;
+    }
+    renderer.render(previewAccumulator / PREVIEW_SIMULATION_INTERVAL);
 }
 function startPreviewAnimation() {
     if (previewFrameId !== null) return;
-    lastPreviewFrame = 0;
+    previewAccumulator = 0;
+    lastPreviewFrame = null;
     previewFrameId = requestAnimationFrame(animatePreview);
 }
 function stopPreviewAnimation() {
     if (previewFrameId !== null) cancelAnimationFrame(previewFrameId);
     previewFrameId = null;
-    lastPreviewFrame = 0;
+    previewAccumulator = 0;
+    lastPreviewFrame = null;
     previewState.tick(0);
     renderer.render();
 }
@@ -224,6 +241,7 @@ let currentMaterial = 'all';
 let selectedScrollId = null;
 let library = [];
 let renderedScrollId = null;
+let renderedScrollBlueprint = null;
 let runtimePreviewScrollId = null;
 let pendingCopyRequestId = null;
 
@@ -1047,13 +1065,14 @@ function fitPreview() {
     }), { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity });
     const width = Math.max(1, bounds.maxX - bounds.minX);
     const height = Math.max(1, bounds.maxY - bounds.minY);
-    previewState.zoomScale = Math.min(4.5, Math.max(0.22, Math.min((canvas.width - 54) / width, (canvas.height - 54) / height)));
+    previewState.zoomScale = Math.min(4.5, Math.max(0.22, Math.min((renderer.width - 54) / width, (renderer.height - 54) / height)));
     previewState.offsetX = -((bounds.minX + bounds.maxX) / 2);
     previewState.offsetY = -((bounds.minY + bounds.maxY) / 2);
 }
 
 function renderPreview(scroll) {
-    if (renderedScrollId === scroll.id) return;
+    const blueprintSignature = JSON.stringify(scroll.blueprint || {});
+    if (renderedScrollId === scroll.id && renderedScrollBlueprint === blueprintSignature) return;
     previewState.placedGears = getGearData(scroll);
     previewState.belts = Array.isArray(scroll?.blueprint?.belts) ? scroll.blueprint.belts : [];
     previewState.network = new GearNetwork(previewState.placedGears, previewState.belts);
@@ -1064,6 +1083,7 @@ function renderPreview(scroll) {
     fitPreview();
     renderer.render();
     renderedScrollId = scroll.id;
+    renderedScrollBlueprint = blueprintSignature;
 }
 
 function syncPreviewLocks(scroll) {
@@ -1392,17 +1412,25 @@ choiceModal?.addEventListener('click', event => {
 });
 
 window.addEventListener('storage', event => {
-    if (event.key === LIBRARY_KEY || event.key === BUILDINGS_KEY || event.key === ACTIVE_SCROLL_KEY || event.key === ACTIVE_SCROLL_RUNNING_KEY || event.key === ACTIVE_SCROLL_TARGETS_KEY || event.key === ACTIVE_SCROLL_SYNC_STATE_KEY || event.key === GAME_SAVE_KEY) {
+    if (event.key === GAME_SAVE_KEY) {
+        // Power changes update the status, but must not refit and redraw the running canvas.
+        renderDetail();
+        return;
+    }
+    if (event.key === LIBRARY_KEY || event.key === BUILDINGS_KEY || event.key === ACTIVE_SCROLL_KEY || event.key === ACTIVE_SCROLL_RUNNING_KEY || event.key === ACTIVE_SCROLL_TARGETS_KEY || event.key === ACTIVE_SCROLL_SYNC_STATE_KEY) {
         library = readLibrary();
         const availableScrolls = getAvailableScrolls();
         if (!availableScrolls.some(scroll => scroll.id === selectedScrollId)) {
             selectedScrollId = availableScrolls[0]?.id || null;
             renderedScrollId = null;
         }
-        if (event.key === LIBRARY_KEY) renderedScrollId = null;
+        const previousRenderedScrollId = renderedScrollId;
+        const previousRenderedScrollBlueprint = renderedScrollBlueprint;
         renderList();
         renderDetail();
-        resizePreview();
+        if (event.key !== LIBRARY_KEY
+            || renderedScrollId !== previousRenderedScrollId
+            || renderedScrollBlueprint !== previousRenderedScrollBlueprint) resizePreview();
     }
 });
 

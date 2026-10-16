@@ -10,7 +10,7 @@ import { BUILDING_BY_ID, BUILDING_DEFINITIONS, canPlaceBuildingOnTerrainCell, dr
 import { getBuildingUtilityStatus, simulateBuildingUtilityNetworks } from './buildingUtilityNetworks.js?v=5';
 import { buildTerritoryBorderSegments, buildTerritoryBorderSegmentsAsync } from './territoryBorders.js?v=36';
 import { directionToVehicleRotation, findNextRailStep, getTrackDirection, getVehicleRenderState, STATION_CONTROL_DEFAULTS, VEHICLE_DEFAULTS } from './railwayRuntime.js?v=9';
-import { GameState as EngineGameState, clearGameProgress } from '../../GearSystem/js/GameState.js?v=runtime-55';
+import { GameState as EngineGameState, clearGameProgress } from '../../GearSystem/js/GameState.js?v=runtime-58';
 import { GEAR_CONFIG as ENGINE_GEAR_CONFIG, GearManager as EngineGearManager } from '../../GearSystem/js/GearManager.js?v=runtime-5';
 import { GearNetwork as EngineGearNetwork } from '../../GearSystem/js/GearSystem.js?v=network-8';
 
@@ -34,6 +34,8 @@ let buildingNavigationRevision = 0;
 let buildingDrawOrderCacheRevision = -1;
 let orderedBuildingDrawCache = [];
 const AUTOMATON_TRANSPORT_STEP_DURATION_MS = 300;
+const AUTOMATON_SPEED_MULTIPLIERS = [1, 1.25, 1.5, 2, 3];
+const AUTOMATON_CARRY_MULTIPLIERS = [1, 2, 3, 5, 10];
 let automatonSkinPreview = null;
 let automatonPreviewSource = '';
 
@@ -4664,6 +4666,10 @@ function getVehicleState(placed) {
         ...saved,
         resources: { ...VEHICLE_DEFAULTS.resources, ...(isRecord(saved.resources) ? saved.resources : {}) }
     };
+    placed.vehicle.speedMultiplier = Math.max(1, Math.min(3, Number(placed.vehicle.speedMultiplier) || 1));
+    placed.vehicle.maxWagons = Math.max(0, Math.min(32, Math.floor(Number(placed.vehicle.maxWagons) || 0)));
+    placed.vehicle.powerPerCell = Math.max(0, Math.min(1000, Number(placed.vehicle.powerPerCell) || 0));
+    placed.vehicle.powerWagonExponent = Math.max(1, Math.min(4, Number(placed.vehicle.powerWagonExponent) || 2));
     return placed.vehicle;
 }
 
@@ -4677,6 +4683,9 @@ function getAutomatonState(placed) {
         axis: 'horizontal',
         direction: 1,
         range: 3,
+        speedMultiplier: 1,
+        carryCapacityMultiplier: 1,
+        powerPerOperation: 1,
         action: 'RESOURCE_COLLECTION',
         conditionCellType: '',
         transformTargetType: 'IRON_VEIN',
@@ -4702,6 +4711,11 @@ function getAutomatonState(placed) {
         ...saved
     };
     if (!['horizontal', 'vertical'].includes(placed.automaton.axis)) placed.automaton.axis = 'horizontal';
+    placed.automaton.speedMultiplier = AUTOMATON_SPEED_MULTIPLIERS.includes(Number(placed.automaton.speedMultiplier))
+        ? Number(placed.automaton.speedMultiplier) : 1;
+    placed.automaton.carryCapacityMultiplier = AUTOMATON_CARRY_MULTIPLIERS.includes(Number(placed.automaton.carryCapacityMultiplier))
+        ? Number(placed.automaton.carryCapacityMultiplier) : 1;
+    placed.automaton.powerPerOperation = Math.max(0, Math.min(1000, Number(placed.automaton.powerPerOperation) || 0));
     if (typeof placed.automaton.skinUrl !== 'string' || !placed.automaton.skinUrl) placed.automaton.skinUrl = skin.url;
     if (typeof placed.automaton.skinName !== 'string') placed.automaton.skinName = skin.name;
     if (!['RESOURCE_COLLECTION', 'TERRAIN_TRANSFORM', 'STORAGE_WITHDRAW', 'STORAGE_DEPOSIT', 'STORAGE_TRANSPORT'].includes(placed.automaton.action)) {
@@ -4730,7 +4744,7 @@ function getAutomatonState(placed) {
     );
     placed.automaton.deliveredAtDestination = Boolean(placed.automaton.deliveredAtDestination);
     const cargo = isRecord(placed.automaton.cargo) ? placed.automaton.cargo : {};
-    let cargoSpace = AUTOMATON_CARRY_STACK_SIZE;
+    let cargoSpace = getAutomatonCarryCapacity(placed.automaton);
     placed.automaton.cargo = {};
     for (const [itemId] of CRAFTING_ITEMS) {
         const amount = Math.min(cargoSpace, Math.max(0, Math.floor(Number(cargo[itemId]) || 0)));
@@ -4765,6 +4779,18 @@ function getAutomatonState(placed) {
         placed.automaton.transformTargetType = 'IRON_VEIN';
     }
     return placed.automaton;
+}
+
+function getAutomatonCarryCapacity(automaton) {
+    return AUTOMATON_CARRY_STACK_SIZE * automaton.carryCapacityMultiplier;
+}
+
+function getAutomatonActionDuration(automaton, baseDuration) {
+    return baseDuration / automaton.speedMultiplier;
+}
+
+function getTrainPowerPerCell(vehicle, wagonCount) {
+    return vehicle.powerPerCell * Math.pow(wagonCount + 1, vehicle.powerWagonExponent);
 }
 
 function getRailAt(x, y) {
@@ -4826,6 +4852,18 @@ function getCoupledWagonsBehind(placed, vehicle) {
     return wagons;
 }
 
+function getConnectedWagonCount(placed, vehicle, firstStep = null) {
+    let previousRail = vehicle.previousRail;
+    if (!previousRail && firstStep && !firstStep.error) {
+        const adjacentWagons = getAdjacentWagons(placed);
+        const wagonBehind = adjacentWagons.find(({ direction }) =>
+            direction[0] !== firstStep.direction[0] || direction[1] !== firstStep.direction[1])
+            || adjacentWagons[0];
+        previousRail = wagonBehind?.position || null;
+    }
+    return previousRail ? getCoupledWagonsBehind(placed, { ...vehicle, previousRail }).length : 0;
+}
+
 function getStationControlAtRail(x, y) {
     for (const placed of state.buildings) {
         const definition = BUILDING_BY_ID.get(placed.id);
@@ -4865,6 +4903,9 @@ function renderAutomatonMenu(placed) {
     document.getElementById('automaton-axis').value = automaton.axis;
     document.getElementById('automaton-range').value = String(automaton.range);
     document.getElementById('automaton-action').value = automaton.action;
+    document.getElementById('automaton-speed-multiplier').value = String(automaton.speedMultiplier);
+    document.getElementById('automaton-carry-capacity').value = String(automaton.carryCapacityMultiplier);
+    document.getElementById('automaton-power-per-operation').value = String(automaton.powerPerOperation);
     const isTransportAction = automaton.action === 'STORAGE_TRANSPORT';
     const stopCondition = document.getElementById('automaton-stop-condition');
     stopCondition.querySelector('[value="round-trips"]').hidden = !isTransportAction;
@@ -4939,13 +4980,17 @@ function renderAutomatonMenu(placed) {
             : automaton.stopCondition === 'source-empty'
                 ? `処理個数 ${automaton.processedItemCount} / 搬出元在庫切れで停止`
                 : `処理個数 ${automaton.processedItemCount}`;
+    const carryCapacity = getAutomatonCarryCapacity(automaton);
     const transportStatus = isTransportAction
-        ? `25×25移動範囲 / 倉庫間の点線が経路 / 積荷 ${cargoCount}/${AUTOMATON_CARRY_STACK_SIZE}`
+        ? `25×25移動範囲 / 倉庫間の点線が経路 / 積荷 ${cargoCount}/${carryCapacity}`
         : '';
     const movementScrollStatus = hasAssignedMovementScroll(placed) ? '' : '動作スクロール未設定 / ';
+    const powerStatus = !engineRuntimeState.creativeMode
+        ? `動力 ${formatUtilityAmount(engineRuntimeState.power)} / 作業消費 ${formatUtilityAmount(automaton.powerPerOperation)}`
+        : 'クリエイティブ / 動力消費なし';
     document.getElementById('automaton-status').textContent = automaton.running
-        ? `稼働中 / ${{ RESOURCE_COLLECTION: '資源を採取', TERRAIN_TRANSFORM: '地形を変成', STORAGE_WITHDRAW: '前方から取り出し', STORAGE_DEPOSIT: '前方へ収納', STORAGE_TRANSPORT: `倉庫間運搬 (${cargoCount}/${AUTOMATON_CARRY_STACK_SIZE})` }[automaton.action]} / ${itemProgressStatus}${isTransportAction ? ' / ' + transportStatus : ''}`
-        : `${movementScrollStatus}${automaton.stopReason || '停止中'} / ${itemProgressStatus}${transportStatus ? ` / ${transportStatus}` : ''}`;
+        ? `稼働中 / ${{ RESOURCE_COLLECTION: '資源を採取', TERRAIN_TRANSFORM: '地形を変成', STORAGE_WITHDRAW: '前方から取り出し', STORAGE_DEPOSIT: '前方へ収納', STORAGE_TRANSPORT: `倉庫間運搬 (${cargoCount}/${carryCapacity})` }[automaton.action]} / ${itemProgressStatus} / ${powerStatus}${isTransportAction ? ' / ' + transportStatus : ''}`
+        : `${movementScrollStatus}${automaton.stopReason || '停止中'} / ${itemProgressStatus} / ${powerStatus}${transportStatus ? ` / ${transportStatus}` : ''}`;
     document.getElementById('automaton-skin-name').textContent = `適用中: ${automaton.skinName || 'プレイヤーの見た目'}`;
     const previewSource = automaton.skinUrl || getPlayerSkinConfig().url;
     if (automatonPreviewSource !== previewSource) {
@@ -4986,6 +5031,17 @@ function changeAutomatonSetting(setting, value) {
     const automaton = getAutomatonState(placed);
     if (setting === 'axis') automaton.axis = value === 'vertical' ? 'vertical' : 'horizontal';
     if (setting === 'range') automaton.range = Math.max(1, Math.min(5, Math.floor(Number(value) || 1)));
+    if (setting === 'speedMultiplier') {
+        const multiplier = Number(value);
+        automaton.speedMultiplier = AUTOMATON_SPEED_MULTIPLIERS.includes(multiplier) ? multiplier : 1;
+    }
+    if (setting === 'carryCapacityMultiplier') {
+        const multiplier = Number(value);
+        automaton.carryCapacityMultiplier = AUTOMATON_CARRY_MULTIPLIERS.includes(multiplier) ? multiplier : 1;
+    }
+    if (setting === 'powerPerOperation') {
+        automaton.powerPerOperation = Math.max(0, Math.min(1000, Number(value) || 0));
+    }
     if (setting === 'stopCondition') {
         const allowedConditions = automaton.action === 'STORAGE_TRANSPORT'
             ? ['none', 'item-count', 'round-trips', 'source-empty']
@@ -5556,7 +5612,7 @@ function transferAutomatonStorage(placed, automaton) {
             : !selectedItems.has(itemId));
     let changed = false;
     let movedTotal = 0;
-    let remainingQuota = Math.min(AUTOMATON_CARRY_STACK_SIZE, getAutomatonItemCountRemaining(automaton));
+    let remainingQuota = Math.min(getAutomatonCarryCapacity(automaton), getAutomatonItemCountRemaining(automaton));
     for (const itemId of itemIds) {
         const resourceKey = { water: 'water', fog: 'fog', power: 'power', steam_power: 'steamPower' }[itemId];
         const storedCount = Math.floor(getStorageMaterialCount(storage, itemId));
@@ -5618,7 +5674,7 @@ function transferAutomatonBetweenStorages(placed, automaton) {
     let movedTotal = 0;
 
     if (cargoCount === 0 && storage.instanceId === automaton.sourceStorageInstanceId) {
-        let remainingCapacity = Math.min(AUTOMATON_CARRY_STACK_SIZE, getAutomatonItemCountRemaining(automaton));
+        let remainingCapacity = Math.min(getAutomatonCarryCapacity(automaton), getAutomatonItemCountRemaining(automaton));
         for (const itemId of itemIds) {
             const storedCount = Math.floor(getStorageMaterialCount(storage, itemId));
             const moved = Math.min(storedCount, remainingCapacity);
@@ -5656,14 +5712,31 @@ function transferAutomatonBetweenStorages(placed, automaton) {
 function processAutomatonCell(placed, automaton) {
     const tile = state.map[placed.y]?.[placed.x];
     if (!tile || automaton.conditionCellType && getCellTypeKey(tile) !== automaton.conditionCellType) return false;
+    const creativeMode = Boolean(engineRuntimeState.creativeMode);
+    const operationPower = creativeMode ? 0 : automaton.powerPerOperation;
+    if (!creativeMode && Number(engineRuntimeState.power) < operationPower) {
+        stopAutomatonWithReason(placed, automaton, '動力不足');
+        return false;
+    }
     if (['STORAGE_WITHDRAW', 'STORAGE_DEPOSIT'].includes(automaton.action)) {
-        return transferAutomatonStorage(placed, automaton);
+        const transferred = transferAutomatonStorage(placed, automaton);
+        if (transferred && !creativeMode) {
+            engineRuntimeState.power -= operationPower;
+            engineRuntimeState.saveGameData();
+            engineRuntimeState.notify();
+        }
+        return transferred;
     }
     if (automaton.action === 'STORAGE_TRANSPORT') {
-        return transferAutomatonBetweenStorages(placed, automaton);
+        const transferred = transferAutomatonBetweenStorages(placed, automaton);
+        if (transferred && !creativeMode) {
+            engineRuntimeState.power -= operationPower;
+            engineRuntimeState.saveGameData();
+            engineRuntimeState.notify();
+        }
+        return transferred;
     }
     const mode = automaton.action;
-    const creativeMode = Boolean(engineRuntimeState.creativeMode);
     const operationMaterials = creativeMode
         ? Object.fromEntries(Object.keys(TERRAIN_TRANSFORM_RECIPES[automaton.transformTargetType] || {})
             .map(item => [item, Number.MAX_SAFE_INTEGER]))
@@ -5673,14 +5746,24 @@ function processAutomatonCell(placed, automaton) {
         mode,
         terrainTargetType: automaton.transformTargetType,
         materials: operationMaterials,
-        power: creativeMode ? Number.MAX_SAFE_INTEGER : engineRuntimeState.power
+        power: creativeMode ? Number.MAX_SAFE_INTEGER : engineRuntimeState.power - operationPower
     });
-    if (!result?.success) return false;
+    if (!result?.success) {
+        if (!creativeMode && mode === 'RESOURCE_COLLECTION') {
+            const requiredPower = operationPower + getCellCollectionPowerCost(
+                getCellTypeKey(tile), Number(tile.collectionCount) || 0
+            );
+            if (Number(engineRuntimeState.power) < requiredPower) {
+                stopAutomatonWithReason(placed, automaton, '動力不足');
+            }
+        }
+        return false;
+    }
     if (!creativeMode) {
         Object.entries(result.consumedItems || {}).forEach(([item, amount]) => {
             engineRuntimeState.materialInventory[item] = Math.max(0, (Number(engineRuntimeState.materialInventory[item]) || 0) - amount);
         });
-        engineRuntimeState.power = Math.max(0, engineRuntimeState.power - (Number(result.consumedPower) || 0));
+        engineRuntimeState.power = Math.max(0, engineRuntimeState.power - operationPower - (Number(result.consumedPower) || 0));
     }
     Object.entries(result.producedItems || {}).forEach(([item, amount]) => {
         engineRuntimeState.materialInventory[item] = (Number(engineRuntimeState.materialInventory[item]) || 0) + amount;
@@ -5700,7 +5783,7 @@ function tryAutomatonStorageTransfer(placed, automaton, direction, now) {
     automaton.facingDirection = direction;
     if (!getAutomatonStorageTarget(placed, automaton)) return false;
     if (!processAutomatonCell(placed, automaton)) return false;
-    automaton.nextMoveAt = now + 1400;
+    automaton.nextMoveAt = now + getAutomatonActionDuration(automaton, 1400);
     return true;
 }
 
@@ -5768,7 +5851,7 @@ function finishAutomatonTransportLeg(placed, automaton, route, now) {
             approach,
             targetStorageInstanceId
         });
-        automaton.nextMoveAt = now + 1400;
+        automaton.nextMoveAt = now + getAutomatonActionDuration(automaton, 1400);
         saveBuildings();
         if (selectedBuildingInstanceId === placed.instanceId) renderAutomatonMenu(placed);
         scheduleDraw();
@@ -5784,7 +5867,7 @@ function finishAutomatonTransportLeg(placed, automaton, route, now) {
         stopAutomatonWithoutTransportRoute(placed, automaton);
         return false;
     }
-    automaton.nextMoveAt = now + 1400;
+    automaton.nextMoveAt = now + getAutomatonActionDuration(automaton, 1400);
     saveBuildings();
     if (selectedBuildingInstanceId === placed.instanceId) renderAutomatonMenu(placed);
     scheduleDraw();
@@ -5858,9 +5941,9 @@ function tickAutomatonTransport(placed, automaton, now) {
         from: { x: placed.x, y: placed.y },
         to: target,
         startedAt: now,
-        durationMs: AUTOMATON_TRANSPORT_STEP_DURATION_MS
+        durationMs: getAutomatonActionDuration(automaton, AUTOMATON_TRANSPORT_STEP_DURATION_MS)
     };
-    automaton.nextMoveAt = now + AUTOMATON_TRANSPORT_STEP_DURATION_MS;
+    automaton.nextMoveAt = now + getAutomatonActionDuration(automaton, AUTOMATON_TRANSPORT_STEP_DURATION_MS);
     scheduleDraw();
     return true;
 }
@@ -5897,7 +5980,7 @@ function tickAutomatons(now) {
             };
             automaton.movement = null;
             const transferred = processAutomatonCell(placed, automaton);
-            automaton.nextMoveAt = movementEnd + (transferred ? 1400 : 250);
+            automaton.nextMoveAt = movementEnd + getAutomatonActionDuration(automaton, transferred ? 1400 : 250);
             buildingsChanged = true;
             continue;
         }
@@ -5937,9 +6020,9 @@ function tickAutomatons(now) {
             from: { x: placed.x, y: placed.y },
             to: target,
             startedAt: now,
-            durationMs: 420
+            durationMs: getAutomatonActionDuration(automaton, 420)
         };
-        automaton.nextMoveAt = now + 700;
+        automaton.nextMoveAt = now + getAutomatonActionDuration(automaton, 700);
         scheduleDraw();
         buildingsChanged = true;
     }
@@ -6028,7 +6111,7 @@ function toggleSelectedAutomaton() {
             automaton.nextMoveAt = performance.now() + 250;
         } else {
             const transferred = processAutomatonCell(placed, automaton);
-            automaton.nextMoveAt = performance.now() + (transferred ? 1400 : 600);
+            automaton.nextMoveAt = performance.now() + getAutomatonActionDuration(automaton, transferred ? 1400 : 600);
         }
     }
     saveBuildings();
@@ -6050,8 +6133,18 @@ function renderVehicleMenu(placed, definition) {
         return;
     }
     const vehicle = getVehicleState(placed);
-    const hasMovementScroll = hasAssignedMovementScroll(placed);
+    const speedSelect = document.getElementById('vehicle-speed-multiplier');
+    const maxWagonsInput = document.getElementById('vehicle-max-wagons');
+    const powerPerCellInput = document.getElementById('vehicle-power-per-cell');
+    const powerExponentInput = document.getElementById('vehicle-power-wagon-exponent');
+    if (speedSelect) speedSelect.value = String(vehicle.speedMultiplier);
+    if (maxWagonsInput) maxWagonsInput.value = String(vehicle.maxWagons);
+    if (powerPerCellInput) powerPerCellInput.value = String(vehicle.powerPerCell);
+    if (powerExponentInput) powerExponentInput.value = String(vehicle.powerWagonExponent);
     const firstStep = vehicle.running ? null : getVehicleNextStep(placed, { ...vehicle, previousRail: null });
+    const coupledWagonCount = getConnectedWagonCount(placed, vehicle, firstStep);
+    const segmentPower = getTrainPowerPerCell(vehicle, coupledWagonCount);
+    const hasMovementScroll = hasAssignedMovementScroll(placed);
     if (start) {
         start.hidden = false;
         start.disabled = !vehicle.running && !hasMovementScroll;
@@ -6061,25 +6154,56 @@ function renderVehicleMenu(placed, definition) {
         start.setAttribute('aria-label', vehicle.running ? '機関車を停止' : '機関車を出発');
     }
     if (status) {
-        status.textContent = vehicle.running ? '運行中' : !hasMovementScroll ? '動作スクロール未設定' : firstStep?.error ? '出発できません' : '停車中';
+        status.textContent = vehicle.running ? '運行中' : coupledWagonCount > vehicle.maxWagons
+            ? '牽引上限を超過'
+            : !hasMovementScroll ? '動作スクロール未設定' : firstStep?.error ? '出発できません' : '停車中';
         status.classList.toggle('is-running', vehicle.running);
-        status.classList.toggle('is-blocked', Boolean(!vehicle.running && firstStep?.error));
+        status.classList.toggle('is-blocked', Boolean(!vehicle.running && (firstStep?.error || coupledWagonCount > vehicle.maxWagons)));
     }
     if (guide) {
         if (vehicle.running) {
             guide.textContent = '運行中です。「停止」を押すと、現在の移動を確定して停車します。';
+        } else if (coupledWagonCount > vehicle.maxWagons) {
+            guide.textContent = `連結貨車 ${coupledWagonCount} 台が設定上限 ${vehicle.maxWagons} 台を超えています。最大連結貨車数を増やしてください。`;
         } else if (!hasMovementScroll) {
             guide.textContent = '出発前に動作スクロールをセットしてください。';
         } else if (firstStep?.error) {
             const reason = VEHICLE_STOP_MESSAGES[firstStep.error] || '線路の接続を確認してください';
             guide.textContent = `出発できません：${reason}。線路を確認してください。`;
         } else if (vehicle.stopReason && vehicle.stopReason !== '手動停止') {
-            guide.textContent = `前回の停止理由：${vehicle.stopReason}。線路を確認して「出発」を押してください。`;
+            guide.textContent = vehicle.stopReason === '動力不足'
+                ? '動力が不足して停止しました。動力を補充してから「出発」を押してください。'
+                : `前回の停止理由：${vehicle.stopReason}。線路と連結貨車数を確認してください。`;
         } else {
             guide.textContent = '出発準備完了。「出発」を押すと線路に沿って進みます。連結した貨車は自動で追従し、分岐では駅舎で進路を指定します。';
         }
     }
-    if (resourceSettings) resourceSettings.textContent = `速度：${vehicle.speedCellsPerSecond}マス / 秒`;
+    if (resourceSettings) resourceSettings.textContent =
+        `速度：${formatUtilityAmount(vehicle.speedCellsPerSecond * vehicle.speedMultiplier)}マス / 秒` +
+        ` / 連結貨車 ${coupledWagonCount}/${vehicle.maxWagons}台` +
+        ` / 消費動力 ${engineRuntimeState.creativeMode ? 'なし' : `${formatUtilityAmount(segmentPower)} / マス`}`;
+}
+
+function changeVehicleSetting(setting, value) {
+    const placed = state.buildings.find(building => building.instanceId === selectedBuildingInstanceId);
+    if (!placed || BUILDING_BY_ID.get(placed.id)?.kind !== 'locomotive') return;
+    const vehicle = getVehicleState(placed);
+    const numericValue = Number(value);
+    if (!Number.isFinite(numericValue)) {
+        renderVehicleMenu(placed, BUILDING_BY_ID.get(placed.id));
+        return;
+    }
+    if (setting === 'speedMultiplier') {
+        vehicle.speedMultiplier = AUTOMATON_SPEED_MULTIPLIERS.includes(numericValue) ? numericValue : 1;
+    } else if (setting === 'maxWagons') {
+        vehicle.maxWagons = Math.max(0, Math.min(32, Math.floor(numericValue)));
+    } else if (setting === 'powerPerCell') {
+        vehicle.powerPerCell = Math.max(0, Math.min(1000, numericValue));
+    } else if (setting === 'powerWagonExponent') {
+        vehicle.powerWagonExponent = Math.max(1, Math.min(4, numericValue));
+    }
+    saveBuildings();
+    renderVehicleMenu(placed, BUILDING_BY_ID.get(placed.id));
 }
 
 function formatUtilityAmount(amount) {
@@ -6114,7 +6238,9 @@ function updateBuildingScrollStatus(placed) {
     if (movementScrollRequired) {
         const scrollId = getMovementScrollId(placed);
         const selectedScroll = getStoredSavedScrolls().find(scroll => scroll.id === scrollId);
-        updateBuildingScrollPreview(null);
+        updateBuildingScrollPreview(
+            BUILDING_BY_ID.get(placed.id)?.kind === 'locomotive' ? selectedScroll || null : null
+        );
         updateBuildingScrollToggle(null);
         if (!scrollId) status.textContent = '動作スクロール未設定。セットすると運転できます。';
         else if (!hasAssignedMovementScroll(placed)) {
@@ -6215,8 +6341,16 @@ function updateBuildingScrollToggle(scroll) {
 }
 
 function updateBuildingScrollPreview(scroll) {
-    const preview = document.getElementById('building-scroll-preview');
-    const frame = document.getElementById('building-scroll-preview-frame');
+    updateScrollPreviewElements(scroll, 'building-scroll-preview', 'building-scroll-preview-frame');
+}
+
+function updateAutomatonScrollPreview(scroll) {
+    updateScrollPreviewElements(scroll, 'automaton-scroll-preview', 'automaton-scroll-preview-frame');
+}
+
+function updateScrollPreviewElements(scroll, previewId, frameId) {
+    const preview = document.getElementById(previewId);
+    const frame = document.getElementById(frameId);
     if (!preview || !frame) return;
     preview.hidden = !scroll;
     if (!scroll) {
@@ -6232,7 +6366,7 @@ function updateBuildingScrollPreview(scroll) {
     previewUrl.searchParams.set('previewOnly', '1');
     previewUrl.searchParams.set('followRunning', '1');
     previewUrl.searchParams.set('scrollId', scroll.id);
-    previewUrl.searchParams.set('v', '58');
+    previewUrl.searchParams.set('v', '59');
     frame.src = previewUrl.href;
     frame.dataset.scrollId = scroll.id;
 }
@@ -6290,6 +6424,7 @@ function renderAutomatonMovementScrollControl(placed) {
         && (!installedScrollIds.has(scroll.id) || scroll.id === assignedScrollId));
     if (assignedScrollId && !scrolls.some(scroll => scroll.id === assignedScrollId)) {
         const assigned = getStoredSavedScrolls().find(scroll => scroll.id === assignedScrollId);
+        updateAutomatonScrollPreview(assigned || null);
         scrolls.unshift(assigned || { id: assignedScrollId, name: '登録解除されたスクロール' });
     }
     select.replaceChildren(new Option('スクロールを選択', ''));
@@ -6593,6 +6728,23 @@ function tickVehicleRuntime(now) {
             continue;
         }
         const coupledWagons = getCoupledWagonsBehind(placed, vehicle);
+        if (coupledWagons.length > vehicle.maxWagons) {
+            vehicle.running = false;
+            vehicle.stopReason = `連結貨車が上限（${vehicle.maxWagons}台）を超過`;
+            vehicle.nextMoveAt = 0;
+            stoppedVehicle = true;
+            changed = true;
+            continue;
+        }
+        const segmentPower = getTrainPowerPerCell(vehicle, coupledWagons.length);
+        if (!engineRuntimeState.creativeMode && Number(engineRuntimeState.power) < segmentPower) {
+            vehicle.running = false;
+            vehicle.stopReason = '動力不足';
+            vehicle.nextMoveAt = 0;
+            stoppedVehicle = true;
+            changed = true;
+            continue;
+        }
         const consistIds = new Set([placed.instanceId, ...coupledWagons.map(({ placed: wagon }) => wagon.instanceId)]);
         const destinations = [step.position, ...coupledWagons.map(({ to }) => to)];
         const blockingVehicle = state.buildings.find(other => !consistIds.has(other.instanceId)
@@ -6617,7 +6769,12 @@ function tickVehicleRuntime(now) {
             changed = true;
             continue;
         }
-        const durationMs = 1000 / Math.max(0.1, Number(vehicle.speedCellsPerSecond) || 1);
+        if (!engineRuntimeState.creativeMode) {
+            engineRuntimeState.power = Math.max(0, engineRuntimeState.power - segmentPower);
+            engineRuntimeState.saveGameData();
+            engineRuntimeState.notify();
+        }
+        const durationMs = 1000 / (Math.max(0.1, Number(vehicle.speedCellsPerSecond) || 1) * vehicle.speedMultiplier);
         const from = { x: placed.x, y: placed.y };
         const direction = step.direction;
         vehicle.movement = {
@@ -7756,6 +7913,9 @@ document.addEventListener('click', (event) => {
 [
     ['automaton-axis', 'axis'],
     ['automaton-range', 'range'],
+    ['automaton-speed-multiplier', 'speedMultiplier'],
+    ['automaton-carry-capacity', 'carryCapacityMultiplier'],
+    ['automaton-power-per-operation', 'powerPerOperation'],
     ['automaton-action', 'action'],
     ['automaton-source-storage', 'sourceStorageInstanceId'],
     ['automaton-destination-storage', 'destinationStorageInstanceId'],
@@ -7765,6 +7925,16 @@ document.addEventListener('click', (event) => {
     ['automaton-stop-limit', 'stopLimit']
 ].forEach(([id, setting]) => {
     document.getElementById(id)?.addEventListener('change', event => changeAutomatonSetting(setting, event.target.value));
+});
+
+[
+    ['vehicle-speed-multiplier', 'speedMultiplier'],
+    ['vehicle-max-wagons', 'maxWagons'],
+    ['vehicle-power-per-cell', 'powerPerCell'],
+    ['vehicle-power-wagon-exponent', 'powerWagonExponent']
+].forEach(([id, setting]) => {
+    document.getElementById(id)?.addEventListener('change', event =>
+        changeVehicleSetting(setting, event.currentTarget.value));
 });
 
 document.getElementById('automaton-skin-file')?.addEventListener('change', event => {

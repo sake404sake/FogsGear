@@ -1095,6 +1095,7 @@ html:has(body.scroll-preview-only) {
         width: 100%;
         max-width: none;
         height: auto;
+        aspect-ratio: 4 / 3;
         flex: 0 1 auto;
     }
     body:not(.scroll-library-page):not(.embedded-library):has(#gearCanvas) > #gear-config-panel {

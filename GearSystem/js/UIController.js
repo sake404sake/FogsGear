@@ -573,8 +573,8 @@ export class UIController {
         const canvasPoint = this.renderer.canvasPoint(event.clientX, event.clientY);
         const adjustedCanvasY = canvasPoint.y - offset;
         return {
-            x: (canvasPoint.x - this.canvas.width / 2) / this.state.zoomScale - this.state.offsetX,
-            y: (adjustedCanvasY - this.canvas.height / 2) / this.state.zoomScale - this.state.offsetY
+            x: (canvasPoint.x - this.renderer.width / 2) / this.state.zoomScale - this.state.offsetX,
+            y: (adjustedCanvasY - this.renderer.height / 2) / this.state.zoomScale - this.state.offsetY
         };
     }
 

@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-71 -71 142 142">
+  <defs>
+    <mask id="perforations" maskUnits="userSpaceOnUse" x="-60" y="-60" width="120" height="120">
+      <circle r="57" fill="#fff"/>
+      <circle r="8" fill="#000"/>
+      <circle cx="0" cy="-39" r="12.5" fill="#000" transform="rotate(60)"/>
+      <circle cx="0" cy="-39" r="12.5" fill="#000" transform="rotate(180)"/>
+      <circle cx="0" cy="-39" r="12.5" fill="#000" transform="rotate(300)"/>
+      <path d="M-1.8-7L-2.3-25Q-2.5-28 0-30Q2.5-28 2.3-25L1.8-7Z" fill="#000" transform="rotate(60)"/>
+      <path d="M-1.8-7L-2.3-25Q-2.5-28 0-30Q2.5-28 2.3-25L1.8-7Z" fill="#000" transform="rotate(180)"/>
+      <path d="M-1.8-7L-2.3-25Q-2.5-28 0-30Q2.5-28 2.3-25L1.8-7Z" fill="#000" transform="rotate(300)"/>
+      <path d="M-3 14V7L-8.5-5Q-11-10-7-13Q-5-15 0-15Q5-15 7-13Q11-10 8.5-5L3 7V14M-4.5 14H4.5M-5.5-3Q0-5.5 5.5-3"
+            fill="none" stroke="#000" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" transform="translate(0 -39)"/>
+      <path d="M-3 14V7L-8.5-5Q-11-10-7-13Q-5-15 0-15Q5-15 7-13Q11-10 8.5-5L3 7V14M-4.5 14H4.5M-5.5-3Q0-5.5 5.5-3"
+            fill="none" stroke="#000" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" transform="rotate(120) translate(0 -39)"/>
+      <path d="M-3 14V7L-8.5-5Q-11-10-7-13Q-5-15 0-15Q5-15 7-13Q11-10 8.5-5L3 7V14M-4.5 14H4.5M-5.5-3Q0-5.5 5.5-3"
+            fill="none" stroke="#000" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" transform="rotate(240) translate(0 -39)"/>
+    </mask>
+  </defs>
+  <g fill="none" stroke="#fff">
+    <circle r="67" stroke-width="7"/>
+    <circle r="59" stroke-width="2"/>
+  </g>
+  <circle r="57" fill="#fff" mask="url(#perforations)"/>
+  <circle r="52" fill="none" stroke="#fff" stroke-width="2"/>
+</svg>

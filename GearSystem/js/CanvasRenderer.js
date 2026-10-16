@@ -1,5 +1,6 @@
 // ベルト点線の見た目上の移動速度。小さくするほどゆっくりになる。
 const BELT_ANIMATION_SPEED = 0.00035;
+const SIMULATION_INTERVAL = 1 / 30;
 
 /**
  * CanvasRenderer - ギア盤面の描画、アニメーション、座標変換を担当する。
@@ -25,24 +26,38 @@ export class CanvasRenderer {
         this.tintedImages = {};
         this.gearSprites = new Map();
         this.resizeObserver = null;
+        this.width = 1;
+        this.height = 1;
+        this.pixelRatio = 1;
+        this.lastFrameAt = null;
+        this.simulationAccumulator = 0;
+        this.previousGearAngles = new Map();
         this.loadGearImages();
         this.resizeCanvas();
         if ('ResizeObserver' in window) {
             this.resizeObserver = new ResizeObserver(() => this.resizeCanvas());
             this.resizeObserver.observe(this.canvas);
         }
-        if (autoAnimate) requestAnimationFrame(() => this.loop());
+        window.addEventListener('resize', () => this.resizeCanvas());
+        if (autoAnimate) requestAnimationFrame(now => this.loop(now));
     }
 
     resizeCanvas() {
         const rect = this.canvas.getBoundingClientRect();
-        const dpr = window.devicePixelRatio || 1;
-        const nextWidth = Math.max(1, Math.round(rect.width * dpr));
-        const nextHeight = Math.max(1, Math.round(rect.height * dpr));
-        if (this.canvas.width !== nextWidth || this.canvas.height !== nextHeight) {
+        const width = Math.max(1, rect.width);
+        const height = Math.max(1, rect.height);
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const nextWidth = Math.max(1, Math.round(width * dpr));
+        const nextHeight = Math.max(1, Math.round(height * dpr));
+        const backingStoreChanged = this.canvas.width !== nextWidth || this.canvas.height !== nextHeight;
+        if (backingStoreChanged) {
             this.canvas.width = nextWidth;
             this.canvas.height = nextHeight;
+            this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         }
+        this.width = width;
+        this.height = height;
+        this.pixelRatio = dpr;
     }
 
     loadGearImages() {
@@ -56,23 +71,36 @@ export class CanvasRenderer {
                 this.tintedImages = {};
                 this.gearSprites.clear();
             };
-            image.src = `assets/gear-${name}.png`;
+            image.onerror = () => {
+                console.error(`Failed to load gear artwork: ${name}`);
+            };
+            image.src = `assets/gear-${name}.${name === 'core' ? 'png' : 'svg'}`;
         });
     }
 
-    loop() {
-        // 1フレームごとにゲーム状態を進めてから、最新状態を描画する。
-        requestAnimationFrame(() => this.loop());
-        this.state.tick();
-        this.render();
+    loop(now) {
+        requestAnimationFrame(nextFrameAt => this.loop(nextFrameAt));
+        if (this.lastFrameAt === null) {
+            this.lastFrameAt = now;
+            this.previousGearAngles = new Map(this.state.placedGears.map(gear => [gear.id, gear.angle]));
+        } else {
+            this.simulationAccumulator += Math.min(0.25, Math.max(0, (now - this.lastFrameAt) / 1000));
+            this.lastFrameAt = now;
+            while (this.simulationAccumulator >= SIMULATION_INTERVAL) {
+                this.previousGearAngles = new Map(this.state.placedGears.map(gear => [gear.id, gear.angle]));
+                this.state.tick(SIMULATION_INTERVAL);
+                this.simulationAccumulator -= SIMULATION_INTERVAL;
+            }
+        }
+        this.render(this.simulationAccumulator / SIMULATION_INTERVAL);
     }
 
     worldPoint(clientX, clientY) {
         // ブラウザー座標をズーム・パン補正後のワールド座標へ変換する。
         const point = this.canvasPoint(clientX, clientY);
         return {
-            x: (point.x - this.canvas.width / 2) / this.state.zoomScale - this.state.offsetX,
-            y: (point.y - this.canvas.height / 2) / this.state.zoomScale - this.state.offsetY
+            x: (point.x - this.width / 2) / this.state.zoomScale - this.state.offsetX,
+            y: (point.y - this.height / 2) / this.state.zoomScale - this.state.offsetY
         };
     }
 
@@ -80,18 +108,18 @@ export class CanvasRenderer {
         // CSS表示サイズと内部キャンバス解像度の差を吸収してキャンバス座標へ変換する。
         const rect = this.canvas.getBoundingClientRect();
         return {
-            x: (clientX - rect.left) * this.canvas.width / rect.width,
-            y: (clientY - rect.top) * this.canvas.height / rect.height
+            x: clientX - rect.left,
+            y: clientY - rect.top
         };
     }
 
-    render() {
-        this.resizeCanvas();
+    render(interpolation = 1) {
         // 背景、グリッド、配置ギア、ループ表示、ゴーストをこの順番で描画する。
-        const { width, height } = this.canvas;
+        const { width, height } = this;
         this.ctx.clearRect(0, 0, width, height);
         this.ctx.fillStyle = '#120e0c';
         this.ctx.fillRect(0, 0, width, height);
+        this.drawHexGrid();
         this.ctx.save();
         this.ctx.translate(width / 2, height / 2);
         this.ctx.scale(this.state.zoomScale, this.state.zoomScale);
@@ -105,7 +133,11 @@ export class CanvasRenderer {
         this.drawBeltSelection();
         this.sortedGears.forEach(gear => {
             if (!this.state.visibleLayers?.[gear.layer]) return;
-            this.drawGear(gear);
+            const previousAngle = this.previousGearAngles.get(gear.id);
+            const angle = previousAngle === undefined
+                ? gear.angle
+                : previousAngle + (gear.angle - previousAngle) * interpolation;
+            this.drawGear(gear, false, true, true, angle);
         });
         this.drawSelectableGears();
         if (this.state.showBelts) this.drawBelts();
@@ -273,17 +305,18 @@ export class CanvasRenderer {
 
     drawHexGrid() {
         // ズーム・パン・配置軸が変わったときだけグリッドを再生成し、通常は画像を再利用する。
-        const { width, height } = this.canvas;
+        const { width, height } = this;
         const gearKey = this.state.placedGears.map(gear => `${gear.q},${gear.r}`).join('|');
-        const key = `${width}x${height}:${this.state.zoomScale}:${this.state.offsetX}:${this.state.offsetY}:${gearKey}`;
+        const key = `${width}x${height}:${this.pixelRatio}:${this.state.zoomScale}:${this.state.offsetX}:${this.state.offsetY}:${gearKey}`;
         if (key === this.gridKey) {
-            this.ctx.drawImage(this.gridCanvas, 0, 0);
+            this.ctx.drawImage(this.gridCanvas, 0, 0, width, height);
             return;
         }
 
-        this.gridCanvas.width = width;
-        this.gridCanvas.height = height;
+        this.gridCanvas.width = this.canvas.width;
+        this.gridCanvas.height = this.canvas.height;
         const gridContext = this.gridCanvas.getContext('2d');
+        gridContext.setTransform(this.gridCanvas.width / width, 0, 0, this.gridCanvas.height / height, 0, 0);
         gridContext.clearRect(0, 0, width, height);
         gridContext.strokeStyle = 'rgba(139, 115, 85, 0.16)';
         gridContext.fillStyle = 'rgba(212, 175, 55, 0.04)';
@@ -300,7 +333,7 @@ export class CanvasRenderer {
                 const center = this.hexToPixel(q, r);
                 const screenX = width / 2 + (center.x + this.state.offsetX) * this.state.zoomScale;
                 const screenY = height / 2 + (center.y + this.state.offsetY) * this.state.zoomScale;
-                const radius = 2 * Math.sqrt(3) * 0.95 * this.state.zoomScale;
+                const radius = 2 * 0.95 * this.state.zoomScale;
                 if (screenX + radius < 0 || screenX - radius > width || screenY + radius < 0 || screenY - radius > height) continue;
                 gridContext.beginPath();
                 for (let i = 0; i < 6; i++) {
@@ -315,7 +348,7 @@ export class CanvasRenderer {
             }
         }
         this.gridKey = key;
-        this.ctx.drawImage(this.gridCanvas, 0, 0);
+        this.ctx.drawImage(this.gridCanvas, 0, 0, width, height);
     }
 
     hexToPixel(q, r) {
@@ -358,7 +391,9 @@ export class CanvasRenderer {
         this.ctx.globalAlpha = alpha;
         const toothLength = Math.max(6, Math.min(10, radius * 0.1));
         const bodyRadius = radius - toothLength;
-        const imageRadius = bodyRadius * (160 / 142);
+        const imageRadius = name === 'core'
+            ? bodyRadius * (160 / 142)
+            : bodyRadius * (71 / 70.5);
         this.ctx.drawImage(image, -imageRadius, -imageRadius, imageRadius * 2, imageRadius * 2);
         this.ctx.globalAlpha = 1;
         return true;
@@ -417,7 +452,7 @@ export class CanvasRenderer {
         this.ctx.fillText(`L${gear.layer + 1}`, gear.x - 10, gear.y - gear.radius + 10);
     }
 
-    drawGear(gear, isGhost = false, useSpriteCache = true, showLayerLabel = true) {
+    drawGear(gear, isGhost = false, useSpriteCache = true, showLayerLabel = true, angle = gear.angle) {
         // 状態に応じた色を選び、画像またはフォールバック図形で1個のギアを描画する。
         const ctx = this.ctx;
         const radius = gear.radius;
@@ -425,7 +460,7 @@ export class CanvasRenderer {
             const sprite = this.getGearSprite(gear);
             ctx.save();
             ctx.translate(gear.x, gear.y);
-            ctx.rotate(gear.angle);
+            ctx.rotate(angle);
             ctx.drawImage(sprite, -sprite.width / 4, -sprite.height / 4, sprite.width / 2, sprite.height / 2);
             ctx.restore();
             if (showLayerLabel) this.drawGearLayerLabel(gear);
@@ -450,7 +485,7 @@ export class CanvasRenderer {
         ctx.save();
         ctx.translate(gear.x, gear.y);
         if (gear.isCore && !isGhost) { ctx.shadowColor = '#ffe066'; ctx.shadowBlur = 20; }
-        ctx.rotate(gear.angle);
+        ctx.rotate(angle);
         const assetName = gear.isCore ? 'core' : String(gear.designType || 'INDUSTRIAL').toLowerCase();
         const assetColor = isGhost
             ? gear.valid ? '#858b8f' : '#d85c4a'

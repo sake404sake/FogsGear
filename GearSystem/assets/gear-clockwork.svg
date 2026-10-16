@@ -1,0 +1,108 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-71 -71 142 142">
+  <defs>
+    <g id="major-marks" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round">
+      <path d="M0-58V-53"/>
+      <path d="M0-58V-53" transform="rotate(30)"/>
+      <path d="M0-58V-53" transform="rotate(60)"/>
+      <path d="M0-58V-53" transform="rotate(90)"/>
+      <path d="M0-58V-53" transform="rotate(120)"/>
+      <path d="M0-58V-53" transform="rotate(150)"/>
+      <path d="M0-58V-53" transform="rotate(180)"/>
+      <path d="M0-58V-53" transform="rotate(210)"/>
+      <path d="M0-58V-53" transform="rotate(240)"/>
+      <path d="M0-58V-53" transform="rotate(270)"/>
+      <path d="M0-58V-53" transform="rotate(300)"/>
+      <path d="M0-58V-53" transform="rotate(330)"/>
+    </g>
+    <mask id="hand-inlay" maskUnits="userSpaceOnUse" x="-8" y="-56" width="16" height="72">
+      <rect x="-8" y="-56" width="16" height="72" fill="#fff"/>
+      <path d="M0-11V-43" stroke="#000" stroke-width="1" stroke-linecap="round"/>
+    </mask>
+  </defs>
+  <g fill="none" stroke="#fff">
+    <circle r="67" stroke-width="7"/>
+    <circle r="59" stroke-width="2"/>
+  </g>
+  <circle r="60" fill="none" stroke="#fff" stroke-width="2"/>
+  <circle r="34" fill="none" stroke="#fff" stroke-width="2"/>
+  <g fill="none" stroke="#fff" stroke-width="1" stroke-linecap="round">
+    <path d="M0-58V-56" transform="rotate(6)"/>
+    <path d="M0-58V-56" transform="rotate(12)"/>
+    <path d="M0-58V-56" transform="rotate(18)"/>
+    <path d="M0-58V-56" transform="rotate(24)"/>
+    <path d="M0-58V-56" transform="rotate(36)"/>
+    <path d="M0-58V-56" transform="rotate(42)"/>
+    <path d="M0-58V-56" transform="rotate(48)"/>
+    <path d="M0-58V-56" transform="rotate(54)"/>
+    <path d="M0-58V-56" transform="rotate(66)"/>
+    <path d="M0-58V-56" transform="rotate(72)"/>
+    <path d="M0-58V-56" transform="rotate(78)"/>
+    <path d="M0-58V-56" transform="rotate(84)"/>
+    <path d="M0-58V-56" transform="rotate(96)"/>
+    <path d="M0-58V-56" transform="rotate(102)"/>
+    <path d="M0-58V-56" transform="rotate(108)"/>
+    <path d="M0-58V-56" transform="rotate(114)"/>
+    <path d="M0-58V-56" transform="rotate(126)"/>
+    <path d="M0-58V-56" transform="rotate(132)"/>
+    <path d="M0-58V-56" transform="rotate(138)"/>
+    <path d="M0-58V-56" transform="rotate(144)"/>
+    <path d="M0-58V-56" transform="rotate(156)"/>
+    <path d="M0-58V-56" transform="rotate(162)"/>
+    <path d="M0-58V-56" transform="rotate(168)"/>
+    <path d="M0-58V-56" transform="rotate(174)"/>
+    <path d="M0-58V-56" transform="rotate(186)"/>
+    <path d="M0-58V-56" transform="rotate(192)"/>
+    <path d="M0-58V-56" transform="rotate(198)"/>
+    <path d="M0-58V-56" transform="rotate(204)"/>
+    <path d="M0-58V-56" transform="rotate(216)"/>
+    <path d="M0-58V-56" transform="rotate(222)"/>
+    <path d="M0-58V-56" transform="rotate(228)"/>
+    <path d="M0-58V-56" transform="rotate(234)"/>
+    <path d="M0-58V-56" transform="rotate(246)"/>
+    <path d="M0-58V-56" transform="rotate(252)"/>
+    <path d="M0-58V-56" transform="rotate(258)"/>
+    <path d="M0-58V-56" transform="rotate(264)"/>
+    <path d="M0-58V-56" transform="rotate(276)"/>
+    <path d="M0-58V-56" transform="rotate(282)"/>
+    <path d="M0-58V-56" transform="rotate(288)"/>
+    <path d="M0-58V-56" transform="rotate(294)"/>
+    <path d="M0-58V-56" transform="rotate(306)"/>
+    <path d="M0-58V-56" transform="rotate(312)"/>
+    <path d="M0-58V-56" transform="rotate(318)"/>
+    <path d="M0-58V-56" transform="rotate(324)"/>
+    <path d="M0-58V-56" transform="rotate(336)"/>
+    <path d="M0-58V-56" transform="rotate(342)"/>
+    <path d="M0-58V-56" transform="rotate(348)"/>
+    <path d="M0-58V-56" transform="rotate(354)"/>
+  </g>
+  <use href="#major-marks"/>
+  <g fill="#fff" font-family="Georgia, 'Times New Roman', serif" font-size="10" font-weight="700" text-anchor="middle">
+    <text x="0" y="-42">XII</text>
+    <text x="21" y="-36">I</text>
+    <text x="36" y="-20">II</text>
+    <text x="42" y="3">III</text>
+    <text x="36" y="26">IV</text>
+    <text x="21" y="42">V</text>
+    <text x="0" y="46">VI</text>
+    <text x="-21" y="42">VII</text>
+    <text x="-36" y="26">VIII</text>
+    <text x="-42" y="3">IX</text>
+    <text x="-36" y="-20">X</text>
+    <text x="-21" y="-36">XI</text>
+  </g>
+  <g fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round">
+    <path d="M0-8V-31" transform="rotate(45)"/>
+    <path d="M0-8V-31" transform="rotate(135)"/>
+    <path d="M0-8V-31" transform="rotate(225)"/>
+    <path d="M0-8V-31" transform="rotate(315)"/>
+  </g>
+  <g transform="rotate(-60)">
+    <path d="M-2 10C-3 5-2-1-2-5V-39L-5-43L0-54L5-43L2-39V-5C2-1 3 5 2 10Z" fill="#fff" mask="url(#hand-inlay)"/>
+  </g>
+  <g transform="rotate(55)">
+    <path d="M-2 10C-3 6-2 2-2-2V-26L-4.5-29L0-38L4.5-29L2-26V-2C2 2 3 6 2 10Z" fill="#fff"/>
+    <path d="M0-9V-28" fill="none" stroke="#fff" stroke-width="1" stroke-linecap="round"/>
+  </g>
+  <circle r="7" fill="#fff"/>
+  <circle r="2" fill="none" stroke="#fff" stroke-width="1"/>
+</svg>
