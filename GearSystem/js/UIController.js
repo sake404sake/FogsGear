@@ -1,4 +1,5 @@
 import { CELL_MATERIALS } from '../../MapSystem/js/worldCells.js?v=12';
+import { CORE_ROTATION_RPM, CORE_ROTATION_SPEEDS } from './GearSystem.js?v=network-10';
 
 /**
  * UIController - DOM操作、ポインター入力、ギア設定吹き出しを管理する。
@@ -12,8 +13,11 @@ export class UIController {
         this.renderer = renderer;
         this.canvas = renderer.canvas;
         this.activeTouches = new Map();
+        this.pointerStartPoints = new Map();
+        this.pointerGestureMoved = false;
         this.initialPinchDist = null;
         this.initialZoom = 1;
+        this.pinchAnchor = null;
         this.startX = 0;
         this.startY = 0;
         this.pendingPointer = null;
@@ -21,7 +25,7 @@ export class UIController {
         this.pendingZoom = null;
         this.pointerDownGear = null;
         this.pointerDownPoint = null;
-        this.longPressTimer = null;
+        this.pointerDownPointerId = null;
         this.noticeTimer = null;
         this.initEvents();
         document.getElementById('named-scroll-name')?.addEventListener('input', event => {
@@ -41,6 +45,15 @@ export class UIController {
 
     initEvents() {
         // ボタン、設定セレクト、キャンバス入力を一度だけ登録する。
+        const speedSelect = document.getElementById('main-gear-speed-select');
+        if (speedSelect) {
+            speedSelect.replaceChildren(...CORE_ROTATION_SPEEDS.map((speed, index) => {
+                const option = document.createElement('option');
+                option.value = String(index + 1);
+                option.textContent = `${index + 1}段階（${(CORE_ROTATION_RPM * speed).toFixed(1)} 回転/分）`;
+                return option;
+            }));
+        }
         document.addEventListener('click', event => {
             const button = event.target.closest('button');
             if (!button) return;
@@ -142,6 +155,11 @@ export class UIController {
             const gear = this.gearManager.findGearById(this.state.selectedGearId);
             if (gear && this.gearManager.updateGearSize(gear, event.target.value)) this.openGearPopover(gear);
         });
+        document.getElementById('main-gear-speed-select').addEventListener('change', event => {
+            const gear = this.gearManager.findGearById(this.state.selectedGearId);
+            const speedLevel = Number(event.target.value);
+            if (gear && this.gearManager.updateCoreRotationSpeed(gear, speedLevel)) this.openGearPopover(gear);
+        });
         document.getElementById('gear-design-select').addEventListener('change', event => {
             // 種類を変えると、その種類で利用できる処理の先頭を選択する。
             const processMode = this.updateProcessOptions(event.target.value);
@@ -215,7 +233,7 @@ export class UIController {
         });
         this.canvas.addEventListener('pointerdown', event => this.pointerDown(event));
         this.canvas.addEventListener('pointermove', event => this.pointerMove(event));
-        this.canvas.addEventListener('pointerleave', () => { this.state.hoveredGearIds = []; this.cancelLongPress(); });
+        this.canvas.addEventListener('pointerleave', () => { this.state.hoveredGearIds = []; });
         this.canvas.addEventListener('pointerup', event => this.pointerUp(event));
         this.canvas.addEventListener('contextmenu', event => {
             event.preventDefault();
@@ -228,11 +246,16 @@ export class UIController {
             this.closeGearPopover();
         });
         this.canvas.addEventListener('pointercancel', event => {
-            this.cancelLongPress();
             this.activeTouches.delete(event.pointerId);
+            this.pointerStartPoints.delete(event.pointerId);
             this.initialPinchDist = null;
-            this.pointerDownGear = null;
-            this.pointerDownPoint = null;
+            this.pinchAnchor = null;
+            if (this.pointerDownPointerId === event.pointerId) {
+                this.pointerDownGear = null;
+                this.pointerDownPoint = null;
+                this.pointerDownPointerId = null;
+            }
+            if (this.activeTouches.size === 0) this.pointerGestureMoved = false;
             this.state.ghostGear = null;
         });
         this.canvas.addEventListener('wheel', event => {
@@ -262,28 +285,63 @@ export class UIController {
     pointerDown(event) {
         // ギアを押した場合は編集対象を確定し、それ以外はパン・ピンチ・配置操作を開始する。
         if (event.button === 2) return;
+        if (this.isTouchPointer(event)) {
+            const point = this.renderer.worldPoint(event.clientX, event.clientY);
+            this.pointerDownGear = this.state.selectedSize ? null : this.selectGearAt(point.x, point.y);
+            this.pointerDownPointerId = this.pointerDownGear ? event.pointerId : null;
+            this.pointerDownPoint = this.pointerDownGear ? { x: event.clientX, y: event.clientY } : null;
+            this.activeTouches.set(event.pointerId, { x: event.clientX, y: event.clientY });
+            this.pointerStartPoints.set(event.pointerId, { x: event.clientX, y: event.clientY });
+            if (this.activeTouches.size === 1) {
+                this.pointerGestureMoved = false;
+                this.startX = event.clientX;
+                this.startY = event.clientY;
+                this.initialPinchDist = null;
+            } else if (this.activeTouches.size === 2 && !this.state.selectedSize) {
+                this.pointerGestureMoved = true;
+                this.pointerDownGear = null;
+                this.pointerDownPointerId = null;
+                this.pointerDownPoint = null;
+                const touches = [...this.activeTouches.values()];
+                this.initialPinchDist = Math.hypot(touches[0].x - touches[1].x, touches[0].y - touches[1].y);
+                this.initialZoom = this.state.zoomScale;
+                this.pinchAnchor = this.renderer.worldPoint(
+                    (touches[0].x + touches[1].x) / 2,
+                    (touches[0].y + touches[1].y) / 2
+                );
+            }
+            if (this.pointerDownGear) this.state.ghostGear = null;
+            this.canvas.setPointerCapture(event.pointerId);
+            if (this.state.selectedSize) {
+                const canvasPoint = this.renderer.canvasPoint(event.clientX, event.clientY);
+                this.gearManager.updateGhost(canvasPoint.x, canvasPoint.y, this.pointerOffset(event));
+            }
+            return;
+        }
         const point = this.renderer.worldPoint(event.clientX, event.clientY);
         if (this.state.selectedItem === 'BELT') {
             const gear = this.selectGearAt(point.x, point.y);
-            if (gear && this.isTouchPointer(event)) {
-                this.pointerDownGear = gear;
-                this.startLongPress(gear, event);
-                this.canvas.setPointerCapture(event.pointerId);
-            }
-            else if (gear) this.openGearPopover(gear);
+            if (gear) this.openGearPopover(gear);
             return;
         }
         this.pointerDownGear = this.state.selectedSize ? null : this.selectGearAt(point.x, point.y);
         if (this.pointerDownGear) {
             this.pointerDownPoint = { x: event.clientX, y: event.clientY };
-            if (this.isTouchPointer(event)) this.startLongPress(this.pointerDownGear, event);
+            this.pointerDownPointerId = event.pointerId;
             this.state.ghostGear = null;
+            this.activeTouches.set(event.pointerId, { x: event.clientX, y: event.clientY });
+            this.pointerStartPoints.set(event.pointerId, { x: event.clientX, y: event.clientY });
+            this.pointerGestureMoved = false;
+            this.startX = event.clientX;
+            this.startY = event.clientY;
             this.canvas.setPointerCapture(event.pointerId);
             return;
         }
         this.closeGearPopover();
         this.activeTouches.set(event.pointerId, { x: event.clientX, y: event.clientY });
+        this.pointerStartPoints.set(event.pointerId, { x: event.clientX, y: event.clientY });
         if (this.activeTouches.size === 1) {
+            this.pointerGestureMoved = false;
             this.startX = event.clientX;
             this.startY = event.clientY;
             this.initialPinchDist = null;
@@ -302,24 +360,23 @@ export class UIController {
     pointerMove(event) {
         // 押下中のタッチ位置を更新し、実際の移動処理を次フレームへ送る。
         if (event.buttons === 2 || event.button === 2) return;
-        if (this.longPressTimer && event.pointerId === this.longPressPointerId
-            && Math.hypot(event.clientX - this.longPressPoint.x, event.clientY - this.longPressPoint.y) > 8) {
-            this.cancelLongPress();
-        }
-        if (this.pointerDownGear && this.pointerDownPoint
+        if (this.pointerDownGear && this.pointerDownPointerId === event.pointerId && this.pointerDownPoint
             && Math.hypot(event.clientX - this.pointerDownPoint.x, event.clientY - this.pointerDownPoint.y) > 8) {
-            this.cancelLongPress();
             this.pointerDownGear = null;
+            this.pointerDownPointerId = null;
             this.pointerDownPoint = null;
-            this.activeTouches.set(event.pointerId, { x: event.clientX, y: event.clientY });
-            this.startX = event.clientX;
-            this.startY = event.clientY;
         }
         if (this.activeTouches.has(event.pointerId)) this.activeTouches.set(event.pointerId, { x: event.clientX, y: event.clientY });
-        const point = this.renderer.worldPoint(event.clientX, event.clientY);
-        const hovered = this.getStackedGearsAt(point.x, point.y);
-        const selected = hovered.find(gear => gear.id === this.state.selectedGearId) || hovered[0];
-        this.state.hoveredGearIds = selected ? [selected.id] : [];
+        const pointerStart = this.pointerStartPoints.get(event.pointerId);
+        if (pointerStart && Math.hypot(event.clientX - pointerStart.x, event.clientY - pointerStart.y) > 8) {
+            this.pointerGestureMoved = true;
+        }
+        if (!this.isTouchPointer(event) && !this.activeTouches.has(event.pointerId)) {
+            const point = this.renderer.worldPoint(event.clientX, event.clientY);
+            const hovered = this.getStackedGearsAt(point.x, point.y);
+            const selected = hovered.find(gear => gear.id === this.state.selectedGearId) || hovered[0];
+            this.state.hoveredGearIds = selected ? [selected.id] : [];
+        }
         this.pendingPointer = event;
         this.scheduleInputFrame();
     }
@@ -336,6 +393,14 @@ export class UIController {
             const touches = [...this.activeTouches.values()];
             const distance = Math.hypot(touches[0].x - touches[1].x, touches[0].y - touches[1].y);
             this.state.zoomScale = Math.max(0.4, Math.min(2.5, this.initialZoom * distance / this.initialPinchDist));
+            const midpoint = this.renderer.canvasPoint(
+                (touches[0].x + touches[1].x) / 2,
+                (touches[0].y + touches[1].y) / 2
+            );
+            if (this.pinchAnchor) {
+                this.state.offsetX = (midpoint.x - this.renderer.width / 2) / this.state.zoomScale - this.pinchAnchor.x;
+                this.state.offsetY = (midpoint.y - this.renderer.height / 2) / this.state.zoomScale - this.pinchAnchor.y;
+            }
             return;
         }
         if (this.activeTouches.size === 1) {
@@ -349,22 +414,70 @@ export class UIController {
     pointerUp(event) {
         // ギア編集、配置確定、または通常の盤面操作を終了する。
         if (event.button === 2) return;
+        if (this.isTouchPointer(event)) {
+            const tappedGear = this.pointerDownPointerId === event.pointerId ? this.pointerDownGear : null;
+            this.activeTouches.delete(event.pointerId);
+            this.pointerStartPoints.delete(event.pointerId);
+            if (this.activeTouches.size < 2) this.initialPinchDist = null;
+            if (this.activeTouches.size < 2) this.pinchAnchor = null;
+            if (this.pointerDownPointerId === event.pointerId) {
+                this.pointerDownGear = null;
+                this.pointerDownPoint = null;
+                this.pointerDownPointerId = null;
+            }
+            if (tappedGear && !this.pointerGestureMoved) {
+                this.openGearPopover(tappedGear);
+                return;
+            }
+            if (this.activeTouches.size !== 0) return;
+            if (this.pointerGestureMoved) {
+                this.pointerGestureMoved = false;
+                return;
+            }
+            if (this.state.selectedItem === 'BELT') return;
+            const point = this.adjustedWorldPoint(event);
+            if (this.state.selectedSize) {
+                const canvasPoint = this.renderer.canvasPoint(event.clientX, event.clientY);
+                this.gearManager.updateGhost(canvasPoint.x, canvasPoint.y, this.pointerOffset(event));
+                this.gearManager.tryPlaceGear(point.x, point.y);
+            } else {
+                this.gearManager.tryPlaceGear(point.x, point.y);
+            }
+            this.state.ghostGear = null;
+            return;
+        }
         if (this.state.selectedItem === 'BELT') {
-            if (this.pointerDownGear && this.isTouchPointer(event)) this.openGearPopover(this.pointerDownGear);
-            this.cancelLongPress();
             this.pointerDownGear = null;
+            return;
+        }
+        if (this.pointerDownGear && this.pointerDownPointerId === event.pointerId) {
+            const tappedGear = this.pointerDownGear;
+            this.activeTouches.delete(event.pointerId);
+            this.pointerStartPoints.delete(event.pointerId);
+            this.pointerDownGear = null;
+            this.pointerDownPoint = null;
+            this.pointerDownPointerId = null;
+            if (!this.pointerGestureMoved) {
+                this.pointerGestureMoved = false;
+                this.openGearPopover(tappedGear);
+                return;
+            }
+        }
+        this.activeTouches.delete(event.pointerId);
+        this.pointerStartPoints.delete(event.pointerId);
+        if (this.activeTouches.size < 2) this.initialPinchDist = null;
+        if (this.activeTouches.size !== 0) return;
+        if (this.pointerGestureMoved) {
+            this.pointerGestureMoved = false;
             return;
         }
         if (this.pointerDownGear) {
-            if (!this.isTouchPointer(event)) this.openGearPopover(this.pointerDownGear);
-            this.cancelLongPress();
+            this.openGearPopover(this.pointerDownGear);
             this.pointerDownGear = null;
             this.pointerDownPoint = null;
+            this.pointerDownPointerId = null;
             return;
         }
-        this.activeTouches.delete(event.pointerId);
-        if (this.activeTouches.size < 2) this.initialPinchDist = null;
-        if (this.activeTouches.size !== 0) return;
         const point = this.adjustedWorldPoint(event);
         const existingGear = this.state.selectedSize ? null : this.gearManager.findGearAt(point.x, point.y);
         if (existingGear) {
@@ -495,7 +608,7 @@ export class UIController {
         document.getElementById('gear-control-item-fields').hidden = !usesItemCount;
     }
     // 選択ギアの設定、コスト、同期状態を吹き出しへまとめて表示する。
-    openGearPopover(gear) { this.state.selectedGearId = gear.id; this.updateProcessInfo(gear); document.getElementById('gear-modal').hidden = false; document.getElementById('gear-popover-title').textContent = gear.isCore ? 'メインギア' : `${gear.sizeKey} ギア設定`; document.getElementById('gear-popover-meta').textContent = gear.isCore ? `L${gear.layer + 1} / ${gear.teeth}歯` : `L${gear.layer + 1} / ${gear.teeth}歯 / ${gear.designType} / ${gear.processMode}`; const friction = Math.round(this.state.network?.calculateGearFriction(gear) || 0); const driveCost = Math.round(gear.steamLoad); const steamCost = driveCost + friction; const rotation = Math.round(Math.abs(gear.angularVelocity || 0)); const loopBonus = this.state.network?.loopGearIds?.has(gear.id) ? '環機構ボーナス' : ''; document.getElementById('gear-popover-cost').innerHTML = gear.isCore ? '<div class="cost-note">メインギア<br>現在コストの集計対象外</div>' : `<div class="resource-block brass-block"><div class="resource-heading">真鍮資材 <strong>${Math.round(gear.brassCost)}</strong></div></div><div class="resource-divider"></div><div class="resource-block steam-block"><div class="cost-row"><span>駆動コスト</span><strong>${driveCost}</strong></div><div class="cost-row"><span>摩擦コスト</span><strong>${friction}</strong></div>${loopBonus ? `<div class="bonus-row">(${loopBonus})</div>` : ''}</div><div class="resource-divider strong"></div><div class="cost-row steam-total"><span>消費スチーム / 回転</span><strong>${steamCost} / ${rotation}</strong></div>`; document.getElementById('gear-lock-toggle').checked = gear.isLocked; document.getElementById('main-gear-size-select').value = gear.sizeKey; document.getElementById('gear-design-select').value = gear.designType; this.updateProcessOptions(gear.designType, gear.processMode); document.getElementById('main-gear-size-row').classList.toggle('main-gear-hidden', !gear.isCore); document.getElementById('gear-design-row').classList.toggle('main-gear-hidden', gear.isCore); document.getElementById('gear-process-row').classList.toggle('main-gear-hidden', gear.isCore); document.getElementById('gear-delete-button').disabled = gear.isCore; }
+    openGearPopover(gear) { this.state.selectedGearId = gear.id; this.updateProcessInfo(gear); document.getElementById('gear-modal').hidden = false; document.getElementById('gear-popover-title').textContent = gear.isCore ? 'メインギア' : `${gear.sizeKey} ギア設定`; document.getElementById('gear-popover-meta').textContent = gear.isCore ? `L${gear.layer + 1} / ${gear.teeth}歯` : `L${gear.layer + 1} / ${gear.teeth}歯 / ${gear.designType} / ${gear.processMode}`; const friction = Math.round(this.state.network?.calculateGearFriction(gear) || 0); const driveCost = Math.round(gear.steamLoad); const steamCost = driveCost + friction; const rotation = Math.round(Math.abs(gear.angularVelocity || 0)); const loopBonus = this.state.network?.loopGearIds?.has(gear.id) ? '環機構ボーナス' : ''; document.getElementById('gear-popover-cost').innerHTML = gear.isCore ? '<div class="cost-note">メインギア<br>現在コストの集計対象外</div>' : `<div class="resource-block brass-block"><div class="resource-heading">真鍮資材 <strong>${Math.round(gear.brassCost)}</strong></div></div><div class="resource-divider"></div><div class="resource-block steam-block"><div class="cost-row"><span>駆動コスト</span><strong>${driveCost}</strong></div><div class="cost-row"><span>摩擦コスト</span><strong>${friction}</strong></div>${loopBonus ? `<div class="bonus-row">(${loopBonus})</div>` : ''}</div><div class="resource-divider strong"></div><div class="cost-row steam-total"><span>消費スチーム / 回転</span><strong>${steamCost} / ${rotation}</strong></div>`; document.getElementById('gear-lock-toggle').checked = gear.isLocked; document.getElementById('main-gear-size-select').value = gear.sizeKey; document.getElementById('main-gear-speed-select').value = String(gear.rotationSpeedLevel || 4); document.getElementById('gear-design-select').value = gear.designType; this.updateProcessOptions(gear.designType, gear.processMode); document.getElementById('main-gear-size-row').classList.toggle('main-gear-hidden', !gear.isCore); document.getElementById('main-gear-speed-row').classList.toggle('main-gear-hidden', !gear.isCore); document.getElementById('gear-design-row').classList.toggle('main-gear-hidden', gear.isCore); document.getElementById('gear-process-row').classList.toggle('main-gear-hidden', gear.isCore); document.getElementById('gear-delete-button').disabled = gear.isCore; }
     updateProcessInfo(gear) {
         // 選択ギアの処理定義を毎秒レートへ変換し、処理能力枠を更新する。
         const section = document.getElementById('gear-process-section');
@@ -579,22 +692,6 @@ export class UIController {
     }
 
     isTouchPointer(event) { return event.pointerType === 'touch' || event.pointerType === 'pen'; }
-    startLongPress(gear, event) {
-        this.cancelLongPress();
-        this.longPressTimer = setTimeout(() => {
-            this.longPressTimer = null;
-            this.openGearPopover(gear);
-        }, 550);
-        this.longPressPointerId = event.pointerId;
-        this.longPressPoint = { x: event.clientX, y: event.clientY };
-    }
-    cancelLongPress() {
-        if (this.longPressTimer) clearTimeout(this.longPressTimer);
-        this.longPressTimer = null;
-        this.longPressPointerId = null;
-        this.longPressPoint = null;
-    }
-
     updateUI() {
         // 資源値、ダッシュボード、ボタン状態、開閉パネルを現在のGameStateへ同期する。
         const steam = document.getElementById('steamPower');

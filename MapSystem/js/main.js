@@ -12,7 +12,7 @@ import { buildTerritoryBorderSegments, buildTerritoryBorderSegmentsAsync } from 
 import { directionToVehicleRotation, findNextRailStep, getTrackDirection, getVehicleRenderState, STATION_CONTROL_DEFAULTS, VEHICLE_DEFAULTS } from './railwayRuntime.js?v=9';
 import { GameState as EngineGameState, clearGameProgress } from '../../GearSystem/js/GameState.js?v=runtime-58';
 import { GEAR_CONFIG as ENGINE_GEAR_CONFIG, GearManager as EngineGearManager } from '../../GearSystem/js/GearManager.js?v=runtime-5';
-import { GearNetwork as EngineGearNetwork } from '../../GearSystem/js/GearSystem.js?v=network-8';
+import { GearNetwork as EngineGearNetwork } from '../../GearSystem/js/GearSystem.js?v=network-10';
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');

@@ -1,5 +1,5 @@
 /** GearManager - ギア仕様定義・配置・補正計算ロジック */
-import { Gear, GearNetwork } from './GearSystem.js?v=network-8';
+import { CORE_ROTATION_SPEEDS, CORE_ROTATION_SPEED_VERSION, Gear, GearNetwork, normalizeCoreRotationSpeedLevel } from './GearSystem.js?v=network-10';
 export const GEAR_CONFIG = {
     'XXS': { teeth: 4, radius: 12, cost: 4, pattern: 'ring' }, 'SS': { teeth: 6, radius: 18, cost: 6, pattern: 'sunburst' }, 'S': { teeth: 10, radius: 30, cost: 10, pattern: 'holes' }, 'M': { teeth: 14, radius: 42, cost: 14, pattern: 'triangular' }, 'L': { teeth: 18, radius: 54, cost: 18, pattern: 'wave' }, 'LL': { teeth: 24, radius: 72, cost: 24, pattern: 'crown' }, '3L': { teeth: 32, radius: 96, cost: 32, pattern: 'lattice' }, '4L': { teeth: 40, radius: 120, cost: 40, pattern: 'radial' }, 'MAX': { teeth: 48, radius: 144, cost: 48, pattern: 'industrial' }
 };
@@ -35,7 +35,7 @@ export class GearManager {
             const sizeKey = data.sizeKey || data.size || 'M';
             const hasHexPosition = Number.isFinite(data.q) && Number.isFinite(data.r);
             const position = hasHexPosition ? { q: data.q, r: data.r } : pixelToHex(data.x || 0, data.y || 0);
-            const gear = this.createGear(position.q, position.r, sizeKey, data.layer, data.isCore, data.angle, data.id);
+            const gear = this.createGear(position.q, position.r, sizeKey, data.layer, data.isCore, data.angle, data.id, data.rotationSpeedLevel, data.rotationSpeedVersion);
             gear.isLocked = data.isLocked ?? Boolean(data.isCore);
             gear.designType = data.designType || gear.designType;
             gear.processMode = ['FOG_TO_LIQUID_METAL', 'GAS_TO_LIQUID_METAL', 'LIQUID_TO_SOLID_METAL', 'SOLID_TO_BRASS'].includes(data.processMode)
@@ -55,7 +55,7 @@ export class GearManager {
             const sizeKey = data.sizeKey || data.size || 'M';
             const hasHexPosition = Number.isFinite(data.q) && Number.isFinite(data.r);
             const position = hasHexPosition ? { q: data.q, r: data.r } : pixelToHex(data.x || 0, data.y || 0);
-            const gear = this.createGear(position.q, position.r, sizeKey, data.layer, data.isCore, data.angle, data.id);
+            const gear = this.createGear(position.q, position.r, sizeKey, data.layer, data.isCore, data.angle, data.id, data.rotationSpeedLevel, data.rotationSpeedVersion);
             gear.isLocked = data.isLocked ?? Boolean(data.isCore);
             gear.designType = data.designType || gear.designType;
             gear.processMode = ['FOG_TO_LIQUID_METAL', 'GAS_TO_LIQUID_METAL', 'LIQUID_TO_SOLID_METAL', 'SOLID_TO_BRASS'].includes(data.processMode)
@@ -80,11 +80,16 @@ export class GearManager {
         this.state.saveGameData();
     }
 
-    createGear(q = 0, r = 0, sizeKey, layer = 0, isCore = false, angle = 0, id = null) {
+    createGear(q = 0, r = 0, sizeKey, layer = 0, isCore = false, angle = 0, id = null, rotationSpeedLevel = null, rotationSpeedVersion = null) {
         // サイズ定義から、独立したGearオブジェクトと描画用メタデータを作る。
         const config = GEAR_CONFIG[sizeKey] || GEAR_CONFIG.M;
         const position = hexToPixel(q, r);
-        const gear = new Gear({id, size: config.teeth, layer, position: { q, r }, isCore, angle });
+        const speedVersion = rotationSpeedVersion
+            ?? (rotationSpeedLevel === null ? CORE_ROTATION_SPEED_VERSION : 1);
+        const gear = new Gear({
+            id, size: config.teeth, layer, position: { q, r }, isCore, angle,
+            rotationSpeedLevel: normalizeCoreRotationSpeedLevel(rotationSpeedLevel ?? 4, speedVersion)
+        });
         return Object.assign(gear, { x: position.x, y: position.y, sizeKey, radius: config.radius, cost: config.cost, pattern: config.pattern });
     }
 
@@ -109,6 +114,16 @@ export class GearManager {
         if (!gear || !config || !gear.isCore || gear.sizeKey === sizeKey) return false;
         this.state.saveState();
         Object.assign(gear, { size: config.teeth, teeth: config.teeth, sizeKey, radius: config.radius, cost: config.cost, pattern: config.pattern });
+        this.state.updatePowerGrid();
+        this.state.saveGameData();
+        this.state.notify();
+        return true;
+    }
+    updateCoreRotationSpeed(gear, speedLevel) {
+        if (!gear?.isCore || !Number.isInteger(speedLevel) || speedLevel < 1 || speedLevel > CORE_ROTATION_SPEEDS.length
+            || gear.rotationSpeedLevel === speedLevel) return false;
+        this.state.saveState();
+        gear.rotationSpeedLevel = speedLevel;
         this.state.updatePowerGrid();
         this.state.saveGameData();
         this.state.notify();

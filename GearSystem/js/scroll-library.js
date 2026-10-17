@@ -1,6 +1,6 @@
-import { CanvasRenderer } from './CanvasRenderer.js?v=render-6';
-import { GEAR_CONFIG, hexToPixel } from './GearManager.js?v=runtime-8';
-import { GearNetwork } from './GearSystem.js?v=network-8';
+import { CanvasRenderer } from './CanvasRenderer.js?v=render-7';
+import { GEAR_CONFIG, hexToPixel } from './GearManager.js?v=runtime-10';
+import { CORE_ROTATION_SPEED_VERSION, GearNetwork, normalizeCoreRotationSpeedLevel } from './GearSystem.js?v=network-10';
 import { SCROLL_MATERIALS, SCROLL_MATERIAL_BY_TYPE } from '../../MapSystem/js/craftingData.js?v=19';
 
 const LIBRARY_KEY = 'fogsgear_scroll_library';
@@ -507,6 +507,11 @@ function validateSharedScroll(payload) {
             layer: gear.layer,
             isCore: Boolean(gear.isCore),
             angle: Number.isFinite(gear.angle) ? Math.max(-1000000, Math.min(1000000, gear.angle)) : 0,
+            rotationSpeedLevel: normalizeCoreRotationSpeedLevel(
+                gear.rotationSpeedLevel ?? 4,
+                gear.rotationSpeedVersion ?? (gear.rotationSpeedLevel == null ? CORE_ROTATION_SPEED_VERSION : 1)
+            ),
+            rotationSpeedVersion: CORE_ROTATION_SPEED_VERSION,
             isLocked: Boolean(gear.isLocked),
             designType,
             processMode: processModes.has(gear.processMode) ? gear.processMode : 'NONE',

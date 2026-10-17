@@ -6,13 +6,24 @@ export const Layer = Object.freeze({ GOLD: 0, SILVER: 1, BRONZE: 2 });
 export const GearDesignType = Object.freeze({ INDUSTRIAL: 'INDUSTRIAL', ALCHEMICAL: 'ALCHEMICAL', LOGISTICS: 'LOGISTICS', CLOCKWORK: 'CLOCKWORK', PRODUCTION: 'PRODUCTION' });
 // 資源変換や霧回収の種類。実際の資源処理はGameStateが担当する。
 export const ProcessMode = Object.freeze({ NONE: 'NONE', POWER_STORAGE: 'POWER_STORAGE', FOG_COLLECTION: 'FOG_COLLECTION', RESOURCE_COLLECTION: 'RESOURCE_COLLECTION', TRANSFORM: 'TRANSFORM', FOG_TO_WATER: 'FOG_TO_WATER', TERRAIN_TRANSFORM: 'TERRAIN_TRANSFORM', ERA_SHIFT: 'ERA_SHIFT', TARGET_SHIFT_UP: 'TARGET_SHIFT_UP', TARGET_SHIFT_DOWN: 'TARGET_SHIFT_DOWN', TARGET_SHIFT_LEFT: 'TARGET_SHIFT_LEFT', TARGET_SHIFT_RIGHT: 'TARGET_SHIFT_RIGHT', CONDITIONAL_CONTROL: 'CONDITIONAL_CONTROL' });
+export const CORE_ROTATION_SPEEDS = Object.freeze([0.5, 2 / 3, 5 / 6, 1, 7 / 6, 4 / 3, 1.5]);
+export const CORE_ROTATION_SPEED_VERSION = 2;
+export const CORE_ROTATION_RPM = 0.012 * 60 * 60 / (Math.PI * 2);
+
+export function normalizeCoreRotationSpeedLevel(level, version = CORE_ROTATION_SPEED_VERSION) {
+    if (!Number.isInteger(level)) return 4;
+    if (version === CORE_ROTATION_SPEED_VERSION) {
+        return level >= 1 && level <= CORE_ROTATION_SPEEDS.length ? level : 4;
+    }
+    return [1, 3, 4, 6, 7][level - 1] || 4;
+}
 
 const layerDesigns = [GearDesignType.INDUSTRIAL, GearDesignType.ALCHEMICAL, GearDesignType.CLOCKWORK];
 const removedProcessModes = new Set(['FOG_TO_LIQUID_METAL', 'GAS_TO_LIQUID_METAL', 'LIQUID_TO_SOLID_METAL', 'SOLID_TO_BRASS']);
 
 export class Gear {
     // ギア1個の永続設定と、ネットワークが毎 tick 更新する回転状態を保持する。
-    constructor({ id, size, layer = Layer.GOLD, isLocked, designType, processMode = ProcessMode.NONE, terrainTargetType = 'IRON_VEIN', controlAction = 'STOP_MAIN_GEAR', controlCondition = 'ROTATIONS', controlRotationCount = 1, controlItemType = 'wood', controlItemCount = 1, controlTargetGearIds = [], position = { q: 0, r: 0 }, isCore = false, angle = 0 }) {
+    constructor({ id, size, layer = Layer.GOLD, isLocked, designType, processMode = ProcessMode.NONE, terrainTargetType = 'IRON_VEIN', controlAction = 'STOP_MAIN_GEAR', controlCondition = 'ROTATIONS', controlRotationCount = 1, controlItemType = 'wood', controlItemCount = 1, controlTargetGearIds = [], position = { q: 0, r: 0 }, isCore = false, angle = 0, rotationSpeedLevel = 4, rotationSpeedVersion = CORE_ROTATION_SPEED_VERSION }) {
         this.id = id || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
         this.size = size;
         this.sizeKey = Object.keys(GearSize).find(key => GearSize[key] === size) || 'M';
@@ -34,9 +45,11 @@ export class Gear {
         this.r = position.r;
         this.isCore = isCore;
         this.angle = angle;
+        this.rotationSpeedLevel = normalizeCoreRotationSpeedLevel(rotationSpeedLevel, rotationSpeedVersion);
+        this.rotationSpeedVersion = CORE_ROTATION_SPEED_VERSION;
         this.powered = isCore;
         this.rotationDir = isCore ? 1 : 0;
-        this.angularVelocity = isCore ? 1 : 0;
+        this.angularVelocity = isCore ? CORE_ROTATION_SPEEDS[this.rotationSpeedLevel - 1] : 0;
         this.isDeadlocked = false;
         this.angleError = false;
     }
@@ -199,9 +212,12 @@ export class GearNetwork {
         invalidLockedAxes.forEach(id => { const gear = this.gears.get(id); gear.angleError = true; gear.isDeadlocked = true; });
         const core = [...this.gears.values()].find(gear => gear.isCore);
         if (!core) return;
+        const speedVersion = core.rotationSpeedVersion
+            ?? (core.rotationSpeedLevel == null ? CORE_ROTATION_SPEED_VERSION : 1);
+        const speedLevel = normalizeCoreRotationSpeedLevel(core.rotationSpeedLevel, speedVersion);
         const rotationStates = new Map();
         const conflicts = new Set();
-        const queue = [{ gear: core, speed: 1, direction: 1 }];
+        const queue = [{ gear: core, speed: CORE_ROTATION_SPEEDS[speedLevel - 1], direction: 1 }];
         while (queue.length) {
             const current = queue.shift();
             const known = rotationStates.get(current.gear.id);

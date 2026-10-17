@@ -1,4 +1,4 @@
-import { GearNetwork } from './GearSystem.js?v=network-8';
+import { CORE_ROTATION_SPEED_VERSION, GearNetwork } from './GearSystem.js?v=network-10';
 import { SCROLL_MATERIALS, SCROLL_MATERIAL_BY_TYPE } from '../../MapSystem/js/craftingData.js?v=19';
 import { ACTIVE_SCROLL_TARGETS_KEY, CELL_MATERIALS, TERRAIN_TRANSFORM_RECIPES, WORLD_CELL_TYPES } from '../../MapSystem/js/worldCells.js?v=12';
 
@@ -561,7 +561,7 @@ export class GameState {
                 size: gear.sizeKey,
                 layer: gear.layer,
                 isCore: gear.isCore,
-                angle: gear.angle, isLocked: gear.isLocked, designType: gear.designType, processMode: gear.processMode, terrainTargetType: gear.terrainTargetType,
+                angle: gear.angle, rotationSpeedLevel: gear.rotationSpeedLevel, rotationSpeedVersion: CORE_ROTATION_SPEED_VERSION, isLocked: gear.isLocked, designType: gear.designType, processMode: gear.processMode, terrainTargetType: gear.terrainTargetType,
                 controlAction: gear.controlAction, controlCondition: gear.controlCondition, controlRotationCount: gear.controlRotationCount,
                 controlItemType: gear.controlItemType, controlItemCount: gear.controlItemCount, controlTargetGearIds: gear.controlTargetGearIds
             }))
@@ -686,7 +686,7 @@ export class GameState {
             gears: this.getRuntimeGears().map(gear => ({
                 id: gear.id,
                 q: gear.q, r: gear.r, size: gear.sizeKey, layer: gear.layer,
-                isCore: Boolean(gear.isCore), angle: gear.angle, isLocked: gear.isLocked, designType: gear.designType, processMode: gear.processMode, terrainTargetType: gear.terrainTargetType,
+                isCore: Boolean(gear.isCore), angle: gear.angle, rotationSpeedLevel: gear.rotationSpeedLevel, rotationSpeedVersion: CORE_ROTATION_SPEED_VERSION, isLocked: gear.isLocked, designType: gear.designType, processMode: gear.processMode, terrainTargetType: gear.terrainTargetType,
                 controlAction: gear.controlAction, controlCondition: gear.controlCondition, controlRotationCount: gear.controlRotationCount,
                 controlItemType: gear.controlItemType, controlItemCount: gear.controlItemCount, controlTargetGearIds: gear.controlTargetGearIds
             })),
@@ -707,6 +707,8 @@ export class GameState {
                 layer: gear.layer,
                 isCore: Boolean(gear.isCore),
                 angle: gear.angle,
+                rotationSpeedLevel: gear.rotationSpeedLevel,
+                rotationSpeedVersion: CORE_ROTATION_SPEED_VERSION,
                 isLocked: gear.isLocked,
                 designType: gear.designType,
                 processMode: gear.processMode,
