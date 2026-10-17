@@ -17,12 +17,6 @@ export class CanvasRenderer {
             { fill: '#b5b8b1', dark: '#5c6260', stroke: '#e6eae3' },
             { fill: '#b87333', dark: '#6d3518', stroke: '#f3b06c' }
         ];
-        this.gridCanvas = document.createElement('canvas');
-        this.gridKey = '';
-        this.gridRefreshTimer = null;
-        this.gridZoomScale = 1;
-        this.gridOffsetX = 0;
-        this.gridOffsetY = 0;
         this.sortedGears = [];
         this.sortedGearKey = '';
         this.sortedGearSource = null;
@@ -153,7 +147,6 @@ export class CanvasRenderer {
         this.ctx.clearRect(0, 0, width, height);
         this.ctx.fillStyle = '#120e0c';
         this.ctx.fillRect(0, 0, width, height);
-        this.drawHexGrid();
         this.ctx.save();
         this.ctx.translate(width / 2, height / 2);
         this.ctx.scale(this.state.zoomScale, this.state.zoomScale);
@@ -335,109 +328,6 @@ export class CanvasRenderer {
             this.ctx.stroke();
             this.ctx.restore();
         });
-    }
-
-    drawHexGrid() {
-        // カメラ操作中はキャッシュを変換して使い、余白が尽きた後にだけ再生成する。
-        const { width, height } = this;
-        const gearKey = this.state.placedGears.map(gear => `${gear.q},${gear.r}`).join('|');
-        const gridStep = window.matchMedia('(pointer: coarse)').matches ? 3 : 1;
-        const key = `${width}x${height}:${this.pixelRatio}:${gridStep}:${gearKey}`;
-        if (key === this.gridKey) {
-            const scale = this.state.zoomScale / this.gridZoomScale;
-            const translateX = width / 2 * (1 - scale) + (this.state.offsetX - this.gridOffsetX) * this.state.zoomScale;
-            const translateY = height / 2 * (1 - scale) + (this.state.offsetY - this.gridOffsetY) * this.state.zoomScale;
-            const left = translateX - width / 2 * scale;
-            const right = translateX + width * 1.5 * scale;
-            const top = translateY - height / 2 * scale;
-            const bottom = translateY + height * 1.5 * scale;
-            this.ctx.save();
-            this.ctx.setTransform(
-                this.pixelRatio * scale, 0, 0, this.pixelRatio * scale,
-                this.pixelRatio * translateX, this.pixelRatio * translateY
-            );
-            this.ctx.drawImage(this.gridCanvas, -width / 2, -height / 2, width * 2, height * 2);
-            this.ctx.restore();
-            if (left > 0 || right < width || top > 0 || bottom < height) {
-                if (this.gridRefreshTimer) clearTimeout(this.gridRefreshTimer);
-                this.gridRefreshTimer = setTimeout(() => {
-                    this.gridKey = '';
-                    this.gridRefreshTimer = null;
-                }, 300);
-            }
-            return;
-        }
-
-        if (this.gridRefreshTimer) {
-            clearTimeout(this.gridRefreshTimer);
-            this.gridRefreshTimer = null;
-        }
-        this.gridCanvas.width = this.canvas.width * 2;
-        this.gridCanvas.height = this.canvas.height * 2;
-        const gridContext = this.gridCanvas.getContext('2d');
-        gridContext.setTransform(this.pixelRatio, 0, 0, this.pixelRatio, 0, 0);
-        gridContext.clearRect(0, 0, width * 2, height * 2);
-        gridContext.strokeStyle = 'rgba(139, 115, 85, 0.16)';
-        gridContext.fillStyle = 'rgba(212, 175, 55, 0.04)';
-        gridContext.lineWidth = 0.6;
-        gridContext.beginPath();
-        let cellsInPath = 0;
-
-        const minWorldX = -width / this.state.zoomScale - this.state.offsetX;
-        const maxWorldX = width / this.state.zoomScale - this.state.offsetX;
-        const minWorldY = -height / this.state.zoomScale - this.state.offsetY;
-        const maxWorldY = height / this.state.zoomScale - this.state.offsetY;
-        const minR = Math.ceil(minWorldY / 3) - 1;
-        const maxR = Math.floor(maxWorldY / 3) + 1;
-        for (let r = minR; r <= maxR; r += gridStep) {
-            const minQ = Math.ceil(minWorldX / (2 * Math.sqrt(3)) - r / 2) - 1;
-            const maxQ = Math.floor(maxWorldX / (2 * Math.sqrt(3)) - r / 2) + 1;
-            for (let q = Math.ceil(minQ / gridStep) * gridStep; q <= maxQ; q += gridStep) {
-                const center = this.hexToPixel(q, r);
-                const screenX = width + (center.x + this.state.offsetX) * this.state.zoomScale;
-                const screenY = height + (center.y + this.state.offsetY) * this.state.zoomScale;
-                const radius = 2 * 0.95 * this.state.zoomScale;
-                if (screenX + radius < 0 || screenX - radius > width * 2 || screenY + radius < 0 || screenY - radius > height * 2) continue;
-                for (let i = 0; i < 6; i++) {
-                    const angle = i * Math.PI / 3 + Math.PI / 6;
-                    const x = screenX + radius * Math.cos(angle);
-                    const y = screenY + radius * Math.sin(angle);
-                    if (i === 0) gridContext.moveTo(x, y); else gridContext.lineTo(x, y);
-                }
-                gridContext.closePath();
-                if (++cellsInPath === 256) {
-                    gridContext.stroke();
-                    gridContext.beginPath();
-                    cellsInPath = 0;
-                }
-            }
-        }
-        if (cellsInPath) gridContext.stroke();
-        this.state.placedGears.forEach(gear => {
-            const screenX = width + (this.hexToPixel(gear.q, gear.r).x + this.state.offsetX) * this.state.zoomScale;
-            const screenY = height + (this.hexToPixel(gear.q, gear.r).y + this.state.offsetY) * this.state.zoomScale;
-            const radius = 2 * 0.95 * this.state.zoomScale;
-            if (screenX + radius < 0 || screenX - radius > width * 2 || screenY + radius < 0 || screenY - radius > height * 2) return;
-            gridContext.beginPath();
-            for (let i = 0; i < 6; i++) {
-                const angle = i * Math.PI / 3 + Math.PI / 6;
-                const x = screenX + radius * Math.cos(angle);
-                const y = screenY + radius * Math.sin(angle);
-                if (i === 0) gridContext.moveTo(x, y); else gridContext.lineTo(x, y);
-            }
-            gridContext.closePath();
-            gridContext.fill();
-        });
-        this.gridKey = key;
-        this.gridZoomScale = this.state.zoomScale;
-        this.gridOffsetX = this.state.offsetX;
-        this.gridOffsetY = this.state.offsetY;
-        this.ctx.drawImage(this.gridCanvas, -width / 2, -height / 2, width * 2, height * 2);
-    }
-
-    hexToPixel(q, r) {
-        // GearManagerと同じピッチで六角座標をワールド座標へ変換する。
-        return { x: 2 * Math.sqrt(3) * (q + r / 2), y: 3 * r };
     }
 
     metalGradient(radius, palette, isCore) {

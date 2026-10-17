@@ -1,4 +1,4 @@
-import { CanvasRenderer } from './CanvasRenderer.js?v=render-14';
+import { CanvasRenderer } from './CanvasRenderer.js?v=render-16';
 import { GEAR_CONFIG, hexToPixel } from './GearManager.js?v=runtime-11';
 import { CORE_ROTATION_SPEED_VERSION, GearNetwork, normalizeCoreRotationSpeedLevel } from './GearSystem.js?v=network-11';
 import { SCROLL_MATERIALS, SCROLL_MATERIAL_BY_TYPE } from '../../MapSystem/js/craftingData.js?v=19';
@@ -1070,7 +1070,7 @@ function fitPreview() {
     }), { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity });
     const width = Math.max(1, bounds.maxX - bounds.minX);
     const height = Math.max(1, bounds.maxY - bounds.minY);
-    previewState.zoomScale = Math.min(4.5, Math.max(0.22, Math.min((renderer.width - 54) / width, (renderer.height - 54) / height)));
+    previewState.zoomScale = Math.min(4.5, Math.min((renderer.width - 54) / width, (renderer.height - 54) / height));
     previewState.offsetX = -((bounds.minX + bounds.maxX) / 2);
     previewState.offsetY = -((bounds.minY + bounds.maxY) / 2);
 }
