@@ -281,7 +281,7 @@ export class UIController {
             }
             event.preventDefault();
             const zoom = this.pendingZoom ?? this.state.zoomScale;
-            this.pendingZoom = Math.max(0.4, Math.min(2.5, zoom * Math.exp(-event.deltaY * 0.0015)));
+            this.pendingZoom = Math.max(0.1, Math.min(2.5, zoom * Math.exp(-event.deltaY * 0.0015)));
             this.scheduleInputFrame();
         }, { passive: false });
     }
@@ -400,7 +400,7 @@ export class UIController {
         if (this.activeTouches.size === 2 && this.initialPinchDist) {
             const touches = [...this.activeTouches.values()];
             const distance = Math.hypot(touches[0].x - touches[1].x, touches[0].y - touches[1].y);
-            this.state.zoomScale = Math.max(0.4, Math.min(2.5, this.initialZoom * distance / this.initialPinchDist));
+            this.state.zoomScale = Math.max(0.1, Math.min(2.5, this.initialZoom * distance / this.initialPinchDist));
             const midpoint = this.renderer.canvasPoint(
                 (touches[0].x + touches[1].x) / 2,
                 (touches[0].y + touches[1].y) / 2

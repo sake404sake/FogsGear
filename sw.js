@@ -1,4 +1,4 @@
-const CACHE_NAME = 'steampunk-explorer-v298';
+const CACHE_NAME = 'steampunk-explorer-v299';
 const APP_SHELL = [
     './',
     './MainSystem/index.html',
@@ -55,7 +55,7 @@ const APP_SHELL = [
     './GearSystem/index.html',
     './GearSystem/scroll-library.html?v=68',
     './GearSystem/css/style.css',
-    './GearSystem/js/main.js?v=gear-art-14',
+    './GearSystem/js/main.js?v=gear-art-15',
     './GearSystem/js/scroll-library.js?v=74',
     './GearSystem/js/GearSystem.js',
     './GearSystem/js/GearManager.js',

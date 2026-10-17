@@ -41,7 +41,7 @@ export class CanvasRenderer {
         this.loadGearImages();
         this.resizeCanvas();
         if (autoAnimate && window.matchMedia('(max-width: 600px) and (pointer: coarse)').matches) {
-            this.state.zoomScale = 0.75;
+            this.fitMobileView();
         }
         if ('ResizeObserver' in window) {
             this.resizeObserver = new ResizeObserver(() => this.resizeCanvas());
@@ -49,6 +49,28 @@ export class CanvasRenderer {
         }
         window.addEventListener('resize', () => this.resizeCanvas());
         if (autoAnimate) requestAnimationFrame(now => this.loop(now));
+    }
+
+    fitMobileView() {
+        const gears = this.state.placedGears;
+        if (!gears.length) {
+            this.state.zoomScale = 0.55;
+            return;
+        }
+        const bounds = gears.reduce((result, gear) => ({
+            minX: Math.min(result.minX, gear.x - gear.radius),
+            maxX: Math.max(result.maxX, gear.x + gear.radius),
+            minY: Math.min(result.minY, gear.y - gear.radius),
+            maxY: Math.max(result.maxY, gear.y + gear.radius)
+        }), { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity });
+        const padding = 32;
+        const fitScale = Math.min(
+            (this.width - padding * 2) / Math.max(1, bounds.maxX - bounds.minX),
+            (this.height - padding * 2) / Math.max(1, bounds.maxY - bounds.minY)
+        );
+        this.state.zoomScale = Math.max(0.1, Math.min(0.75, fitScale));
+        this.state.offsetX = -(bounds.minX + bounds.maxX) / 2;
+        this.state.offsetY = -(bounds.minY + bounds.maxY) / 2;
     }
 
     resizeCanvas() {
@@ -336,11 +358,12 @@ export class CanvasRenderer {
             );
             this.ctx.drawImage(this.gridCanvas, -width / 2, -height / 2, width * 2, height * 2);
             this.ctx.restore();
-            if ((left > 0 || right < width || top > 0 || bottom < height) && !this.gridRefreshTimer) {
+            if (left > 0 || right < width || top > 0 || bottom < height) {
+                if (this.gridRefreshTimer) clearTimeout(this.gridRefreshTimer);
                 this.gridRefreshTimer = setTimeout(() => {
                     this.gridKey = '';
                     this.gridRefreshTimer = null;
-                }, 180);
+                }, 300);
             }
             return;
         }
