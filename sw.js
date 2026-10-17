@@ -1,4 +1,4 @@
-const CACHE_NAME = 'steampunk-explorer-v306';
+const CACHE_NAME = 'steampunk-explorer-v315';
 const APP_SHELL = [
     './',
     './MainSystem/index.html',
@@ -12,7 +12,7 @@ const APP_SHELL = [
     './MapSystem/manifest.webmanifest',
     './MapSystem/css/style.css',
     './MapSystem/cell-icons.svg',
-    './MapSystem/js/main.js?v=838',
+    './MapSystem/js/main.js?v=839',
     './MapSystem/js/mapGenerator.js',
     './MapSystem/js/skinRenderer.js',
     './MapSystem/js/skinPreview.js',
@@ -55,7 +55,7 @@ const APP_SHELL = [
     './GearSystem/index.html',
     './GearSystem/scroll-library.html?v=69',
     './GearSystem/css/style.css',
-    './GearSystem/js/main.js?v=gear-art-17',
+    './GearSystem/js/main.js?v=gear-art-20',
     './GearSystem/js/scroll-library.js?v=75',
     './GearSystem/js/GearSystem.js',
     './GearSystem/js/GearManager.js',

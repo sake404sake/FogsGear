@@ -180,15 +180,19 @@ export class CanvasRenderer {
         const belts = Array.isArray(this.state.belts) ? this.state.belts : [];
         this.ctx.save();
         this.ctx.strokeStyle = '#b07a45';
-        this.ctx.lineWidth = 4 / this.state.zoomScale;
-        this.ctx.setLineDash([12 / this.state.zoomScale, 4 / this.state.zoomScale]);
+        const zoomScale = this.state.zoomScale;
+        const beltVisualScale = window.matchMedia('(pointer: coarse)').matches
+            ? Math.max(0.4, Math.min(1, zoomScale / 0.75))
+            : 1;
+        this.ctx.lineWidth = 4 * beltVisualScale / zoomScale;
+        this.ctx.setLineDash([12 * beltVisualScale / zoomScale, 4 * beltVisualScale / zoomScale]);
         belts.forEach(belt => {
             if (!Array.isArray(belt?.gearIds)) return;
             const beltGears = belt.gearIds.map(id => gears.get(id)).filter(Boolean);
             if (beltGears.length < 2) return;
             const points = [];
             beltGears.forEach(gear => {
-                const radius = gear.radius + 8 / this.state.zoomScale;
+                const radius = gear.radius + 1 / zoomScale;
                 for (let index = 0; index < 24; index++) {
                     const angle = index * Math.PI * 2 / 24;
                     points.push({ x: gear.x + Math.cos(angle) * radius, y: gear.y + Math.sin(angle) * radius });

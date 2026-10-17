@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
     <title>Fogs Gear</title>
-    <link rel="stylesheet" href="css/style.css?v=gear-layout-20">
+    <link rel="stylesheet" href="css/style.css?v=gear-layout-21">
 </head>
 <body>
     <div id="loadingOverlay" class="loading-overlay" role="status" aria-live="polite">
@@ -32,8 +32,8 @@
             <table class="rate-table">
                 <thead><tr><th>処理</th><th>入力</th><th>出力</th></tr></thead>
                 <tbody>
-                    <tr><td>霧の回収</td><td>なし</td><td>霧（歯数×10 / 回転）</td></tr>
-                    <tr><td>資材収集</td><td>対象セル</td><td>セル資材（最大で歯数個 / 回転、動力消費あり）</td></tr>
+                    <tr><td>霧の回収</td><td>なし</td><td><span>霧 × 歯数 × 10</span><small>1回転あたり</small></td></tr>
+                    <tr><td>資材収集</td><td>対象セル</td><td><span>セル資材（最大：歯数分）</span><small>1回転あたり・動力消費</small></td></tr>
                     <tr><td>水→スチーム</td><td>水 1</td><td>スチーム 10</td></tr>
                     <tr><td>霧→水</td><td>霧 10</td><td>水 5</td></tr>
                 </tbody>
@@ -184,7 +184,7 @@
             }
         })();
     </script>
-    <script type="module" src="js/main.js?v=gear-art-17"></script>
+    <script type="module" src="js/main.js?v=gear-art-20"></script>
     <script>
         document.addEventListener('click', (event) => {
             const target = event.target.closest('a, button[onclick]');

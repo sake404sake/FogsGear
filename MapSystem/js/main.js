@@ -7638,8 +7638,39 @@ let engineTickIntervalId = null;
 let buildingUtilityIntervalId = null;
 let gearEditorFrame = null;
 
+function pushOverlayHistory(kind) {
+    const currentState = history.state && typeof history.state === 'object' ? history.state : {};
+    history.pushState({ ...currentState, fogsgearOverlay: kind }, '', window.location.href);
+}
+
+function clearOverlayHistory() {
+    const { fogsgearOverlay, ...state } = history.state && typeof history.state === 'object' ? history.state : {};
+    history.replaceState(state, '', window.location.href);
+}
+
+function closeGearEditorOverlay(syncHistory = false) {
+    if (!gearEditorFrame) return;
+    gearEditorFrame.parentElement?.remove();
+    gearEditorFrame = null;
+    if (syncHistory && history.state?.fogsgearOverlay === 'gear-editor') history.back();
+}
+
+function closeAppPageOverlay(syncHistory = false) {
+    if (!appPageFrame) return;
+    appPageFrame.parentElement?.remove();
+    appPageFrame = null;
+    if (syncHistory && history.state?.fogsgearOverlay === 'app-page') history.back();
+}
+
+window.addEventListener('popstate', event => {
+    const activeOverlay = event.state?.fogsgearOverlay;
+    if (activeOverlay !== 'gear-editor') closeGearEditorOverlay();
+    if (activeOverlay !== 'app-page') closeAppPageOverlay();
+});
+
 function openAppPage(path, title) {
-    appPageFrame?.parentElement.remove();
+    if (appPageFrame) closeAppPageOverlay();
+    if (gearEditorFrame) closeGearEditorOverlay();
     const overlay = document.createElement('div');
     overlay.className = 'app-page-overlay';
     const frame = document.createElement('iframe');
@@ -7648,10 +7679,11 @@ function openAppPage(path, title) {
     overlay.appendChild(frame);
     document.body.appendChild(overlay);
     appPageFrame = frame;
+    pushOverlayHistory('app-page');
 }
 
 function openGearEditor(material, scrollId = null) {
-    if (gearEditorFrame) gearEditorFrame.parentElement.remove();
+    if (gearEditorFrame) closeGearEditorOverlay();
     const overlay = document.createElement('div');
     overlay.className = 'gear-editor-overlay';
     const frame = document.createElement('iframe');
@@ -7665,6 +7697,7 @@ function openGearEditor(material, scrollId = null) {
     overlay.appendChild(frame);
     document.body.appendChild(overlay);
     gearEditorFrame = frame;
+    pushOverlayHistory('gear-editor');
     closeInventoryItem();
 }
 
@@ -8223,8 +8256,7 @@ window.addEventListener('message', event => {
     if (event.origin !== window.location.origin && event.origin !== 'null') return;
     if (gearEditorFrame && event.source === gearEditorFrame.contentWindow) {
         if (event.data?.type === 'fogsgear:close-editor') {
-            gearEditorFrame.parentElement?.remove();
-            gearEditorFrame = null;
+            closeGearEditorOverlay(true);
             return;
         }
     }
@@ -8236,8 +8268,8 @@ window.addEventListener('message', event => {
         if (event.data?.type === 'fogsgear:reload-game-save') {
             window.clearInterval(engineTickIntervalId);
             window.clearInterval(buildingUtilityIntervalId);
-            appPageFrame.parentElement.remove();
-            appPageFrame = null;
+            closeAppPageOverlay();
+            clearOverlayHistory();
             window.location.reload();
             return;
         }
@@ -8253,8 +8285,7 @@ window.addEventListener('message', event => {
             return;
         }
         if (event.data?.type === 'fogsgear:close-page') {
-            appPageFrame.parentElement.remove();
-            appPageFrame = null;
+            closeAppPageOverlay(true);
             return;
         }
         if (event.data?.type === 'fogsgear:reset-game') {
@@ -8270,8 +8301,8 @@ window.addEventListener('message', event => {
                 event.source.postMessage({ type: 'fogsgear:reset-game-failed', message: '保存データを消去できませんでした。空き容量やブラウザー設定を確認してください。' }, window.location.origin);
                 return;
             }
-            appPageFrame.parentElement.remove();
-            appPageFrame = null;
+            closeAppPageOverlay();
+            clearOverlayHistory();
             window.location.reload();
             return;
         }

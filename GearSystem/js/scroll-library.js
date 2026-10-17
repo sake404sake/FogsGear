@@ -1,4 +1,4 @@
-import { CanvasRenderer } from './CanvasRenderer.js?v=render-16';
+import { CanvasRenderer } from './CanvasRenderer.js?v=render-19';
 import { GEAR_CONFIG, hexToPixel } from './GearManager.js?v=runtime-11';
 import { CORE_ROTATION_SPEED_VERSION, GearNetwork, normalizeCoreRotationSpeedLevel } from './GearSystem.js?v=network-11';
 import { SCROLL_MATERIALS, SCROLL_MATERIAL_BY_TYPE } from '../../MapSystem/js/craftingData.js?v=19';

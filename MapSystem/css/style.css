@@ -1209,6 +1209,17 @@ canvas.engine-runtime-canvas { display: none; }
         font-size: 0.68rem;
         letter-spacing: 0;
     }
+    body:has(#gameCanvas) .dashboard-shortcuts .dashboard-toggle {
+        min-height: 32px;
+        padding-top: 3px;
+        padding-bottom: 3px;
+        line-height: 1.1;
+    }
+    body:has(#gameCanvas) .dashboard-shortcuts .dashboard-toggle span {
+        width: 16px;
+        height: 16px;
+        font-size: 0.8rem;
+    }
     .landscape-main-frame > .panel > .dashboard-toggle {
         margin-bottom: 2px;
         padding: 4px 7px;
@@ -1224,6 +1235,7 @@ canvas.engine-runtime-canvas { display: none; }
         grid-template-columns: repeat(3, 48px);
         grid-template-rows: repeat(3, 40px);
         gap: 4px;
+        transform: translateX(-6px);
     }
     .movement-button { width: 44px; height: 36px; font-size: 0.82rem; }
     .movement-joystick { width: 38px; height: 38px; }
@@ -1233,6 +1245,24 @@ canvas.engine-runtime-canvas { display: none; }
     .main-page-dots { gap: 8px; margin: 4px 0 0; }
     .main-page-dot { width: 9px; height: 9px; }
     .rule-text { display: none; }
+}
+
+@media (max-width: 620px) {
+    body:has(#gameCanvas) > .panel:last-of-type .main-page:first-child > .control-group:has(> .navigation-toggle) {
+        width: 100%;
+        box-sizing: border-box;
+    }
+    body:has(#gameCanvas) > .panel:last-of-type .navigation-toggle {
+        width: calc(100% - 16px);
+        min-width: 0;
+        box-sizing: border-box;
+        align-self: flex-start;
+    }
+    body:has(#gameCanvas) > .panel:last-of-type #navigation-panel {
+        width: calc(100% - 16px);
+        box-sizing: border-box;
+        align-self: flex-start;
+    }
 }
 
 @media (max-width: 620px) and (max-aspect-ratio: 1 / 1) {
@@ -1320,6 +1350,7 @@ canvas.engine-runtime-canvas { display: none; }
         aspect-ratio: 1;
         grid-template-columns: repeat(3, minmax(0, 1fr));
         grid-template-rows: repeat(3, minmax(0, 1fr));
+        transform: translateX(-14px);
     }
     body:has(#gameCanvas) > .panel:last-of-type .movement-button {
         width: min(100%, clamp(44px, 15vw, 58px));

@@ -195,6 +195,7 @@ h1 {
 .rate-table th { padding: 5px 6px; color: #a7f0d9; font-weight: 600; border-bottom: 1px solid rgba(98, 194, 170, 0.45); }
 .rate-table td { padding: 5px 6px; color: var(--text-muted); border-bottom: 1px solid rgba(198, 154, 82, 0.16); }
 .rate-table td:last-child { color: #d9fff2; font-family: monospace; }
+.rate-table td small { display: block; margin-top: 2px; color: var(--text-muted); font: inherit; font-size: 0.88em; line-height: 1.25; }
 @media (max-width: 600px) {
     body { padding: 6px; }
     .panel { width: 100%; box-sizing: border-box; padding: 10px 8px; }
@@ -206,6 +207,17 @@ h1 {
     .btn-action, .btn-reset { flex: 1 1 44%; min-width: 0; padding: 7px 5px; }
     .btn-item-confirm { top: 8px; right: 8px; min-height: 42px; padding: 9px 11px; font-size: 0.72rem; }
     .dashboard-resource-row { grid-template-columns: 0.95fr repeat(3, 1fr); gap: 4px; font-size: 0.6rem; }
+    .rate-table-panel { margin-bottom: 8px; padding: 5px 6px; }
+    .rate-table { table-layout: fixed; font-size: 0.62rem; line-height: 1.25; }
+    .rate-table th,
+    .rate-table td { padding: 4px 3px; vertical-align: top; overflow-wrap: anywhere; }
+    .rate-table th:first-child,
+    .rate-table td:first-child { width: 24%; }
+    .rate-table th:nth-child(2),
+    .rate-table td:nth-child(2) { width: 20%; }
+    .rate-table th:last-child,
+    .rate-table td:last-child { width: 56%; }
+    .rate-table td small { margin-top: 2px; font-size: 0.92em; line-height: 1.2; }
     h1 { letter-spacing: 2px; }
 }
 
