@@ -1,4 +1,4 @@
-import { CORE_ROTATION_SPEED_VERSION, GearNetwork } from './GearSystem.js?v=network-10';
+import { CORE_ROTATION_SPEED_VERSION, GearNetwork } from './GearSystem.js?v=network-11';
 import { SCROLL_MATERIALS, SCROLL_MATERIAL_BY_TYPE } from '../../MapSystem/js/craftingData.js?v=19';
 import { ACTIVE_SCROLL_TARGETS_KEY, CELL_MATERIALS, TERRAIN_TRANSFORM_RECIPES, WORLD_CELL_TYPES } from '../../MapSystem/js/worldCells.js?v=12';
 

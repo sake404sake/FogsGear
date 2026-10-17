@@ -6,16 +6,29 @@ export const Layer = Object.freeze({ GOLD: 0, SILVER: 1, BRONZE: 2 });
 export const GearDesignType = Object.freeze({ INDUSTRIAL: 'INDUSTRIAL', ALCHEMICAL: 'ALCHEMICAL', LOGISTICS: 'LOGISTICS', CLOCKWORK: 'CLOCKWORK', PRODUCTION: 'PRODUCTION' });
 // 資源変換や霧回収の種類。実際の資源処理はGameStateが担当する。
 export const ProcessMode = Object.freeze({ NONE: 'NONE', POWER_STORAGE: 'POWER_STORAGE', FOG_COLLECTION: 'FOG_COLLECTION', RESOURCE_COLLECTION: 'RESOURCE_COLLECTION', TRANSFORM: 'TRANSFORM', FOG_TO_WATER: 'FOG_TO_WATER', TERRAIN_TRANSFORM: 'TERRAIN_TRANSFORM', ERA_SHIFT: 'ERA_SHIFT', TARGET_SHIFT_UP: 'TARGET_SHIFT_UP', TARGET_SHIFT_DOWN: 'TARGET_SHIFT_DOWN', TARGET_SHIFT_LEFT: 'TARGET_SHIFT_LEFT', TARGET_SHIFT_RIGHT: 'TARGET_SHIFT_RIGHT', CONDITIONAL_CONTROL: 'CONDITIONAL_CONTROL' });
-export const CORE_ROTATION_SPEEDS = Object.freeze([0.5, 2 / 3, 5 / 6, 1, 7 / 6, 4 / 3, 1.5]);
-export const CORE_ROTATION_SPEED_VERSION = 2;
 export const CORE_ROTATION_RPM = 0.012 * 60 * 60 / (Math.PI * 2);
+export const CORE_ROTATION_RPMS = Object.freeze([1, 3, 5, 7, 13, 17, 23]);
+export const CORE_ROTATION_SPEEDS = Object.freeze(
+    CORE_ROTATION_RPMS.map((rpm, index) => index === 3 ? 1 : rpm / CORE_ROTATION_RPM)
+);
+export const CORE_ROTATION_SPEED_VERSION = 3;
 
 export function normalizeCoreRotationSpeedLevel(level, version = CORE_ROTATION_SPEED_VERSION) {
     if (!Number.isInteger(level)) return 4;
     if (version === CORE_ROTATION_SPEED_VERSION) {
         return level >= 1 && level <= CORE_ROTATION_SPEEDS.length ? level : 4;
     }
-    return [1, 3, 4, 6, 7][level - 1] || 4;
+    const previousSpeeds = version === 1
+        ? [0.5, 0.75, 1, 1.25, 1.5]
+        : version === 2
+            ? [0.5, 2 / 3, 5 / 6, 1, 7 / 6, 4 / 3, 1.5]
+            : null;
+    const previousSpeed = previousSpeeds?.[level - 1];
+    if (previousSpeed === undefined) return 4;
+    return CORE_ROTATION_SPEEDS.reduce((closestLevel, speed, index) =>
+        Math.abs(speed - previousSpeed) < Math.abs(CORE_ROTATION_SPEEDS[closestLevel - 1] - previousSpeed)
+            ? index + 1
+            : closestLevel, 1);
 }
 
 const layerDesigns = [GearDesignType.INDUSTRIAL, GearDesignType.ALCHEMICAL, GearDesignType.CLOCKWORK];

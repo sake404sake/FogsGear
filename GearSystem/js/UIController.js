@@ -1,5 +1,5 @@
 import { CELL_MATERIALS } from '../../MapSystem/js/worldCells.js?v=12';
-import { CORE_ROTATION_RPM, CORE_ROTATION_SPEEDS } from './GearSystem.js?v=network-10';
+import { CORE_ROTATION_RPMS } from './GearSystem.js?v=network-11';
 
 /**
  * UIController - DOM操作、ポインター入力、ギア設定吹き出しを管理する。
@@ -15,6 +15,7 @@ export class UIController {
         this.activeTouches = new Map();
         this.pointerStartPoints = new Map();
         this.pointerGestureMoved = false;
+        this.multiPointerGesture = false;
         this.initialPinchDist = null;
         this.initialZoom = 1;
         this.pinchAnchor = null;
@@ -47,10 +48,10 @@ export class UIController {
         // ボタン、設定セレクト、キャンバス入力を一度だけ登録する。
         const speedSelect = document.getElementById('main-gear-speed-select');
         if (speedSelect) {
-            speedSelect.replaceChildren(...CORE_ROTATION_SPEEDS.map((speed, index) => {
+            speedSelect.replaceChildren(...CORE_ROTATION_RPMS.map((rpm, index) => {
                 const option = document.createElement('option');
                 option.value = String(index + 1);
-                option.textContent = `${index + 1}段階（${(CORE_ROTATION_RPM * speed).toFixed(1)} 回転/分）`;
+                option.textContent = `${index + 1}段階（${rpm} rpm）`;
                 return option;
             }));
         }
@@ -246,16 +247,22 @@ export class UIController {
             this.closeGearPopover();
         });
         this.canvas.addEventListener('pointercancel', event => {
+            if (this.activeTouches.size > 1) this.multiPointerGesture = true;
             this.activeTouches.delete(event.pointerId);
             this.pointerStartPoints.delete(event.pointerId);
-            this.initialPinchDist = null;
-            this.pinchAnchor = null;
+            if (this.activeTouches.size < 2) {
+                this.initialPinchDist = null;
+                this.pinchAnchor = null;
+            }
             if (this.pointerDownPointerId === event.pointerId) {
                 this.pointerDownGear = null;
                 this.pointerDownPoint = null;
                 this.pointerDownPointerId = null;
             }
-            if (this.activeTouches.size === 0) this.pointerGestureMoved = false;
+            if (this.activeTouches.size === 0) {
+                this.pointerGestureMoved = false;
+                this.multiPointerGesture = false;
+            }
             this.state.ghostGear = null;
         });
         this.canvas.addEventListener('wheel', event => {
@@ -292,6 +299,7 @@ export class UIController {
             this.pointerDownPoint = this.pointerDownGear ? { x: event.clientX, y: event.clientY } : null;
             this.activeTouches.set(event.pointerId, { x: event.clientX, y: event.clientY });
             this.pointerStartPoints.set(event.pointerId, { x: event.clientX, y: event.clientY });
+            if (this.activeTouches.size > 1) this.multiPointerGesture = true;
             if (this.activeTouches.size === 1) {
                 this.pointerGestureMoved = false;
                 this.startX = event.clientX;
@@ -425,13 +433,14 @@ export class UIController {
                 this.pointerDownPoint = null;
                 this.pointerDownPointerId = null;
             }
-            if (tappedGear && !this.pointerGestureMoved) {
+            if (tappedGear && !this.pointerGestureMoved && !this.multiPointerGesture) {
                 this.openGearPopover(tappedGear);
                 return;
             }
             if (this.activeTouches.size !== 0) return;
-            if (this.pointerGestureMoved) {
+            if (this.pointerGestureMoved || this.multiPointerGesture) {
                 this.pointerGestureMoved = false;
+                this.multiPointerGesture = false;
                 return;
             }
             if (this.state.selectedItem === 'BELT') return;

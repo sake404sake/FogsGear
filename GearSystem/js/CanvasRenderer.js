@@ -19,6 +19,7 @@ export class CanvasRenderer {
         ];
         this.gridCanvas = document.createElement('canvas');
         this.gridKey = '';
+        this.gridRefreshTimer = null;
         this.gridZoomScale = 1;
         this.gridOffsetX = 0;
         this.gridOffsetY = 0;
@@ -32,11 +33,16 @@ export class CanvasRenderer {
         this.width = 1;
         this.height = 1;
         this.pixelRatio = 1;
+        this.lastRenderAt = null;
+        this.renderInterval = window.matchMedia('(pointer: coarse)').matches ? 1000 / 30 : 0;
         this.lastFrameAt = null;
         this.simulationAccumulator = 0;
         this.previousGearAngles = new Map();
         this.loadGearImages();
         this.resizeCanvas();
+        if (autoAnimate && window.matchMedia('(max-width: 600px) and (pointer: coarse)').matches) {
+            this.state.zoomScale = 0.75;
+        }
         if ('ResizeObserver' in window) {
             this.resizeObserver = new ResizeObserver(() => this.resizeCanvas());
             this.resizeObserver.observe(this.canvas);
@@ -49,7 +55,8 @@ export class CanvasRenderer {
         const rect = this.canvas.getBoundingClientRect();
         const width = Math.max(1, rect.width);
         const height = Math.max(1, rect.height);
-        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const maxPixelRatio = window.matchMedia('(pointer: coarse)').matches ? 1.5 : 2;
+        const dpr = Math.min(window.devicePixelRatio || 1, maxPixelRatio);
         const nextWidth = Math.max(1, Math.round(width * dpr));
         const nextHeight = Math.max(1, Math.round(height * dpr));
         const backingStoreChanged = this.canvas.width !== nextWidth || this.canvas.height !== nextHeight;
@@ -95,6 +102,8 @@ export class CanvasRenderer {
                 this.simulationAccumulator -= SIMULATION_INTERVAL;
             }
         }
+        if (this.renderInterval && this.lastRenderAt !== null && now - this.lastRenderAt < this.renderInterval) return;
+        this.lastRenderAt = now;
         this.render(this.simulationAccumulator / SIMULATION_INTERVAL);
     }
 
@@ -307,10 +316,10 @@ export class CanvasRenderer {
     }
 
     drawHexGrid() {
-        // カメラ移動中は余白付きグリッド画像を変換して再利用し、必要時だけ再生成する。
+        // カメラ操作中はキャッシュを変換して使い、余白が尽きた後にだけ再生成する。
         const { width, height } = this;
         const gearKey = this.state.placedGears.map(gear => `${gear.q},${gear.r}`).join('|');
-        const gridStep = this.state.zoomScale < 0.6 ? 2 : 1;
+        const gridStep = window.matchMedia('(pointer: coarse)').matches ? 3 : 1;
         const key = `${width}x${height}:${this.pixelRatio}:${gridStep}:${gearKey}`;
         if (key === this.gridKey) {
             const scale = this.state.zoomScale / this.gridZoomScale;
@@ -320,18 +329,26 @@ export class CanvasRenderer {
             const right = translateX + width * 1.5 * scale;
             const top = translateY - height / 2 * scale;
             const bottom = translateY + height * 1.5 * scale;
-            if (left <= 0 && right >= width && top <= 0 && bottom >= height) {
-                this.ctx.save();
-                this.ctx.setTransform(
-                    this.pixelRatio * scale, 0, 0, this.pixelRatio * scale,
-                    this.pixelRatio * translateX, this.pixelRatio * translateY
-                );
-                this.ctx.drawImage(this.gridCanvas, -width / 2, -height / 2, width * 2, height * 2);
-                this.ctx.restore();
-                return;
+            this.ctx.save();
+            this.ctx.setTransform(
+                this.pixelRatio * scale, 0, 0, this.pixelRatio * scale,
+                this.pixelRatio * translateX, this.pixelRatio * translateY
+            );
+            this.ctx.drawImage(this.gridCanvas, -width / 2, -height / 2, width * 2, height * 2);
+            this.ctx.restore();
+            if ((left > 0 || right < width || top > 0 || bottom < height) && !this.gridRefreshTimer) {
+                this.gridRefreshTimer = setTimeout(() => {
+                    this.gridKey = '';
+                    this.gridRefreshTimer = null;
+                }, 180);
             }
+            return;
         }
 
+        if (this.gridRefreshTimer) {
+            clearTimeout(this.gridRefreshTimer);
+            this.gridRefreshTimer = null;
+        }
         this.gridCanvas.width = this.canvas.width * 2;
         this.gridCanvas.height = this.canvas.height * 2;
         const gridContext = this.gridCanvas.getContext('2d');
@@ -340,20 +357,24 @@ export class CanvasRenderer {
         gridContext.strokeStyle = 'rgba(139, 115, 85, 0.16)';
         gridContext.fillStyle = 'rgba(212, 175, 55, 0.04)';
         gridContext.lineWidth = 0.6;
+        gridContext.beginPath();
+        let cellsInPath = 0;
 
-        const worldWidth = width * 2 / this.state.zoomScale;
-        const worldHeight = height * 2 / this.state.zoomScale;
-        const qRange = Math.ceil(Math.max(worldWidth / (2 * Math.sqrt(3)), worldHeight / 3)) + 4;
-        const activeAxes = new Set(this.state.placedGears.map(gear => `${gear.q},${gear.r}`));
-        for (let q = -qRange; q <= qRange; q += gridStep) {
-            for (let r = -qRange; r <= qRange; r += gridStep) {
-                if (Math.abs(q + r) > qRange) continue;
+        const minWorldX = -width / this.state.zoomScale - this.state.offsetX;
+        const maxWorldX = width / this.state.zoomScale - this.state.offsetX;
+        const minWorldY = -height / this.state.zoomScale - this.state.offsetY;
+        const maxWorldY = height / this.state.zoomScale - this.state.offsetY;
+        const minR = Math.ceil(minWorldY / 3) - 1;
+        const maxR = Math.floor(maxWorldY / 3) + 1;
+        for (let r = minR; r <= maxR; r += gridStep) {
+            const minQ = Math.ceil(minWorldX / (2 * Math.sqrt(3)) - r / 2) - 1;
+            const maxQ = Math.floor(maxWorldX / (2 * Math.sqrt(3)) - r / 2) + 1;
+            for (let q = Math.ceil(minQ / gridStep) * gridStep; q <= maxQ; q += gridStep) {
                 const center = this.hexToPixel(q, r);
                 const screenX = width + (center.x + this.state.offsetX) * this.state.zoomScale;
                 const screenY = height + (center.y + this.state.offsetY) * this.state.zoomScale;
                 const radius = 2 * 0.95 * this.state.zoomScale;
                 if (screenX + radius < 0 || screenX - radius > width * 2 || screenY + radius < 0 || screenY - radius > height * 2) continue;
-                gridContext.beginPath();
                 for (let i = 0; i < 6; i++) {
                     const angle = i * Math.PI / 3 + Math.PI / 6;
                     const x = screenX + radius * Math.cos(angle);
@@ -361,10 +382,29 @@ export class CanvasRenderer {
                     if (i === 0) gridContext.moveTo(x, y); else gridContext.lineTo(x, y);
                 }
                 gridContext.closePath();
-                if (activeAxes.has(`${q},${r}`)) gridContext.fill();
-                gridContext.stroke();
+                if (++cellsInPath === 256) {
+                    gridContext.stroke();
+                    gridContext.beginPath();
+                    cellsInPath = 0;
+                }
             }
         }
+        if (cellsInPath) gridContext.stroke();
+        this.state.placedGears.forEach(gear => {
+            const screenX = width + (this.hexToPixel(gear.q, gear.r).x + this.state.offsetX) * this.state.zoomScale;
+            const screenY = height + (this.hexToPixel(gear.q, gear.r).y + this.state.offsetY) * this.state.zoomScale;
+            const radius = 2 * 0.95 * this.state.zoomScale;
+            if (screenX + radius < 0 || screenX - radius > width * 2 || screenY + radius < 0 || screenY - radius > height * 2) return;
+            gridContext.beginPath();
+            for (let i = 0; i < 6; i++) {
+                const angle = i * Math.PI / 3 + Math.PI / 6;
+                const x = screenX + radius * Math.cos(angle);
+                const y = screenY + radius * Math.sin(angle);
+                if (i === 0) gridContext.moveTo(x, y); else gridContext.lineTo(x, y);
+            }
+            gridContext.closePath();
+            gridContext.fill();
+        });
         this.gridKey = key;
         this.gridZoomScale = this.state.zoomScale;
         this.gridOffsetX = this.state.offsetX;
