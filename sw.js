@@ -1,4 +1,4 @@
-const CACHE_NAME = 'steampunk-explorer-v315';
+const CACHE_NAME = 'steampunk-explorer-v329';
 const APP_SHELL = [
     './',
     './MainSystem/index.html',
@@ -12,7 +12,10 @@ const APP_SHELL = [
     './MapSystem/manifest.webmanifest',
     './MapSystem/css/style.css',
     './MapSystem/cell-icons.svg',
-    './MapSystem/js/main.js?v=839',
+    './MapSystem/js/main.js?v=848',
+    './MapSystem/js/gameAudio.js?v=5',
+    './design/game-audio-sfx-reference-player.js?v=3',
+    './design/audio-sources/pdsounds/manifest.json',
     './MapSystem/js/mapGenerator.js',
     './MapSystem/js/skinRenderer.js',
     './MapSystem/js/skinPreview.js',
@@ -76,6 +79,17 @@ self.addEventListener('install', (event) => {
     event.waitUntil((async () => {
         const cache = await caches.open(CACHE_NAME);
         await cache.addAll(APP_SHELL.map(path => new URL(path, self.registration.scope).href));
+        const manifestUrl = new URL('./design/audio-sources/pdsounds/manifest.json', self.registration.scope);
+        const manifestResponse = await cache.match(manifestUrl);
+        if (!manifestResponse) throw new Error('ゲーム効果音の音源台帳がアプリキャッシュにありません。');
+        const manifest = await manifestResponse.json();
+        if (!Array.isArray(manifest.assets) || manifest.assets.some(asset => typeof asset.file !== 'string')) {
+            throw new Error('ゲーム効果音の音源台帳が不正です。');
+        }
+        const recordingUrls = manifest.assets.map(asset =>
+            new URL(`./design/audio-sources/pdsounds/${asset.file}`, self.registration.scope).href
+        );
+        await cache.addAll(recordingUrls);
         await self.skipWaiting();
     })());
 });
@@ -95,7 +109,8 @@ self.addEventListener('fetch', (event) => {
 
     event.respondWith((async () => {
         const cache = await caches.open(CACHE_NAME);
-        const cached = await cache.match(event.request, { ignoreSearch: true });
+        const cached = await cache.match(event.request)
+            || await cache.match(event.request, { ignoreSearch: true });
         if (cached) return cached;
 
         try {

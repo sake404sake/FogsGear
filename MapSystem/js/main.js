@@ -10,6 +10,7 @@ import { BUILDING_BY_ID, BUILDING_DEFINITIONS, canPlaceBuildingOnTerrainCell, dr
 import { getBuildingUtilityStatus, simulateBuildingUtilityNetworks } from './buildingUtilityNetworks.js?v=5';
 import { buildTerritoryBorderSegments, buildTerritoryBorderSegmentsAsync } from './territoryBorders.js?v=36';
 import { directionToVehicleRotation, findNextRailStep, getTrackDirection, getVehicleRenderState, STATION_CONTROL_DEFAULTS, VEHICLE_DEFAULTS } from './railwayRuntime.js?v=9';
+import { getBuildingSoundProfile, getShoreSoundProfile, getSurfaceSoundProfile, getTerrainSoundProfile, playGameSound } from './gameAudio.js?v=5';
 import { GameState as EngineGameState, clearGameProgress } from '../../GearSystem/js/GameState.js?v=runtime-58';
 import { GEAR_CONFIG as ENGINE_GEAR_CONFIG, GearManager as EngineGearManager } from '../../GearSystem/js/GearManager.js?v=runtime-5';
 import { GearNetwork as EngineGearNetwork } from '../../GearSystem/js/GearSystem.js?v=network-11';
@@ -6586,6 +6587,9 @@ function openBuildingMenu(instanceId) {
     const placed = state.buildings.find(building => building.instanceId === instanceId);
     const definition = BUILDING_BY_ID.get(placed?.id);
     if (!placed || !definition) return;
+    const modal = document.getElementById('building-menu-modal');
+    const isOpeningMenu = modal.hidden || selectedBuildingInstanceId !== instanceId;
+    const soundProfile = getBuildingSoundProfile(placed.id) || getSurfaceSoundProfile(placed.id);
     if (selectedBuildingInstanceId !== instanceId) selectedStorageStack = null;
     selectedBuildingInstanceId = instanceId;
     cancelBuildingDemolition();
@@ -6593,6 +6597,7 @@ function openBuildingMenu(instanceId) {
         document.getElementById('building-menu-modal').hidden = true;
         renderAutomatonMenu(placed);
         document.getElementById('automaton-menu-modal').hidden = false;
+        if (isOpeningMenu) playGameSound(soundProfile, { singleHit: placed.id === 'simple-storage' || placed.id === 'warehouse' });
         return;
     }
     document.getElementById('automaton-menu-modal').hidden = true;
@@ -6609,7 +6614,8 @@ function openBuildingMenu(instanceId) {
     const startVehicleButton = document.getElementById('building-menu-start-vehicle');
     const actions = document.querySelector('#building-menu-modal .inventory-modal-actions');
     if (actions) actions.hidden = Boolean(craftButton?.hidden && startVehicleButton?.hidden);
-    document.getElementById('building-menu-modal').hidden = false;
+    modal.hidden = false;
+    if (isOpeningMenu) playGameSound(soundProfile, { singleHit: placed.id === 'simple-storage' || placed.id === 'warehouse' });
 }
 
 function saveSelectedBuildingName(input) {
@@ -7379,7 +7385,7 @@ function setupControls() {
     });
 }
 
-function movePlayer(dx, dy) {
+function movePlayer(dx, dy, { haptic = false } = {}) {
     const newX = state.player.x + dx;
     const newY = state.player.y + dy;
 
@@ -7392,8 +7398,24 @@ function movePlayer(dx, dy) {
         if (engineRuntimeState.brass > 0) ownedItems.add('brass-stock');
         if (canEnterCell(targetTile, { rules: state.cellEntryRules, items: ownedItems })
             && !isBuildingCellBlocked(newX, newY)) {
+            const previousShoreProfile = getShoreSoundProfile(state.map, state.player.x, state.player.y);
+            let surface = null;
+            for (let index = state.buildings.length - 1; index >= 0; index--) {
+                const building = state.buildings[index];
+                if (building.x === newX && building.y === newY && getSurfaceSoundProfile(building.id)) {
+                    surface = building;
+                    break;
+                }
+            }
+            const footstepProfile = getSurfaceSoundProfile(surface?.id) || getTerrainSoundProfile(targetTile);
             state.player.x = newX;
             state.player.y = newY;
+            if (haptic) triggerMovementHaptic();
+            playGameSound(footstepProfile, { singleHit: true });
+            const shoreProfile = getShoreSoundProfile(state.map, newX, newY);
+            if (shoreProfile && shoreProfile !== previousShoreProfile) {
+                playGameSound(shoreProfile, { singleHit: true });
+            }
             stopPlayerTargetedScrolls(true);
             savePlayerPos();
             state.skin.setDirection(dx, dy);
@@ -8652,7 +8674,6 @@ engineTickIntervalId = window.setInterval(() => {
     engineRuntimeState.tick();
 }, 16);
 buildingUtilityIntervalId = window.setInterval(updateBuildingUtilityNetworks, 1000);
-
 window.addEventListener('keydown', (e) => {
     if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
 
@@ -8667,42 +8688,105 @@ window.addEventListener('keydown', (e) => {
     if (handled && e.key.toLowerCase().startsWith('arrow')) e.preventDefault();
 });
 
-function triggerMovementHaptic(duration = 8) {
+function triggerMovementHaptic(duration = 12) {
     if (typeof navigator.vibrate === 'function') navigator.vibrate(duration);
 }
-
-const moveByButton = (x, y) => {
-    triggerMovementHaptic();
-    movePlayer(x, y);
-};
-
-document.getElementById('move-up').onclick = () => moveByButton(0, -1);
-document.getElementById('move-down').onclick = () => moveByButton(0, 1);
-document.getElementById('move-left').onclick = () => moveByButton(-1, 0);
-document.getElementById('move-right').onclick = () => moveByButton(1, 0);
 
 const joystick = document.getElementById('move-joystick');
 const joystickKnob = joystick?.querySelector('.movement-joystick-knob');
 let joystickDirection = '';
 let joystickSuppressClicksUntil = 0;
-let joystickMoveTimer = null;
+let continuousMoveOwner = null;
+let continuousMoveDirection = '';
+let continuousMoveDelayTimer = null;
+let continuousMoveTimer = null;
 
-function moveJoystickInDirection() {
-    const movement = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] }[joystickDirection];
-    if (movement) movePlayer(movement[0], movement[1]);
+const MOVEMENT_VECTORS = Object.freeze({
+    up: [0, -1],
+    down: [0, 1],
+    left: [-1, 0],
+    right: [1, 0]
+});
+
+function moveInDirection(direction) {
+    const movement = MOVEMENT_VECTORS[direction];
+    if (movement) movePlayer(movement[0], movement[1], { haptic: true });
 }
 
-function startJoystickMovement() {
-    if (joystickMoveTimer || !joystickDirection) return;
-    joystickMoveTimer = window.setInterval(moveJoystickInDirection, 180);
+function stopContinuousMovement(owner = null) {
+    if (owner && continuousMoveOwner !== owner) return;
+    if (continuousMoveDelayTimer) {
+        window.clearTimeout(continuousMoveDelayTimer);
+        continuousMoveDelayTimer = null;
+    }
+    if (continuousMoveTimer) {
+        window.clearInterval(continuousMoveTimer);
+        continuousMoveTimer = null;
+    }
+    continuousMoveOwner = null;
+    continuousMoveDirection = '';
 }
+
+function startContinuousMovement(owner, direction) {
+    if (continuousMoveOwner === owner && continuousMoveDirection === direction) return;
+    stopContinuousMovement();
+    continuousMoveOwner = owner;
+    continuousMoveDirection = direction;
+    moveInDirection(direction);
+    continuousMoveDelayTimer = window.setTimeout(() => {
+        continuousMoveDelayTimer = null;
+        if (continuousMoveOwner !== owner || continuousMoveDirection !== direction) return;
+        continuousMoveTimer = window.setInterval(() => {
+            if (continuousMoveOwner === owner && continuousMoveDirection === direction) {
+                moveInDirection(direction);
+            }
+        }, 180);
+    }, 300);
+}
+
+const movementButtons = [
+    ['move-up', 'up'],
+    ['move-down', 'down'],
+    ['move-left', 'left'],
+    ['move-right', 'right']
+];
+
+for (const [buttonId, direction] of movementButtons) {
+    const button = document.getElementById(buttonId);
+    let suppressPointerClick = false;
+    button.addEventListener('pointerdown', event => {
+        suppressPointerClick = true;
+        button.setPointerCapture(event.pointerId);
+        startContinuousMovement(button, direction);
+    });
+    const stopButtonMovement = event => {
+        if (button.hasPointerCapture(event.pointerId)) button.releasePointerCapture(event.pointerId);
+        stopContinuousMovement(button);
+    };
+    button.addEventListener('pointerup', stopButtonMovement);
+    button.addEventListener('pointercancel', event => {
+        suppressPointerClick = false;
+        stopButtonMovement(event);
+    });
+    button.addEventListener('lostpointercapture', () => stopContinuousMovement(button));
+    button.addEventListener('click', event => {
+        if (suppressPointerClick && event.detail > 0) {
+            suppressPointerClick = false;
+            return;
+        }
+        suppressPointerClick = false;
+        moveInDirection(direction);
+    });
+}
+
+window.addEventListener('blur', () => stopContinuousMovement());
+document.addEventListener('visibilitychange', () => {
+    if (document.hidden) stopContinuousMovement();
+});
 
 function resetJoystick() {
     joystickDirection = '';
-    if (joystickMoveTimer) {
-        window.clearInterval(joystickMoveTimer);
-        joystickMoveTimer = null;
-    }
+    stopContinuousMovement(joystick);
     if (joystickKnob) joystickKnob.style.transform = 'translate(-50%, -50%)';
     joystick?.setAttribute('aria-valuenow', '0');
 }
@@ -8724,10 +8808,7 @@ function updateJoystick(event) {
     const threshold = Math.max(10, rect.width * 0.2);
     if (distance < threshold) {
         joystickDirection = '';
-        if (joystickMoveTimer) {
-            window.clearInterval(joystickMoveTimer);
-            joystickMoveTimer = null;
-        }
+        stopContinuousMovement(joystick);
         joystick.setAttribute('aria-valuenow', '0');
         return;
     }
@@ -8737,10 +8818,8 @@ function updateJoystick(event) {
         : (deltaY > 0 ? 'down' : 'up');
     if (nextDirection === joystickDirection) return;
     joystickDirection = nextDirection;
-    triggerMovementHaptic();
     joystick.setAttribute('aria-valuenow', nextDirection === 'right' || nextDirection === 'down' ? '1' : '-1');
-    moveJoystickInDirection();
-    startJoystickMovement();
+    startContinuousMovement(joystick, nextDirection);
 }
 
 if (joystick) {

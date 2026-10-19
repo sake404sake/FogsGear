@@ -1,4 +1,4 @@
-const CACHE_NAME = 'steampunk-explorer-v260';
+const CACHE_NAME = 'steampunk-explorer-v271';
 const APP_SHELL = [
     './',
     './index.html',
@@ -6,7 +6,10 @@ const APP_SHELL = [
     './worldmap.html',
     './manifest.webmanifest',
     './css/style.css?v=708',
-    './js/main.js?v=826',
+    './js/main.js?v=848',
+    './js/gameAudio.js?v=5',
+    '../design/game-audio-sfx-reference-player.js?v=3',
+    '../design/audio-sources/pdsounds/manifest.json',
     './js/craftingData.js?v=19',
     './js/mapGenerator.js?v=92',
     './js/skinRenderer.js?v=5',
@@ -29,8 +32,21 @@ const APP_SHELL = [
 ];
 
 self.addEventListener('install', (event) => {
-    event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));
-    self.skipWaiting();
+    event.waitUntil((async () => {
+        const cache = await caches.open(CACHE_NAME);
+        await cache.addAll(APP_SHELL);
+        const manifestUrl = new URL('../design/audio-sources/pdsounds/manifest.json', self.registration.scope);
+        const manifestResponse = await cache.match(manifestUrl);
+        if (!manifestResponse) throw new Error('ゲーム効果音の音源台帳がアプリキャッシュにありません。');
+        const manifest = await manifestResponse.json();
+        if (!Array.isArray(manifest.assets) || manifest.assets.some(asset => typeof asset.file !== 'string')) {
+            throw new Error('ゲーム効果音の音源台帳が不正です。');
+        }
+        await cache.addAll(manifest.assets.map(asset =>
+            new URL(`../design/audio-sources/pdsounds/${asset.file}`, self.registration.scope).href
+        ));
+        await self.skipWaiting();
+    })());
 });
 
 self.addEventListener('activate', (event) => {
