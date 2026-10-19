@@ -1,4 +1,8 @@
-import { AUDIO_PROFILE_NAMES, playFogsGearReferenceRecording } from '../../design/game-audio-sfx-reference-player.js?v=3';
+import {
+    AUDIO_PROFILE_NAMES,
+    playFogsGearReferenceRecording,
+    startFogsGearReferenceLoop
+} from '../../design/game-audio-sfx-reference-player.js?v=4';
 import { getCellTypeKey } from './cellRules.js';
 
 const TERRAIN_SOUND_PROFILES = Object.freeze({
@@ -111,6 +115,8 @@ if (unmappedProfiles.length || invalidProfiles.length) {
 
 let audioContext;
 let masterGain;
+const BUILDING_SOUND_AUDIBLE_RADIUS = 14;
+const buildingSoundVoices = new Map();
 
 function getAudioOutput() {
     if (!audioContext) {
@@ -165,5 +171,86 @@ export function playGameSound(profileName, { singleHit = false } = {}) {
             .catch(error => console.error(`ゲーム効果音を再生できません (${profileName})`, error));
     } catch (error) {
         console.error(`ゲーム効果音を再生できません (${profileName})`, error);
+    }
+}
+
+function setVoiceGain(voice, value, duration) {
+    const now = voice.context.currentTime;
+    voice.gain.gain.cancelScheduledValues(now);
+    voice.gain.gain.setValueAtTime(voice.gain.gain.value, now);
+    voice.gain.gain.linearRampToValueAtTime(value, now + duration);
+}
+
+function stopBuildingVoice(instanceId, voice) {
+    if (voice.stopped) return;
+    voice.stopped = true;
+    if (buildingSoundVoices.get(instanceId) === voice) buildingSoundVoices.delete(instanceId);
+    voice.stopLoop?.();
+    setVoiceGain(voice, 0, 0.25);
+    window.setTimeout(() => {
+        voice.gain.disconnect();
+    }, 300);
+}
+
+export function updateBuildingSoundscape(buildings, playerPosition) {
+    const desiredVoices = new Map();
+    if (playerPosition && document.visibilityState !== 'hidden') {
+        for (const building of buildings) {
+            if (!building.active || !building.profile) continue;
+            const distance = Math.hypot(
+                building.x - playerPosition.x,
+                building.y - playerPosition.y
+            );
+            if (distance >= BUILDING_SOUND_AUDIBLE_RADIUS) continue;
+            const proximity = 1 - distance / BUILDING_SOUND_AUDIBLE_RADIUS;
+            desiredVoices.set(building.instanceId, {
+                profile: building.profile,
+                volume: 0.8 * proximity ** 1.5
+            });
+        }
+    }
+
+    for (const [instanceId, voice] of buildingSoundVoices) {
+        const desired = desiredVoices.get(instanceId);
+        if (!desired || desired.profile !== voice.profile) {
+            stopBuildingVoice(instanceId, voice);
+            continue;
+        }
+        setVoiceGain(voice, desired.volume, 0.35);
+    }
+
+    for (const [instanceId, desired] of desiredVoices) {
+        if (buildingSoundVoices.has(instanceId)) continue;
+        try {
+            const { context } = getAudioOutput();
+            if (context.state === 'suspended') void context.resume().catch(error => {
+                console.error('建物の稼働音を開始できません', error);
+            });
+            const gain = context.createGain();
+            gain.gain.value = 0;
+            gain.connect(masterGain);
+            const voice = { context, gain, profile: desired.profile, stopped: false, stopLoop: null };
+            buildingSoundVoices.set(instanceId, voice);
+            setVoiceGain(voice, desired.volume, 0.4);
+            void startFogsGearReferenceLoop(
+                desired.profile,
+                context,
+                gain,
+                () => buildingSoundVoices.get(instanceId) === voice && !voice.stopped
+            ).then(stopLoop => {
+                voice.stopLoop = stopLoop;
+                if (voice.stopped) stopLoop();
+            }).catch(error => {
+                if (buildingSoundVoices.get(instanceId) === voice) {
+                    buildingSoundVoices.delete(instanceId);
+                    voice.stopped = true;
+                    setVoiceGain(voice, 0, 0.1);
+                    window.setTimeout(() => gain.disconnect(), 150);
+                }
+                console.error(`建物の稼働音を再生できません (${desired.profile})`, error);
+            });
+        } catch (error) {
+            console.error(`建物の稼働音を再生できません (${desired.profile})`, error);
+        }
     }
 }

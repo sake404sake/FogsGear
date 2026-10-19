@@ -10,7 +10,7 @@ import { BUILDING_BY_ID, BUILDING_DEFINITIONS, canPlaceBuildingOnTerrainCell, dr
 import { getBuildingUtilityStatus, simulateBuildingUtilityNetworks } from './buildingUtilityNetworks.js?v=5';
 import { buildTerritoryBorderSegments, buildTerritoryBorderSegmentsAsync } from './territoryBorders.js?v=36';
 import { directionToVehicleRotation, findNextRailStep, getTrackDirection, getVehicleRenderState, STATION_CONTROL_DEFAULTS, VEHICLE_DEFAULTS } from './railwayRuntime.js?v=9';
-import { getBuildingSoundProfile, getShoreSoundProfile, getSurfaceSoundProfile, getTerrainSoundProfile, playGameSound } from './gameAudio.js?v=5';
+import { getBuildingSoundProfile, getShoreSoundProfile, getSurfaceSoundProfile, getTerrainSoundProfile, playGameSound, updateBuildingSoundscape } from './gameAudio.js?v=6';
 import { GameState as EngineGameState, clearGameProgress } from '../../GearSystem/js/GameState.js?v=runtime-58';
 import { GEAR_CONFIG as ENGINE_GEAR_CONFIG, GearManager as EngineGearManager } from '../../GearSystem/js/GearManager.js?v=runtime-5';
 import { GearNetwork as EngineGearNetwork } from '../../GearSystem/js/GearSystem.js?v=network-11';
@@ -4163,6 +4163,39 @@ function isBuildingCraftingActive(placed, now = Date.now()) {
         && Number(job.completesAt) > now);
 }
 
+function isBuildingSoundActive(placed, now = Date.now()) {
+    if (placed.vehicle?.running || placed.vehicle?.movement
+        || placed.automaton?.running || placed.automaton?.movement) return true;
+    if (placed.id === 'scroll-stand' && hasRunningCraftingScroll(placed)) return true;
+    return engineRuntimeState.craftingJobs.some(job =>
+        job.craftingStationId === placed.instanceId
+        && Number(job.startedAt) <= now
+        && Number(job.completesAt) > now
+        && (!job.requiresPower || (hasRunningCraftingScroll(placed)
+            && (engineRuntimeState.creativeMode
+                || (!job.powerPaused && Number(engineRuntimeState.power) > 0)))))
+        || (placed.id === 'boiler-forge'
+            && buildingUtilityOperationStatuses.get(placed.instanceId) === '稼働中');
+}
+
+function updateBuildingSoundscapeForWorld() {
+    const now = Date.now();
+    const sounds = state.buildings.map(placed => {
+        const definition = BUILDING_BY_ID.get(placed.id);
+        return {
+            instanceId: placed.instanceId,
+            profile: getBuildingSoundProfile(placed.id),
+            active: isBuildingSoundActive(placed, now),
+            x: placed.x + (definition?.width || 1) / 2,
+            y: placed.y + (definition?.height || 1) / 2
+        };
+    });
+    updateBuildingSoundscape(sounds, {
+        x: state.player.x + 0.5,
+        y: state.player.y + 0.5
+    });
+}
+
 function getActiveCraftingBuildingSignature(now = Date.now()) {
     return state.buildings
         .filter(placed => isBuildingCraftingActive(placed, now))
@@ -6590,6 +6623,7 @@ function openBuildingMenu(instanceId) {
     const modal = document.getElementById('building-menu-modal');
     const isOpeningMenu = modal.hidden || selectedBuildingInstanceId !== instanceId;
     const soundProfile = getBuildingSoundProfile(placed.id) || getSurfaceSoundProfile(placed.id);
+    const isStorage = placed.id === 'simple-storage' || placed.id === 'warehouse';
     if (selectedBuildingInstanceId !== instanceId) selectedStorageStack = null;
     selectedBuildingInstanceId = instanceId;
     cancelBuildingDemolition();
@@ -6597,7 +6631,7 @@ function openBuildingMenu(instanceId) {
         document.getElementById('building-menu-modal').hidden = true;
         renderAutomatonMenu(placed);
         document.getElementById('automaton-menu-modal').hidden = false;
-        if (isOpeningMenu) playGameSound(soundProfile, { singleHit: placed.id === 'simple-storage' || placed.id === 'warehouse' });
+        if (isOpeningMenu && isStorage) playGameSound(soundProfile, { singleHit: true });
         return;
     }
     document.getElementById('automaton-menu-modal').hidden = true;
@@ -6615,7 +6649,7 @@ function openBuildingMenu(instanceId) {
     const actions = document.querySelector('#building-menu-modal .inventory-modal-actions');
     if (actions) actions.hidden = Boolean(craftButton?.hidden && startVehicleButton?.hidden);
     modal.hidden = false;
-    if (isOpeningMenu) playGameSound(soundProfile, { singleHit: placed.id === 'simple-storage' || placed.id === 'warehouse' });
+    if (isOpeningMenu && isStorage) playGameSound(soundProfile, { singleHit: true });
 }
 
 function saveSelectedBuildingName(input) {
@@ -7658,6 +7692,7 @@ let appPageFrame = null;
 let gameResetInProgress = false;
 let engineTickIntervalId = null;
 let buildingUtilityIntervalId = null;
+let buildingSoundIntervalId = null;
 let gearEditorFrame = null;
 
 function pushOverlayHistory(kind) {
@@ -8290,6 +8325,7 @@ window.addEventListener('message', event => {
         if (event.data?.type === 'fogsgear:reload-game-save') {
             window.clearInterval(engineTickIntervalId);
             window.clearInterval(buildingUtilityIntervalId);
+            window.clearInterval(buildingSoundIntervalId);
             closeAppPageOverlay();
             clearOverlayHistory();
             window.location.reload();
@@ -8315,6 +8351,7 @@ window.addEventListener('message', event => {
             gameResetInProgress = true;
             window.clearInterval(engineTickIntervalId);
             window.clearInterval(buildingUtilityIntervalId);
+            window.clearInterval(buildingSoundIntervalId);
             try {
                 clearGameProgress(Boolean(event.data.keepSavedGears));
             } catch (error) {
@@ -8674,6 +8711,7 @@ engineTickIntervalId = window.setInterval(() => {
     engineRuntimeState.tick();
 }, 16);
 buildingUtilityIntervalId = window.setInterval(updateBuildingUtilityNetworks, 1000);
+buildingSoundIntervalId = window.setInterval(updateBuildingSoundscapeForWorld, 400);
 window.addEventListener('keydown', (e) => {
     if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
 
@@ -8924,8 +8962,13 @@ mainPageArrows.forEach(arrow => arrow.addEventListener('click', () => {
     setMainPage(currentMainPage + (arrow.dataset.mainPage === 'next' ? 1 : -1));
 }));
 const captureMainPageSwipe = (event, allowInteractiveTarget = false) => {
+    if (event.target?.closest('.movement-pad')) {
+        mainPagePointerStart = null;
+        mainPageTouchStart = null;
+        return;
+    }
     if (event.pointerType === 'touch') return;
-    if (!allowInteractiveTarget && event.target && event.target.closest('button, input, select, .movement-joystick, .crafting-progress-card')) return;
+    if (!allowInteractiveTarget && event.target && event.target.closest('button, input, select, .crafting-progress-card')) return;
     mainPagePointerStart = { x: event.clientX, y: event.clientY };
 };
 const releaseMainPageSwipe = (point, start = mainPagePointerStart) => {
@@ -8938,6 +8981,11 @@ const releaseMainPageSwipe = (point, start = mainPagePointerStart) => {
     setMainPage(currentMainPage + (deltaX < 0 ? 1 : -1));
 };
 const captureMainPageTouch = event => {
+    if (event.target?.closest('.movement-pad')) {
+        mainPagePointerStart = null;
+        mainPageTouchStart = null;
+        return;
+    }
     if (event.target?.closest('.crafting-progress-card')) return;
     const touch = event.changedTouches[0];
     if (touch) mainPageTouchStart = { x: touch.clientX, y: touch.clientY };
