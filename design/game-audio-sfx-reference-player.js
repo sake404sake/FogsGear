@@ -337,7 +337,7 @@ function activeOffset(buffer, duration, random) {
     return bestOffset;
 }
 
-function playLayer(layer, buffer, context, output, recipe, random) {
+function playLayer(layer, buffer, context, output, recipe, random, baseTime, activeSources) {
     const count = layer.mode === 'bed' ? 1 : layer.count;
     for (let index = 0; index < count; index++) {
         const rate = layer.rate * (0.97 + random() * 0.06);
@@ -351,7 +351,7 @@ function playLayer(layer, buffer, context, output, recipe, random) {
         const filter = context.createBiquadFilter();
         const envelope = context.createGain();
         const jitter = index ? (random() - 0.5) * Math.min(0.06, (layer.period || 0) * 0.12) : 0;
-        const when = context.currentTime + 0.05 + layer.start + (layer.period || 0) * index + jitter;
+        const when = baseTime + layer.start + (layer.period || 0) * index + jitter;
         const end = when + duration;
         source.buffer = buffer;
         source.playbackRate.value = rate;
@@ -366,10 +366,12 @@ function playLayer(layer, buffer, context, output, recipe, random) {
         filter.connect(envelope);
         envelope.connect(output);
         source.onended = () => {
+            activeSources?.delete(source);
             source.disconnect();
             filter.disconnect();
             envelope.disconnect();
         };
+        activeSources?.add(source);
         source.start(when, offset, sourceDuration);
         source.stop(end + 0.015);
     }
@@ -404,8 +406,49 @@ export async function playFogsGearReferenceRecording(
         }
         : recipe;
     const random = Math.random;
-    playbackRecipe.layers.forEach((layer, index) => playLayer(layer, buffers[index], context, output, playbackRecipe, random));
+    const baseTime = context.currentTime + 0.05;
+    playbackRecipe.layers.forEach((layer, index) => playLayer(layer, buffers[index], context, output, playbackRecipe, random, baseTime));
     return playbackRecipe.duration + 0.14;
+}
+
+export async function startFogsGearReferenceLoop(
+    profileName,
+    context,
+    output,
+    isCurrent = () => true
+) {
+    const recipe = profileRecipes[profileName];
+    if (!recipe) throw new Error(`${profileName}: 対応する実録音の音響レシピがありません。`);
+    const sources = await getManifest();
+    const missingSources = recipe.layers.map(layer => layer.source).filter(id => !sources.has(id));
+    if (missingSources.length) {
+        throw new Error(`${profileName}: 必要な録音が音源台帳にありません (${[...new Set(missingSources)].join(', ')})`);
+    }
+    const buffers = await Promise.all(recipe.layers.map(layer => getAudioBuffer(layer.source, context, sources)));
+    if (!isCurrent()) return () => {};
+
+    let stopped = false;
+    let timeoutId = null;
+    let nextStartTime = context.currentTime + 0.05;
+    const activeSources = new Set();
+    const random = Math.random;
+    const playNextCycle = () => {
+        if (stopped || !isCurrent()) return;
+        const baseTime = Math.max(nextStartTime, context.currentTime + 0.02);
+        recipe.layers.forEach((layer, index) =>
+            playLayer(layer, buffers[index], context, output, recipe, random, baseTime, activeSources)
+        );
+        nextStartTime = baseTime + recipe.duration;
+        const delayUntilNextCycle = Math.max(80, (nextStartTime - context.currentTime - 0.08) * 1000);
+        timeoutId = window.setTimeout(playNextCycle, delayUntilNextCycle);
+    };
+    playNextCycle();
+
+    return () => {
+        stopped = true;
+        if (timeoutId !== null) window.clearTimeout(timeoutId);
+        timeoutId = null;
+    };
 }
 
 window.playFogsGearReferenceRecording = playFogsGearReferenceRecording;
