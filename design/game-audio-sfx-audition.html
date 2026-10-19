@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#17120f">
+    <title>ゲーム効果音 実録音ベース試聴</title>
+    <style>
+        :root {
+            color-scheme: dark;
+            font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+            background: #120e0c;
+            color: #e2d9cd;
+        }
+        * { box-sizing: border-box; }
+        body { max-width: 960px; margin: 0 auto; padding: 24px 16px 44px; }
+        h1 { margin: 0 0 8px; color: #f3c653; font-size: clamp(1.3rem, 5vw, 1.8rem); }
+        h2 { margin: 24px 0 8px; color: #e4c17a; font-size: 1rem; }
+        h3 { margin: 16px 0 7px; color: #c9ad76; font-size: .85rem; }
+        p { color: #c2b6a8; line-height: 1.6; }
+        .notice, .calibration { padding: 12px; border: 1px solid #7c6335; background: #211a10; }
+        .calibration { border-color: #4f695d; background: #152019; }
+        .evaluation { margin-top: 20px; padding: 14px; border: 1px solid #65718a; background: #171c28; }
+        .evaluation h2 { margin-top: 0; }
+        .evaluation button { margin: 4px 0 10px; }
+        #evaluationStatus { min-height: 1.5em; color: #c8d8ff; }
+        #evaluationReport { max-height: 440px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; color: #d9d4ca; font: 12px/1.5 ui-monospace, Consolas, monospace; }
+        .samples { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 7px; }
+        button {
+            min-height: 42px;
+            padding: 8px 10px;
+            color: #fff0bd;
+            background: #30251a;
+            border: 1px solid #765c34;
+            border-radius: 6px;
+            font: inherit;
+            cursor: pointer;
+            touch-action: manipulation;
+        }
+        button:hover { background: #41311f; border-color: #bd9850; }
+        button:focus-visible { outline: 2px solid #f3c653; outline-offset: 2px; }
+        button[aria-pressed="true"] { background: #4b3820; border-color: #f3c653; }
+        .controls { position: sticky; bottom: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 18px -4px 0; padding: 10px 4px; background: rgba(18, 14, 12, .96); border-top: 1px solid #4a3b2c; }
+        .controls label { display: flex; align-items: center; gap: 8px; color: #c2b6a8; }
+        input[type="range"] { width: min(42vw, 180px); }
+        output { min-width: 3em; color: #f3c653; font-variant-numeric: tabular-nums; }
+        #playbackStatus { min-height: 1.5em; color: #a7f0d9; }
+        #referenceSources { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 10px; }
+        #referenceSources article { padding: 12px; border: 1px solid #4f695d; background: #152019; }
+        #referenceSources h3 { margin: 0 0 6px; }
+        #referenceSources p { margin: 6px 0; overflow-wrap: anywhere; font-size: .9rem; }
+        #referenceSources a { color: #a7f0d9; }
+        #referenceSources audio { display: block; width: 100%; margin-top: 8px; }
+        .back-link { display: inline-block; margin-top: 20px; color: #f3c653; }
+        @media (max-width: 420px) {
+            body { padding: 18px 12px 32px; }
+            .samples { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+            button { padding: 8px 6px; font-size: .88rem; }
+        }
+    </style>
+</head>
+<body>
+    <main>
+        <h1>ゲーム効果音 実録音ベース試聴</h1>
+        <p class="notice">地形・建築ボタンは、このプロジェクトに同梱した実録音を素材に再生します。録音断片の選択・反復・速度・帯域・包絡を加工した試作で、旧来の仮合成音は試聴に使いません。出典と各ファイルの権利・ハッシュは音源台帳に記録しています。個別の聞き分け品質は人によるブラインド試聴前のため、音質承認済みとは扱いません。</p>
+        <section aria-labelledby="source-heading">
+            <h2 id="source-heading">同梱した実録音・権利情報</h2>
+            <p>音源はページ内で自動読込します。パブリックドメイン音源に加え、表示されたCC BY 4.0素材は作者表示とライセンスリンクを保持しています。音源ファイル・出典・加工素材の記録は <a href="./audio-sources/pdsounds/manifest.json">音源台帳</a> を参照してください。</p>
+            <div id="referenceSources"></div>
+            <p id="referenceSourceStatus" role="status" aria-live="polite">同梱音源を読み込んでいます。</p>
+        </section>
+        <section aria-labelledby="terrain-heading">
+            <h2 id="terrain-heading">地形</h2>
+            <div id="terrainSamples" class="samples" aria-label="地形の試聴"></div>
+        </section>
+        <section aria-labelledby="building-heading">
+            <h2 id="building-heading">建築物・床材・線路・車両</h2>
+            <div id="buildingSamples"></div>
+        </section>
+        <div class="controls">
+            <button id="stopButton" type="button">停止</button>
+            <label for="volume">試聴音量 <input id="volume" type="range" min="0" max="1" step="0.05" value="0.7"></label>
+            <output id="volumeValue" for="volume">70%</output>
+        </div>
+        <p id="playbackStatus" role="status" aria-live="polite">試聴する場所を選んでください。</p>
+        <a class="back-link" href="./game-audio-sfx-spec-proposal.md">効果音仕様案に戻る</a>
+    </main>
+    <script type="module" src="./game-audio-sfx-reference-player.js"></script>
+    <script type="module" src="./game-audio-sfx-synth.js"></script>
+</body>
+</html>
