@@ -10,7 +10,7 @@ import { BUILDING_BY_ID, BUILDING_DEFINITIONS, canPlaceBuildingOnTerrainCell, dr
 import { getBuildingUtilityStatus, simulateBuildingUtilityNetworks } from './buildingUtilityNetworks.js?v=5';
 import { buildTerritoryBorderSegments, buildTerritoryBorderSegmentsAsync } from './territoryBorders.js?v=36';
 import { directionToVehicleRotation, findNextRailStep, getTrackDirection, getVehicleRenderState, STATION_CONTROL_DEFAULTS, VEHICLE_DEFAULTS } from './railwayRuntime.js?v=9';
-import { getBuildingSoundProfile, getShoreSoundProfile, getSurfaceSoundProfile, getTerrainSoundProfile, playGameSound, updateBuildingSoundscape } from './gameAudio.js?v=6';
+import { getBuildingSoundProfile, getShoreSoundProfile, getSurfaceSoundProfile, getTerrainSoundProfile, playGameSound, updateBuildingSoundscape } from './gameAudio.js?v=7';
 import { GameState as EngineGameState, clearGameProgress } from '../../GearSystem/js/GameState.js?v=runtime-58';
 import { GEAR_CONFIG as ENGINE_GEAR_CONFIG, GearManager as EngineGearManager } from '../../GearSystem/js/GearManager.js?v=runtime-5';
 import { GearNetwork as EngineGearNetwork } from '../../GearSystem/js/GearSystem.js?v=network-11';
@@ -3414,28 +3414,33 @@ function renderBuildingCrafting() {
         const searchableText = [family, title, station, note, getCraftingItemName(output), ...inputs.map(([itemId]) => getCraftingItemName(itemId))].join(' ');
         return normalizeInventorySearch(searchableText).includes(search);
     });
-    const jobSignature = JSON.stringify(recipes.map(({ recipe }) => {
-        const recipeKey = `${recipe[0]}:${recipe[1]}`;
-        const activeJobs = (engineRuntimeState.craftingJobs || [])
-            .filter(job => job.recipeKey === recipeKey)
-            .map(job => [job.jobId, Number(job.completesAt)]);
-        const availableInputs = recipe[2].map(([itemId]) => getCraftingItemCount(itemId));
-        return [recipeKey, activeJobs, availableInputs];
-    }));
-    const signature = `${placed.instanceId}:${search}:${jobSignature}`;
-    if (signature === buildingCraftingRenderSignature) return;
-    buildingCraftingRenderSignature = signature;
-    list.replaceChildren();
-    if (!recipes.length) {
-        const empty = document.createElement('p');
-        empty.className = 'inventory-empty';
-        empty.textContent = search ? '該当する製作レシピはありません' : 'この設備で製作できるレシピはありません';
-        list.appendChild(empty);
-        return;
+    const signature = `${placed.instanceId}:${search}:${recipes.map(({ index }) => index).join(',')}`;
+    const rebuildList = signature !== buildingCraftingRenderSignature;
+    if (rebuildList) {
+        buildingCraftingRenderSignature = signature;
+        list.replaceChildren();
+        if (!recipes.length) {
+            const empty = document.createElement('p');
+            empty.className = 'inventory-empty';
+            empty.textContent = search ? '該当する製作レシピはありません' : 'この設備で製作できるレシピはありません';
+            list.appendChild(empty);
+            return;
+        }
     }
     const now = Date.now();
-    sortCraftingRecipesByAvailability(recipes)
-        .forEach(({ recipe, index }) => list.appendChild(createCraftingRecipeCard(recipe, index, now, placed.instanceId)));
+    if (rebuildList) {
+        sortCraftingRecipesByAvailability(recipes)
+            .forEach(({ recipe, index }) => list.appendChild(createCraftingRecipeCard(recipe, index, now, placed.instanceId)));
+        return;
+    }
+    recipes.forEach(({ recipe, index }) => {
+        let card = list.querySelector(`.crafting-recipe-card[data-recipe-index="${index}"]`);
+        if (!card) {
+            card = createCraftingRecipeCard(recipe, index, now, placed.instanceId);
+            list.appendChild(card);
+        }
+        updateCraftingRecipeCard(card, recipe, index, now);
+    });
 }
 
 function updateCraftingCountdowns() {
@@ -6377,6 +6382,16 @@ function getActiveScrollIds() {
 function stopPlayerTargetedScrolls(playerMoved = false) {
     const activeIds = new Set(getActiveScrollIds());
     if (!activeIds.size) return;
+    const worldAffectingProcessModes = new Set([
+        'RESOURCE_COLLECTION',
+        'TERRAIN_TRANSFORM',
+        'ERA_SHIFT',
+        'TARGET_SHIFT_UP',
+        'TARGET_SHIFT_DOWN',
+        'TARGET_SHIFT_LEFT',
+        'TARGET_SHIFT_RIGHT'
+    ]);
+    const savedScrolls = new Map(getStoredSavedScrolls().map(scroll => [scroll.id, scroll]));
     let targets;
     try {
         const stored = JSON.parse(localStorage.getItem(ACTIVE_SCROLL_TARGETS_KEY) || '{}');
@@ -6387,10 +6402,14 @@ function stopPlayerTargetedScrolls(playerMoved = false) {
     }
     const stoppedIds = [...activeIds].filter(scrollId => {
         const target = targets[scrollId];
+        const scroll = savedScrolls.get(scrollId);
         const anchoredBuilding = state.buildings.find(building => building.instanceId === target?.buildingInstanceId
             && (supportsStationaryScrolls(building) && building.craftingScrollId === scrollId
                 || requiresMovementScroll(building) && getMovementScrollId(building) === scrollId));
+        const affectsWorld = !scroll || !Array.isArray(scroll.blueprint?.gears)
+            || scroll.blueprint.gears.some(gear => worldAffectingProcessModes.has(gear.processMode));
         return !anchoredBuilding
+            && affectsWorld
             && (playerMoved || target?.x !== state.player.x || target?.y !== state.player.y);
     });
     if (!stoppedIds.length) return;
@@ -7445,10 +7464,13 @@ function movePlayer(dx, dy, { haptic = false } = {}) {
             state.player.x = newX;
             state.player.y = newY;
             if (haptic) triggerMovementHaptic();
-            playGameSound(footstepProfile, { singleHit: true });
+            playGameSound(footstepProfile, {
+                singleHit: true,
+                ...(surface ? {} : { normalizeToProfile: 'grass' })
+            });
             const shoreProfile = getShoreSoundProfile(state.map, newX, newY);
             if (shoreProfile && shoreProfile !== previousShoreProfile) {
-                playGameSound(shoreProfile, { singleHit: true });
+                playGameSound(shoreProfile, { singleHit: true, normalizeToProfile: 'grass' });
             }
             stopPlayerTargetedScrolls(true);
             savePlayerPos();
@@ -7553,15 +7575,18 @@ function updateEngineDashboard() {
     if (dashboard) {
         Object.entries(displayValues).forEach(([id, value]) => {
             const element = dashboard.querySelector(`#${id}`);
-            if (element) element.textContent = String(value);
+            const text = String(value);
+            if (element && element.textContent !== text) element.textContent = text;
         });
         Object.entries(rates).forEach(([id, value]) => {
             const element = dashboard.querySelector(`#${id}`);
-            if (element) element.textContent = `${formatCompactCount(value)} /秒`;
+            const text = `${formatCompactCount(value)} /秒`;
+            if (element && element.textContent !== text) element.textContent = text;
         });
         dashboard.querySelectorAll('[data-generated-resource]').forEach(row => {
             const resource = row.dataset.generatedResource;
-            row.hidden = !(Number(generationRates[resource]) > 0 || Number(consumptionRates[resource]) > 0);
+            const hidden = !(Number(generationRates[resource]) > 0 || Number(consumptionRates[resource]) > 0);
+            if (row.hidden !== hidden) row.hidden = hidden;
         });
         const resourceTable = dashboard.querySelector('.dashboard-resource-table');
         const collectedIds = new Set(collectedMaterials.map(material => material.itemId));
@@ -7579,16 +7604,22 @@ function updateEngineDashboard() {
                 resourceTable.appendChild(row);
             }
             if (!row) return;
-            row.children[0].textContent = material.name;
-            row.children[1].textContent = formatInventoryCount(material.itemId, material.amount);
-            row.children[2].textContent = `${material.rate} /秒`;
-            row.children[3].textContent = '—';
+            const values = [
+                material.name,
+                formatInventoryCount(material.itemId, material.amount),
+                `${material.rate} /秒`,
+                '—'
+            ];
+            values.forEach((value, index) => {
+                if (row.children[index].textContent !== value) row.children[index].textContent = value;
+            });
         });
         const creativeIndicator = dashboard.querySelector('#main-creative-mode-indicator');
-        if (creativeIndicator) creativeIndicator.hidden = !save.creativeMode;
+        if (creativeIndicator && creativeIndicator.hidden === Boolean(save.creativeMode)) {
+            creativeIndicator.hidden = !save.creativeMode;
+        }
     }
-    const previewFrame = document.querySelector('.gear-preview-page iframe');
-    previewFrame?.contentWindow?.postMessage({
+    const dashboardMessage = {
         type: 'fogsgear:engine-dashboard',
         values: displayValues,
         rates: Object.fromEntries(Object.entries(rates).map(([id, value]) => [id, `${formatCompactCount(value)} /秒`])),
@@ -7596,7 +7627,9 @@ function updateEngineDashboard() {
         consumptionRates,
         collectedMaterials,
         creativeMode: Boolean(save.creativeMode)
-    }, '*');
+    };
+    const previewFrame = document.querySelector('.gear-preview-page iframe');
+    [previewFrame, appPageFrame].forEach(frame => frame?.contentWindow?.postMessage(dashboardMessage, '*'));
     renderCellMaterials();
 }
 
@@ -7733,6 +7766,9 @@ function openAppPage(path, title) {
     const frame = document.createElement('iframe');
     frame.title = title;
     frame.src = new URL(path, window.location.href).href;
+    frame.addEventListener('load', () => {
+        if (appPageFrame === frame) updateEngineDashboard();
+    }, { once: true });
     overlay.appendChild(frame);
     document.body.appendChild(overlay);
     appPageFrame = frame;
@@ -7986,7 +8022,7 @@ document.addEventListener('click', (event) => {
     }
     if (button.dataset.action === 'inspect-inventory-item') {
         if (button.dataset.itemKey === 'scroll_book') {
-            openAppPage('../GearSystem/scroll-library.html?embed=1&source=scroll-book&v=13', 'スクロール書庫');
+            openAppPage('../GearSystem/scroll-library.html?embed=1&source=scroll-book&v=14', 'スクロール書庫');
             return;
         }
         openInventoryItem(button.dataset.itemKey);
@@ -8904,7 +8940,10 @@ const gearPreviewIframe = document.querySelector('.gear-preview-page iframe');
 const canvasContainer = document.getElementById('canvas-container');
 let currentMainPage = 0;
 let mainPagePointerStart = null;
+let mainPagePointerId = null;
+const mainPageIgnoredPointerIds = new Set();
 let mainPageTouchStart = null;
+let mainPageTouchId = null;
 
 function applyMapFrameRadius() {
     if (!canvasContainer) return;
@@ -8962,56 +9001,109 @@ mainPageArrows.forEach(arrow => arrow.addEventListener('click', () => {
     setMainPage(currentMainPage + (arrow.dataset.mainPage === 'next' ? 1 : -1));
 }));
 const captureMainPageSwipe = (event, allowInteractiveTarget = false) => {
+    mainPagePointerStart = null;
+    mainPagePointerId = null;
     if (event.target?.closest('.movement-pad')) {
-        mainPagePointerStart = null;
+        mainPageIgnoredPointerIds.add(event.pointerId);
         mainPageTouchStart = null;
+        mainPageTouchId = null;
         return;
     }
     if (event.pointerType === 'touch') return;
     if (!allowInteractiveTarget && event.target && event.target.closest('button, input, select, .crafting-progress-card')) return;
     mainPagePointerStart = { x: event.clientX, y: event.clientY };
+    mainPagePointerId = event.pointerId;
 };
-const releaseMainPageSwipe = (point, start = mainPagePointerStart) => {
+const releaseMainPageSwipe = (event, start = mainPagePointerStart) => {
+    if (mainPageIgnoredPointerIds.delete(event.pointerId)
+        || event.target?.closest('.movement-pad')
+        || mainPagePointerId !== event.pointerId) {
+        if (mainPagePointerId === event.pointerId) {
+            mainPagePointerStart = null;
+            mainPagePointerId = null;
+        }
+        return;
+    }
     if (!start) return;
-    const deltaX = point.x - start.x;
-    const deltaY = point.y - start.y;
-    if (start === mainPagePointerStart) mainPagePointerStart = null;
-    if (start === mainPageTouchStart) mainPageTouchStart = null;
+    const deltaX = event.clientX - start.x;
+    const deltaY = event.clientY - start.y;
+    mainPagePointerStart = null;
+    mainPagePointerId = null;
     if (Math.abs(deltaX) < 42 || Math.abs(deltaX) < Math.abs(deltaY) * 1.25) return;
     setMainPage(currentMainPage + (deltaX < 0 ? 1 : -1));
 };
 const captureMainPageTouch = event => {
+    mainPageTouchStart = null;
+    mainPageTouchId = null;
     if (event.target?.closest('.movement-pad')) {
         mainPagePointerStart = null;
-        mainPageTouchStart = null;
         return;
     }
     if (event.target?.closest('.crafting-progress-card')) return;
     const touch = event.changedTouches[0];
-    if (touch) mainPageTouchStart = { x: touch.clientX, y: touch.clientY };
+    if (touch) {
+        mainPageTouchStart = { x: touch.clientX, y: touch.clientY };
+        mainPageTouchId = touch.identifier;
+    }
 };
 const releaseMainPageTouch = event => {
     const touch = event.changedTouches[0];
-    if (touch) releaseMainPageSwipe({ x: touch.clientX, y: touch.clientY }, mainPageTouchStart);
+    if (event.target?.closest('.movement-pad') || touch?.target?.closest?.('.movement-pad')) {
+        mainPageTouchStart = null;
+        mainPageTouchId = null;
+        return;
+    }
+    if (!touch || touch.identifier !== mainPageTouchId || !mainPageTouchStart) return;
+    const start = mainPageTouchStart;
+    mainPageTouchStart = null;
+    mainPageTouchId = null;
+    const deltaX = touch.clientX - start.x;
+    const deltaY = touch.clientY - start.y;
+    if (Math.abs(deltaX) < 42 || Math.abs(deltaX) < Math.abs(deltaY) * 1.25) return;
+    setMainPage(currentMainPage + (deltaX < 0 ? 1 : -1));
 };
 
 mainPageViewport?.addEventListener('pointerdown', captureMainPageSwipe);
-mainPageViewport?.addEventListener('pointerup', event => releaseMainPageSwipe({ x: event.clientX, y: event.clientY }));
-mainPageViewport?.addEventListener('pointercancel', () => { mainPagePointerStart = null; });
+mainPageViewport?.addEventListener('pointerup', event => releaseMainPageSwipe(event));
+mainPageViewport?.addEventListener('pointercancel', event => {
+    mainPageIgnoredPointerIds.delete(event.pointerId);
+    if (mainPagePointerId === event.pointerId) {
+        mainPagePointerStart = null;
+        mainPagePointerId = null;
+    }
+});
 mainPageViewport?.addEventListener('touchstart', captureMainPageTouch, { passive: true });
 mainPageViewport?.addEventListener('touchend', releaseMainPageTouch, { passive: true });
-mainPageViewport?.addEventListener('touchcancel', () => { mainPageTouchStart = null; }, { passive: true });
+mainPageViewport?.addEventListener('touchcancel', event => {
+    const touch = event.changedTouches[0];
+    if (!touch || touch.identifier === mainPageTouchId) {
+        mainPageTouchStart = null;
+        mainPageTouchId = null;
+    }
+}, { passive: true });
 
 const bindGearPreviewSwipe = () => {
     if (!gearPreviewIframe || !gearPreviewIframe.contentWindow || !gearPreviewIframe.contentWindow.document) return;
     const frameDocument = gearPreviewIframe.contentWindow.document;
     const capturePreviewSwipe = event => captureMainPageSwipe(event, true);
     frameDocument.addEventListener('pointerdown', capturePreviewSwipe, { passive: true, capture: true });
-    frameDocument.addEventListener('pointerup', event => releaseMainPageSwipe({ x: event.clientX, y: event.clientY }), { passive: true, capture: true });
-    frameDocument.addEventListener('pointercancel', () => { mainPagePointerStart = null; }, { passive: true });
+    frameDocument.addEventListener('pointerup', event => releaseMainPageSwipe(event), { passive: true, capture: true });
+    frameDocument.addEventListener('pointercancel', event => {
+        mainPageIgnoredPointerIds.delete(event.pointerId);
+        if (mainPagePointerId === event.pointerId) {
+            mainPagePointerStart = null;
+            mainPagePointerId = null;
+        }
+    }, { passive: true });
     frameDocument.addEventListener('touchstart', captureMainPageTouch, { passive: true, capture: true });
     frameDocument.addEventListener('touchend', releaseMainPageTouch, { passive: true, capture: true });
-    frameDocument.addEventListener('touchcancel', () => { mainPageTouchStart = null; }, { passive: true, capture: true });
+    frameDocument.addEventListener('touchcancel', event => {
+        const touch = event.changedTouches[0];
+        if (!touch || touch.identifier === mainPageTouchId) {
+            mainPageTouchStart = null;
+            mainPageTouchId = null;
+        }
+    }, { passive: true, capture: true });
 };
 
 gearPreviewIframe?.addEventListener('load', bindGearPreviewSwipe);

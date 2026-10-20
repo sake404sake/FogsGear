@@ -1,4 +1,4 @@
-const CACHE_NAME = 'steampunk-explorer-v332';
+const CACHE_NAME = 'steampunk-explorer-v348';
 const APP_SHELL = [
     './',
     './MainSystem/index.html',
@@ -12,9 +12,9 @@ const APP_SHELL = [
     './MapSystem/manifest.webmanifest',
     './MapSystem/css/style.css',
     './MapSystem/cell-icons.svg',
-    './MapSystem/js/main.js?v=851',
-    './MapSystem/js/gameAudio.js?v=6',
-    './design/game-audio-sfx-reference-player.js?v=4',
+    './MapSystem/js/main.js?v=860',
+    './MapSystem/js/gameAudio.js?v=7',
+    './design/game-audio-sfx-reference-player.js?v=5',
     './design/audio-sources/pdsounds/manifest.json',
     './MapSystem/js/mapGenerator.js',
     './MapSystem/js/skinRenderer.js',
@@ -56,10 +56,10 @@ const APP_SHELL = [
     './MapSystem/assets/guide-screenshots/10b-cell-catalog.png',
     './MapSystem/assets/guide-screenshots/11-settings.png',
     './GearSystem/index.html',
-    './GearSystem/scroll-library.html?v=69',
+    './GearSystem/scroll-library.html?v=73',
     './GearSystem/css/style.css',
     './GearSystem/js/main.js?v=gear-art-20',
-    './GearSystem/js/scroll-library.js?v=75',
+    './GearSystem/js/scroll-library.js?v=80',
     './GearSystem/js/GearSystem.js',
     './GearSystem/js/GearManager.js',
     './GearSystem/js/GameState.js',

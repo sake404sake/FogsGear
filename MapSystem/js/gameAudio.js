@@ -2,7 +2,7 @@ import {
     AUDIO_PROFILE_NAMES,
     playFogsGearReferenceRecording,
     startFogsGearReferenceLoop
-} from '../../design/game-audio-sfx-reference-player.js?v=4';
+} from '../../design/game-audio-sfx-reference-player.js?v=5';
 import { getCellTypeKey } from './cellRules.js';
 
 const TERRAIN_SOUND_PROFILES = Object.freeze({
@@ -160,14 +160,14 @@ export function getShoreSoundProfile(map, x, y) {
     return shoreline ? getTerrainSoundProfile(shoreline) : null;
 }
 
-export function playGameSound(profileName, { singleHit = false } = {}) {
+export function playGameSound(profileName, { singleHit = false, normalizeToProfile = null } = {}) {
     if (!profileName) return;
     try {
         const { context, output } = getAudioOutput();
         if (context.state === 'suspended') void context.resume().catch(error => {
             console.error('ゲーム効果音の音声出力を開始できません', error);
         });
-        void playFogsGearReferenceRecording(profileName, context, output, () => true, { singleHit })
+        void playFogsGearReferenceRecording(profileName, context, output, () => true, { singleHit, normalizeToProfile })
             .catch(error => console.error(`ゲーム効果音を再生できません (${profileName})`, error));
     } catch (error) {
         console.error(`ゲーム効果音を再生できません (${profileName})`, error);
