@@ -582,6 +582,9 @@ canvas {
 .scroll-status { margin: 0; color: var(--text-muted); font-size: 0.76rem; }
 .scroll-actions { display: flex; gap: 7px; }
 .scroll-actions .btn { white-space: nowrap; }
+.scroll-action-icon { width: 18px; height: 18px; flex: 0 0 auto; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.7; }
+.scroll-actions .btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
+.embedded-library:not(.scroll-book-view) .scroll-actions { display: none; }
 .embedded-library:not(.scroll-book-view) #scroll-share { display: none; }
 .scroll-share-panel { position: relative; display: grid; justify-items: center; width: min(100%, 420px); margin: auto; }
 .scroll-share-panel > * { max-width: 100%; }
@@ -651,6 +654,7 @@ canvas {
 .embedded-engine-dashboard > summary::-webkit-details-marker { display: none; }
 .embedded-engine-dashboard[open] > summary span { transform: rotate(45deg); }
 .embedded-engine-dashboard .engine-dashboard-page { display: block; min-height: 0; padding: 5px 7px; overflow: visible; background: linear-gradient(145deg, rgba(98, 194, 170, 0.08), rgba(18, 14, 12, 0.92)); border: 1px solid rgba(98, 194, 170, 0.24); }
+.embedded-engine-dashboard:not([open]) > .engine-dashboard-page { display: none; }
 .embedded-engine-dashboard .main-engine-dashboard { margin: 0 auto; padding: 5px 7px; }
 .embedded-engine-dashboard .dashboard-title-row { margin-bottom: 3px; }
 .embedded-engine-dashboard .dashboard-title { max-width: 650px; margin: 0 auto; font-size: 0.6rem; letter-spacing: 1px; }
@@ -710,6 +714,108 @@ canvas {
 .embedded-library.scroll-is-running .scroll-detail-heading h2 { display: inline-block; }
 .embedded-library .scroll-preview-frame { height: min(62dvh, 430px); min-height: 180px; background: transparent; border: 0; box-shadow: none; }
 .embedded-library .scroll-detail-footer { bottom: 12px; }
+.embedded-library.scroll-book-view {
+    height: auto;
+    min-height: 100dvh;
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+.embedded-library.scroll-book-view .scroll-library-shell { height: auto; min-height: 100dvh; }
+.embedded-library.scroll-book-view .scroll-library-layout {
+    display: flex;
+    flex: 1 0 auto;
+    flex-direction: column;
+    min-height: 0;
+    overflow: visible;
+}
+.embedded-library.scroll-book-view .scroll-list-panel {
+    position: relative;
+    inset: auto;
+    max-height: none;
+    overflow: visible;
+}
+.embedded-library.scroll-book-view .scroll-detail-panel {
+    display: flex;
+    flex: 1 0 auto;
+    flex-direction: column;
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+}
+.embedded-library.scroll-book-view #scroll-detail:not([hidden]) {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.embedded-library.scroll-book-view .scroll-preview-frame { flex: 0 0 auto; }
+.embedded-library.scroll-book-view .scroll-detail-footer {
+    position: static;
+    inset: auto;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+    margin: 8px 0 0;
+    pointer-events: auto;
+}
+.embedded-library.scroll-book-view .scroll-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: stretch;
+    gap: 12px;
+    width: 100%;
+    margin: 0;
+}
+.embedded-library.scroll-book-view .scroll-actions-primary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    min-width: 0;
+}
+.embedded-library.scroll-book-view .scroll-actions-primary .btn {
+    flex: 1 1 110px;
+    min-width: 0;
+    min-height: 44px;
+    padding: 8px 10px;
+    white-space: normal;
+}
+.embedded-library.scroll-book-view .scroll-actions-danger {
+    display: flex;
+    align-items: center;
+    padding-left: 12px;
+    border-left: 1px solid rgba(210, 103, 73, 0.45);
+}
+.embedded-library.scroll-book-view .scroll-actions-danger .btn {
+    min-width: 68px;
+    min-height: 44px;
+    padding: 8px 12px;
+    color: #ffc2a6;
+    border-color: rgba(210, 103, 73, 0.72);
+}
+.embedded-library.scroll-book-view .embedded-engine-dashboard {
+    display: block;
+    flex: 0 0 auto;
+    max-height: none;
+    margin: 8px 0 0;
+    padding: 4px 6px;
+    overflow: visible;
+    border-top: 1px solid rgba(98, 194, 170, 0.28);
+}
+.embedded-library.scroll-book-view .embedded-engine-dashboard > summary { display: flex; }
+.embedded-library.scroll-book-view .embedded-engine-dashboard .engine-dashboard-page {
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+}
+
+@media (max-width: 380px) {
+    .embedded-library.scroll-book-view .scroll-actions { grid-template-columns: minmax(0, 1fr); }
+    .embedded-library.scroll-book-view .scroll-actions-danger {
+        justify-content: flex-end;
+        padding: 8px 0 0;
+        border-top: 1px solid rgba(210, 103, 73, 0.45);
+        border-left: 0;
+    }
+}
 
 @media (max-width: 700px) {
     .embedded-library .scroll-tabs { height: 36px; padding: 0 6px; }

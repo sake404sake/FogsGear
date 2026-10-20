@@ -97,7 +97,7 @@ if (isPreviewOnly) document.body.classList.add('scroll-preview-only');
 if (isEmbedded && hideMapBack) document.body.classList.add('hide-embedded-map-back');
 if (isScrollBook) document.body.classList.add('scroll-book-view');
 if (isEmbedded && hasExternalDashboard) document.body.classList.add('external-engine-dashboard');
-if (isEmbedded && !hasExternalDashboard && window.matchMedia('(max-width: 700px) and (max-height: 520px)').matches) {
+if (isEmbedded && !hasExternalDashboard && (isScrollBook || window.matchMedia('(max-width: 700px) and (max-height: 520px)').matches)) {
     const dashboard = document.querySelector('.embedded-engine-dashboard');
     if (dashboard) dashboard.open = true;
 }
@@ -107,38 +107,55 @@ window.addEventListener('message', event => {
     if (!values || !rates || !generationRates) return;
     Object.entries(values).forEach(([id, value]) => {
         const element = document.getElementById(id);
-        if (element) element.textContent = String(value);
+        const text = String(value);
+        if (element && element.textContent !== text) element.textContent = text;
     });
     Object.entries(rates).forEach(([id, value]) => {
         const element = document.getElementById(id);
-        if (element) element.textContent = String(value);
+        const text = String(value);
+        if (element && element.textContent !== text) element.textContent = text;
     });
     document.querySelectorAll('[data-generated-resource]').forEach(row => {
         const resource = row.dataset.generatedResource;
-        row.hidden = !(Number(generationRates[resource]) > 0 || Number(consumptionRates[resource]) > 0);
+        const hidden = !isScrollBook && !(Number(generationRates[resource]) > 0 || Number(consumptionRates[resource]) > 0);
+        if (row.hidden !== hidden) row.hidden = hidden;
     });
     const resourceTable = document.querySelector('.dashboard-resource-table');
     if (resourceTable && Array.isArray(event.data.collectedMaterials)) {
-        resourceTable.querySelectorAll('[data-collected-material]').forEach(row => row.remove());
-        event.data.collectedMaterials.forEach(material => {
-            if (typeof material?.itemId !== 'string' || typeof material?.name !== 'string') return;
-            const row = document.createElement('div');
-            row.className = 'dashboard-resource-row';
-            row.dataset.collectedMaterial = material.itemId;
-            const name = document.createElement('span');
-            name.textContent = material.name;
-            const amount = document.createElement('strong');
-            amount.textContent = String(material.amount);
-            const rate = document.createElement('span');
-            rate.textContent = `${material.rate} /秒`;
-            const consumption = document.createElement('span');
-            consumption.textContent = '—';
-            row.append(name, amount, rate, consumption);
-            resourceTable.appendChild(row);
+        const materials = event.data.collectedMaterials.filter(material =>
+            typeof material?.itemId === 'string' && typeof material?.name === 'string');
+        const existingRows = new Map([...resourceTable.querySelectorAll('[data-collected-material]')]
+            .map(row => [row.dataset.collectedMaterial, row]));
+        const firstDynamicRow = resourceTable.querySelector('[data-collected-material]');
+        let nextRow = firstDynamicRow;
+        materials.forEach(material => {
+            let row = existingRows.get(material.itemId);
+            if (row) existingRows.delete(material.itemId);
+            else {
+                row = document.createElement('div');
+                row.className = 'dashboard-resource-row';
+                row.dataset.collectedMaterial = material.itemId;
+                row.append(document.createElement('span'), document.createElement('strong'),
+                    document.createElement('span'), document.createElement('span'));
+            }
+            if (row !== nextRow) resourceTable.insertBefore(row, nextRow);
+            const values = [
+                material.name,
+                String(material.amount),
+                `${material.rate} /秒`,
+                '—'
+            ];
+            values.forEach((value, index) => {
+                if (row.children[index].textContent !== value) row.children[index].textContent = value;
+            });
+            nextRow = row.nextElementSibling;
         });
+        existingRows.forEach(row => row.remove());
     }
     const creativeIndicator = document.getElementById('main-creative-mode-indicator');
-    if (creativeIndicator) creativeIndicator.hidden = !creativeMode;
+    if (creativeIndicator && creativeIndicator.hidden === Boolean(creativeMode)) {
+        creativeIndicator.hidden = !creativeMode;
+    }
 });
 document.querySelectorAll('.back-to-map').forEach(link => {
     link.addEventListener('click', event => {
@@ -240,6 +257,7 @@ function stopPreviewAnimation() {
 let currentMaterial = 'all';
 let selectedScrollId = null;
 let library = [];
+let renderedScrollListSignature = '';
 let renderedScrollId = null;
 let renderedScrollBlueprint = null;
 let runtimePreviewScrollId = null;
@@ -305,6 +323,12 @@ function getCopyMaterialCost(scroll) {
     }, 0);
 }
 
+function updateCopyCost(scroll) {
+    const material = SCROLL_MATERIAL_BY_TYPE.get(copyMaterialSelect.value);
+    if (!scroll || !material) return;
+    copyCostElement.textContent = `消費: ${material.label}スクロール素材 1個 + 真鍮 ${getCopyMaterialCost(scroll)}（メインギア以外のギアの設置コスト合計）`;
+}
+
 function getUsedRotations(scroll) {
     const value = Number(scroll?.usedRotations);
     return Number.isFinite(value) ? Math.max(0, value) : 0;
@@ -357,14 +381,14 @@ function requestCopy(scrollId, name, material) {
 }
 
 function openCopyModal(scroll) {
-    if (!scroll || !isScrollBook || getInstalledScrollIds().has(scroll.id)) return;
+    if (!scroll || !isScrollBook || !isEmbedded || isPreviewOnly || getInstalledScrollIds().has(scroll.id)) return;
     try {
         const cost = getCopyMaterialCost(scroll);
         if (cost <= 0) throw new Error('メインギア以外のギアがないため写本できません。');
         copySourceElement.textContent = `${scroll.name || '名前なしスクロール'} / 材料: 真鍮 ${cost}`;
         copyMaterialSelect.value = getScrollMaterialType(scroll);
         copyNameInput.value = getUniqueCopyName(scroll.name);
-        copyCostElement.textContent = `消費: 真鍮 ${cost}（メインギア以外のギアの設置コスト合計）`;
+        updateCopyCost(scroll);
         copyStatusElement.textContent = '';
         copySubmitButton.disabled = false;
         copyModal.hidden = false;
@@ -1125,45 +1149,84 @@ function syncPreviewLocks(scroll) {
 function renderList() {
     const filtered = getFilteredScrolls();
     const activeScrollIds = new Set(getActiveScrollIds());
-    countElement.textContent = String(filtered.length);
-    listElement.replaceChildren();
+    const signature = JSON.stringify([
+        currentMaterial,
+        filtered.map(scroll => [
+            scroll.id,
+            scroll.name || '',
+            getScrollMaterialType(scroll),
+            selectedScrollId === scroll.id,
+            activeScrollIds.has(scroll.id)
+        ]),
+        filtered.length ? '' : currentMaterial === 'exhausted'
+            ? 'レガシー設計はありません。'
+            : currentMaterial !== 'all'
+                ? 'この種類のスクロールはありません。'
+                : library.length ? 'すべて設備にセット中です。取り外すと手元に戻ります。' : '保存済みスクロールはありません。'
+    ]);
+    if (signature === renderedScrollListSignature) return;
+    renderedScrollListSignature = signature;
+    if (countElement.textContent !== String(filtered.length)) countElement.textContent = String(filtered.length);
     if (!filtered.length) {
-        const empty = document.createElement('p');
-        empty.className = 'scroll-list-empty';
-        empty.textContent = currentMaterial === 'exhausted'
+        const emptyText = currentMaterial === 'exhausted'
             ? 'レガシー設計はありません。'
             : currentMaterial !== 'all'
                 ? 'この種類のスクロールはありません。'
                 : library.length ? 'すべて設備にセット中です。取り外すと手元に戻ります。' : '保存済みスクロールはありません。';
-        listElement.appendChild(empty);
+        let empty = listElement.querySelector('.scroll-list-empty');
+        if (!empty) {
+            empty = document.createElement('p');
+            empty.className = 'scroll-list-empty';
+            listElement.replaceChildren(empty);
+        }
+        if (empty.textContent !== emptyText) empty.textContent = emptyText;
         return;
     }
-    filtered.forEach(scroll => {
+    listElement.querySelector('.scroll-list-empty')?.remove();
+    const existingItems = new Map([...listElement.querySelectorAll('.scroll-list-item[data-scroll-id]')]
+        .map(item => [item.dataset.scrollId, item]));
+    const orderedItems = filtered.map(scroll => {
         const isRunning = activeScrollIds.has(scroll.id);
-        const item = document.createElement('div');
-        item.className = `scroll-list-item${scroll.id === selectedScrollId ? ' active' : ''}${isRunning ? ' running' : ''}`;
-        item.dataset.scrollId = scroll.id;
-        const selectButton = document.createElement('button');
-        selectButton.className = 'scroll-list-select';
-        selectButton.type = 'button';
-        const typeLabel = document.createElement('span');
-        typeLabel.className = 'scroll-list-type';
-        typeLabel.textContent = SCROLL_MATERIAL_BY_TYPE.get(getScrollMaterialType(scroll))?.label || '紙';
-        const nameLabel = document.createElement('span');
-        nameLabel.className = 'scroll-list-name';
-        nameLabel.textContent = scroll.name || '名前なしスクロール';
-        selectButton.append(typeLabel, nameLabel);
-        const editButton = document.createElement('button');
-        editButton.className = 'scroll-list-edit';
-        editButton.type = 'button';
-        editButton.setAttribute('aria-label', 'スクロールを編集');
-        editButton.title = 'スクロールを編集';
-        editButton.textContent = '⚙︎';
-        item.append(selectButton, editButton);
+        let item = existingItems.get(scroll.id);
+        if (item) existingItems.delete(scroll.id);
+        else {
+            item = document.createElement('div');
+            item.className = 'scroll-list-item';
+            item.dataset.scrollId = scroll.id;
+            const selectButton = document.createElement('button');
+            selectButton.className = 'scroll-list-select';
+            selectButton.type = 'button';
+            const typeLabel = document.createElement('span');
+            typeLabel.className = 'scroll-list-type';
+            const nameLabel = document.createElement('span');
+            nameLabel.className = 'scroll-list-name';
+            selectButton.append(typeLabel, nameLabel);
+            const editButton = document.createElement('button');
+            editButton.className = 'scroll-list-edit';
+            editButton.type = 'button';
+            editButton.setAttribute('aria-label', 'スクロールを編集');
+            editButton.title = 'スクロールを編集';
+            editButton.textContent = '⚙︎';
+            item.append(selectButton, editButton);
+        }
+        item.classList.toggle('active', scroll.id === selectedScrollId);
+        item.classList.toggle('running', isRunning);
+        const selectButton = item.querySelector('.scroll-list-select');
+        const typeLabel = item.querySelector('.scroll-list-type');
+        const nameLabel = item.querySelector('.scroll-list-name');
+        const typeText = SCROLL_MATERIAL_BY_TYPE.get(getScrollMaterialType(scroll))?.label || '紙';
+        const nameText = scroll.name || '名前なしスクロール';
+        if (typeLabel.textContent !== typeText) typeLabel.textContent = typeText;
+        if (nameLabel.textContent !== nameText) nameLabel.textContent = nameText;
         selectButton.dataset.scrollId = scroll.id;
-        selectButton.setAttribute('aria-label', `${getMaterialLabel(scroll)}: ${scroll.name || '名前なしスクロール'}、${isRunning ? '起動中' : '停止中'}`);
-        editButton.dataset.scrollId = scroll.id;
-        listElement.appendChild(item);
+        const ariaLabel = `${getMaterialLabel(scroll)}: ${nameText}、${isRunning ? '起動中' : '停止中'}`;
+        if (selectButton.getAttribute('aria-label') !== ariaLabel) selectButton.setAttribute('aria-label', ariaLabel);
+        item.querySelector('.scroll-list-edit').dataset.scrollId = scroll.id;
+        return item;
+    });
+    existingItems.forEach(item => item.remove());
+    orderedItems.forEach((item, index) => {
+        if (listElement.children[index] !== item) listElement.insertBefore(item, listElement.children[index] || null);
     });
 }
 
@@ -1217,7 +1280,7 @@ function renderDetail() {
     toggleButton.classList.toggle('btn-reset', effectiveRunning);
     toggleButton.classList.toggle('btn-visibility', !effectiveRunning);
     toggleButton.disabled = previewState.invalid || exhausted;
-    copyButton.hidden = !isScrollBook || !hasScroll || installed;
+    copyButton.hidden = !isScrollBook || !isEmbedded || isPreviewOnly || !hasScroll || installed;
     deleteButton.hidden = !isScrollBook || !hasScroll || installed;
 }
 
@@ -1341,7 +1404,7 @@ copyModal?.addEventListener('click', event => {
 });
 copyMaterialSelect?.addEventListener('change', () => {
     const scroll = getSelectedScroll();
-    if (scroll) copyCostElement.textContent = `消費: 真鍮 ${getCopyMaterialCost(scroll)}（メインギア以外のギアの設置コスト合計）`;
+    updateCopyCost(scroll);
 });
 window.addEventListener('message', event => {
     if ((event.origin !== window.location.origin && event.origin !== 'null') || event.source !== window.parent

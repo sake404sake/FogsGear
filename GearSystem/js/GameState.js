@@ -15,6 +15,7 @@ const PERSISTENT_GAME_SETTINGS = new Set([
 const INITIAL_MATERIAL_INVENTORY = Object.freeze({ paper_scroll: 10, cloth_scroll: 10, scroll_book: 1 });
 const MATERIAL_INVENTORY_VERSION = 4;
 const MATERIAL_INVENTORY_SLOT_LIMIT = 30;
+const SHARED_ENERGY_ITEM_IDS = new Set(['water', 'fog', 'power', 'steam_power']);
 const LEGACY_INITIAL_MATERIAL_INVENTORY = Object.freeze({ 'iron-screw': 12, 'pressure-gauge': 1 });
 let gameProgressResetInProgress = false;
 
@@ -1127,29 +1128,19 @@ export class GameState {
     getInventorySlotIds(includeReserved = false) {
         const itemIds = new Set(Object.entries(this.materialInventory || {})
             .filter(([, count]) => Number(count) > 0)
+            .filter(([itemId]) => !SHARED_ENERGY_ITEM_IDS.has(itemId))
             .map(([itemId]) => itemId));
         if (Number(this.brass) > 0) itemIds.add('brass-stock');
-        [['water', this.water], ['fog', this.fog], ['power', this.power]]
-            .forEach(([itemId, count]) => {
-                if (Number(count) > 0) itemIds.add(itemId);
-            });
-        // Keep recovery resources reserved at zero so a full inventory cannot block their regeneration.
-        itemIds.add('water');
-        itemIds.add('steam_power');
         if (this.creativeMode && this.creativeSnapshot) {
             if (Number(this.creativeSnapshot.brass) > 0) itemIds.add('brass-stock');
-            [['water', this.creativeSnapshot.water], ['fog', this.creativeSnapshot.fog],
-                ['power', this.creativeSnapshot.power], ['steam_power', this.creativeSnapshot.steamPower]]
-                .forEach(([itemId, count]) => {
-                    if (Number(count) > 0) itemIds.add(itemId);
-                });
         }
         if (includeReserved) {
             this.craftingJobs.forEach(job => {
-                if (typeof job.outputItem === 'string' && job.outputItem) itemIds.add(job.outputItem);
+                if (typeof job.outputItem === 'string' && job.outputItem
+                    && !SHARED_ENERGY_ITEM_IDS.has(job.outputItem)) itemIds.add(job.outputItem);
                 (Array.isArray(job.inputCosts) ? job.inputCosts : []).forEach(cost => {
                     if (Array.isArray(cost) && typeof cost[0] === 'string' && cost[0]
-                        && Number(cost[1]) > 0) itemIds.add(cost[0]);
+                        && Number(cost[1]) > 0 && !SHARED_ENERGY_ITEM_IDS.has(cost[0])) itemIds.add(cost[0]);
                 });
             });
         }
@@ -1164,6 +1155,7 @@ export class GameState {
         const occupiedItemIds = this.getInventorySlotIds(true);
         let canAdd = true;
         itemIds.forEach(itemId => {
+            if (SHARED_ENERGY_ITEM_IDS.has(itemId)) return;
             if (typeof itemId === 'string' && itemId && !occupiedItemIds.has(itemId)) {
                 occupiedItemIds.add(itemId);
                 if (occupiedItemIds.size > MATERIAL_INVENTORY_SLOT_LIMIT) canAdd = false;

@@ -312,7 +312,6 @@ async function getAudioBuffer(assetId, context, sources) {
 
 function activeOffset(buffer, duration, random) {
     const maxOffset = Math.max(0, buffer.duration - duration);
-    if (maxOffset === 0) return 0;
     let bestOffset = 0;
     let bestScore = -1;
     const channels = Array.from({ length: buffer.numberOfChannels }, (_, index) => buffer.getChannelData(index));
@@ -334,7 +333,30 @@ function activeOffset(buffer, duration, random) {
             bestOffset = offset;
         }
     }
-    return bestOffset;
+    return { offset: bestOffset, rms: Math.sqrt(bestScore) };
+}
+
+function getSingleHitLayers(recipe, buffers, random) {
+    return recipe.layers.map((layer, index) => {
+        const buffer = buffers[index];
+        const clip = Math.min(layer.clip || 0.48, 0.48);
+        const sourceDuration = Math.min(clip, buffer.duration / layer.rate) * layer.rate;
+        const { offset, rms } = activeOffset(buffer, sourceDuration, random);
+        return {
+            ...layer,
+            mode: 'hits',
+            count: 1,
+            period: 0,
+            clip,
+            offset,
+            sourceRms: rms
+        };
+    });
+}
+
+function estimateSingleHitEnergy(layers) {
+    return Math.sqrt(layers.reduce((energy, layer) =>
+        energy + layer.gain ** 2 * layer.sourceRms ** 2 * layer.clip, 0));
 }
 
 function playLayer(layer, buffer, context, output, recipe, random, baseTime, activeSources) {
@@ -346,7 +368,7 @@ function playLayer(layer, buffer, context, output, recipe, random, baseTime, act
         const sourceDuration = duration * rate;
         const offset = layer.mode === 'bed'
             ? random() * Math.max(0, buffer.duration - sourceDuration)
-            : activeOffset(buffer, sourceDuration, random);
+            : layer.offset ?? activeOffset(buffer, sourceDuration, random).offset;
         const source = context.createBufferSource();
         const filter = context.createBiquadFilter();
         const envelope = context.createGain();
@@ -359,8 +381,9 @@ function playLayer(layer, buffer, context, output, recipe, random, baseTime, act
         filter.frequency.value = Math.min(context.sampleRate / 2, layer.cutoff);
         filter.Q.value = 0.65;
         envelope.gain.setValueAtTime(0.0001, when);
-        envelope.gain.linearRampToValueAtTime(layer.gain, when + Math.min(0.025, duration * 0.2));
-        envelope.gain.setValueAtTime(layer.gain, Math.max(when + 0.03, end - Math.min(0.08, duration * 0.3)));
+        const layerGain = layer.gain * (recipe.gainScale || 1);
+        envelope.gain.linearRampToValueAtTime(layerGain, when + Math.min(0.025, duration * 0.2));
+        envelope.gain.setValueAtTime(layerGain, Math.max(when + 0.03, end - Math.min(0.08, duration * 0.3)));
         envelope.gain.exponentialRampToValueAtTime(0.0001, end);
         source.connect(filter);
         filter.connect(envelope);
@@ -382,7 +405,7 @@ export async function playFogsGearReferenceRecording(
     context,
     output,
     isCurrent = () => true,
-    { singleHit = false } = {}
+    { singleHit = false, normalizeToProfile = null } = {}
 ) {
     const recipe = profileRecipes[profileName];
     if (!recipe) throw new Error(`${profileName}: 対応する実録音の音響レシピがありません。`);
@@ -393,19 +416,30 @@ export async function playFogsGearReferenceRecording(
     }
     const buffers = await Promise.all(recipe.layers.map(layer => getAudioBuffer(layer.source, context, sources)));
     if (!isCurrent()) return 0;
-    const playbackRecipe = singleHit
-        ? {
-            duration: 0.58,
-            layers: recipe.layers.map(layer => ({
-                ...layer,
-                mode: 'hits',
-                count: 1,
-                period: 0,
-                clip: Math.min(layer.clip || 0.48, 0.48)
-            }))
-        }
-        : recipe;
     const random = Math.random;
+    let playbackRecipe = recipe;
+    if (singleHit) {
+        const layers = getSingleHitLayers(recipe, buffers, random);
+        let gainScale = 1;
+        if (normalizeToProfile && profileRecipes[normalizeToProfile]) {
+            const referenceRecipe = profileRecipes[normalizeToProfile];
+            const referenceBuffers = normalizeToProfile === profileName
+                ? buffers
+                : await Promise.all(referenceRecipe.layers.map(layer =>
+                    getAudioBuffer(layer.source, context, sources)
+                ));
+            const referenceLayers = normalizeToProfile === profileName
+                ? layers
+                : getSingleHitLayers(referenceRecipe, referenceBuffers, (() => {
+                    let sample = 0;
+                    return () => ((sample++ % 12) + 0.5) / 12;
+                })());
+            const referenceEnergy = estimateSingleHitEnergy(referenceLayers);
+            const playbackEnergy = estimateSingleHitEnergy(layers);
+            gainScale = Math.max(0.45, Math.min(2.2, referenceEnergy / Math.max(playbackEnergy, 0.0001)));
+        }
+        playbackRecipe = { duration: 0.58, gainScale, layers };
+    }
     const baseTime = context.currentTime + 0.05;
     playbackRecipe.layers.forEach((layer, index) => playLayer(layer, buffers[index], context, output, playbackRecipe, random, baseTime));
     return playbackRecipe.duration + 0.14;

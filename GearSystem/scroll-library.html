@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>スクロール書庫 | Fogs Gear</title>
-    <link rel="stylesheet" href="css/style.css?v=scroll-71">
+    <link rel="stylesheet" href="css/style.css?v=scroll-75">
 </head>
 <body class="scroll-library-page">
     <main class="scroll-library-shell">
@@ -48,9 +48,22 @@
                     <div class="scroll-detail-footer">
                         <p id="scroll-status" class="scroll-status">このスクロールは停止中です。</p>
                         <div class="scroll-actions">
-                            <button id="scroll-copy" class="btn btn-action" type="button">写本</button>
-                            <button id="scroll-delete" class="btn btn-reset" type="button">削除</button>
-                            <button id="scroll-share" class="btn btn-action" type="button">QRで共有</button>
+                            <div class="scroll-actions-primary">
+                                <button id="scroll-copy" class="btn btn-action" type="button">
+                                    <svg class="scroll-action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M8 8V4h12v12h-4M4 8h12v12H4z" /></svg>
+                                    <span>写本</span>
+                                </button>
+                                <button id="scroll-share" class="btn btn-action" type="button">
+                                    <svg class="scroll-action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h2v2h-2zM18 14h2v6h-2zM14 18h2v2h-2z" /></svg>
+                                    <span>QRで共有</span>
+                                </button>
+                            </div>
+                            <div class="scroll-actions-danger">
+                                <button id="scroll-delete" class="btn btn-reset" type="button">
+                                    <svg class="scroll-action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7h16M9 7V4h6v3m3 0-.8 13H6.8L6 7m4 4v6m4-6v6" /></svg>
+                                    <span>削除</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -157,6 +170,6 @@
     </div>
     <script src="js/vendor/qrcode-generator.min.js?v=2.0.4"></script>
     <script src="js/vendor/jsQR.js?v=1.4.0"></script>
-    <script type="module" src="js/scroll-library.js?v=75"></script>
+    <script type="module" src="js/scroll-library.js?v=80"></script>
 </body>
 </html>
