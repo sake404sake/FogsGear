@@ -1,4 +1,4 @@
-const CACHE_NAME = 'steampunk-explorer-v352';
+const CACHE_NAME = 'steampunk-explorer-v357';
 const APP_SHELL = [
     './',
     './MainSystem/index.html',
@@ -12,7 +12,7 @@ const APP_SHELL = [
     './MapSystem/manifest.webmanifest',
     './MapSystem/css/style.css?v=719',
     './MapSystem/cell-icons.svg',
-    './MapSystem/js/main.js?v=864',
+    './MapSystem/js/main.js?v=869',
     './MapSystem/js/gameAudio.js?v=7',
     './design/game-audio-sfx-reference-player.js?v=5',
     './design/audio-sources/pdsounds/manifest.json',
@@ -58,11 +58,11 @@ const APP_SHELL = [
     './GearSystem/index.html',
     './GearSystem/scroll-library.html?v=73',
     './GearSystem/css/style.css',
-    './GearSystem/js/main.js?v=gear-art-20',
+    './GearSystem/js/main.js?v=gear-art-21',
     './GearSystem/js/scroll-library.js?v=80',
     './GearSystem/js/GearSystem.js',
     './GearSystem/js/GearManager.js',
-    './GearSystem/js/GameState.js',
+    './GearSystem/js/GameState.js?v=runtime-64',
     './GearSystem/js/CanvasRenderer.js',
     './GearSystem/js/UIController.js',
     './GearSystem/js/vendor/qrcode-generator.min.js',

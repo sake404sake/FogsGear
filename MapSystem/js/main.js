@@ -11,7 +11,7 @@ import { getBuildingUtilityStatus, simulateBuildingUtilityNetworks } from './bui
 import { buildTerritoryBorderSegments, buildTerritoryBorderSegmentsAsync } from './territoryBorders.js?v=36';
 import { directionToVehicleRotation, findNextRailStep, getTrackDirection, getVehicleRenderState, STATION_CONTROL_DEFAULTS, VEHICLE_DEFAULTS } from './railwayRuntime.js?v=9';
 import { getBuildingSoundProfile, getShoreSoundProfile, getSurfaceSoundProfile, getTerrainSoundProfile, playGameSound, updateBuildingSoundscape } from './gameAudio.js?v=7';
-import { GameState as EngineGameState, clearGameProgress } from '../../GearSystem/js/GameState.js?v=runtime-58';
+import { GameState as EngineGameState, clearGameProgress, MATERIAL_INVENTORY_SLOT_LIMIT } from '../../GearSystem/js/GameState.js?v=runtime-59';
 import { GEAR_CONFIG as ENGINE_GEAR_CONFIG, GearManager as EngineGearManager } from '../../GearSystem/js/GearManager.js?v=runtime-5';
 import { GearNetwork as EngineGearNetwork } from '../../GearSystem/js/GearSystem.js?v=network-11';
 
@@ -49,7 +49,6 @@ function invalidateAutomatonNavigation() {
 }
 let cellIconAtlas = null;
 const INVENTORY_ITEMS_KEY = 'steampunk_explorer_inventory_items';
-const INVENTORY_SLOT_LIMIT = 30;
 const BUILDINGS_STORAGE_KEY = 'fogsgear_world_buildings';
 const GAME_PROGRESS_EPOCH_KEY = 'fogsgear_game_progress_epoch';
 const gameProgressEpochAtStart = localStorage.getItem(GAME_PROGRESS_EPOCH_KEY) || '';
@@ -889,7 +888,7 @@ function notifyInventoryFull() {
     const now = Date.now();
     if (now - inventoryFullNoticeAt < 10000) return;
     inventoryFullNoticeAt = now;
-    showAppNotice(`所持枠が上限（${INVENTORY_SLOT_LIMIT}枠）です。資材をストレージに預けてください。`);
+    showAppNotice(`所持枠が上限（${MATERIAL_INVENTORY_SLOT_LIMIT}枠）です。資材をストレージに預けてください。`);
 }
 
 function canPersistGameProgress() {
@@ -2817,7 +2816,7 @@ function renderCellMaterials() {
     renderBuildingInventory();
     const capacityStatus = document.getElementById('inventory-capacity-status');
     if (capacityStatus) {
-        capacityStatus.textContent = `所持枠 ${engineRuntimeState.getInventorySlotCount()} / ${INVENTORY_SLOT_LIMIT}`;
+        capacityStatus.textContent = `所持枠 ${engineRuntimeState.getInventorySlotCount()} / ${MATERIAL_INVENTORY_SLOT_LIMIT}`;
     }
     const inventoryList = document.getElementById('inventory-item-list');
     const inventoryIds = new Set(Object.entries(engineRuntimeState.materialInventory || {})
@@ -3762,14 +3761,6 @@ function syncCraftingNotifications(force = false) {
 function openBuildingCrafting() {
     const placed = state.buildings.find(building => building.instanceId === selectedBuildingInstanceId);
     if (!placed || !getCraftingRecipesForBuilding(placed.id).length) return;
-    if (!hasAssignedCraftingScroll(placed)) {
-        showAppNotice('製作を始めるには、有効なスクロールを設備にセットしてください。');
-        return;
-    }
-    if (!hasRunningCraftingScroll(placed)) {
-        showAppNotice('製作を始めるには、設備にセットしたスクロールを起動してください。');
-        return;
-    }
     activeCraftingBuildingInstanceId = placed.instanceId;
     document.getElementById('building-crafting-search').value = '';
     document.getElementById('building-crafting-modal').hidden = false;
@@ -4161,6 +4152,7 @@ function drawPlacedBuildings(startCol, endCol, startRow, endRow, now) {
             activeCraftingStationIds.add(job.craftingStationId);
         }
     }
+    const activeScrollIds = new Set(getActiveScrollIds());
     orderedBuildingDrawCache.forEach(placed => {
         const building = BUILDING_BY_ID.get(placed.id);
         if (!building) return;
@@ -4177,6 +4169,7 @@ function drawPlacedBuildings(startCol, endCol, startRow, endRow, now) {
         if (maxX + building.width < startCol || minX > endCol || maxY + building.height < startRow || minY > endRow) return;
         if (building.kind === 'automaton') {
             drawAutomaton(placed, now);
+            drawBuildingScrollIndicator(ctx, placed, drawX, drawY, activeScrollIds);
             return;
         }
         const drawRotation = vehicleRender ? vehicleRender.rotation : placed.rotation || 0;
@@ -4195,7 +4188,51 @@ function drawPlacedBuildings(startCol, endCol, startRow, endRow, now) {
             ctx.strokeRect(x + 1 / zoom, y + 1 / zoom, width - 2 / zoom, height - 2 / zoom);
             ctx.restore();
         }
+        drawBuildingScrollIndicator(ctx, placed, drawX, drawY, activeScrollIds);
     });
+}
+
+function drawBuildingScrollIndicator(context, placed, drawX, drawY, activeScrollIds) {
+    const movementScrollRequired = requiresMovementScroll(placed);
+    const scrollId = movementScrollRequired ? getMovementScrollId(placed) : placed.craftingScrollId;
+    if (typeof scrollId !== 'string' || !scrollId) return;
+    const building = BUILDING_BY_ID.get(placed.id);
+    if (!building) return;
+    const running = activeScrollIds.has(scrollId) && (movementScrollRequired
+        ? hasAssignedMovementScroll(placed) && engineRuntimeState.mainGearRunning
+            && (engineRuntimeState.creativeMode || Number(engineRuntimeState.steamPower) > 0)
+        : hasRunningCraftingScroll(placed));
+    const zoom = Math.max(0.25, state.zoom);
+    const x = drawX * state.tileSize;
+    const y = drawY * state.tileSize;
+    const width = building.width * state.tileSize;
+    const height = building.height * state.tileSize;
+    if (running) {
+        context.save();
+        context.strokeStyle = 'rgba(98, 220, 190, .98)';
+        context.lineWidth = 2.5 / zoom;
+        context.shadowColor = 'rgba(98, 220, 190, .95)';
+        context.shadowBlur = 12 / zoom;
+        context.strokeRect(x + 1 / zoom, y + 1 / zoom, width - 2 / zoom, height - 2 / zoom);
+        context.restore();
+    }
+    const badgeX = x + 3 / zoom;
+    const badgeY = y + 3 / zoom;
+    const badgeWidth = 18 / zoom;
+    const badgeHeight = 16 / zoom;
+    context.save();
+    context.fillStyle = 'rgba(18, 14, 12, .96)';
+    context.fillRect(badgeX, badgeY, badgeWidth, badgeHeight);
+    context.strokeStyle = running ? '#62c2aa' : '#c69a52';
+    context.lineWidth = 1 / zoom;
+    context.strokeRect(badgeX + 0.5 / zoom, badgeY + 0.5 / zoom, badgeWidth - 1 / zoom, badgeHeight - 1 / zoom);
+    context.fillStyle = '#f3d27a';
+    context.fillRect(badgeX + 6 / zoom, badgeY + 4 / zoom, 7 / zoom, 8 / zoom);
+    context.beginPath();
+    context.arc(badgeX + 6 / zoom, badgeY + 8 / zoom, 2.5 / zoom, -Math.PI / 2, Math.PI / 2);
+    context.arc(badgeX + 13 / zoom, badgeY + 8 / zoom, 2.5 / zoom, Math.PI / 2, -Math.PI / 2);
+    context.fill();
+    context.restore();
 }
 
 function isBuildingCraftingActive(placed, now = Date.now()) {
@@ -4633,6 +4670,7 @@ function drawVehicleAnimationLayer(now) {
     const viewH = canvas.height / state.zoom;
     const left = state.camera.x - viewW / 2;
     const top = state.camera.y - viewH / 2;
+    const activeScrollIds = new Set(getActiveScrollIds());
     vehicleAnimationContext.save();
     vehicleAnimationContext.scale(state.zoom, state.zoom);
     vehicleAnimationContext.translate(-left, -top);
@@ -4646,6 +4684,7 @@ function drawVehicleAnimationLayer(now) {
             : vehicleAnimationPoses.get(placed.instanceId) || { x: placed.x, y: placed.y, rotation: placed.rotation || 0 };
         vehicleAnimationPoses.set(placed.instanceId, render);
         drawBuilding(vehicleAnimationContext, { ...building, x: render.x, y: render.y, rotation: render.rotation }, state.tileSize, { zoom: state.zoom });
+        drawBuildingScrollIndicator(vehicleAnimationContext, placed, render.x, render.y, activeScrollIds);
     });
     vehicleAnimationContext.restore();
 }
@@ -6482,9 +6521,7 @@ function updateBuildingScrollStatus(placed) {
             ? `${selectedScroll.name || 'スクロール'} セット済み / 稼働可能 / オーバークロック ${overclock.speedMultiplier}倍 / ${formatRate(powerRate)} 動力/秒`
             : `${selectedScroll.name || 'スクロール'} セット済み / 稼働可能`;
     }
-    if (craftButton && hasRecipes) {
-        craftButton.disabled = !running || !engineRuntimeState.creativeMode && Number(engineRuntimeState.power) <= 0;
-    }
+    if (craftButton && hasRecipes) craftButton.disabled = false;
 }
 
 function getActiveScrollIds() {
