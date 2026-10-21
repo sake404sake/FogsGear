@@ -106,6 +106,25 @@ export class GearManager {
         return true;
     }
 
+    removeAllNonCoreGears() {
+        const removedGears = this.state.placedGears.filter(gear => !gear.isCore);
+        if (!removedGears.length) return 0;
+        const removedIds = new Set(removedGears.map(gear => gear.id));
+        this.state.saveState();
+        this.state.placedGears = this.state.placedGears.filter(gear => gear.isCore);
+        this.state.belts = this.state.belts.filter(belt => !belt.gearIds?.some(id => removedIds.has(id)));
+        if (!this.state.creativeMode) {
+            this.state.brass += removedGears.reduce((total, gear) => total + Math.floor(gear.cost * 0.8), 0);
+        }
+        this.state.selectedGearId = null;
+        this.state.beltSelection = [];
+        this.state.ghostGear = null;
+        this.state.updatePowerGrid();
+        this.state.saveGameData();
+        this.state.notify();
+        return removedGears.length;
+    }
+
     // UIが保持するIDから、現在のギア実体を検索する。
     findGearById(id) { return this.state.placedGears.find(gear => gear.id === id) || null; }
     updateGearSize(gear, sizeKey) {

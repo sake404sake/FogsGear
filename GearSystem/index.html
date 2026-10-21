@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
     <title>Fogs Gear</title>
-    <link rel="stylesheet" href="css/style.css?v=gear-layout-21">
+    <link rel="stylesheet" href="css/style.css?v=gear-layout-22">
 </head>
 <body>
     <div id="loadingOverlay" class="loading-overlay" role="status" aria-live="polite">
@@ -162,6 +162,10 @@
             <div class="button-row" style="width: 100%;">
                 <button class="btn btn-action" id="btn-undo" data-action="undo" disabled>↩ Undo</button>
                 <button class="btn btn-action" id="btn-redo" data-action="redo" disabled>Redo ↪</button>
+                <button class="btn btn-reset" id="gear-clear-all-button" data-action="clear-added-gears" type="button" aria-label="メインギア以外のギアを全消去" title="メインギアを残し、追加ギアとベルトを消去">
+                    <svg class="gear-clear-all-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7h16M9 7V4h6v3m3 0-.8 13H6.8L6 7m4 3v7m4-7v7" /></svg>
+                    <span>全消去</span>
+                </button>
                 <button class="btn btn-main-gear" data-action="toggle-main-gear" aria-pressed="true">メインギア: 起動中</button>
                 <button class="btn btn-action" data-action="toggle-creative" aria-pressed="false">テストモード: OFF</button>
             </div>
@@ -184,7 +188,7 @@
             }
         })();
     </script>
-    <script type="module" src="js/main.js?v=gear-art-21"></script>
+    <script type="module" src="js/main.js?v=gear-art-23"></script>
     <script>
         document.addEventListener('click', (event) => {
             const target = event.target.closest('a, button[onclick]');

@@ -98,6 +98,10 @@ export class UIController {
                 this.state.undo();
             } else if (button.dataset.action === 'redo') {
                 this.state.redo();
+            } else if (button.dataset.action === 'clear-added-gears') {
+                const removedCount = this.gearManager.removeAllNonCoreGears();
+                this.closeGearPopover();
+                if (removedCount) this.showNotice(`追加ギアを${removedCount}個撤去しました。`);
             } else if (button.dataset.action === 'toggle-loops') {
                 this.state.showLoops = !this.state.showLoops;
                 this.state.notify();
@@ -797,6 +801,8 @@ export class UIController {
         document.querySelectorAll('.btn-layer').forEach(button => button.classList.toggle('active', Number(button.dataset.layer) === this.state.selectedLayer));
         document.getElementById('btn-undo').disabled = this.state.undoStack.length === 0;
         document.getElementById('btn-redo').disabled = this.state.redoStack.length === 0;
+        const clearAddedGearsButton = document.getElementById('gear-clear-all-button');
+        if (clearAddedGearsButton) clearAddedGearsButton.disabled = !this.state.placedGears.some(gear => !gear.isCore);
         const loopButton = document.querySelector('[data-action="toggle-loops"]');
         if (loopButton) {
             loopButton.classList.toggle('active', this.state.showLoops);

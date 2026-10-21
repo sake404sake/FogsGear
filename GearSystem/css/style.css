@@ -354,6 +354,9 @@ h1 {
     color: #d99b9b;
     padding: 6px 16px;
 }
+.gear-clear-all-button { display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-width: 78px; }
+.gear-clear-all-icon { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.8; }
+.gear-clear-all-button:disabled { cursor: not-allowed; }
 
 .btn-reset:hover {
     background: #3d1c1c;
