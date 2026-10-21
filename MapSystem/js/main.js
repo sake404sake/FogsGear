@@ -1932,6 +1932,36 @@ function createBuildingStorageIcon(itemId) {
     return icon;
 }
 
+function setBuildingStorageItemPickerOpen(open) {
+    const picker = document.getElementById('building-storage-item-picker');
+    const button = document.getElementById('building-storage-item-button');
+    if (!picker || !button) return;
+    if (open) {
+        picker.hidden = false;
+        if (typeof picker.showPopover === 'function' && !picker.matches(':popover-open')) picker.showPopover();
+        const buttonRect = button.getBoundingClientRect();
+        const width = Math.min(280, window.innerWidth - 32);
+        const belowSpace = window.innerHeight - buttonRect.bottom - 8;
+        const aboveSpace = buttonRect.top - 8;
+        const popupHeight = picker.scrollHeight;
+        const showAbove = popupHeight > belowSpace && aboveSpace > belowSpace;
+        const availableHeight = Math.max(0, showAbove ? aboveSpace : belowSpace);
+        const left = Math.max(16, Math.min(buttonRect.left, window.innerWidth - width - 16));
+        const top = showAbove
+            ? Math.max(8, buttonRect.top - Math.min(popupHeight, availableHeight) - 4)
+            : Math.min(buttonRect.bottom + 4, window.innerHeight - Math.min(popupHeight, availableHeight) - 8);
+        picker.style.width = `${width}px`;
+        picker.style.maxHeight = `${availableHeight}px`;
+        picker.style.overflowY = 'auto';
+        picker.style.left = `${left}px`;
+        picker.style.top = `${Math.max(8, top)}px`;
+    } else {
+        if (picker.matches(':popover-open')) picker.hidePopover();
+        picker.hidden = true;
+    }
+    button.setAttribute('aria-expanded', String(open));
+}
+
 function renderBuildingStorageItemPicker() {
     const itemSelect = document.getElementById('building-storage-item');
     const selectedItemId = itemSelect.value;
@@ -4690,6 +4720,7 @@ function setZoom(newZoom, pivotCanvasX, pivotCanvasY) {
 }
 
 function closeBuildingMenu() {
+    setBuildingStorageItemPickerOpen(false);
     const modal = document.getElementById('building-menu-modal');
     if (modal) modal.hidden = true;
     document.getElementById('automaton-menu-modal').hidden = true;
@@ -8558,24 +8589,23 @@ document.getElementById('building-storage-grid')?.addEventListener('click', even
     }
     selectedStorageStack = { itemId, count: stackCount, stackIndex };
     const itemSelect = document.getElementById('building-storage-item');
-    const itemPicker = document.getElementById('building-storage-item-picker');
-    const itemPickerButton = document.getElementById('building-storage-item-button');
     itemSelect.value = itemId;
-    itemPicker.hidden = true;
-    itemPickerButton.setAttribute('aria-expanded', 'false');
+    setBuildingStorageItemPickerOpen(false);
     renderBuildingStorage(placed, definition);
 });
 
 document.getElementById('building-storage-item-button')?.addEventListener('click', () => {
     const picker = document.getElementById('building-storage-item-picker');
-    const button = document.getElementById('building-storage-item-button');
-    picker.hidden = !picker.hidden;
-    button.setAttribute('aria-expanded', String(!picker.hidden));
-    if (!picker.hidden) {
+    const isOpen = picker.matches(':popover-open') || (!picker.hidden && typeof picker.showPopover !== 'function');
+    const shouldOpen = !isOpen;
+    if (shouldOpen) {
         const search = document.getElementById('building-storage-item-search');
         search.value = '';
         if (state.buildings.some(building => building.instanceId === selectedBuildingInstanceId)) renderBuildingStorageItemPicker();
+        setBuildingStorageItemPickerOpen(true);
         search.focus();
+    } else {
+        setBuildingStorageItemPickerOpen(false);
     }
 });
 
@@ -8622,8 +8652,7 @@ document.getElementById('building-storage-item-list')?.addEventListener('click',
     const definition = BUILDING_BY_ID.get(placed?.id);
     selectedStorageStack = null;
     document.getElementById('building-storage-item').value = option.dataset.itemId;
-    document.getElementById('building-storage-item-picker').hidden = true;
-    document.getElementById('building-storage-item-button').setAttribute('aria-expanded', 'false');
+    setBuildingStorageItemPickerOpen(false);
     if (placed && definition) renderBuildingStorage(placed, definition);
 });
 
@@ -8632,8 +8661,7 @@ document.addEventListener('pointerdown', event => {
     const automatonPicker = document.getElementById('automaton-item-picker');
     if (!(event.target instanceof Element)) return;
     if (picker && !picker.hidden && !event.target.closest('.building-storage-picker')) {
-        picker.hidden = true;
-        document.getElementById('building-storage-item-button').setAttribute('aria-expanded', 'false');
+        setBuildingStorageItemPickerOpen(false);
     }
     if (automatonPicker && !automatonPicker.hidden && !event.target.closest('.automaton-item-picker')) {
         automatonPicker.hidden = true;
@@ -8748,9 +8776,9 @@ engineTickIntervalId = window.setInterval(() => {
 }, 16);
 buildingUtilityIntervalId = window.setInterval(updateBuildingUtilityNetworks, 1000);
 buildingSoundIntervalId = window.setInterval(updateBuildingSoundscapeForWorld, 400);
-window.addEventListener('keydown', (e) => {
-    if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
-
+function handlePlayerMovementKey(e) {
+    const target = e.target;
+    if (target?.closest?.('input, textarea, select, [contenteditable="true"]')) return;
     let handled = true;
     switch(e.key.toLowerCase()) {
         case 'w': case 'arrowup': movePlayer(0, -1); break;
@@ -8760,7 +8788,8 @@ window.addEventListener('keydown', (e) => {
         default: handled = false;
     }
     if (handled && e.key.toLowerCase().startsWith('arrow')) e.preventDefault();
-});
+}
+window.addEventListener('keydown', handlePlayerMovementKey);
 
 function triggerMovementHaptic(duration = 12) {
     if (typeof navigator.vibrate === 'function') navigator.vibrate(duration);
@@ -8937,6 +8966,8 @@ const mainPageTrack = document.getElementById('main-page-track');
 const mainPageDots = [...document.querySelectorAll('.main-page-dot')];
 const mainPageArrows = [...document.querySelectorAll('.main-page-arrow')];
 const gearPreviewIframe = document.querySelector('.gear-preview-page iframe');
+const movementPreviewIframes = document.querySelectorAll('#building-scroll-preview-frame, #vehicle-scroll-preview-frame, #automaton-scroll-preview-frame, .gear-preview-page iframe');
+const movementPreviewDocuments = new WeakSet();
 const canvasContainer = document.getElementById('canvas-container');
 let currentMainPage = 0;
 let mainPagePointerStart = null;
@@ -8995,6 +9026,19 @@ function setMainPage(page) {
     });
     syncMainPageViewportHeight();
 }
+
+function bindMovementKeysToPreview(iframe) {
+    const bindDocument = () => {
+        const frameDocument = iframe.contentDocument;
+        if (!frameDocument || movementPreviewDocuments.has(frameDocument)) return;
+        movementPreviewDocuments.add(frameDocument);
+        frameDocument.addEventListener('keydown', handlePlayerMovementKey, true);
+    };
+    iframe.addEventListener('load', bindDocument);
+    bindDocument();
+}
+
+movementPreviewIframes.forEach(bindMovementKeysToPreview);
 
 mainPageDots.forEach(dot => dot.addEventListener('click', () => setMainPage(Number(dot.dataset.mainPage))));
 mainPageArrows.forEach(arrow => arrow.addEventListener('click', () => {

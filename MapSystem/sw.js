@@ -1,12 +1,12 @@
-const CACHE_NAME = 'steampunk-explorer-v283';
+const CACHE_NAME = 'steampunk-explorer-v284';
 const APP_SHELL = [
     './',
     './index.html',
     './settings.html',
     './worldmap.html',
     './manifest.webmanifest',
-    './css/style.css?v=708',
-    './js/main.js?v=859',
+    './css/style.css?v=719',
+    './js/main.js?v=861',
     './js/gameAudio.js?v=7',
     '../design/game-audio-sfx-reference-player.js?v=5',
     '../design/audio-sources/pdsounds/manifest.json',
