@@ -1,5 +1,6 @@
 import { CORE_ROTATION_SPEED_VERSION, GearNetwork } from './GearSystem.js?v=network-11';
 import { SCROLL_MATERIALS, SCROLL_MATERIAL_BY_TYPE } from '../../MapSystem/js/craftingData.js?v=19';
+import { BUILDING_BY_ID } from '../../MapSystem/js/buildingData.js?v=36';
 import { ACTIVE_SCROLL_TARGETS_KEY, CELL_MATERIALS, TERRAIN_TRANSFORM_RECIPES, WORLD_CELL_TYPES } from '../../MapSystem/js/worldCells.js?v=12';
 
 const ACTIVE_SCROLL_SYNC_STATE_KEY = 'fogsgear_active_scroll_sync_state';
@@ -14,8 +15,9 @@ const PERSISTENT_GAME_SETTINGS = new Set([
 ]);
 const INITIAL_MATERIAL_INVENTORY = Object.freeze({ paper_scroll: 10, cloth_scroll: 10, scroll_book: 1 });
 const MATERIAL_INVENTORY_VERSION = 4;
-const MATERIAL_INVENTORY_SLOT_LIMIT = 30;
+export const MATERIAL_INVENTORY_SLOT_LIMIT = 50;
 const SHARED_ENERGY_ITEM_IDS = new Set(['water', 'fog', 'power', 'steam_power']);
+const BUILDING_KIT_ITEM_IDS = new Set(BUILDING_BY_ID.keys());
 const LEGACY_INITIAL_MATERIAL_INVENTORY = Object.freeze({ 'iron-screw': 12, 'pressure-gauge': 1 });
 let gameProgressResetInProgress = false;
 
@@ -1128,7 +1130,7 @@ export class GameState {
     getInventorySlotIds(includeReserved = false) {
         const itemIds = new Set(Object.entries(this.materialInventory || {})
             .filter(([, count]) => Number(count) > 0)
-            .filter(([itemId]) => !SHARED_ENERGY_ITEM_IDS.has(itemId))
+            .filter(([itemId]) => !SHARED_ENERGY_ITEM_IDS.has(itemId) && !BUILDING_KIT_ITEM_IDS.has(itemId))
             .map(([itemId]) => itemId));
         if (Number(this.brass) > 0) itemIds.add('brass-stock');
         if (this.creativeMode && this.creativeSnapshot) {
@@ -1137,10 +1139,11 @@ export class GameState {
         if (includeReserved) {
             this.craftingJobs.forEach(job => {
                 if (typeof job.outputItem === 'string' && job.outputItem
-                    && !SHARED_ENERGY_ITEM_IDS.has(job.outputItem)) itemIds.add(job.outputItem);
+                    && !SHARED_ENERGY_ITEM_IDS.has(job.outputItem) && !BUILDING_KIT_ITEM_IDS.has(job.outputItem)) itemIds.add(job.outputItem);
                 (Array.isArray(job.inputCosts) ? job.inputCosts : []).forEach(cost => {
                     if (Array.isArray(cost) && typeof cost[0] === 'string' && cost[0]
-                        && Number(cost[1]) > 0 && !SHARED_ENERGY_ITEM_IDS.has(cost[0])) itemIds.add(cost[0]);
+                        && Number(cost[1]) > 0 && !SHARED_ENERGY_ITEM_IDS.has(cost[0])
+                        && !BUILDING_KIT_ITEM_IDS.has(cost[0])) itemIds.add(cost[0]);
                 });
             });
         }
@@ -1155,7 +1158,7 @@ export class GameState {
         const occupiedItemIds = this.getInventorySlotIds(true);
         let canAdd = true;
         itemIds.forEach(itemId => {
-            if (SHARED_ENERGY_ITEM_IDS.has(itemId)) return;
+            if (SHARED_ENERGY_ITEM_IDS.has(itemId) || BUILDING_KIT_ITEM_IDS.has(itemId)) return;
             if (typeof itemId === 'string' && itemId && !occupiedItemIds.has(itemId)) {
                 occupiedItemIds.add(itemId);
                 if (occupiedItemIds.size > MATERIAL_INVENTORY_SLOT_LIMIT) canAdd = false;
