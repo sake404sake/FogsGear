@@ -87,6 +87,11 @@ const state = {
     activeScrollTargets: {},
     cellEntryRules: { types: {}, cells: {} }
 };
+const TERRAIN_CACHE_CHUNK_SIZE = 16;
+const TERRAIN_CACHE_MAX_PIXELS = 16 * 1024 * 1024;
+const terrainChunkCache = new Map();
+let terrainChunkCachePixels = 0;
+let terrainChunkCacheMap = null;
 let activeBuildingPlacement = null;
 let buildingPlacementMode = 'single';
 let selectedBuildingInstanceId = null;
@@ -1320,6 +1325,7 @@ async function init() {
         saveMapSnapshot(generated, state.worldSeed, mapSize.width, mapSize.height).catch(() => {});
     }
     state.map = generated.grid;
+    clearTerrainChunkCache();
     setStartupStage('建築データ復元', '建築データを読み込んでいます...');
     await new Promise(resolve => window.setTimeout(resolve, 0));
     loadBuildings();
@@ -1578,6 +1584,7 @@ function handleWorldCellOperation(operation) {
         tile.collectionCount = nextCollectionCount;
         tile.transformCount = nextTransformCount;
         if (typeChanged) setWorldCellType(tile, nextType);
+        if (typeChanged) invalidateTerrainChunkAt(x, y);
         state.cellChanges = saveCellChange(state.worldSeed, x, y, {
             type: nextType,
             initialType,
@@ -4444,6 +4451,112 @@ function updateScrollStandMagicCircles() {
     });
 }
 
+function clearTerrainChunkCache() {
+    terrainChunkCache.clear();
+    terrainChunkCachePixels = 0;
+    terrainChunkCacheMap = state.map;
+}
+
+function invalidateTerrainChunkAt(x, y) {
+    const chunkX = Math.floor(x / TERRAIN_CACHE_CHUNK_SIZE);
+    const chunkY = Math.floor(y / TERRAIN_CACHE_CHUNK_SIZE);
+    const keyPrefix = `${chunkX},${chunkY},`;
+    for (const [key, chunk] of terrainChunkCache) {
+        if (!key.startsWith(keyPrefix)) continue;
+        terrainChunkCachePixels -= chunk.pixels;
+        terrainChunkCache.delete(key);
+    }
+}
+
+function createTerrainChunk(chunkX, chunkY, showIcons) {
+    const startCol = chunkX * TERRAIN_CACHE_CHUNK_SIZE;
+    const startRow = chunkY * TERRAIN_CACHE_CHUNK_SIZE;
+    const endCol = Math.min(state.cols, startCol + TERRAIN_CACHE_CHUNK_SIZE);
+    const endRow = Math.min(state.rows, startRow + TERRAIN_CACHE_CHUNK_SIZE);
+    const worldWidth = (endCol - startCol) * state.tileSize;
+    const worldHeight = (endRow - startRow) * state.tileSize;
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.ceil(worldWidth));
+    canvas.height = Math.max(1, Math.ceil(worldHeight));
+    const context = canvas.getContext('2d');
+    if (!context) return null;
+
+    const pixelSize = Math.ceil(state.tileSize);
+    for (let y = startRow; y < endRow; y++) {
+        for (let x = startCol; x < endCol; x++) {
+            const tile = state.map[y][x];
+            const localX = (x - startCol) * state.tileSize;
+            const localY = (y - startRow) * state.tileSize;
+            context.fillStyle = getMosaicColor(tile.color || '#526f4e', x, y);
+            context.fillRect(Math.floor(localX), Math.floor(localY), pixelSize, pixelSize);
+        }
+    }
+
+    if (showIcons) {
+        const iconSize = state.tileSize * 0.58;
+        const iconOffset = (state.tileSize - iconSize) / 2;
+        context.save();
+        context.globalAlpha = 0.28;
+        context.imageSmoothingEnabled = true;
+        for (let y = startRow; y < endRow; y++) {
+            for (let x = startCol; x < endCol; x++) {
+                drawCellIcon(context, cellIconAtlas, state.map[y][x],
+                    (x - startCol) * state.tileSize + iconOffset,
+                    (y - startRow) * state.tileSize + iconOffset,
+                    iconSize);
+            }
+        }
+        context.restore();
+    }
+
+    return { canvas, pixels: canvas.width * canvas.height, worldWidth, worldHeight };
+}
+
+function getTerrainChunk(chunkX, chunkY, showIcons) {
+    if (terrainChunkCacheMap !== state.map) clearTerrainChunkCache();
+    const key = `${chunkX},${chunkY},${showIcons ? 1 : 0}`;
+    const cached = terrainChunkCache.get(key);
+    if (cached) {
+        terrainChunkCache.delete(key);
+        terrainChunkCache.set(key, cached);
+        return cached;
+    }
+
+    const chunk = createTerrainChunk(chunkX, chunkY, showIcons);
+    if (!chunk) return null;
+    while (terrainChunkCache.size && terrainChunkCachePixels + chunk.pixels > TERRAIN_CACHE_MAX_PIXELS) {
+        const oldestKey = terrainChunkCache.keys().next().value;
+        const oldest = terrainChunkCache.get(oldestKey);
+        terrainChunkCache.delete(oldestKey);
+        terrainChunkCachePixels -= oldest.pixels;
+    }
+    if (chunk.pixels <= TERRAIN_CACHE_MAX_PIXELS) {
+        terrainChunkCache.set(key, chunk);
+        terrainChunkCachePixels += chunk.pixels;
+    }
+    return chunk;
+}
+
+function drawTerrainChunks(startCol, endCol, startRow, endRow) {
+    if (startCol >= endCol || startRow >= endRow) return;
+    const showIcons = Boolean(cellIconAtlas && state.tileSize * state.zoom >= 14);
+    const firstChunkX = Math.floor(startCol / TERRAIN_CACHE_CHUNK_SIZE);
+    const lastChunkX = Math.floor((endCol - 1) / TERRAIN_CACHE_CHUNK_SIZE);
+    const firstChunkY = Math.floor(startRow / TERRAIN_CACHE_CHUNK_SIZE);
+    const lastChunkY = Math.floor((endRow - 1) / TERRAIN_CACHE_CHUNK_SIZE);
+    for (let chunkY = firstChunkY; chunkY <= lastChunkY; chunkY++) {
+        for (let chunkX = firstChunkX; chunkX <= lastChunkX; chunkX++) {
+            const chunk = getTerrainChunk(chunkX, chunkY, showIcons);
+            if (!chunk) continue;
+            ctx.drawImage(chunk.canvas,
+                chunkX * TERRAIN_CACHE_CHUNK_SIZE * state.tileSize,
+                chunkY * TERRAIN_CACHE_CHUNK_SIZE * state.tileSize,
+                chunk.worldWidth,
+                chunk.worldHeight);
+        }
+    }
+}
+
 function draw() {
     const now = performance.now();
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -4464,30 +4577,7 @@ function draw() {
     const startRow = Math.max(0, Math.floor(top / state.tileSize));
     const endRow = Math.min(state.rows, Math.ceil((top + viewH) / state.tileSize));
 
-    for (let y = startRow; y < endRow; y++) {
-        for (let x = startCol; x < endCol; x++) {
-            const tile = state.map[y][x];
-            ctx.fillStyle = getMosaicColor(tile.color || '#526f4e', x, y);
-            const px = Math.floor(x * state.tileSize);
-            const py = Math.floor(y * state.tileSize);
-            const pSize = Math.ceil(state.tileSize);
-            ctx.fillRect(px, py, pSize, pSize);
-        }
-    }
-
-    if (cellIconAtlas && state.tileSize * state.zoom >= 14) {
-        const iconSize = state.tileSize * 0.58;
-        const iconOffset = (state.tileSize - iconSize) / 2;
-        ctx.save();
-        ctx.globalAlpha = 0.28;
-        ctx.imageSmoothingEnabled = true;
-        for (let y = startRow; y < endRow; y++) {
-            for (let x = startCol; x < endCol; x++) {
-                drawCellIcon(ctx, cellIconAtlas, state.map[y][x], x * state.tileSize + iconOffset, y * state.tileSize + iconOffset, iconSize);
-            }
-        }
-        ctx.restore();
-    }
+    drawTerrainChunks(startCol, endCol, startRow, endRow);
 
     drawGridOverlay(startCol, endCol, startRow, endRow);
     drawPlacedBuildings(startCol, endCol, startRow, endRow, now);
