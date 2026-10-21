@@ -10,7 +10,7 @@
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="icon" href="../MainSystem/icons/app-icon.jpg" type="image/jpeg">
     <link rel="apple-touch-icon" href="assets/app-icon-192.png">
-    <link rel="stylesheet" href="css/style.css?v=719">
+    <link rel="stylesheet" href="css/style.css?v=725">
 </head>
 <body>
     <div id="loadingOverlay" class="loading-overlay" role="status" aria-live="polite">
@@ -359,6 +359,18 @@
             </div>
         </div>
     </div>
+    <div id="crafting-reservation-modal" class="inventory-modal" hidden role="dialog" aria-modal="true" aria-labelledby="crafting-reservation-title">
+        <section class="inventory-modal-panel crafting-reservation-panel">
+            <button class="inventory-modal-close" type="button" data-action="close-crafting-reservations" aria-label="製作予約を閉じる">×</button>
+            <div class="inventory-modal-kicker">WORKSHOP / QUEUE</div>
+            <header class="crafting-reservation-heading">
+                <h2 id="crafting-reservation-title">製作予約</h2>
+                <strong id="crafting-reservation-count">0</strong>
+            </header>
+            <div id="crafting-reservation-list" class="crafting-reservation-list" aria-live="polite"></div>
+            <div class="inventory-modal-actions"><button class="inventory-modal-secondary" type="button" data-action="close-crafting-reservations">閉じる</button></div>
+        </section>
+    </div>
     <div id="inventory-discard-confirm-modal" class="inventory-modal" hidden role="dialog" aria-modal="true" aria-labelledby="inventory-discard-confirm-title">
         <section class="inventory-modal-panel demolition-confirm-panel">
             <button class="inventory-modal-close" type="button" data-action="cancel-inventory-discard" aria-label="破棄確認を閉じる">×</button>
@@ -505,6 +517,6 @@
         </div>
     </div>
 
-    <script type="module" src="js/main.js?v=869"></script>
+    <script type="module" src="js/main.js?v=874"></script>
 </body>
 </html>

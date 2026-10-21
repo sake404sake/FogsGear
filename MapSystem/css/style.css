@@ -554,6 +554,25 @@ h1 {
 .inventory-item-icon svg, .crafting-item-icon svg { display: block; width: 100%; height: 100%; }
 .inventory-item-name { min-width: 0; overflow-wrap: anywhere; font-size: 0.7rem; line-height: 1.25; }
 .inventory-item-count { color: #f7d77d; font: 700 0.78rem monospace; }
+.crafting-reservation-panel { display: flex; flex-direction: column; width: min(620px, calc(100vw - 24px)); min-height: 180px; max-height: min(82dvh, 640px); text-align: left; }
+.crafting-reservation-heading { display: flex; flex: 0 0 auto; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; color: #d8c17b; }
+.crafting-reservation-heading h2 { margin: 4px 0 12px; color: #f0dfb0; font-size: 1.1rem; overflow-wrap: anywhere; }
+.crafting-reservation-heading strong { color: #a7f0d9; font: .65rem monospace; }
+.crafting-reservation-panel .crafting-reservation-heading strong { padding: 3px 8px; border: 1px solid rgba(98, 194, 170, .35); background: rgba(98, 194, 170, .08); }
+.crafting-reservation-list { display: grid; flex: 1 1 auto; grid-auto-rows: max-content; align-content: start; gap: 5px; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.crafting-reservation-empty { padding: 8px 4px; color: var(--text-muted); font-size: .66rem; text-align: center; }
+.crafting-reservation-row { display: grid; grid-template-columns: 28px minmax(0, 1fr) 30px; align-items: center; gap: 5px; min-height: 38px; padding: 3px 5px; border: 1px solid rgba(198, 154, 82, .28); background: rgba(18, 14, 12, .5); }
+.crafting-reservation-row.is-drag-target { border-color: #62c2aa; background: rgba(98, 194, 170, .12); }
+.crafting-reservation-grip, .crafting-reservation-delete { display: grid; place-items: center; width: 28px; height: 28px; padding: 0; color: #c6aa72; background: transparent; border: 1px solid transparent; cursor: pointer; }
+.crafting-reservation-grip { touch-action: none; cursor: grab; font-size: 1rem; line-height: 1; }
+.crafting-reservation-grip:active { cursor: grabbing; }
+.crafting-reservation-grip:focus-visible, .crafting-reservation-delete:focus-visible { outline: 2px solid #62c2aa; outline-offset: 1px; }
+.crafting-reservation-copy { display: grid; gap: 2px; min-width: 0; }
+.crafting-reservation-copy strong { overflow: hidden; color: #efe2c3; font-size: .66rem; text-overflow: ellipsis; white-space: nowrap; }
+.crafting-reservation-copy span { overflow: hidden; color: var(--text-muted); font-size: .58rem; text-overflow: ellipsis; white-space: nowrap; }
+.crafting-reservation-delete { color: #ffd0c7; border-color: rgba(220, 130, 112, .32); background: rgba(154, 54, 42, .18); }
+.crafting-reservation-delete svg { display: block; width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.crafting-reservation-delete:hover { color: #ffb6a7; border-color: rgba(220, 130, 112, .45); background: rgba(154, 54, 42, .14); }
 .inventory-empty { grid-column: 1 / -1; padding: 12px; color: var(--text-muted); text-align: center; font-size: 0.74rem; }
 .crafting-filter-row { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 8px; margin-bottom: 8px; color: #a7f0d9; font-size: 0.72rem; }
 .crafting-filter-row select { min-width: 0; width: 100%; padding: 5px; color: var(--text-main); background: #1c1511; border: 1px solid var(--border-sub); }
@@ -588,6 +607,10 @@ h1 {
 .crafting-recipe-footer > button { grid-column: 3; justify-self: end; }
 .crafting-recipe-footer > button { min-width: 58px; min-height: 26px; padding: 3px 6px; color: #f7d77d; background: rgba(98, 194, 170, 0.12); border: 1px solid rgba(98, 194, 170, 0.5); cursor: pointer; font-size: .62rem; }
 .crafting-recipe-footer button:disabled { opacity: 0.4; cursor: not-allowed; }
+.crafting-reservation-controls { grid-column: 1 / -1; display: flex; align-items: center; justify-content: flex-end; gap: 5px; min-width: 0; padding-top: 4px; border-top: 1px solid rgba(198, 154, 82, .16); }
+.crafting-reservation-quantity { display: inline-flex; align-items: center; gap: 4px; color: #d8c17b; font-size: .58rem; }
+.crafting-reservation-quantity input { width: 44px; min-height: 26px; box-sizing: border-box; padding: 2px 4px; color: #f1e7d4; border: 1px solid rgba(198, 154, 82, .32); border-radius: 3px; background: #100e0c; font: .64rem monospace; text-align: center; }
+.crafting-recipe-footer .crafting-reservation-controls > button { min-width: 54px; color: #a7f0d9; border-color: rgba(98, 194, 170, .5); background: rgba(98, 194, 170, .1); }
 .crafting-recipe-note { margin: 0; color: var(--text-muted); font-size: 0.58rem; line-height: 1.25; }
 @media(max-width:520px){
     #inventory-panel.dashboard-popup { width: calc(100vw - 16px); height: 90dvh; max-height: 90dvh; padding: 10px; }
@@ -986,12 +1009,6 @@ body.guide-item-detail-open #recipe-detail-modal { z-index: 1300; }
 .engine-runtime-canvas { position: fixed; left: -10000px; top: -10000px; width: 1px; height: 1px; pointer-events: none; opacity: 0; }
 .vehicle-animation-layer { position: absolute; inset: 0; z-index: 2; overflow: hidden; pointer-events: none; }
 .vehicle-animation-canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
-.scroll-stand-magic-circle { position: absolute; left: 0; top: 0; overflow: visible; opacity: .92; pointer-events: none; will-change: transform; }
-.scroll-stand-magic-gear { transform-box: fill-box; transform-origin: center; animation: scroll-stand-gear-spin 18s linear infinite, scroll-stand-magic-pulse 2.4s ease-in-out infinite alternate; }
-.scroll-stand-magic-orbit { transform-box: fill-box; transform-origin: center; animation: scroll-stand-gear-spin 32s linear infinite reverse; }
-@keyframes scroll-stand-gear-spin { to { transform: rotate(360deg); } }
-@keyframes scroll-stand-magic-pulse { from { opacity: .65; } to { opacity: 1; } }
-
 canvas {
     display: block;
     width: 100%;

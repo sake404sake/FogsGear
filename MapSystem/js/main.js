@@ -12,7 +12,7 @@ import { buildTerritoryBorderSegments, buildTerritoryBorderSegmentsAsync } from 
 import { directionToVehicleRotation, findNextRailStep, getTrackDirection, getVehicleRenderState, STATION_CONTROL_DEFAULTS, VEHICLE_DEFAULTS } from './railwayRuntime.js?v=9';
 import { getBuildingSoundProfile, getShoreSoundProfile, getSurfaceSoundProfile, getTerrainSoundProfile, playGameSound, updateBuildingSoundscape } from './gameAudio.js?v=7';
 import { GameState as EngineGameState, clearGameProgress, MATERIAL_INVENTORY_SLOT_LIMIT } from '../../GearSystem/js/GameState.js?v=runtime-59';
-import { GEAR_CONFIG as ENGINE_GEAR_CONFIG, GearManager as EngineGearManager } from '../../GearSystem/js/GearManager.js?v=runtime-5';
+import { GEAR_CONFIG as ENGINE_GEAR_CONFIG, GearManager as EngineGearManager } from '../../GearSystem/js/GearManager.js?v=runtime-6';
 import { GearNetwork as EngineGearNetwork } from '../../GearSystem/js/GearSystem.js?v=network-11';
 
 const canvas = document.getElementById('gameCanvas');
@@ -24,7 +24,6 @@ vehicleAnimationLayer.prepend(vehicleAnimationCanvas);
 const vehicleAnimationContext = vehicleAnimationCanvas.getContext('2d');
 let vehicleAnimationLayerActive = false;
 const vehicleAnimationPoses = new Map();
-const scrollStandMagicCircles = new Map();
 const automatonSkinRenderers = new Map();
 const AUTOMATON_TRANSPORT_RADIUS = 12;
 const AUTOMATON_CARRY_STACK_SIZE = 99;
@@ -50,6 +49,7 @@ function invalidateAutomatonNavigation() {
 let cellIconAtlas = null;
 const INVENTORY_ITEMS_KEY = 'steampunk_explorer_inventory_items';
 const BUILDINGS_STORAGE_KEY = 'fogsgear_world_buildings';
+const CRAFTING_RESERVATIONS_KEY = 'fogsgear_crafting_reservations';
 const GAME_PROGRESS_EPOCH_KEY = 'fogsgear_game_progress_epoch';
 const gameProgressEpochAtStart = localStorage.getItem(GAME_PROGRESS_EPOCH_KEY) || '';
 const BUILDING_CONSTRUCTION_STATION_GROUPS = new Set(['production', 'automation', 'mega', 'final']);
@@ -88,6 +88,15 @@ const state = {
 };
 const TERRAIN_CACHE_CHUNK_SIZE = 16;
 const TERRAIN_CACHE_MAX_PIXELS = 16 * 1024 * 1024;
+const WORLD_AFFECTING_SCROLL_MODES = new Set([
+    'RESOURCE_COLLECTION',
+    'TERRAIN_TRANSFORM',
+    'ERA_SHIFT',
+    'TARGET_SHIFT_UP',
+    'TARGET_SHIFT_DOWN',
+    'TARGET_SHIFT_LEFT',
+    'TARGET_SHIFT_RIGHT'
+]);
 const terrainChunkCache = new Map();
 let terrainChunkCachePixels = 0;
 let terrainChunkCacheMap = null;
@@ -111,7 +120,7 @@ const MAP_UNLOCK_KEY = 'fogsgear_world_unlocks';
 const COASTAL_MAP_SIZE = { width: 640, height: 360 };
 const FULL_MAP_SIZE = { width: 2000, height: 1000 };
 const SAVE_BACKUP_FORMAT = 'fogsgear-save';
-const SAVE_BACKUP_VERSION = 3;
+const SAVE_BACKUP_VERSION = 4;
 const CELL_CHANGES_PREFIX = 'fogsgear_world_cell_changes:';
 const LEGACY_SAVE_BACKUP_KEYS = [
     'fog_thermo_save',
@@ -127,7 +136,7 @@ const LEGACY_SAVE_BACKUP_KEYS = [
     'steampunk_explorer_skin_source',
     'steampunk_explorer_skin_name'
 ];
-const SAVE_BACKUP_KEYS = [
+const SAVE_BACKUP_V3_KEYS = [
     ...LEGACY_SAVE_BACKUP_KEYS,
     INVENTORY_ITEMS_KEY,
     BUILDINGS_STORAGE_KEY,
@@ -136,6 +145,7 @@ const SAVE_BACKUP_KEYS = [
     ACTIVE_SCROLL_TARGETS_KEY,
     'fogsgear_active_scroll_sync_state'
 ];
+const SAVE_BACKUP_KEYS = [...SAVE_BACKUP_V3_KEYS, CRAFTING_RESERVATIONS_KEY];
 let pendingSaveBackup = null;
 
 function isGameSaveStorageKey(key) {
@@ -177,6 +187,8 @@ let craftingNotificationQueueIds = [];
 let activeCraftingNotificationQueueId = null;
 let isCraftingNotificationFlipInProgress = false;
 let inventoryRefreshTimer = 0;
+let craftingReservationRenderSignature = '';
+let lastCraftingReservationCheckAt = 0;
 let lastCraftingProgressUpdateAt = 0;
 let lastCraftingNotificationSyncAt = 0;
 let lastCraftingCountdownUpdateAt = 0;
@@ -931,6 +943,25 @@ function isRecord(value) {
     return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
+function readCraftingReservations() {
+    try {
+        const reservations = JSON.parse(localStorage.getItem(CRAFTING_RESERVATIONS_KEY) || '[]');
+        if (!Array.isArray(reservations)) return [];
+        return reservations.filter(reservation => isRecord(reservation)
+            && typeof reservation.id === 'string'
+            && typeof reservation.buildingInstanceId === 'string'
+            && Number.isInteger(reservation.recipeIndex)
+            && Number.isInteger(reservation.quantity)
+            && reservation.quantity > 0);
+    } catch (error) {
+        return [];
+    }
+}
+
+function saveCraftingReservations(reservations) {
+    localStorage.setItem(CRAFTING_RESERVATIONS_KEY, JSON.stringify(reservations));
+}
+
 function validateSaveBackupValue(key, value) {
     if (value === null) return;
     if (typeof value !== 'string' || value.length > 8_000_000) throw new Error('保存データの形式が正しくありません。');
@@ -978,6 +1009,16 @@ function validateSaveBackupValue(key, value) {
             || typeof building.id !== 'string' || !BUILDING_BY_ID.has(building.id)
             || !Number.isInteger(building.x) || !Number.isInteger(building.y)
             || typeof building.instanceId !== 'string')) throw new Error('建築物の配置データが不正です。');
+    } else if (key === CRAFTING_RESERVATIONS_KEY) {
+        if (!Array.isArray(parsed) || parsed.some(reservation => !isRecord(reservation)
+            || typeof reservation.id !== 'string' || !reservation.id
+            || typeof reservation.buildingInstanceId !== 'string' || !reservation.buildingInstanceId
+            || !Number.isInteger(reservation.recipeIndex) || reservation.recipeIndex < 0
+            || reservation.recipeIndex >= CRAFTING_RECIPES.length
+            || !Number.isInteger(reservation.quantity) || reservation.quantity < 1 || reservation.quantity > 99
+            || !Number.isFinite(Number(reservation.queuedAt)))) {
+            throw new Error('製作予約データが不正です。');
+        }
     } else if (key === ACTIVE_SCROLL_TARGETS_KEY) {
         if (!isRecord(parsed) || Object.values(parsed).some(target => !isRecord(target)
             || !Number.isInteger(target.x) || !Number.isInteger(target.y)
@@ -992,13 +1033,13 @@ function validateSaveBackupValue(key, value) {
 }
 
 function validateSaveBackup(backup) {
-    if (!isRecord(backup) || backup.format !== SAVE_BACKUP_FORMAT || ![1, 2, SAVE_BACKUP_VERSION].includes(backup.version)) {
+    if (!isRecord(backup) || backup.format !== SAVE_BACKUP_FORMAT || ![1, 2, 3, SAVE_BACKUP_VERSION].includes(backup.version)) {
         throw new Error('FogsGearの対応セーブJSONではありません。');
     }
     if (!isRecord(backup.data) || !isRecord(backup.cellChanges)) throw new Error('セーブJSONの構造が不正です。');
     const requiredKeys = backup.version === 1 ? LEGACY_SAVE_BACKUP_KEYS
-        : backup.version === 2 ? SAVE_BACKUP_KEYS.filter(key => key !== BUILDINGS_STORAGE_KEY)
-            : SAVE_BACKUP_KEYS;
+        : backup.version === 2 ? SAVE_BACKUP_V3_KEYS.filter(key => key !== BUILDINGS_STORAGE_KEY)
+            : backup.version === 3 ? SAVE_BACKUP_V3_KEYS : SAVE_BACKUP_KEYS;
     for (const key of requiredKeys) {
         if (!Object.hasOwn(backup.data, key)) throw new Error('セーブJSONに必要な項目がありません。');
         validateSaveBackupValue(key, backup.data[key]);
@@ -1335,7 +1376,7 @@ async function init() {
     state.cellChanges = applyCellChanges(state.map, state.worldSeed);
     try {
         const targets = JSON.parse(localStorage.getItem(ACTIVE_SCROLL_TARGETS_KEY) || '{}');
-        state.activeScrollTargets = targets && typeof targets === 'object' ? targets : {};
+        state.activeScrollTargets = getWorldAffectingActiveScrollTargets(targets && typeof targets === 'object' ? targets : {});
     } catch (error) {
         state.activeScrollTargets = {};
     }
@@ -1673,18 +1714,27 @@ function handleWorldCellOperation(operation) {
 }
 
 function refreshActiveScrollTargets(targets = null) {
-    if (targets) {
-        state.activeScrollTargets = targets;
-    } else {
+    let activeTargets = targets;
+    if (!activeTargets) {
         try {
             const stored = JSON.parse(localStorage.getItem(ACTIVE_SCROLL_TARGETS_KEY) || '{}');
-            state.activeScrollTargets = stored && typeof stored === 'object' ? stored : {};
+            activeTargets = stored && typeof stored === 'object' ? stored : {};
         } catch (error) {
-            state.activeScrollTargets = {};
+            activeTargets = {};
         }
     }
+    state.activeScrollTargets = getWorldAffectingActiveScrollTargets(activeTargets);
     updateCellInspection();
     scheduleDraw();
+}
+
+function getWorldAffectingActiveScrollTargets(targets) {
+    const savedScrolls = new Map(getStoredSavedScrolls().map(scroll => [scroll.id, scroll]));
+    return Object.fromEntries(Object.entries(targets).filter(([scrollId]) => {
+        const scroll = savedScrolls.get(scrollId);
+        return !scroll || !Array.isArray(scroll.blueprint?.gears)
+            || scroll.blueprint.gears.some(gear => WORLD_AFFECTING_SCROLL_MODES.has(gear.processMode));
+    }));
 }
 
 function updateCellInspection() {
@@ -1707,6 +1757,7 @@ function updateCellInspection() {
 }
 
 function getCraftingItemCount(itemId) {
+    if (itemId === 'crafting_reservations') return readCraftingReservations().length;
     if (itemId === 'brass-stock') return Math.max(0, Number(engineRuntimeState?.brass) || 0);
     const resourceKey = { water: 'water', fog: 'fog', power: 'power', steam_power: 'steamPower' }[itemId];
     if (resourceKey) return Math.max(0, Number(engineRuntimeState?.[resourceKey]) || 0);
@@ -1848,6 +1899,7 @@ function sortCraftingRecipesByAvailability(recipes) {
 function getCraftingItemName(itemId) {
     return CRAFTING_ITEM_BY_ID.get(itemId)?.[1] || CELL_MATERIALS[itemId]?.label || INVENTORY_ITEM_DEFINITIONS[itemId]?.name
         || BUILDING_BY_ID.get(itemId)?.name
+        || ({ crafting_reservations: '製作予約' }[itemId])
         || ({ fog: '霧', power: '動力', steam_power: 'スチーム' }[itemId]) || itemId;
 }
 
@@ -2691,6 +2743,7 @@ function loadBuildings() {
 
 function createInventoryIcon(itemId) {
     if (BUILDING_BY_ID.has(itemId)) return createBuildingSvgIcon(itemId);
+    if (itemId === 'crafting_reservations') return createCraftingIcon('scroll_book');
     if (CRAFTING_ITEM_BY_ID.has(itemId) || itemId === 'grain' || itemId === 'paper_scroll' || itemId === 'cloth_scroll' || itemId === 'scroll_book' || itemId === 'fog' || itemId === 'power' || itemId === 'steam_power') {
         return createCraftingIcon(itemId);
     }
@@ -2701,7 +2754,7 @@ function createInventoryIcon(itemId) {
 }
 
 function getInventoryCategory(itemId) {
-    if (SCROLL_MATERIAL_BY_ITEM.has(itemId) || itemId === 'scroll_book') return 'scrolls';
+    if (SCROLL_MATERIAL_BY_ITEM.has(itemId) || itemId === 'scroll_book' || itemId === 'crafting_reservations') return 'scrolls';
     if (['water', 'fog', 'power', 'steam_power'].includes(itemId)) return 'resources';
     if (BUILDING_BY_ID.has(itemId)) return 'building-kits';
     const item = CRAFTING_ITEM_BY_ID.get(itemId);
@@ -2811,8 +2864,182 @@ function syncInventoryCategories(inventoryList, visibleInventoryIds) {
     inventoryList.scrollTop = previousScrollTop;
 }
 
+function renderCraftingReservations() {
+    const list = document.getElementById('crafting-reservation-list');
+    const count = document.getElementById('crafting-reservation-count');
+    if (!list || !count) return;
+    const buildings = new Map(state.buildings.map(building => [building.instanceId, building]));
+    let reservations = readCraftingReservations();
+    const validReservations = reservations.filter(reservation => {
+        const building = buildings.get(reservation.buildingInstanceId);
+        const recipe = CRAFTING_RECIPES[reservation.recipeIndex];
+        return building && getCraftingRecipeForBuilding(recipe, building.id);
+    });
+    if (validReservations.length !== reservations.length) {
+        reservations = validReservations;
+        saveCraftingReservations(reservations);
+    }
+    count.textContent = String(reservations.length);
+    const itemCount = document.querySelector('.inventory-item-count[data-item-key="crafting_reservations"]');
+    if (itemCount) itemCount.textContent = String(reservations.length);
+    const signature = JSON.stringify(reservations.map(reservation => [
+        reservation.id, reservation.buildingInstanceId, reservation.recipeIndex,
+        reservation.quantity, reservation.queuedAt,
+        buildings.get(reservation.buildingInstanceId)?.customName || ''
+    ]));
+    if (signature === craftingReservationRenderSignature) return;
+    craftingReservationRenderSignature = signature;
+    list.replaceChildren();
+    if (!reservations.length) {
+        const empty = document.createElement('p');
+        empty.className = 'crafting-reservation-empty';
+        empty.textContent = '製作予約はありません';
+        list.appendChild(empty);
+        return;
+    }
+    reservations.forEach((reservation, index) => {
+        const building = buildings.get(reservation.buildingInstanceId);
+        const recipe = getCraftingRecipeForBuilding(CRAFTING_RECIPES[reservation.recipeIndex], building.id);
+        const row = document.createElement('article');
+        row.className = 'crafting-reservation-row';
+        row.dataset.reservationId = reservation.id;
+        const grip = document.createElement('button');
+        grip.type = 'button';
+        grip.className = 'crafting-reservation-grip';
+        grip.dataset.reservationHandle = reservation.id;
+        grip.setAttribute('aria-label', `${getCraftingRecipeDisplayName(recipe[1])}の優先度。ドラッグまたは上下矢印で並べ替え`);
+        grip.setAttribute('aria-keyshortcuts', 'ArrowUp ArrowDown');
+        grip.title = 'つまんで優先順を変更';
+        grip.textContent = '⋮⋮';
+        const copy = document.createElement('div');
+        copy.className = 'crafting-reservation-copy';
+        const title = document.createElement('strong');
+        title.textContent = getCraftingRecipeDisplayName(recipe[1]);
+        const detail = document.createElement('span');
+        const buildingDefinition = BUILDING_BY_ID.get(building.id);
+        const buildingName = building.customName || buildingDefinition?.name || '設備';
+        const outputAmount = Math.max(1, Number(recipe[6]) || 1) * reservation.quantity;
+        detail.textContent = `${buildingName} / ${reservation.quantity}回分・${outputAmount}個`;
+        copy.append(title, detail);
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'crafting-reservation-delete';
+        remove.dataset.action = 'delete-crafting-reservation';
+        remove.dataset.reservationId = reservation.id;
+        remove.setAttribute('aria-label', `${getCraftingRecipeDisplayName(recipe[1])}の予約を削除`);
+        remove.title = '予約を削除';
+        remove.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7h16M9 7V4h6v3m3 0-.8 13H6.8L6 7m4 3v7m4-7v7" /></svg>';
+        row.append(grip, copy, remove);
+        list.appendChild(row);
+    });
+}
+
+function openCraftingReservations() {
+    const modal = document.getElementById('crafting-reservation-modal');
+    if (!modal) return;
+    renderCraftingReservations();
+    modal.hidden = false;
+}
+
+function closeCraftingReservations() {
+    const modal = document.getElementById('crafting-reservation-modal');
+    if (modal) modal.hidden = true;
+}
+
+function addCraftingReservation(recipeIndex, buildingInstanceId, quantity) {
+    const building = state.buildings.find(item => item.instanceId === buildingInstanceId);
+    const recipe = getCraftingRecipeForBuilding(CRAFTING_RECIPES[recipeIndex], building?.id);
+    if (!building || !recipe || recipe[4] === HANDCRAFT_STATION) return false;
+    if (!Number.isInteger(quantity) || quantity < 1 || quantity > 99) return false;
+    const reservationId = globalThis.crypto?.randomUUID?.()
+        || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const reservations = readCraftingReservations();
+    reservations.push({ id: reservationId, buildingInstanceId, recipeIndex, quantity, queuedAt: Date.now() });
+    saveCraftingReservations(reservations);
+    craftingReservationRenderSignature = '';
+    renderCraftingReservations();
+    showAppNotice(`${getCraftingRecipeDisplayName(recipe[1])}を${quantity}回分予約しました。`);
+    processCraftingReservations(Date.now(), true);
+    return true;
+}
+
+function removeCraftingReservation(reservationId) {
+    const reservations = readCraftingReservations();
+    const remaining = reservations.filter(reservation => reservation.id !== reservationId);
+    if (remaining.length === reservations.length) return false;
+    saveCraftingReservations(remaining);
+    craftingReservationRenderSignature = '';
+    renderCraftingReservations();
+    return true;
+}
+
+function moveCraftingReservation(reservationId, targetIndex) {
+    const reservations = readCraftingReservations();
+    const sourceIndex = reservations.findIndex(reservation => reservation.id === reservationId);
+    if (sourceIndex < 0 || !Number.isInteger(targetIndex)) return false;
+    const destination = Math.max(0, Math.min(reservations.length - 1, targetIndex));
+    if (sourceIndex === destination) return false;
+    const [reservation] = reservations.splice(sourceIndex, 1);
+    reservations.splice(destination, 0, reservation);
+    saveCraftingReservations(reservations);
+    craftingReservationRenderSignature = '';
+    renderCraftingReservations();
+    return true;
+}
+
+function removeCraftingReservationsForBuilding(buildingInstanceId) {
+    const reservations = readCraftingReservations();
+    const remaining = reservations.filter(reservation => reservation.buildingInstanceId !== buildingInstanceId);
+    if (remaining.length === reservations.length) return false;
+    saveCraftingReservations(remaining);
+    craftingReservationRenderSignature = '';
+    renderCraftingReservations();
+    return true;
+}
+
+function processCraftingReservations(now = Date.now(), force = false) {
+    if (!craftingWorldReady || !force && now - lastCraftingReservationCheckAt < 250) return;
+    lastCraftingReservationCheckAt = now;
+    const reservations = readCraftingReservations();
+    let changed = false;
+    for (let index = reservations.length - 1; index >= 0; index--) {
+        const reservation = reservations[index];
+        const building = state.buildings.find(item => item.instanceId === reservation.buildingInstanceId);
+        const baseRecipe = CRAFTING_RECIPES[reservation.recipeIndex];
+        if (!building || !baseRecipe || !getCraftingRecipeForBuilding(baseRecipe, building.id)) {
+            reservations.splice(index, 1);
+            changed = true;
+        }
+    }
+    const runningScrollIds = new Set(getActiveScrollIds());
+    for (let index = 0; index < reservations.length; index++) {
+        const reservation = reservations[index];
+        const building = state.buildings.find(item => item.instanceId === reservation.buildingInstanceId);
+        const recipe = getCraftingRecipeForBuilding(CRAFTING_RECIPES[reservation.recipeIndex], building?.id);
+        if (!building || !recipe || !hasAssignedCraftingScroll(building)
+            || !isBuildingScrollRunning(building, runningScrollIds)
+            || !engineRuntimeState.creativeMode && Number(engineRuntimeState.power) <= 0) continue;
+        let startQuantity = Math.min(reservation.quantity, getMaximumCraftCount(recipe[2]));
+        const outputMultiplier = Math.max(1, Number(recipe[6]) || 1);
+        while (startQuantity > 0 && !canAddInventoryItems(Array(startQuantity * outputMultiplier).fill(recipe[3]))) startQuantity--;
+        if (startQuantity < 1 || !craftRecipe(reservation.recipeIndex, building.instanceId, startQuantity, { quiet: true })) continue;
+        reservation.quantity -= startQuantity;
+        changed = true;
+        if (reservation.quantity < 1) {
+            reservations.splice(index, 1);
+            index--;
+        }
+    }
+    if (changed) {
+        saveCraftingReservations(reservations);
+        craftingReservationRenderSignature = '';
+        renderCraftingReservations();
+    }
+}
+
 function renderCellMaterials() {
     if (!engineRuntimeState) return;
+    renderCraftingReservations();
     renderBuildingInventory();
     const capacityStatus = document.getElementById('inventory-capacity-status');
     if (capacityStatus) {
@@ -2827,6 +3054,7 @@ function renderCellMaterials() {
     ['water', 'fog', 'power', 'steam_power'].forEach(itemId => {
         if (getCraftingItemCount(itemId) > 0) inventoryIds.add(itemId);
     });
+    inventoryIds.add('crafting_reservations');
     const orderedIds = [
         ...CRAFTING_ITEMS.map(([id]) => id).filter(id => inventoryIds.has(id)),
         ...[...inventoryIds].filter(id => !CRAFTING_ITEM_BY_ID.has(id))
@@ -3023,6 +3251,29 @@ function createCraftingRecipeCard(recipe, index, now, buildingInstanceId = '') {
     craftButton.textContent = `製作 ×${batch * selectedCount}`;
     craftButton.disabled = maxCraftCount === 0;
     footer.append(stationLabel, quantityControl, availableCount, craftButton);
+    if (buildingInstanceId) {
+        const reservationControls = document.createElement('div');
+        reservationControls.className = 'crafting-reservation-controls';
+        const reservationLabel = document.createElement('label');
+        reservationLabel.className = 'crafting-reservation-quantity';
+        reservationLabel.append(document.createTextNode('予約数'));
+        const reservationInput = document.createElement('input');
+        reservationInput.type = 'number';
+        reservationInput.min = '1';
+        reservationInput.max = '99';
+        reservationInput.step = '1';
+        reservationInput.value = '1';
+        reservationInput.setAttribute('aria-label', `${getCraftingItemName(output)}の予約数`);
+        reservationLabel.appendChild(reservationInput);
+        const reservationButton = document.createElement('button');
+        reservationButton.type = 'button';
+        reservationButton.dataset.action = 'add-crafting-reservation';
+        reservationButton.dataset.recipeIndex = String(index);
+        reservationButton.dataset.buildingInstanceId = buildingInstanceId;
+        reservationButton.textContent = '予約';
+        reservationControls.append(reservationLabel, reservationButton);
+        footer.appendChild(reservationControls);
+    }
     const noteElement = document.createElement('p');
     noteElement.className = 'crafting-recipe-note';
     noteElement.textContent = note;
@@ -3339,44 +3590,45 @@ function canCraftRecipeAtBuilding(recipe, buildingInstanceId) {
     return state.buildings.some(building => building.instanceId === buildingInstanceId && buildingIds.includes(building.id));
 }
 
-function craftRecipe(recipeIndex, buildingInstanceId = '', requestedCount) {
+function craftRecipe(recipeIndex, buildingInstanceId = '', requestedCount, { quiet = false } = {}) {
     const baseRecipe = CRAFTING_RECIPES[recipeIndex];
     const buildingId = state.buildings.find(building => building.instanceId === buildingInstanceId)?.id;
     const recipe = getCraftingRecipeForBuilding(baseRecipe, buildingId);
     const creative = Boolean(engineRuntimeState?.creativeMode);
     const isHandcraft = recipe?.[4] === HANDCRAFT_STATION;
     if (!recipe || (isHandcraft ? Boolean(buildingInstanceId) : !canCraftRecipeAtBuilding(recipe, buildingInstanceId))) {
-        showAppNotice('このレシピに対応する製作設備が必要です。');
-        return;
+        if (!quiet) showAppNotice('このレシピに対応する製作設備が必要です。');
+        return false;
     }
     const craftingBuilding = buildingInstanceId
         ? state.buildings.find(building => building.instanceId === buildingInstanceId)
         : null;
     if (craftingBuilding && !hasAssignedCraftingScroll(craftingBuilding)) {
-        showAppNotice('製作設備に有効なスクロールをセットしてください。');
-        return;
+        if (!quiet) showAppNotice('製作設備に有効なスクロールをセットしてください。');
+        return false;
     }
     if (craftingBuilding && !hasRunningCraftingScroll(craftingBuilding)) {
-        showAppNotice('製作設備にセットしたスクロールを起動してください。');
-        return;
+        if (!quiet) showAppNotice('製作設備にセットしたスクロールを起動してください。');
+        return false;
     }
     if (craftingBuilding && !engineRuntimeState.creativeMode && Number(engineRuntimeState.power) <= 0) {
-        showAppNotice('製作設備に動力が供給されていません。');
-        return;
+        if (!quiet) showAppNotice('製作設備に動力が供給されていません。');
+        return false;
     }
     const maxCraftCount = getMaximumCraftCount(recipe[2], creative);
     const quantity = requestedCount === 'max' ? maxCraftCount : Math.floor(Number(requestedCount));
+    const outputMultiplier = Math.max(1, Number(recipe[6]) || 1);
     if (!Number.isFinite(quantity) || quantity < 1 || quantity > maxCraftCount) {
-        showAppNotice(maxCraftCount > 0 ? `製作数は1〜${maxCraftCount}回で指定してください。` : '製作に必要な素材が足りません。');
-        return;
+        if (!quiet) showAppNotice(maxCraftCount > 0 ? `製作数は1〜${maxCraftCount}回で指定してください。` : '製作に必要な素材が足りません。');
+        return false;
     }
-    if (!canAddInventoryItems(Array(quantity).fill(recipe[3]))) {
-        notifyInventoryFull();
-        return;
+    if (!canAddInventoryItems(Array(quantity * outputMultiplier).fill(recipe[3]))) {
+        if (!quiet) notifyInventoryFull();
+        return false;
     }
     if (!creative && recipe[2].some(([itemId, amount]) => getCraftingItemCount(itemId) < amount * quantity)) {
-        showAppNotice('製作に必要な素材が足りません。');
-        return;
+        if (!quiet) showAppNotice('製作に必要な素材が足りません。');
+        return false;
     }
     const recipeKey = `${recipe[0]}:${recipe[1]}`;
     engineRuntimeState.saveState();
@@ -3424,7 +3676,8 @@ function craftRecipe(recipeIndex, buildingInstanceId = '', requestedCount) {
     engineRuntimeState.notify();
     updateEngineDashboard();
     if (!document.getElementById('building-crafting-modal')?.hidden) renderBuildingCrafting();
-    showAppNotice(`${getCraftingItemName(recipe[3])}の製作を開始しました。`);
+    if (!quiet) showAppNotice(`${getCraftingItemName(recipe[3])}の製作を開始しました。`);
+    return true;
 }
 
 function closeBuildingCrafting() {
@@ -4152,7 +4405,6 @@ function drawPlacedBuildings(startCol, endCol, startRow, endRow, now) {
             activeCraftingStationIds.add(job.craftingStationId);
         }
     }
-    const activeScrollIds = new Set(getActiveScrollIds());
     orderedBuildingDrawCache.forEach(placed => {
         const building = BUILDING_BY_ID.get(placed.id);
         if (!building) return;
@@ -4169,7 +4421,6 @@ function drawPlacedBuildings(startCol, endCol, startRow, endRow, now) {
         if (maxX + building.width < startCol || minX > endCol || maxY + building.height < startRow || minY > endRow) return;
         if (building.kind === 'automaton') {
             drawAutomaton(placed, now);
-            drawBuildingScrollIndicator(ctx, placed, drawX, drawY, activeScrollIds);
             return;
         }
         const drawRotation = vehicleRender ? vehicleRender.rotation : placed.rotation || 0;
@@ -4188,51 +4439,7 @@ function drawPlacedBuildings(startCol, endCol, startRow, endRow, now) {
             ctx.strokeRect(x + 1 / zoom, y + 1 / zoom, width - 2 / zoom, height - 2 / zoom);
             ctx.restore();
         }
-        drawBuildingScrollIndicator(ctx, placed, drawX, drawY, activeScrollIds);
     });
-}
-
-function drawBuildingScrollIndicator(context, placed, drawX, drawY, activeScrollIds) {
-    const movementScrollRequired = requiresMovementScroll(placed);
-    const scrollId = movementScrollRequired ? getMovementScrollId(placed) : placed.craftingScrollId;
-    if (typeof scrollId !== 'string' || !scrollId) return;
-    const building = BUILDING_BY_ID.get(placed.id);
-    if (!building) return;
-    const running = activeScrollIds.has(scrollId) && (movementScrollRequired
-        ? hasAssignedMovementScroll(placed) && engineRuntimeState.mainGearRunning
-            && (engineRuntimeState.creativeMode || Number(engineRuntimeState.steamPower) > 0)
-        : hasRunningCraftingScroll(placed));
-    const zoom = Math.max(0.25, state.zoom);
-    const x = drawX * state.tileSize;
-    const y = drawY * state.tileSize;
-    const width = building.width * state.tileSize;
-    const height = building.height * state.tileSize;
-    if (running) {
-        context.save();
-        context.strokeStyle = 'rgba(98, 220, 190, .98)';
-        context.lineWidth = 2.5 / zoom;
-        context.shadowColor = 'rgba(98, 220, 190, .95)';
-        context.shadowBlur = 12 / zoom;
-        context.strokeRect(x + 1 / zoom, y + 1 / zoom, width - 2 / zoom, height - 2 / zoom);
-        context.restore();
-    }
-    const badgeX = x + 3 / zoom;
-    const badgeY = y + 3 / zoom;
-    const badgeWidth = 18 / zoom;
-    const badgeHeight = 16 / zoom;
-    context.save();
-    context.fillStyle = 'rgba(18, 14, 12, .96)';
-    context.fillRect(badgeX, badgeY, badgeWidth, badgeHeight);
-    context.strokeStyle = running ? '#62c2aa' : '#c69a52';
-    context.lineWidth = 1 / zoom;
-    context.strokeRect(badgeX + 0.5 / zoom, badgeY + 0.5 / zoom, badgeWidth - 1 / zoom, badgeHeight - 1 / zoom);
-    context.fillStyle = '#f3d27a';
-    context.fillRect(badgeX + 6 / zoom, badgeY + 4 / zoom, 7 / zoom, 8 / zoom);
-    context.beginPath();
-    context.arc(badgeX + 6 / zoom, badgeY + 8 / zoom, 2.5 / zoom, -Math.PI / 2, Math.PI / 2);
-    context.arc(badgeX + 13 / zoom, badgeY + 8 / zoom, 2.5 / zoom, Math.PI / 2, -Math.PI / 2);
-    context.fill();
-    context.restore();
 }
 
 function isBuildingCraftingActive(placed, now = Date.now()) {
@@ -4418,74 +4625,83 @@ function updateBuildingPlacementFromEvent(event) {
     updateBuildingPlacementControls();
 }
 
-function updateScrollStandMagicCircles() {
-    const activeScrollIds = new Set(getActiveScrollIds());
-    const activeStands = state.buildings.filter(building => {
-        if (!supportsStationaryScrolls(building) || !building.craftingScrollId
-            || !activeScrollIds.has(building.craftingScrollId)) return false;
-        const target = state.activeScrollTargets[building.craftingScrollId];
-        return target?.buildingInstanceId === building.instanceId
-            && target.x === building.x && target.y === building.y;
-    });
-    const activeStandIds = new Set(activeStands.map(building => building.instanceId));
-    scrollStandMagicCircles.forEach((circle, instanceId) => {
-        if (activeStandIds.has(instanceId)) return;
-        circle.remove();
-        scrollStandMagicCircles.delete(instanceId);
-    });
+function getBuildingScrollId(building) {
+    return requiresMovementScroll(building) ? getMovementScrollId(building) : building?.craftingScrollId || '';
+}
 
-    const viewLeft = state.camera.x - canvas.width / (2 * state.zoom);
-    const viewTop = state.camera.y - canvas.height / (2 * state.zoom);
-    activeStands.forEach(building => {
+function isBuildingScrollRunning(building, activeScrollIds) {
+    const scrollId = getBuildingScrollId(building);
+    if (!scrollId || !activeScrollIds.has(scrollId)) return false;
+    if (requiresMovementScroll(building)) {
+        return hasAssignedMovementScroll(building) && engineRuntimeState.mainGearRunning
+            && (engineRuntimeState.creativeMode || Number(engineRuntimeState.steamPower) > 0);
+    }
+    return hasRunningCraftingScroll(building);
+}
+
+function drawScrollAlchemyCircles(context, now) {
+    const activeScrollIds = new Set(getActiveScrollIds());
+    const scrollBuildings = state.buildings.filter(building => Boolean(getBuildingScrollId(building)));
+    let hasRunningCircle = false;
+    const viewW = canvas.width / state.zoom;
+    const viewH = canvas.height / state.zoom;
+    const viewLeft = state.camera.x - viewW / 2;
+    const viewTop = state.camera.y - viewH / 2;
+    const zoom = Math.max(0.25, state.zoom);
+    scrollBuildings.forEach(building => {
         const definition = BUILDING_BY_ID.get(building.id);
         if (!definition) return;
+        const running = isBuildingScrollRunning(building, activeScrollIds);
+        hasRunningCircle ||= running;
         const worldCenterX = (building.x + definition.width / 2) * state.tileSize;
         const worldCenterY = (building.y + definition.height / 2) * state.tileSize;
         const radius = state.tileSize * Math.max(definition.width, definition.height) * .62;
-        if (worldCenterX + radius < viewLeft || worldCenterX - radius > viewLeft + canvas.width / state.zoom
-            || worldCenterY + radius < viewTop || worldCenterY - radius > viewTop + canvas.height / state.zoom) return;
-
-        let circle = scrollStandMagicCircles.get(building.instanceId);
-        if (!circle) {
-            const svgId = building.instanceId.replace(/[^a-zA-Z0-9_-]/g, '-');
-            const gearPath = Array.from({ length: 72 }, (_, index) => {
-                const tooth = Math.floor(index / 6);
-                const point = index % 6;
-                const offsets = [0, .12, .12, .3, .3, .5];
-                const radii = [35, 35, 43, 43, 35, 35];
-                const angle = (tooth + offsets[point]) * Math.PI / 6 - Math.PI / 2;
-                return `${index ? 'L' : 'M'}${(60 + Math.cos(angle) * radii[point]).toFixed(2)} ${(60 + Math.sin(angle) * radii[point]).toFixed(2)}`;
-            }).join(' ') + ' Z';
-            circle = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-            circle.classList.add('scroll-stand-magic-circle');
-            circle.setAttribute('viewBox', '0 0 120 120');
-            circle.setAttribute('aria-hidden', 'true');
-            circle.innerHTML = `<defs><radialGradient id="scroll-stand-aura-${svgId}"><stop offset="0" stop-color="#b9ffff" stop-opacity=".24"/><stop offset=".7" stop-color="#82eaff" stop-opacity=".09"/><stop offset="1" stop-color="#82eaff" stop-opacity="0"/></radialGradient><filter id="scroll-stand-glow-${svgId}" x="-.25" y="-.25" width="1.5" height="1.5"><feGaussianBlur stdDeviation="1.8" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs><circle cx="60" cy="60" r="55" fill="url(#scroll-stand-aura-${svgId})"/><g class="scroll-stand-magic-gear" filter="url(#scroll-stand-glow-${svgId})"><path d="${gearPath}" fill="#91f3ff" fill-opacity=".15" stroke="#b8fbff" stroke-width="2"/><circle cx="60" cy="60" r="34" fill="none" stroke="#8be9ff" stroke-width="1.7"/><circle cx="60" cy="60" r="29" fill="none" stroke="#c0ffff" stroke-opacity=".8" stroke-width="1.3" stroke-dasharray="2 3"/><path d="M60 27v7m0 52v7M27 60h7m52 0h7M36.7 36.7l5 5m36.6 36.6 5 5m0-46.6-5 5m-36.6 36.6-5 5" stroke="#d0ffff" stroke-width="2.2" stroke-linecap="round"/><circle cx="60" cy="20" r="2.5" fill="#efffff"/><circle cx="60" cy="100" r="2.5" fill="#efffff"/><circle cx="20" cy="60" r="2.5" fill="#efffff"/><circle cx="100" cy="60" r="2.5" fill="#efffff"/><circle cx="60" cy="60" r="18" fill="none" stroke="#d7ffff" stroke-width="2"/><path d="M60 45 64 56 75 60 64 64 60 75 56 64 45 60 56 56Z" fill="#dbffff" fill-opacity=".85"/><circle cx="60" cy="60" r="4" fill="#efffff"/></g><g class="scroll-stand-magic-orbit"><circle cx="60" cy="60" r="48" fill="none" stroke="#77dcff" stroke-opacity=".82" stroke-width="1.5" stroke-dasharray="9 4 2 4"/><path d="m60 10 3 7-6 0zM110 60l-7 3v-6zM60 110l-3-7h6zM10 60l7-3v6z" fill="#e4ffff"/></g>`;
-            vehicleAnimationLayer.appendChild(circle);
-            scrollStandMagicCircles.set(building.instanceId, circle);
+        if (worldCenterX + radius < viewLeft || worldCenterX - radius > viewLeft + viewW
+            || worldCenterY + radius < viewTop || worldCenterY - radius > viewTop + viewH) return;
+        const angle = running ? now / 18000 * Math.PI * 2 : 0;
+        const alpha = running ? 0.7 : 0.42;
+        context.save();
+        context.translate(worldCenterX, worldCenterY);
+        context.globalAlpha = alpha;
+        context.strokeStyle = running ? '#8ef5d9' : '#b7875a';
+        context.fillStyle = running ? '#8ef5d9' : '#b7875a';
+        context.lineWidth = running ? 1.8 / zoom : 1.5 / zoom;
+        if (running) {
+            context.shadowColor = 'rgba(98, 220, 190, .55)';
+            context.shadowBlur = 3 / zoom;
+        } else {
+            context.shadowColor = 'rgba(183, 135, 90, .35)';
+            context.shadowBlur = 2 / zoom;
         }
-        const diameter = radius * 2 * state.zoom;
-        const screenCenterX = (worldCenterX - state.camera.x) * state.zoom + canvas.width / 2;
-        const screenCenterY = (worldCenterY - state.camera.y) * state.zoom + canvas.height / 2;
-        circle.style.width = `${diameter}px`;
-        circle.style.height = `${diameter}px`;
-        circle.style.transform = `translate3d(${screenCenterX - diameter / 2}px, ${screenCenterY - diameter / 2}px, 0)`;
-        circle.style.display = 'block';
+        context.beginPath();
+        context.arc(0, 0, radius * .96, 0, Math.PI * 2);
+        context.stroke();
+        context.beginPath();
+        context.setLineDash([5 / zoom, 4 / zoom]);
+        context.arc(0, 0, radius * .78, -angle, Math.PI * 2 - angle);
+        context.stroke();
+        context.setLineDash([]);
+        if (running) context.rotate(angle);
+        context.beginPath();
+        for (let index = 0; index < 72; index++) {
+            const tooth = Math.floor(index / 6);
+            const point = index % 6;
+            const offsets = [0, .12, .12, .3, .3, .5];
+            const radii = [radius * .8, radius * .8, radius * .96, radius * .96, radius * .8, radius * .8];
+            const theta = (tooth + offsets[point]) * Math.PI / 6 - Math.PI / 2;
+            const x = Math.cos(theta) * radii[point];
+            const y = Math.sin(theta) * radii[point];
+            if (index === 0) context.moveTo(x, y);
+            else context.lineTo(x, y);
+        }
+        context.closePath();
+        context.stroke();
+        context.beginPath();
+        context.arc(0, 0, radius * .58, 0, Math.PI * 2);
+        context.stroke();
+        context.restore();
     });
-    activeStands.forEach(building => {
-        const definition = BUILDING_BY_ID.get(building.id);
-        const circle = scrollStandMagicCircles.get(building.instanceId);
-        if (!circle || !definition) return;
-        const worldCenterX = (building.x + definition.width / 2) * state.tileSize;
-        const worldCenterY = (building.y + definition.height / 2) * state.tileSize;
-        const viewLeft = state.camera.x - canvas.width / (2 * state.zoom);
-        const viewTop = state.camera.y - canvas.height / (2 * state.zoom);
-        const radius = state.tileSize * Math.max(definition.width, definition.height) * .62;
-        circle.style.display = worldCenterX + radius < viewLeft || worldCenterX - radius > viewLeft + canvas.width / state.zoom
-            || worldCenterY + radius < viewTop || worldCenterY - radius > viewTop + canvas.height / state.zoom
-            ? 'none'
-            : 'block';
-    });
+    return hasRunningCircle;
 }
 
 function clearTerrainChunkCache() {
@@ -4617,6 +4833,7 @@ function draw() {
     drawTerrainChunks(startCol, endCol, startRow, endRow);
 
     drawGridOverlay(startCol, endCol, startRow, endRow);
+    const hasRunningScrollAlchemyCircle = drawScrollAlchemyCircles(ctx, now);
     drawPlacedBuildings(startCol, endCol, startRow, endRow, now);
     drawBuildingGhost();
     drawTerritoryOverlay(startCol, endCol, startRow, endRow);
@@ -4646,7 +4863,7 @@ function draw() {
     });
 
     ctx.restore();
-    updateScrollStandMagicCircles();
+    if (hasRunningScrollAlchemyCircle) requestAnimationFrame(scheduleDraw);
     const hasActiveVehicle = state.buildings.some(placed => placed.vehicle?.running || placed.vehicle?.movement);
     vehicleAnimationLayerActive = hasActiveVehicle;
     if (hasActiveVehicle) drawVehicleAnimationLayer(now);
@@ -4670,7 +4887,6 @@ function drawVehicleAnimationLayer(now) {
     const viewH = canvas.height / state.zoom;
     const left = state.camera.x - viewW / 2;
     const top = state.camera.y - viewH / 2;
-    const activeScrollIds = new Set(getActiveScrollIds());
     vehicleAnimationContext.save();
     vehicleAnimationContext.scale(state.zoom, state.zoom);
     vehicleAnimationContext.translate(-left, -top);
@@ -4684,7 +4900,6 @@ function drawVehicleAnimationLayer(now) {
             : vehicleAnimationPoses.get(placed.instanceId) || { x: placed.x, y: placed.y, rotation: placed.rotation || 0 };
         vehicleAnimationPoses.set(placed.instanceId, render);
         drawBuilding(vehicleAnimationContext, { ...building, x: render.x, y: render.y, rotation: render.rotation }, state.tileSize, { zoom: state.zoom });
-        drawBuildingScrollIndicator(vehicleAnimationContext, placed, render.x, render.y, activeScrollIds);
     });
     vehicleAnimationContext.restore();
 }
@@ -6540,15 +6755,6 @@ function getActiveScrollIds() {
 function stopPlayerTargetedScrolls(playerMoved = false) {
     const activeIds = new Set(getActiveScrollIds());
     if (!activeIds.size) return;
-    const worldAffectingProcessModes = new Set([
-        'RESOURCE_COLLECTION',
-        'TERRAIN_TRANSFORM',
-        'ERA_SHIFT',
-        'TARGET_SHIFT_UP',
-        'TARGET_SHIFT_DOWN',
-        'TARGET_SHIFT_LEFT',
-        'TARGET_SHIFT_RIGHT'
-    ]);
     const savedScrolls = new Map(getStoredSavedScrolls().map(scroll => [scroll.id, scroll]));
     let targets;
     try {
@@ -6565,7 +6771,7 @@ function stopPlayerTargetedScrolls(playerMoved = false) {
             && (supportsStationaryScrolls(building) && building.craftingScrollId === scrollId
                 || requiresMovementScroll(building) && getMovementScrollId(building) === scrollId));
         const affectsWorld = !scroll || !Array.isArray(scroll.blueprint?.gears)
-            || scroll.blueprint.gears.some(gear => worldAffectingProcessModes.has(gear.processMode));
+            || scroll.blueprint.gears.some(gear => WORLD_AFFECTING_SCROLL_MODES.has(gear.processMode));
         return !anchoredBuilding
             && affectsWorld
             && (playerMoved || target?.x !== state.player.x || target?.y !== state.player.y);
@@ -7331,6 +7537,7 @@ function demolishSelectedBuilding() {
     stopScrollIfRunning(placed.craftingScrollId);
     stopScrollIfRunning(getMovementScrollId(placed));
     state.buildings.splice(index, 1);
+    removeCraftingReservationsForBuilding(placed.instanceId);
     refunds.forEach(({ itemId, amount }) => {
         const resourceKey = { water: 'water', fog: 'fog', power: 'power', steam_power: 'steamPower' }[itemId];
         if (itemId === 'brass-stock') engineRuntimeState.brass += amount;
@@ -8140,6 +8347,20 @@ document.addEventListener('click', (event) => {
         demolishSelectedBuilding();
         return;
     }
+    if (button.dataset.action === 'add-crafting-reservation') {
+        const card = button.closest('.crafting-recipe-card');
+        const quantity = Math.floor(Number(card?.querySelector('.crafting-reservation-quantity input')?.value));
+        if (!Number.isInteger(quantity) || quantity < 1 || quantity > 99) {
+            showAppNotice('予約数は1〜99回で指定してください。');
+            return;
+        }
+        addCraftingReservation(Number(button.dataset.recipeIndex), button.dataset.buildingInstanceId, quantity);
+        return;
+    }
+    if (button.dataset.action === 'delete-crafting-reservation') {
+        removeCraftingReservation(button.dataset.reservationId);
+        return;
+    }
     if (button.dataset.action === 'craft-recipe') {
         const selectedQuantity = button.closest('.crafting-recipe-card')?.querySelector('.crafting-quantity-option[aria-pressed="true"]');
         const quantity = selectedQuantity?.dataset.isMaximum === 'true' ? 'max' : selectedQuantity?.dataset.quantity;
@@ -8179,6 +8400,10 @@ document.addEventListener('click', (event) => {
         return;
     }
     if (button.dataset.action === 'inspect-inventory-item') {
+        if (button.dataset.itemKey === 'crafting_reservations') {
+            openCraftingReservations();
+            return;
+        }
         if (button.dataset.itemKey === 'scroll_book') {
             openAppPage('../GearSystem/scroll-library.html?embed=1&source=scroll-book&v=14', 'スクロール書庫');
             return;
@@ -8198,6 +8423,10 @@ document.addEventListener('click', (event) => {
     }
     if (button.dataset.action === 'close-inventory-modal') {
         closeInventoryItem();
+        return;
+    }
+    if (button.dataset.action === 'close-crafting-reservations') {
+        closeCraftingReservations();
         return;
     }
     if (button.dataset.action === 'open-inventory-discard-confirmation') {
@@ -8783,6 +9012,60 @@ document.getElementById('building-storage-item-list')?.addEventListener('click',
     if (placed && definition) renderBuildingStorage(placed, definition);
 });
 
+const craftingReservationList = document.getElementById('crafting-reservation-list');
+let activeCraftingReservationDrag = null;
+function clearCraftingReservationDrag() {
+    craftingReservationList?.querySelectorAll('.is-drag-target, .is-dragging').forEach(row =>
+        row.classList.remove('is-drag-target', 'is-dragging'));
+    activeCraftingReservationDrag = null;
+}
+
+craftingReservationList?.addEventListener('pointerdown', event => {
+    const handle = event.target.closest('.crafting-reservation-grip');
+    if (!handle || !event.isPrimary || event.pointerType === 'mouse' && event.button !== 0) return;
+    const row = handle.closest('.crafting-reservation-row');
+    if (!row) return;
+    activeCraftingReservationDrag = { pointerId: event.pointerId, reservationId: handle.dataset.reservationHandle };
+    row.classList.add('is-dragging');
+    handle.setPointerCapture(event.pointerId);
+    event.preventDefault();
+});
+
+craftingReservationList?.addEventListener('pointermove', event => {
+    if (!activeCraftingReservationDrag || activeCraftingReservationDrag.pointerId !== event.pointerId) return;
+    const targetRow = document.elementFromPoint(event.clientX, event.clientY)?.closest('.crafting-reservation-row');
+    craftingReservationList.querySelectorAll('.is-drag-target').forEach(row => row.classList.remove('is-drag-target'));
+    if (targetRow && targetRow.dataset.reservationId !== activeCraftingReservationDrag.reservationId) {
+        targetRow.classList.add('is-drag-target');
+    }
+    event.preventDefault();
+});
+
+craftingReservationList?.addEventListener('pointerup', event => {
+    const drag = activeCraftingReservationDrag;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    const targetRow = document.elementFromPoint(event.clientX, event.clientY)?.closest('.crafting-reservation-row');
+    const reservations = readCraftingReservations();
+    const targetIndex = reservations.findIndex(reservation => reservation.id === targetRow?.dataset.reservationId);
+    if (targetIndex >= 0) moveCraftingReservation(drag.reservationId, targetIndex);
+    clearCraftingReservationDrag();
+});
+
+craftingReservationList?.addEventListener('pointercancel', clearCraftingReservationDrag);
+craftingReservationList?.addEventListener('keydown', event => {
+    const handle = event.target.closest('.crafting-reservation-grip');
+    if (!handle || !['ArrowUp', 'ArrowDown'].includes(event.key)) return;
+    const reservations = readCraftingReservations();
+    const sourceIndex = reservations.findIndex(reservation => reservation.id === handle.dataset.reservationHandle);
+    if (sourceIndex < 0) return;
+    event.preventDefault();
+    const targetIndex = sourceIndex + (event.key === 'ArrowUp' ? -1 : 1);
+    if (moveCraftingReservation(handle.dataset.reservationHandle, targetIndex)) {
+        [...craftingReservationList.querySelectorAll('.crafting-reservation-grip')]
+            .find(button => button.dataset.reservationHandle === handle.dataset.reservationHandle)?.focus();
+    }
+});
+
 document.addEventListener('pointerdown', event => {
     const picker = document.getElementById('building-storage-item-picker');
     const automatonPicker = document.getElementById('automaton-item-picker');
@@ -8798,6 +9081,11 @@ document.addEventListener('pointerdown', event => {
 
 document.addEventListener('pointerup', (event) => {
     const target = event.target;
+    const craftingReservationModal = document.getElementById('crafting-reservation-modal');
+    if (craftingReservationModal && !craftingReservationModal.hidden) {
+        if (target === craftingReservationModal) closeCraftingReservations();
+        return;
+    }
     const recipeDetailModal = document.getElementById('recipe-detail-modal');
     if (recipeDetailModal && !recipeDetailModal.hidden) return;
 
@@ -8821,6 +9109,12 @@ document.addEventListener('pointerup', (event) => {
 
 window.addEventListener('keydown', (event) => {
     if (event.key !== 'Escape') return;
+    const craftingReservationModal = document.getElementById('crafting-reservation-modal');
+    if (craftingReservationModal && !craftingReservationModal.hidden) {
+        closeCraftingReservations();
+        event.preventDefault();
+        return;
+    }
     const discardModal = document.getElementById('inventory-discard-confirm-modal');
     if (discardModal && !discardModal.hidden) {
         cancelInventoryDiscard();
@@ -8900,6 +9194,7 @@ engineTickIntervalId = window.setInterval(() => {
     if (!craftingWorldReady) return;
     advancePoweredCraftingJobs();
     engineRuntimeState.tick();
+    processCraftingReservations();
 }, 16);
 buildingUtilityIntervalId = window.setInterval(updateBuildingUtilityNetworks, 1000);
 buildingSoundIntervalId = window.setInterval(updateBuildingSoundscapeForWorld, 400);
