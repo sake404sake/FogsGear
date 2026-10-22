@@ -950,7 +950,8 @@ function readCraftingReservations() {
         return reservations.filter(reservation => isRecord(reservation)
             && typeof reservation.id === 'string'
             && typeof reservation.buildingInstanceId === 'string'
-            && Number.isInteger(reservation.recipeIndex)
+            && ((Number.isInteger(reservation.recipeIndex) && reservation.recipeIndex >= 0)
+                || (reservation.recipeIndex === -1 && typeof reservation.buildingId === 'string' && BUILDING_BY_ID.has(reservation.buildingId)))
             && Number.isInteger(reservation.quantity)
             && reservation.quantity > 0);
     } catch (error) {
@@ -1012,9 +1013,14 @@ function validateSaveBackupValue(key, value) {
     } else if (key === CRAFTING_RESERVATIONS_KEY) {
         if (!Array.isArray(parsed) || parsed.some(reservation => !isRecord(reservation)
             || typeof reservation.id !== 'string' || !reservation.id
-            || typeof reservation.buildingInstanceId !== 'string' || !reservation.buildingInstanceId
-            || !Number.isInteger(reservation.recipeIndex) || reservation.recipeIndex < 0
-            || reservation.recipeIndex >= CRAFTING_RECIPES.length
+            || typeof reservation.buildingInstanceId !== 'string'
+            || (!Number.isInteger(reservation.recipeIndex)
+                || reservation.recipeIndex < -1
+                || (reservation.recipeIndex === -1
+                    ? (typeof reservation.buildingId !== 'string' || !BUILDING_BY_ID.has(reservation.buildingId))
+                    : (reservation.recipeIndex >= CRAFTING_RECIPES.length
+                        || (!reservation.buildingInstanceId && CRAFTING_RECIPES[reservation.recipeIndex]?.[4] !== HANDCRAFT_STATION)
+                        || (reservation.buildingInstanceId && CRAFTING_RECIPES[reservation.recipeIndex]?.[4] === HANDCRAFT_STATION))))
             || !Number.isInteger(reservation.quantity) || reservation.quantity < 1 || reservation.quantity > 99
             || !Number.isFinite(Number(reservation.queuedAt)))) {
             throw new Error('製作予約データが不正です。');
@@ -2433,23 +2439,43 @@ function renderBuildingInventory() {
         createButton.textContent = `製作 ×${selectedCount}`;
         createButton.disabled = !stationAvailable || !affordable;
         footer.append(cost, quantityControl, availableCount, createButton);
+        const reservationControls = document.createElement('div');
+        reservationControls.className = 'crafting-reservation-controls';
+        const reservationLabel = document.createElement('label');
+        reservationLabel.className = 'crafting-reservation-quantity';
+        reservationLabel.append(document.createTextNode('予約数'));
+        const reservationInput = document.createElement('input');
+        reservationInput.type = 'number';
+        reservationInput.min = '1';
+        reservationInput.max = '99';
+        reservationInput.step = '1';
+        reservationInput.value = '1';
+        reservationInput.setAttribute('aria-label', `${building.name}の製作予約数`);
+        reservationLabel.appendChild(reservationInput);
+        const reservationButton = document.createElement('button');
+        reservationButton.type = 'button';
+        reservationButton.dataset.action = 'add-building-crafting-reservation';
+        reservationButton.dataset.buildingId = building.id;
+        reservationButton.textContent = '予約';
+        reservationControls.append(reservationLabel, reservationButton);
+        footer.appendChild(reservationControls);
         card.append(heading, outputBlock, footer, materialsBlock);
         list.appendChild(card);
     });
 }
 
-function craftBuildingKit(buildingId, requestedCount) {
+function craftBuildingKit(buildingId, requestedCount, { quiet = false } = {}) {
     const building = BUILDING_BY_ID.get(buildingId);
-    if (!building || !engineRuntimeState) return;
+    if (!building || !engineRuntimeState) return false;
     const requiresStation = isLargeBuilding(building) && building.id !== 'craft-bench';
     if (requiresStation && !hasBuildingConstructionStation()) {
-        showAppNotice('2×2以上の建築には作業台以上の設備が必要です。');
-        return;
+        if (!quiet) showAppNotice('2×2以上の建築には作業台以上の設備が必要です。');
+        return false;
     }
     const missingRequirements = getMissingBuildingRequirements(building);
     if (missingRequirements.length) {
-        showAppNotice(`建設条件を満たしていません。必要設備: ${missingRequirements.map(id => BUILDING_BY_ID.get(id)?.name || id).join('・')}`);
-        return;
+        if (!quiet) showAppNotice(`建設条件を満たしていません。必要設備: ${missingRequirements.map(id => BUILDING_BY_ID.get(id)?.name || id).join('・')}`);
+        return false;
     }
     const creative = Boolean(engineRuntimeState.creativeMode);
     const materialCosts = getBuildingMaterialCosts(building);
@@ -2461,16 +2487,16 @@ function craftBuildingKit(buildingId, requestedCount) {
             .filter(([itemId, amount]) => getCraftingItemCount(itemId) < amount)
             .map(([itemId]) => getCraftingItemName(itemId));
         const missingCost = [...(missingBrass ? ['真鍮'] : []), ...missingMaterials].join('・');
-        showAppNotice(maxCraftCount > 0 ? `製作数は1〜${maxCraftCount}個で指定してください。` : `建築キットの製作に必要な${missingCost || '素材'}が足りません。`);
-        return;
+        if (!quiet) showAppNotice(maxCraftCount > 0 ? `製作数は1〜${maxCraftCount}個で指定してください。` : `建築キットの製作に必要な${missingCost || '素材'}が足りません。`);
+        return false;
     }
     if (!canAddInventoryItems(Array(quantity).fill(building.id))) {
-        notifyInventoryFull();
-        return;
+        if (!quiet) notifyInventoryFull();
+        return false;
     }
     if (!creative && getCraftingItemCount('brass-stock') < building.brassCost * quantity) {
-        showAppNotice('建築キットの製作に必要な真鍮が足りません。');
-        return;
+        if (!quiet) showAppNotice('建築キットの製作に必要な真鍮が足りません。');
+        return false;
     }
     if (!creative) {
         engineRuntimeState.brass = Math.max(0, Number(engineRuntimeState.brass) - building.brassCost * quantity);
@@ -2508,6 +2534,7 @@ function craftBuildingKit(buildingId, requestedCount) {
     updateEngineDashboard();
     buildingRenderSignature = '';
     renderBuildingInventory();
+    return true;
 }
 
 function saveBuildings() {
@@ -2871,9 +2898,12 @@ function renderCraftingReservations() {
     const buildings = new Map(state.buildings.map(building => [building.instanceId, building]));
     let reservations = readCraftingReservations();
     const validReservations = reservations.filter(reservation => {
+        if (reservation.recipeIndex === -1) return BUILDING_BY_ID.has(reservation.buildingId);
         const building = buildings.get(reservation.buildingInstanceId);
         const recipe = CRAFTING_RECIPES[reservation.recipeIndex];
-        return building && getCraftingRecipeForBuilding(recipe, building.id);
+        if (!reservation.buildingInstanceId) return recipe?.[4] === HANDCRAFT_STATION;
+        return Boolean(building && recipe?.[4] !== HANDCRAFT_STATION
+            && getCraftingRecipesForBuilding(building.id).some(entry => entry.index === reservation.recipeIndex));
     });
     if (validReservations.length !== reservations.length) {
         reservations = validReservations;
@@ -2883,7 +2913,7 @@ function renderCraftingReservations() {
     const itemCount = document.querySelector('.inventory-item-count[data-item-key="crafting_reservations"]');
     if (itemCount) itemCount.textContent = String(reservations.length);
     const signature = JSON.stringify(reservations.map(reservation => [
-        reservation.id, reservation.buildingInstanceId, reservation.recipeIndex,
+        reservation.id, reservation.buildingInstanceId, reservation.recipeIndex, reservation.buildingId,
         reservation.quantity, reservation.queuedAt,
         buildings.get(reservation.buildingInstanceId)?.customName || ''
     ]));
@@ -2898,8 +2928,41 @@ function renderCraftingReservations() {
         return;
     }
     reservations.forEach((reservation, index) => {
+        if (reservation.recipeIndex === -1) {
+            const building = BUILDING_BY_ID.get(reservation.buildingId);
+            const row = document.createElement('article');
+            row.className = 'crafting-reservation-row';
+            row.dataset.reservationId = reservation.id;
+            const grip = document.createElement('button');
+            grip.type = 'button';
+            grip.className = 'crafting-reservation-grip';
+            grip.dataset.reservationHandle = reservation.id;
+            grip.setAttribute('aria-label', `${building.name}の製作予約の優先度。ドラッグまたは上下矢印で並べ替え`);
+            grip.title = 'つまんで優先順を変更';
+            grip.textContent = '⋮⋮';
+            const copy = document.createElement('div');
+            copy.className = 'crafting-reservation-copy';
+            const title = document.createElement('strong');
+            title.textContent = building.name;
+            const detail = document.createElement('span');
+            detail.textContent = `建築キット / ${reservation.quantity}個`;
+            copy.append(title, detail);
+            const remove = document.createElement('button');
+            remove.type = 'button';
+            remove.className = 'crafting-reservation-delete';
+            remove.dataset.action = 'delete-crafting-reservation';
+            remove.dataset.reservationId = reservation.id;
+            remove.setAttribute('aria-label', `${building.name}の製作予約を削除`);
+            remove.title = '予約を削除';
+            remove.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7h16M9 7V4h6v3m3 0-.8 13H6.8L6 7m4 3v7m4-7v7" /></svg>';
+            row.append(grip, copy, remove);
+            list.appendChild(row);
+            return;
+        }
         const building = buildings.get(reservation.buildingInstanceId);
-        const recipe = getCraftingRecipeForBuilding(CRAFTING_RECIPES[reservation.recipeIndex], building.id);
+        const baseRecipe = CRAFTING_RECIPES[reservation.recipeIndex];
+        const recipe = getCraftingRecipeForBuilding(baseRecipe, building?.id);
+        if (!recipe) return;
         const row = document.createElement('article');
         row.className = 'crafting-reservation-row';
         row.dataset.reservationId = reservation.id;
@@ -2916,8 +2979,8 @@ function renderCraftingReservations() {
         const title = document.createElement('strong');
         title.textContent = getCraftingRecipeDisplayName(recipe[1]);
         const detail = document.createElement('span');
-        const buildingDefinition = BUILDING_BY_ID.get(building.id);
-        const buildingName = building.customName || buildingDefinition?.name || '設備';
+        const buildingDefinition = BUILDING_BY_ID.get(building?.id);
+        const buildingName = building?.customName || buildingDefinition?.name || '手作業';
         const outputAmount = Math.max(1, Number(recipe[6]) || 1) * reservation.quantity;
         detail.textContent = `${buildingName} / ${reservation.quantity}回分・${outputAmount}個`;
         copy.append(title, detail);
@@ -2948,17 +3011,33 @@ function closeCraftingReservations() {
 
 function addCraftingReservation(recipeIndex, buildingInstanceId, quantity) {
     const building = state.buildings.find(item => item.instanceId === buildingInstanceId);
-    const recipe = getCraftingRecipeForBuilding(CRAFTING_RECIPES[recipeIndex], building?.id);
-    if (!building || !recipe || recipe[4] === HANDCRAFT_STATION) return false;
+    const baseRecipe = CRAFTING_RECIPES[recipeIndex];
+    const recipe = getCraftingRecipeForBuilding(baseRecipe, building?.id);
+    const isHandcraft = baseRecipe?.[4] === HANDCRAFT_STATION;
+    if ((!isHandcraft && (!building || !recipe)) || (isHandcraft && buildingInstanceId)) return false;
     if (!Number.isInteger(quantity) || quantity < 1 || quantity > 99) return false;
     const reservationId = globalThis.crypto?.randomUUID?.()
         || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
     const reservations = readCraftingReservations();
-    reservations.push({ id: reservationId, buildingInstanceId, recipeIndex, quantity, queuedAt: Date.now() });
+    reservations.push({ id: reservationId, buildingInstanceId: buildingInstanceId || '', recipeIndex, quantity, queuedAt: Date.now() });
     saveCraftingReservations(reservations);
     craftingReservationRenderSignature = '';
     renderCraftingReservations();
     showAppNotice(`${getCraftingRecipeDisplayName(recipe[1])}を${quantity}回分予約しました。`);
+    processCraftingReservations(Date.now(), true);
+    return true;
+}
+
+function addBuildingCraftingReservation(buildingId, quantity) {
+    if (!BUILDING_BY_ID.has(buildingId) || !Number.isInteger(quantity) || quantity < 1 || quantity > 99) return false;
+    const reservationId = globalThis.crypto?.randomUUID?.()
+        || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const reservations = readCraftingReservations();
+    reservations.push({ id: reservationId, buildingInstanceId: '', recipeIndex: -1, buildingId, quantity, queuedAt: Date.now() });
+    saveCraftingReservations(reservations);
+    craftingReservationRenderSignature = '';
+    renderCraftingReservations();
+    showAppNotice(`${BUILDING_BY_ID.get(buildingId).name}を${quantity}個予約しました。`);
     processCraftingReservations(Date.now(), true);
     return true;
 }
@@ -3004,9 +3083,31 @@ function processCraftingReservations(now = Date.now(), force = false) {
     let changed = false;
     for (let index = reservations.length - 1; index >= 0; index--) {
         const reservation = reservations[index];
+        if (reservation.recipeIndex === -1) {
+            const building = BUILDING_BY_ID.get(reservation.buildingId);
+            if (!building) {
+                reservations.splice(index, 1);
+                changed = true;
+                continue;
+            }
+            const missingRequirements = getMissingBuildingRequirements(building);
+            const requiresStation = isLargeBuilding(building) && building.id !== 'craft-bench';
+            if (requiresStation && !hasBuildingConstructionStation() || missingRequirements.length) continue;
+            const maxCraftCount = getMaximumBuildingKitCraftCount(building, Boolean(engineRuntimeState.creativeMode));
+            const startQuantity = Math.min(reservation.quantity, maxCraftCount);
+            if (startQuantity < 1 || !craftBuildingKit(building.id, startQuantity, { quiet: true })) continue;
+            reservation.quantity -= startQuantity;
+            changed = true;
+            if (reservation.quantity < 1) {
+                reservations.splice(index, 1);
+                index--;
+            }
+            continue;
+        }
         const building = state.buildings.find(item => item.instanceId === reservation.buildingInstanceId);
         const baseRecipe = CRAFTING_RECIPES[reservation.recipeIndex];
-        if (!building || !baseRecipe || !getCraftingRecipeForBuilding(baseRecipe, building.id)) {
+        const validHandcraft = !reservation.buildingInstanceId && baseRecipe?.[4] === HANDCRAFT_STATION;
+        if (!baseRecipe || (!validHandcraft && (!building || !getCraftingRecipeForBuilding(baseRecipe, building.id)))) {
             reservations.splice(index, 1);
             changed = true;
         }
@@ -3016,13 +3117,14 @@ function processCraftingReservations(now = Date.now(), force = false) {
         const reservation = reservations[index];
         const building = state.buildings.find(item => item.instanceId === reservation.buildingInstanceId);
         const recipe = getCraftingRecipeForBuilding(CRAFTING_RECIPES[reservation.recipeIndex], building?.id);
-        if (!building || !recipe || !hasAssignedCraftingScroll(building)
+        const isHandcraft = !reservation.buildingInstanceId && recipe?.[4] === HANDCRAFT_STATION;
+        if (!recipe || (!isHandcraft && (!building || !hasAssignedCraftingScroll(building)
             || !isBuildingScrollRunning(building, runningScrollIds)
-            || !engineRuntimeState.creativeMode && Number(engineRuntimeState.power) <= 0) continue;
+            || !engineRuntimeState.creativeMode && Number(engineRuntimeState.power) <= 0))) continue;
         let startQuantity = Math.min(reservation.quantity, getMaximumCraftCount(recipe[2]));
         const outputMultiplier = Math.max(1, Number(recipe[6]) || 1);
         while (startQuantity > 0 && !canAddInventoryItems(Array(startQuantity * outputMultiplier).fill(recipe[3]))) startQuantity--;
-        if (startQuantity < 1 || !craftRecipe(reservation.recipeIndex, building.instanceId, startQuantity, { quiet: true })) continue;
+        if (startQuantity < 1 || !craftRecipe(reservation.recipeIndex, building?.instanceId || '', startQuantity, { quiet: true })) continue;
         reservation.quantity -= startQuantity;
         changed = true;
         if (reservation.quantity < 1) {
@@ -3251,7 +3353,7 @@ function createCraftingRecipeCard(recipe, index, now, buildingInstanceId = '') {
     craftButton.textContent = `製作 ×${batch * selectedCount}`;
     craftButton.disabled = maxCraftCount === 0;
     footer.append(stationLabel, quantityControl, availableCount, craftButton);
-    if (buildingInstanceId) {
+    if (buildingInstanceId || station === HANDCRAFT_STATION) {
         const reservationControls = document.createElement('div');
         reservationControls.className = 'crafting-reservation-controls';
         const reservationLabel = document.createElement('label');
@@ -3269,7 +3371,7 @@ function createCraftingRecipeCard(recipe, index, now, buildingInstanceId = '') {
         reservationButton.type = 'button';
         reservationButton.dataset.action = 'add-crafting-reservation';
         reservationButton.dataset.recipeIndex = String(index);
-        reservationButton.dataset.buildingInstanceId = buildingInstanceId;
+        if (buildingInstanceId) reservationButton.dataset.buildingInstanceId = buildingInstanceId;
         reservationButton.textContent = '予約';
         reservationControls.append(reservationLabel, reservationButton);
         footer.appendChild(reservationControls);
@@ -4389,7 +4491,7 @@ function updateBuildingPlacementControls() {
     }
 }
 
-function drawPlacedBuildings(startCol, endCol, startRow, endRow, now) {
+function drawPlacedBuildings(startCol, endCol, startRow, endRow, now, foundationPass = null) {
     const drawOrder = { foundation: 0, decoration: 1, rail: 2, structure: 3, vehicle: 4 };
     if (buildingDrawOrderCacheRevision !== buildingNavigationRevision) {
         orderedBuildingDrawCache = [...state.buildings].sort((left, right) => {
@@ -4408,6 +4510,7 @@ function drawPlacedBuildings(startCol, endCol, startRow, endRow, now) {
     orderedBuildingDrawCache.forEach(placed => {
         const building = BUILDING_BY_ID.get(placed.id);
         if (!building) return;
+        if (foundationPass !== null && (building.role === 'foundation') !== foundationPass) return;
         const activeVehicle = building.role === 'vehicle' && (placed.vehicle?.running || placed.vehicle?.movement);
         if (activeVehicle) return;
         const vehicleRender = building.role === 'vehicle' ? getVehicleRenderState(placed, now) : null;
@@ -4639,7 +4742,7 @@ function isBuildingScrollRunning(building, activeScrollIds) {
     return hasRunningCraftingScroll(building);
 }
 
-function drawScrollAlchemyCircles(context, now) {
+function drawScrollAlchemyCircles(context, now, runningState) {
     const activeScrollIds = new Set(getActiveScrollIds());
     const scrollBuildings = state.buildings.filter(building => Boolean(getBuildingScrollId(building)));
     let hasRunningCircle = false;
@@ -4652,26 +4755,36 @@ function drawScrollAlchemyCircles(context, now) {
         const definition = BUILDING_BY_ID.get(building.id);
         if (!definition) return;
         const running = isBuildingScrollRunning(building, activeScrollIds);
+        if (running !== runningState) return;
         hasRunningCircle ||= running;
         const worldCenterX = (building.x + definition.width / 2) * state.tileSize;
         const worldCenterY = (building.y + definition.height / 2) * state.tileSize;
-        const radius = state.tileSize * Math.max(definition.width, definition.height) * .62;
+        const isAutomaton = building.id === 'field-automaton';
+        const influenceRange = isAutomaton
+            ? 0
+            : supportsStationaryScrolls(building)
+            ? getNearbyScrollStorageTargets(building).reduce((range, target) => Math.max(range, target.definition.collectionImportRange), 0)
+            : Number(definition.scrollAlchemyRange) || 0;
+        const footprintRadius = isAutomaton
+            ? 0.5
+            : Math.hypot(definition.width, definition.height) / 2;
+        const radius = state.tileSize * (footprintRadius + influenceRange + (isAutomaton ? 0 : 0.12));
         if (worldCenterX + radius < viewLeft || worldCenterX - radius > viewLeft + viewW
             || worldCenterY + radius < viewTop || worldCenterY - radius > viewTop + viewH) return;
         const angle = running ? now / 18000 * Math.PI * 2 : 0;
-        const alpha = running ? 0.7 : 0.42;
+        const alpha = running ? 0.92 : 0.94;
         context.save();
         context.translate(worldCenterX, worldCenterY);
         context.globalAlpha = alpha;
-        context.strokeStyle = running ? '#8ef5d9' : '#b7875a';
-        context.fillStyle = running ? '#8ef5d9' : '#b7875a';
-        context.lineWidth = running ? 1.8 / zoom : 1.5 / zoom;
+        context.strokeStyle = running ? '#8ef5d9' : '#f0b66d';
+        context.fillStyle = running ? '#8ef5d9' : '#f0b66d';
+        context.lineWidth = running ? 2 / zoom : 1.8 / zoom;
         if (running) {
             context.shadowColor = 'rgba(98, 220, 190, .55)';
             context.shadowBlur = 3 / zoom;
         } else {
-            context.shadowColor = 'rgba(183, 135, 90, .35)';
-            context.shadowBlur = 2 / zoom;
+            context.shadowColor = 'rgba(240, 182, 109, .5)';
+            context.shadowBlur = 3 / zoom;
         }
         context.beginPath();
         context.arc(0, 0, radius * .96, 0, Math.PI * 2);
@@ -4833,8 +4946,9 @@ function draw() {
     drawTerrainChunks(startCol, endCol, startRow, endRow);
 
     drawGridOverlay(startCol, endCol, startRow, endRow);
-    const hasRunningScrollAlchemyCircle = drawScrollAlchemyCircles(ctx, now);
-    drawPlacedBuildings(startCol, endCol, startRow, endRow, now);
+    drawPlacedBuildings(startCol, endCol, startRow, endRow, now, true);
+    drawScrollAlchemyCircles(ctx, now, false);
+    drawPlacedBuildings(startCol, endCol, startRow, endRow, now, false);
     drawBuildingGhost();
     drawTerritoryOverlay(startCol, endCol, startRow, endRow);
     drawTargetCellHighlights(left, top, viewW, viewH);
@@ -4862,6 +4976,7 @@ function draw() {
         ctx.restore();
     });
 
+    const hasRunningScrollAlchemyCircle = drawScrollAlchemyCircles(ctx, now, true);
     ctx.restore();
     if (hasRunningScrollAlchemyCircle) requestAnimationFrame(scheduleDraw);
     const hasActiveVehicle = state.buildings.some(placed => placed.vehicle?.running || placed.vehicle?.movement);
@@ -8281,6 +8396,16 @@ document.addEventListener('click', (event) => {
         const selectedQuantity = button.closest('.building-item-card')?.querySelector('.crafting-quantity-option[aria-pressed="true"]');
         const quantity = selectedQuantity?.dataset.isMaximum === 'true' ? 'max' : selectedQuantity?.dataset.quantity;
         craftBuildingKit(button.dataset.buildingId, quantity);
+        return;
+    }
+    if (button.dataset.action === 'add-building-crafting-reservation') {
+        const card = button.closest('.building-item-card');
+        const quantity = Math.floor(Number(card?.querySelector('.crafting-reservation-quantity input')?.value));
+        if (!Number.isInteger(quantity) || quantity < 1 || quantity > 99) {
+            showAppNotice('予約数は1〜99個で指定してください。');
+            return;
+        }
+        addBuildingCraftingReservation(button.dataset.buildingId, quantity);
         return;
     }
     if (button.dataset.action === 'place-building-from-inventory') {
